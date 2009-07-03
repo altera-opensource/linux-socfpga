@@ -6559,7 +6559,9 @@ static int page_alloc_cpu_notify(struct notifier_block *self,
 	int cpu = (unsigned long)hcpu;
 
 	if (action == CPU_DEAD || action == CPU_DEAD_FROZEN) {
+		local_lock_irq_on(swapvec_lock, cpu);
 		lru_add_drain_cpu(cpu);
+		local_unlock_irq_on(swapvec_lock, cpu);
 		drain_pages(cpu);
 
 		/*
