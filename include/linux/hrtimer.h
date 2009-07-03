@@ -87,6 +87,8 @@ enum hrtimer_restart {
  * @function:	timer expiry callback function
  * @base:	pointer to the timer base (per cpu and per clock)
  * @state:	state information (See bit values above)
+ * @cb_entry:	list entry to defer timers from hardirq context
+ * @irqsafe:	timer can run in hardirq context
  * @praecox:	timer expiry time if expired at the time of programming
  * @is_rel:	Set if the timer was armed relative
  * @start_pid:  timer statistics field to store the pid of the task which
@@ -104,6 +106,8 @@ struct hrtimer {
 	enum hrtimer_restart		(*function)(struct hrtimer *);
 	struct hrtimer_clock_base	*base;
 	u8				state;
+	struct list_head		cb_entry;
+	int				irqsafe;
 #ifdef CONFIG_MISSED_TIMER_OFFSETS_HIST
 	ktime_t				praecox;
 #endif
@@ -136,6 +140,7 @@ struct hrtimer_sleeper {
  *			timer to a base on another cpu.
  * @clockid:		clock id for per_cpu support
  * @active:		red black tree root node for the active timers
+ * @expired:		list head for deferred timers.
  * @get_time:		function to retrieve the current time of the clock
  * @offset:		offset of this clock to the monotonic base
  */
@@ -144,6 +149,7 @@ struct hrtimer_clock_base {
 	int			index;
 	clockid_t		clockid;
 	struct timerqueue_head	active;
+	struct list_head	expired;
 	ktime_t			(*get_time)(void);
 	ktime_t			offset;
 } __attribute__((__aligned__(HRTIMER_CLOCK_BASE_ALIGN)));
@@ -187,6 +193,7 @@ struct hrtimer_cpu_base {
 	raw_spinlock_t			lock;
 	seqcount_t			seq;
 	struct hrtimer			*running;
+	struct hrtimer			*running_soft;
 	unsigned int			cpu;
 	unsigned int			active_bases;
 	unsigned int			clock_was_set_seq;
