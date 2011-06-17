@@ -1520,6 +1520,12 @@ struct task_struct {
 #endif
 
 	unsigned int policy;
+#ifdef CONFIG_PREEMPT_RT_FULL
+	int migrate_disable;
+# ifdef CONFIG_SCHED_DEBUG
+	int migrate_disable_atomic;
+# endif
+#endif
 	int nr_cpus_allowed;
 	cpumask_t cpus_allowed;
 
@@ -1989,14 +1995,6 @@ static inline struct vm_struct *task_stack_vm_area(const struct task_struct *t)
 	return NULL;
 }
 #endif
-
-/* Future-safe accessor for struct task_struct's cpus_allowed. */
-#define tsk_cpus_allowed(tsk) (&(tsk)->cpus_allowed)
-
-static inline int tsk_nr_cpus_allowed(struct task_struct *p)
-{
-	return p->nr_cpus_allowed;
-}
 
 #define TNF_MIGRATED	0x01
 #define TNF_NO_GROUP	0x02
@@ -3514,6 +3512,31 @@ static inline void set_task_cpu(struct task_struct *p, unsigned int cpu)
 }
 
 #endif /* CONFIG_SMP */
+
+static inline int __migrate_disabled(struct task_struct *p)
+{
+#ifdef CONFIG_PREEMPT_RT_FULL
+	return p->migrate_disable;
+#else
+	return 0;
+#endif
+}
+
+/* Future-safe accessor for struct task_struct's cpus_allowed. */
+static inline const struct cpumask *tsk_cpus_allowed(struct task_struct *p)
+{
+	if (__migrate_disabled(p))
+		return cpumask_of(task_cpu(p));
+
+	return &p->cpus_allowed;
+}
+
+static inline int tsk_nr_cpus_allowed(struct task_struct *p)
+{
+	if (__migrate_disabled(p))
+		return 1;
+	return p->nr_cpus_allowed;
+}
 
 extern long sched_setaffinity(pid_t pid, const struct cpumask *new_mask);
 extern long sched_getaffinity(pid_t pid, struct cpumask *mask);

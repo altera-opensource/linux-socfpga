@@ -1100,6 +1100,11 @@ void do_set_cpus_allowed(struct task_struct *p, const struct cpumask *new_mask)
 
 	lockdep_assert_held(&p->pi_lock);
 
+	if (__migrate_disabled(p)) {
+		cpumask_copy(&p->cpus_allowed, new_mask);
+		return;
+	}
+
 	queued = task_on_rq_queued(p);
 	running = task_current(rq, p);
 
@@ -1179,7 +1184,7 @@ static int __set_cpus_allowed_ptr(struct task_struct *p,
 	}
 
 	/* Can the task run on the task's current CPU? If so, we're done */
-	if (cpumask_test_cpu(task_cpu(p), new_mask))
+	if (cpumask_test_cpu(task_cpu(p), new_mask) || __migrate_disabled(p))
 		goto out;
 
 	dest_cpu = cpumask_any_and(cpu_valid_mask, new_mask);
@@ -3251,6 +3256,69 @@ static inline void schedule_debug(struct task_struct *prev)
 
 	schedstat_inc(this_rq()->sched_count);
 }
+
+#if defined(CONFIG_PREEMPT_RT_FULL) && defined(CONFIG_SMP)
+
+void migrate_disable(void)
+{
+	struct task_struct *p = current;
+
+	if (in_atomic()) {
+#ifdef CONFIG_SCHED_DEBUG
+		p->migrate_disable_atomic++;
+#endif
+		return;
+	}
+
+#ifdef CONFIG_SCHED_DEBUG
+	WARN_ON_ONCE(p->migrate_disable_atomic);
+#endif
+
+	if (p->migrate_disable) {
+		p->migrate_disable++;
+		return;
+	}
+
+	preempt_disable();
+	pin_current_cpu();
+	p->migrate_disable = 1;
+	preempt_enable();
+}
+EXPORT_SYMBOL(migrate_disable);
+
+void migrate_enable(void)
+{
+	struct task_struct *p = current;
+
+	if (in_atomic()) {
+#ifdef CONFIG_SCHED_DEBUG
+		p->migrate_disable_atomic--;
+#endif
+		return;
+	}
+
+#ifdef CONFIG_SCHED_DEBUG
+	WARN_ON_ONCE(p->migrate_disable_atomic);
+#endif
+	WARN_ON_ONCE(p->migrate_disable <= 0);
+
+	if (p->migrate_disable > 1) {
+		p->migrate_disable--;
+		return;
+	}
+
+	preempt_disable();
+	/*
+	 * Clearing migrate_disable causes tsk_cpus_allowed to
+	 * show the tasks original cpu affinity.
+	 */
+	p->migrate_disable = 0;
+
+	unpin_current_cpu();
+	preempt_enable();
+}
+EXPORT_SYMBOL(migrate_enable);
+#endif
 
 /*
  * Pick up the highest-prio task:
