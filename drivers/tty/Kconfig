@@ -174,6 +174,12 @@ config LDISC_AUTOLOAD
 
 source "drivers/tty/serial/Kconfig"
 
+config NEWHAVEN_LCD
+       tristate "NEWHAVEN LCD"
+       depends on I2C
+       help
+         Add support for a TTY device on a Newhaven I2C LCD device.
+
 config SERIAL_NONSTANDARD
 	bool "Non-standard serial port support"
 	depends on HAS_IOMEM
