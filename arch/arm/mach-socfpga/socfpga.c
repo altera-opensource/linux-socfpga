@@ -33,6 +33,12 @@ void __iomem *sdr_ctl_base_addr;
 unsigned long socfpga_cpu1start_addr;
 void __iomem *clkmgr_base_addr;
 
+static void __init enable_periphs(void)
+{
+	/* Release all peripherals from reset.*/
+	__raw_writel(0, rst_manager_base_addr + SOCFPGA_RSTMGR_MODPERRST);
+}
+
 void __init socfpga_sysmgr_init(void)
 {
 	struct device_node *np;
