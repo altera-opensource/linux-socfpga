@@ -436,6 +436,12 @@ config DW_XDATA_PCIE
 
 	  If unsure, say N.
 
+config ALTERA_HWMUTEX
+	tristate "Altera Hardware Mutex"
+	help
+	  This option enables device driver support for Altera Hardware Mutex.
+	  Say Y here if you want to use the Altera hardware mutex support.
+
 config PCI_ENDPOINT_TEST
 	depends on PCI
 	select CRC32
