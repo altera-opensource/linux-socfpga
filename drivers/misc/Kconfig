@@ -503,6 +503,11 @@ config VCPU_STALL_DETECTOR
 
 	  If you do not intend to run this kernel as a guest, say N.
 
+config ALTERA_SYSID
+	tristate "Altera System ID"
+	help
+	  This enables Altera System ID soft core driver.
+
 source "drivers/misc/c2port/Kconfig"
 source "drivers/misc/eeprom/Kconfig"
 source "drivers/misc/cb710/Kconfig"
