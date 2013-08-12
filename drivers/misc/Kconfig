@@ -476,12 +476,6 @@ config SRAM
 config SRAM_EXEC
 	bool
 
-config ALTERA_HWMUTEX
-	tristate "Altera Hardware Mutex"
-	help
-	  This option enables device driver support for Altera Hardware Mutex.
-	  Say Y here if you want to use the Altera hardware mutex support.
-
 config VEXPRESS_SYSCFG
 	bool "Versatile Express System Configuration driver"
 	depends on VEXPRESS_CONFIG
@@ -526,6 +520,11 @@ config PVPANIC
 	  This driver provides support for the pvpanic device.  pvpanic is
 	  a paravirtualized device provided by QEMU; it lets a virtual machine
 	  (guest) communicate panic events to the host.
+
+config ALTERA_SYSID
+	tristate "Altera System ID"
+	help
+	This enables Altera System ID soft core driver.
 
 source "drivers/misc/c2port/Kconfig"
 source "drivers/misc/eeprom/Kconfig"
