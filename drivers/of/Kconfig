@@ -117,6 +117,14 @@ config OF_OVERLAY_KUNIT_TEST
 
 	  If unsure, say N here, but this option is safe to enable.
 
+config OF_CONFIGFS
+	bool "Device Tree Overlay ConfigFS interface"
+	select CONFIGFS_FS
+	select OF_FLATTREE
+	depends on OF_OVERLAY
+	help
+	  Enable a simple user-space driven DT overlay interface.
+
 config OF_NUMA
 	bool
 
