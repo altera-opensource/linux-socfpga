@@ -639,7 +639,7 @@
 		};
 
 		L2: l2-cache@fffef000 {
-			compatible = "arm,pl310-cache";
+			compatible = "arm,pl310-cache", "syscon";
 			reg = <0xfffef000 0x1000>;
 			interrupts = <0 38 0x04>;
 			cache-unified;
@@ -705,6 +705,13 @@
 				reg = <0x16800000 0x1000000>;
 			};
 		};
+
+
+		l2edac@xffd08140 {
+			compatible = "altr,l2-edac";
+			reg = <0xffd08140 0x4>;
+			interrupts = <0 36 1>, <0 37 1>;
+                };
 
 		qspi: spi@ff705000 {
 			compatible = "cadence,qspi";
