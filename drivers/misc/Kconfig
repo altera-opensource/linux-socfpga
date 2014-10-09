@@ -601,6 +601,12 @@ config MARVELL_CN10K_DPI
 	  To compile this driver as a module, choose M here: the module
 	  will be called mrvl_cn10k_dpi.
 
+config ALTERA_ILC
+	tristate "Altera Interrupt Latency Counter driver"
+	help
+	  This enables the Interrupt Latency Counter driver for the Altera
+	  SOCFPGA platform.
+
 source "drivers/misc/c2port/Kconfig"
 source "drivers/misc/eeprom/Kconfig"
 source "drivers/misc/cb710/Kconfig"
