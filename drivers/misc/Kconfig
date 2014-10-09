@@ -634,6 +634,11 @@ config MCHP_LAN966X_PCI
 	    - lan966x-serdes (PHY_LAN966X_SERDES)
 	    - lan966x-miim (MDIO_MSCC_MIIM)
 	    - lan966x-switch (LAN966X_SWITCH)
+config ALTERA_ILC
+	tristate "Altera Interrupt Latency Counter driver"
+	help
+	  This enables the Interrupt Latency Counter driver for the Altera
+	  SOCFPGA platform.
 
 source "drivers/misc/c2port/Kconfig"
 source "drivers/misc/eeprom/Kconfig"
