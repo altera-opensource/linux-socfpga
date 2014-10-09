@@ -42,6 +42,7 @@ obj-y				+= ti-st/
 obj-y				+= lis3lv02d/
 obj-$(CONFIG_ALTERA_STAPL)	+=altera-stapl/
 obj-$(CONFIG_ALTERA_HWMUTEX)	+= altera_hwmutex.o
+obj-$(CONFIG_ALTERA_ILC)	+= altera_ilc.o
 obj-$(CONFIG_ALTERA_SYSID)	+= altera_sysid.o
 obj-$(CONFIG_INTEL_MEI)		+= mei/
 obj-$(CONFIG_VMWARE_VMCI)	+= vmw_vmci/
