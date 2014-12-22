@@ -970,6 +970,14 @@ config GPIO_MC33880
 	  SPI driver for Freescale MC33880 high-side/low-side switch.
 	  This provides GPIO interface supporting inputs and outputs.
 
+config GPIO_A10SYCON
+	tristate "Altera Arria10 System Controller GPIO"
+	depends on ARCH_SOCFPGA
+	select MFD_A10SYCON
+	help
+	  Driver for Arria10 GPIO expansion which includes reads of
+	  pushbuttons and DIP switches as well as writes to LEDs and
+	  peripheral reset.
 endmenu
 
 menu "USB GPIO expanders"
