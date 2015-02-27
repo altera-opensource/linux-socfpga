@@ -401,12 +401,19 @@ choice
 		  The uncompressor code port configuration is now handled
 		  by CONFIG_S3C_LOWLEVEL_UART_PORT.
 
-	config DEBUG_SOCFPGA_UART
+	config DEBUG_SOCFPGA_UART0
 		depends on ARCH_SOCFPGA
-		bool "Use SOCFPGA UART for low-level debug"
+		bool "Use SOCFPGA UART0 for low-level debug"
 		help
 		  Say Y here if you want kernel low-level debugging support
-		  on SOCFPGA based platforms.
+		  on SOCFPGA(Cyclone5 or Arria5) based platforms.
+
+	config DEBUG_SOCFPGA_UART1
+		depends on ARCH_SOCFPGA
+		bool "Use SOCFPGA UART1 for low-level debug"
+		help
+		  Say Y here if you want kernel low-level debugging support
+		  on SOCFPGA(Arria10) based platforms.
 
 	config DEBUG_SUNXI_UART0
 		bool "Kernel low-level debugging messages via sunXi UART0"
@@ -640,7 +647,7 @@ config DEBUG_LL_INCLUDE
 	default "debug/pxa.S" if DEBUG_PXA_UART1 || DEBUG_MMP_UART2 || \
 				 DEBUG_MMP_UART3
 	default "debug/sirf.S" if DEBUG_SIRFPRIMA2_UART1 || DEBUG_SIRFMARCO_UART1
-	default "debug/socfpga.S" if DEBUG_SOCFPGA_UART
+	default "debug/socfpga.S" if DEBUG_SOCFPGA_UART0 || DEBUG_SOCFPGA_UART1
 	default "debug/sunxi.S" if DEBUG_SUNXI_UART0 || DEBUG_SUNXI_UART1
 	default "debug/tegra.S" if DEBUG_TEGRA_UART
 	default "debug/ux500.S" if DEBUG_UX500_UART
@@ -649,6 +656,12 @@ config DEBUG_LL_INCLUDE
 	default "debug/vt8500.S" if DEBUG_VT8500_UART0
 	default "debug/zynq.S" if DEBUG_ZYNQ_UART0 || DEBUG_ZYNQ_UART1
 	default "mach/debug-macro.S"
+
+config SOCFPGA_DEBUG_LL_UART_OFFSET
+	hex "Physical base address of debug UART"
+	default 0x2000 if DEBUG_SOCFPGA_UART0
+	default 0x2100 if DEBUG_SOCFPGA_UART1
+	depends on DEBUG_SOCFPGA_UART0 || DEBUG_SOCFPGA_UART1
 
 config DEBUG_UNCOMPRESS
 	bool

@@ -92,13 +92,6 @@ static struct map_desc scu_io_desc __initdata = {
 	.type		= MT_DEVICE,
 };
 
-static struct map_desc uart_io_desc __initdata = {
-	.virtual        = 0xfec02000,
-	.pfn            = __phys_to_pfn(0xffc02000),
-	.length         = SZ_8K,
-	.type           = MT_DEVICE,
-};
-
 static void __init socfpga_soc_device_init(void)
 {
 	struct device_node *root;
@@ -262,7 +255,6 @@ static int stmmac_plat_init(struct platform_device *pdev)
 static void __init socfpga_map_io(void)
 {
 	socfpga_scu_map_io();
-	iotable_init(&uart_io_desc, 1);
 	early_printk("Early printk initialized\n");
 }
 
