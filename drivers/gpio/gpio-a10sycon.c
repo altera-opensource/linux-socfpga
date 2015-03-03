@@ -40,9 +40,9 @@ static int a10sycon_gpio_get(struct gpio_chip *gc, unsigned nr)
 {
 	struct a10sycon_gpio *gpio = to_a10sycon_gpio(gc);
 	int ret;
+	unsigned char reg = A10SYCON_LED_RD_REG + A10SYCON_REG_OFFSET(nr);
 
-	ret = a10sycon_reg_read(gpio->a10sc,
-				A10SYCON_REG_OFFSET(nr >> 1));
+	ret = a10sycon_reg_read(gpio->a10sc, reg);
 	if (ret < 0)
 		return ret;
 
@@ -99,7 +99,6 @@ static struct gpio_chip a10sycon_gc = {
 	.set = a10sycon_gpio_set,
 	.direction_input = a10sycon_gpio_direction_input,
 	.direction_output = a10sycon_gpio_direction_output,
-	.to_irq =  a10sycon_gpio_to_irq,
 	.can_sleep = true,
 	.ngpio = 16,
 	.base = -1,
