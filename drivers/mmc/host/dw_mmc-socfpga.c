@@ -3,7 +3,7 @@
  * driver
  *
  *  Copyright (C) 2012, Samsung Electronics Co., Ltd.
- *  Copyright (C) 2013 Altera Corporation
+ *  Copyright (C) 2013,2015 Altera Corporation
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -29,6 +29,8 @@
 #define SYSMGR_SDMMC_CTRL_SET(smplsel, drvsel)\
 	((((smplsel) & 0x7) << 3) | (((drvsel) & 0x7) << 0))
 
+#define PWR_EN		0x1
+
 /* SOCFPGA implementation specific driver private data */
 struct dw_mci_socfpga_priv_data {
 	u8      ciu_div; /* card interface unit divisor */
@@ -39,8 +41,6 @@ struct dw_mci_socfpga_priv_data {
 static int dw_mci_socfpga_priv_init(struct dw_mci *host)
 {
 	struct dw_mci_socfpga_priv_data *priv;
-	struct device *dev = host->dev;
-	int pwr_en;
 
 	priv = devm_kzalloc(host->dev, sizeof(*priv), GFP_KERNEL);
 	if (!priv) {
@@ -54,14 +54,6 @@ static int dw_mci_socfpga_priv_init(struct dw_mci *host)
 		return PTR_ERR(priv->sysreg);
 	}
 	host->priv = priv;
-
-	if (of_property_read_u32(dev->of_node, "pwr-en", &pwr_en)) {
-		dev_info(dev, "couldn't determine pwr-en, assuming pwr-en = 0\n");
-		pwr_en = 0;
-	}
-
-	/* Set PWREN bit */
-	mci_writel(host, PWREN, pwr_en);
 
 	return 0;
 }
@@ -111,11 +103,44 @@ static int dw_mci_socfpga_parse_dt(struct dw_mci *host)
 	return 0;
 }
 
+static void dw_mci_socfpga_set_ios(struct dw_mci *host, struct mmc_ios *ios)
+{
+	struct device *dev = host->dev;
+	u32 regs;
+	int pwr_en;
+
+	if (of_property_read_u32(dev->of_node, "pwr-en", &pwr_en)) {
+		dev_dbg(dev, "couldn't determine pwr-en, assuming pwr-en = 1\n");
+		pwr_en = 1;
+	}
+
+	switch (ios->power_mode) {
+	case MMC_POWER_UP:
+		if (pwr_en) {
+			regs = mci_readl(host, PWREN);
+			regs |= PWR_EN;
+			/* Set PWREN bit */
+			mci_writel(host, PWREN, regs);
+		}
+		break;
+	case MMC_POWER_OFF:
+		if (pwr_en) {
+			regs = mci_readl(host, PWREN);
+			regs &= ~PWR_EN;
+			mci_writel(host, PWREN, regs);
+		}
+		break;
+	default:
+		break;
+	}
+}
+
 static const struct dw_mci_drv_data socfpga_drv_data = {
 	.init			= dw_mci_socfpga_priv_init,
 	.setup_clock		= dw_mci_socfpga_setup_clock,
 	.prepare_command	= dw_mci_socfpga_prepare_command,
 	.parse_dt		= dw_mci_socfpga_parse_dt,
+	.set_ios		= dw_mci_socfpga_set_ios,
 };
 
 static const struct of_device_id dw_mci_socfpga_match[] = {
