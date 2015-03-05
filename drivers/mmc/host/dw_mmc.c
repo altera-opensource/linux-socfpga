@@ -1151,6 +1151,7 @@ static void dw_mci_set_ios(struct mmc_host *mmc, struct mmc_ios *ios)
 {
 	struct dw_mci_slot *slot = mmc_priv(mmc);
 	const struct dw_mci_drv_data *drv_data = slot->host->drv_data;
+	struct dw_mci *host = slot->host;
 	u32 regs;
 	int ret;
 
@@ -1202,7 +1203,11 @@ static void dw_mci_set_ios(struct mmc_host *mmc, struct mmc_ios *ios)
 		set_bit(DW_MMC_CARD_NEED_INIT, &slot->flags);
 		regs = mci_readl(slot->host, PWREN);
 		regs |= (1 << slot->id);
-		mci_writel(slot->host, PWREN, regs);
+		if (host->pdata->pwr_en) {
+			regs = mci_readl(slot->host, PWREN);
+			regs |= (1 << slot->id);
+			mci_writel(slot->host, PWREN, regs);
+		}
 		break;
 	case MMC_POWER_ON:
 		if (!slot->host->vqmmc_enabled) {
@@ -1239,9 +1244,11 @@ static void dw_mci_set_ios(struct mmc_host *mmc, struct mmc_ios *ios)
 			regulator_disable(mmc->supply.vqmmc);
 		slot->host->vqmmc_enabled = false;
 
-		regs = mci_readl(slot->host, PWREN);
-		regs &= ~(1 << slot->id);
-		mci_writel(slot->host, PWREN, regs);
+		if (host->pdata->pwr_en) {
+			regs = mci_readl(slot->host, PWREN);
+			regs &= ~(1 << slot->id);
+			mci_writel(slot->host, PWREN, regs);
+		}
 		break;
 	default:
 		break;
@@ -2668,6 +2675,7 @@ static struct dw_mci_board *dw_mci_parse_dt(struct dw_mci *host)
 	const struct dw_mci_drv_data *drv_data = host->drv_data;
 	int idx, ret;
 	u32 clock_frequency;
+	int pwr_en;
 
 	pdata = devm_kzalloc(dev, sizeof(*pdata), GFP_KERNEL);
 	if (!pdata)
@@ -2703,6 +2711,11 @@ static struct dw_mci_board *dw_mci_parse_dt(struct dw_mci *host)
 
 	if (of_find_property(np, "supports-highspeed", NULL))
 		pdata->caps |= MMC_CAP_SD_HIGHSPEED | MMC_CAP_MMC_HIGHSPEED;
+
+	if (of_property_read_u32(dev->of_node, "pwr-en", &pwr_en)) {
+		dev_dbg(dev, "couldn't determine pwr-en, assuming pwr-en = 1\n");
+		pdata->pwr_en = 1;
+	}
 
 	return pdata;
 }
