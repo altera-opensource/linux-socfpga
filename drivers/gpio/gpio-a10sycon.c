@@ -83,15 +83,6 @@ static int a10sycon_gpio_direction_output(struct gpio_chip *gc,
 	return -EINVAL;
 }
 
-static int a10sycon_gpio_to_irq(struct gpio_chip *gc, u32 nr)
-{
-	struct a10sycon_gpio *gpio = to_a10sycon_gpio(gc);
-
-	nr -= A10SC_IN_VALID_RANGE_LO;
-
-	return a10sycon_map_irq(gpio->a10sc, nr);
-}
-
 static struct gpio_chip a10sycon_gc = {
 	.label = "a10sycon-gpio",
 	.owner = THIS_MODULE,
