@@ -494,6 +494,7 @@
 			compatible = "snps,designware-i2c";
 			reg = <0xffc02200 0x100>;
 			interrupts = <0 105 IRQ_TYPE_LEVEL_HIGH>;
+			clocks = <&l4_sp_clk>;
 			status = "disabled";
 		};
 
@@ -503,6 +504,7 @@
 			compatible = "snps,designware-i2c";
 			reg = <0xffc02300 0x100>;
 			interrupts = <0 106 IRQ_TYPE_LEVEL_HIGH>;
+			clocks = <&l4_sp_clk>;
 			status = "disabled";
 		};
 
@@ -512,6 +514,7 @@
 			compatible = "snps,designware-i2c";
 			reg = <0xffc02400 0x100>;
 			interrupts = <0 107 IRQ_TYPE_LEVEL_HIGH>;
+			clocks = <&l4_sp_clk>;
 			status = "disabled";
 		};
 
@@ -521,6 +524,7 @@
 			compatible = "snps,designware-i2c";
 			reg = <0xffc02500 0x100>;
 			interrupts = <0 108 IRQ_TYPE_LEVEL_HIGH>;
+			clocks = <&l4_sp_clk>;
 			status = "disabled";
 		};
 
@@ -530,6 +534,7 @@
 			compatible = "snps,designware-i2c";
 			reg = <0xffc02600 0x100>;
 			interrupts = <0 109 IRQ_TYPE_LEVEL_HIGH>;
+			clocks = <&l4_sp_clk>;
 			status = "disabled";
 		};
 
