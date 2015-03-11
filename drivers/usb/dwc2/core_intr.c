@@ -469,12 +469,13 @@ irqreturn_t dwc2_handle_common_intr(int irq, void *dev)
 	int retry_count = 8;
 	irqreturn_t retval = IRQ_HANDLED;
 
+	spin_lock(&hsotg->lock);
+
 	if (dwc2_check_core_status(hsotg) < 0) {
 		dev_warn(hsotg->dev, "Controller is disconnected\n");
 		goto out;
 	}
 
-	spin_lock(&hsotg->lock);
 irq_retry:
 	gintsts = dwc2_read_common_intr(hsotg);
 	if (gintsts & ~GINTSTS_PRTINT)
@@ -611,8 +612,8 @@ irq_retry:
 	if (gintsts & IRQ_RETRY_MASK && --retry_count > 0)
 		goto irq_retry;
 
-	spin_unlock(&hsotg->lock);
 out:
+	spin_unlock(&hsotg->lock);
 	return IRQ_RETVAL(retval);
 }
 EXPORT_SYMBOL_GPL(dwc2_handle_common_intr);
