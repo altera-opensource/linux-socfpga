@@ -29,6 +29,6 @@
 
 	slot@0 {
 		reg = <0>;
-		bus-width = <1>;
+		bus-width = <4>;
 	};
 };
