@@ -80,7 +80,13 @@ asmlinkage void do_page_fault(struct pt_regs *regs, unsigned long cause,
 	if (in_atomic() || !mm)
 		goto bad_area_nosemaphore;
 
-	down_read(&mm->mmap_sem);
+	if (!down_read_trylock(&mm->mmap_sem)) {
+		if (!user_mode(regs) && !search_exception_tables(regs->ea))
+			goto bad_area_nosemaphore;
+
+		down_read(&mm->mmap_sem);
+	}
+
 	vma = find_vma(mm, address);
 	if (!vma)
 		goto bad_area;
