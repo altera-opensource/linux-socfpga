@@ -117,9 +117,9 @@ good_area:
 			goto bad_area;
 		break;
 	case EXC_W_PROTECTION_FAULT:
-		flags = FAULT_FLAG_WRITE;
 		if (!(vma->vm_flags & VM_WRITE))
 			goto bad_area;
+		flags = FAULT_FLAG_WRITE;
 		break;
 	}
 
