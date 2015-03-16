@@ -122,7 +122,7 @@ static void __init nios2_time_init(struct device_node *timer)
 		panic("Unable to get timer clock frequency\n");
 
 	irq = irq_of_parse_and_map(timer, 0);
-	if (irq < 0)
+	if (!irq)
 		panic("Unable to parse timer irq\n");
 
 	if (setup_irq(irq, &nios2_timer_irq))
