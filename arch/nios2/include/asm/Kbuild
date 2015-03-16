@@ -1,5 +1,3 @@
-include include/asm-generic/Kbuild.asm
-
 header-y += ucontext.h
 header-y += traps.h
 
@@ -55,4 +53,5 @@ generic-y += topology.h
 generic-y += types.h
 generic-y += unaligned.h
 generic-y += user.h
+generic-y += vga.h
 generic-y += xor.h
