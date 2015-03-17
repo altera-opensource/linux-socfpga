@@ -54,7 +54,7 @@ void __init early_init_dt_add_memory_arch(u64 base, u64 size)
 
 void * __init early_init_dt_alloc_memory_arch(u64 size, u64 align)
 {
-	return __alloc_bootmem(size, align, __pa(MAX_DMA_ADDRESS));
+	return alloc_bootmem_align(size, align);
 }
 
 #ifdef CONFIG_BLK_DEV_INITRD
