@@ -180,13 +180,11 @@ ENTRY(handle_system_call)
 	ldw	r1, %lo(sys_call_table)(r1)
 	beq	r1, r0, ret_invsyscall
 
-	/* Get thread info pointer */
-	movi	r11, %lo(0xfffff000)
-	and	r11, sp, r11
-	ldw	r11, TI_FLAGS(r11)
+	/* Check if we are being traced */
+	GET_THREAD_INFO r11
+	ldw	r11,TI_FLAGS(r11)
+	BTBNZ   r11,r11,TIF_SYSCALL_TRACE,traced_system_call
 
-	/* If someone is ptrace:ing us, take the long way. */
-	BTBNZ	r11, r11, TIF_SYSCALL_TRACE, traced_system_call
 
 	/* Execute the system call */
 	callr	r1
