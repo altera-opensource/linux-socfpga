@@ -54,7 +54,7 @@ static void __init nios2_soc_device_init(void)
 	soc_dev_attr->family = "Nios II";
 
 	soc_dev = soc_device_register(soc_dev_attr);
-	if (IS_ERR_OR_NULL(soc_dev)) {
+	if (IS_ERR(soc_dev)) {
 		kfree(soc_dev_attr->soc_id);
 		kfree(soc_dev_attr->machine);
 		kfree(soc_dev_attr->revision);
