@@ -300,11 +300,7 @@ static void setup_frame(int sig, struct k_sigaction *ka,
 
 	/* Set up registers for signal handler */
 	regs->sp = (unsigned long) frame;
-	regs->r4 = (unsigned long) (current_thread_info()->exec_domain
-			&& current_thread_info()->exec_domain->signal_invmap
-			&& sig < 32
-			? current_thread_info()->exec_domain->signal_invmap[sig]
-			: sig);
+	regs->r4 = (unsigned long) sig;
 	regs->ea = (unsigned long) ka->sa.sa_handler;
 	return;
 
@@ -345,11 +341,7 @@ static void setup_rt_frame(int sig, struct k_sigaction *ka, siginfo_t *info,
 
 	/* Set up registers for signal handler */
 	regs->sp = (unsigned long) frame;
-	regs->r4 = (unsigned long) (current_thread_info()->exec_domain
-			&& current_thread_info()->exec_domain->signal_invmap
-			&& sig < 32
-			? current_thread_info()->exec_domain->signal_invmap[sig]
-			: sig);
+	regs->r4 = (unsigned long) sig;
 	regs->r5 = (unsigned long) &frame->info;
 	regs->r6 = (unsigned long) &frame->uc;
 	regs->ea = (unsigned long) ka->sa.sa_handler;
@@ -405,11 +397,6 @@ static void handle_signal(int sig, struct k_sigaction *ka, siginfo_t *info,
 	}
 }
 
-/*
- * Note that 'init' is a special process: it doesn't get signals it doesn't
- * want to handle. Thus you cannot kill init even with a SIGKILL even by
- * mistake.
- */
 static int do_signal(struct pt_regs *regs, sigset_t *oldset, int in_syscall)
 {
 	struct k_sigaction ka;
@@ -460,7 +447,6 @@ static int do_signal(struct pt_regs *regs, sigset_t *oldset, int in_syscall)
 asmlinkage void do_notify_resume(struct pt_regs *regs, sigset_t *oldset,
 				int in_syscall)
 {
-	pr_debug("--> ENTERING %s\n", __func__);
 	/*
 	 * We want the common case to go fast, which is why we may in certain
 	 * cases get here from kernel mode. Just return without doing anything
