@@ -11,6 +11,7 @@ UIMAGE_ENTRYADDR = $(shell $(NM) vmlinux | awk '$$NF == "_start" {print $$1}')
 UIMAGE_COMPRESSION = gzip
 
 OBJCOPYFLAGS_vmlinux.bin := -O binary
+targets += vmlinux.bin vmlinux.gz vmImage
 $(obj)/vmlinux.bin: vmlinux FORCE
 	$(call if_changed,objcopy)
 
