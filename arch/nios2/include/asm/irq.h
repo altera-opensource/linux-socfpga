@@ -21,12 +21,6 @@
 #define _ASM_NIOS2_IRQ_H
 
 #define NIOS2_CPU_NR_IRQS	32
-/* Reserve 32 additional interrupts for GPIO IRQs */
-#define NR_IRQS			(NIOS2_CPU_NR_IRQS + 32)
-
-#ifndef NO_IRQ
-#define NO_IRQ			(-1)
-#endif
 
 #include <asm-generic/irq.h>
 #include <linux/irqdomain.h>
