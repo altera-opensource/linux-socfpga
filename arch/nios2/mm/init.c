@@ -44,24 +44,13 @@ pgd_t *pgd_current;
 void __init paging_init(void)
 {
 	unsigned long zones_size[MAX_NR_ZONES];
-	unsigned long start_mem, end_mem;
 
 	memset(zones_size, 0, sizeof(zones_size));
-
-	/*
-	 * Make sure start_mem is page aligned, otherwise bootmem and
-	 * page_alloc get different views of the world.
-	 */
-	start_mem = PHYS_OFFSET;
-	end_mem   = memory_end;
 
 	pagetable_init();
 	pgd_current = swapper_pg_dir;
 
-	/*
-	 * Set up SFC/DFC registers (user data space).
-	 */
-	zones_size[ZONE_DMA] = ((end_mem - start_mem) >> PAGE_SHIFT);
+	zones_size[ZONE_NORMAL] = max_mapnr;
 
 	/* pass the memory from the bootmem allocator to the main allocator */
 	free_area_init(zones_size);
@@ -80,8 +69,6 @@ void __init mem_init(void)
 
 	end_mem &= PAGE_MASK;
 	high_memory = __va(end_mem);
-
-	max_mapnr = ((unsigned long)end_mem) >> PAGE_SHIFT;
 
 	num_physpages = max_mapnr;
 	pr_debug("We have %ld pages of RAM\n", num_physpages);

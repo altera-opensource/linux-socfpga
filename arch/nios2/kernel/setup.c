@@ -169,17 +169,19 @@ void __init setup_arch(char **cmdline_p)
 	memcpy(boot_command_line, cmd_line, COMMAND_LINE_SIZE);
 	boot_command_line[COMMAND_LINE_SIZE-1] = 0;
 
+	min_low_pfn = PFN_UP(memory_start);
+	max_low_pfn = PFN_DOWN(memory_end);
+	max_mapnr = max_low_pfn;
+
 	/*
 	 * give all the memory to the bootmap allocator,  tell it to put the
 	 * boot mem_map at the start of memory
 	 */
 	pr_debug("init_bootmem_node(?,%#lx, %#x, %#lx)\n",
-		PFN_UP(memory_start), PFN_DOWN(PHYS_OFFSET),
-		PFN_DOWN(memory_end));
+		min_low_pfn, PFN_DOWN(PHYS_OFFSET), max_low_pfn);
 	bootmap_size = init_bootmem_node(NODE_DATA(0),
-					 PFN_UP(memory_start),
-					 PFN_DOWN(PHYS_OFFSET),
-					 PFN_DOWN(memory_end));
+					min_low_pfn, PFN_DOWN(PHYS_OFFSET),
+					max_low_pfn);
 
 	/*
 	 * free the usable memory,  we have to make sure we do not free

@@ -34,9 +34,6 @@ config NO_IOPORT
 config HAS_DMA
 	def_bool y
 
-config ZONE_DMA
-	def_bool y
-
 config FPU
 	def_bool n
 
