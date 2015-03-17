@@ -43,18 +43,18 @@ static inline unsigned long read_timersnapshot(void)
 {
 	unsigned long count;
 
-	outw(0, timer_membase + ALTERA_TIMER_SNAPL_REG);
+	writew(0, timer_membase + ALTERA_TIMER_SNAPL_REG);
 	count =
-		inw(timer_membase + ALTERA_TIMER_SNAPH_REG) << 16 |
-		inw(timer_membase + ALTERA_TIMER_SNAPL_REG);
+		readw(timer_membase + ALTERA_TIMER_SNAPH_REG) << 16 |
+		readw(timer_membase + ALTERA_TIMER_SNAPL_REG);
 
 	return count;
 }
 
 static inline void write_timerperiod(unsigned long period)
 {
-	outw(period, timer_membase + ALTERA_TIMER_PERIODL_REG);
-	outw(period >> 16, timer_membase + ALTERA_TIMER_PERIODH_REG);
+	writew(period, timer_membase + ALTERA_TIMER_PERIODL_REG);
+	writew(period >> 16, timer_membase + ALTERA_TIMER_PERIODH_REG);
 }
 
 /*
@@ -64,7 +64,7 @@ static inline void write_timerperiod(unsigned long period)
 irqreturn_t timer_interrupt(int irq, void *dummy)
 {
 	/* Clear the interrupt condition */
-	outw(0, timer_membase + ALTERA_TIMER_STATUS_REG);
+	writew(0, timer_membase + ALTERA_TIMER_STATUS_REG);
 	nios2_timer_count += NIOS2_TIMER_PERIOD;
 
 	profile_tick(CPU_PROFILING);
@@ -137,7 +137,7 @@ static void __init nios2_time_init(struct device_node *timer)
 	/* interrupt enable + continuous + start */
 	ctrl = ALTERA_TIMER_CONTROL_ITO_MSK | ALTERA_TIMER_CONTROL_CONT_MSK |
 		ALTERA_TIMER_CONTROL_START_MSK;
-	outw(ctrl, timer_membase + ALTERA_TIMER_CONTROL_REG);
+	writew(ctrl, timer_membase + ALTERA_TIMER_CONTROL_REG);
 
 	initialized = 1;
 }
