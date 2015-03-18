@@ -172,6 +172,22 @@ static void __init enable_periphs(void)
 #define MICREL_KSZ9021_RGMII_CLK_CTRL_PAD_SCEW 260
 #define MICREL_KSZ9021_RGMII_RX_DATA_PAD_SCEW 261
 
+#define MICREL_KSZ9031_MMD_ACCESS_CONTROL	0xd
+#define MICREL_KSZ9031_MMD_ACCESS_DATA		0xe
+
+#define MICREL_KSZ9031_MMD_OP_DATANOINC		0x4000
+
+/*
+ * Note that these skew settings depend on an FPGA I/O Delay of
+ * 600ps applied to the TX_CLK output to the phy in order
+ * for these settings to work correctly.
+ * See the Application notes on this topic at http://www.altera.com
+ */
+#define MICREL_KSZ9031_A10_CLOCK_SKEW		0x3fc
+#define MICREL_KSZ9031_A10_CTRL_SKEW		0x070
+#define MICREL_KSZ9031_A10_RXD_SKEW		0x7777
+#define MICREL_KSZ9031_A10_TXD_SKEW		0x0
+
 static int ksz9021rlrn_phy_fixup(struct phy_device *phydev)
 {
 	if (IS_BUILTIN(CONFIG_PHYLIB)) {
@@ -187,6 +203,48 @@ static int ksz9021rlrn_phy_fixup(struct phy_device *phydev)
 		phy_write(phydev, MICREL_KSZ9021_EXTREG_CTRL, 0x104);
 	}
 
+	return 0;
+}
+
+static void ksz9031_write_mmd_register(struct phy_device *phydev,
+				       unsigned short mmdreg,
+				       unsigned short mmdval)
+{
+	unsigned short mmd_address = 2;
+	unsigned short mmd_address_op = mmd_address |
+		MICREL_KSZ9031_MMD_OP_DATANOINC;
+
+	phy_write(phydev, MICREL_KSZ9031_MMD_ACCESS_CONTROL, mmd_address);
+	phy_write(phydev, MICREL_KSZ9031_MMD_ACCESS_DATA, mmdreg);
+	phy_write(phydev, MICREL_KSZ9031_MMD_ACCESS_CONTROL, mmd_address_op);
+	phy_write(phydev, MICREL_KSZ9031_MMD_ACCESS_DATA, mmdval);
+}
+
+static int ksz9031_phy_fixup(struct phy_device *phydev)
+{
+	if (IS_BUILTIN(CONFIG_PHYLIB)) {
+		/*
+		 * See the Micrel ksz9031rnx specification for details on
+		 * how to access the MMD registers to configure the skew
+		 * values.
+		 */
+
+		/* set ksz9031, register 8 - clock pad skews */
+		ksz9031_write_mmd_register(phydev, 8,
+					   MICREL_KSZ9031_A10_CLOCK_SKEW);
+
+		/* set ksz9031, register 4 - control skews */
+		ksz9031_write_mmd_register(phydev, 4,
+					   MICREL_KSZ9031_A10_CTRL_SKEW);
+
+		/* set ksz9031, register 5 - RX Data skews */
+		ksz9031_write_mmd_register(phydev, 5,
+					   MICREL_KSZ9031_A10_RXD_SKEW);
+
+		/* set ksz9031, register 6 - TX Data skews */
+		ksz9031_write_mmd_register(phydev, 6,
+					   MICREL_KSZ9031_A10_TXD_SKEW);
+	}
 	return 0;
 }
 
@@ -363,9 +421,14 @@ static void __init socfpga_cyclone5_init(void)
 	enable_periphs();
 
 	socfpga_soc_device_init();
-	if (IS_BUILTIN(CONFIG_PHYLIB))
+	if (IS_BUILTIN(CONFIG_PHYLIB)) {
 		phy_register_fixup_for_uid(PHY_ID_KSZ9021RLRN,
-			MICREL_PHY_ID_MASK, ksz9021rlrn_phy_fixup);
+					   MICREL_PHY_ID_MASK,
+					   ksz9021rlrn_phy_fixup);
+		phy_register_fixup_for_uid(PHY_ID_KSZ9031,
+					   MICREL_PHY_ID_MASK,
+					   ksz9031_phy_fixup);
+	}
 }
 
 static const char *altera_dt_match[] = {
