@@ -171,6 +171,7 @@ ENTRY(handle_system_call)
 	ldw	r4, PT_R4(sp)
 	ldw	r5, PT_R5(sp)
 
+local_restart:
 	/* Check that the requested system call is within limits */
 	movui	r1, NR_syscalls
 	bgeu	r2, r1, ret_invsyscall
@@ -196,8 +197,6 @@ ENTRY(handle_system_call)
 	 *   Set r7 to 0.
 	 * The sigreturn system calls will skip the code below by
 	 * adding to register ra. To avoid destroying registers
-	 *
-	 * FIXME: We probably need an orig_r7
 	 */
 translate_rc_and_ret:
 	movi	r1, 0
@@ -227,24 +226,22 @@ ret_invsyscall:
 	br	translate_rc_and_ret
 
 	/* This implements the same as above, except it calls
-	 * syscall_trace before and after the syscall in order
-	 * for utilities like strace and gdb to work.
+	 * do_syscall_trace_enter and do_syscall_trace_exit before and after the
+	 * syscall in order for utilities like strace and gdb to work.
 	 */
 traced_system_call:
 	SAVE_SWITCH_STACK
-	call	syscall_trace
+	call	do_syscall_trace_enter
 	RESTORE_SWITCH_STACK
 
-	/* r2 and r7-r9 might be destroyed  by syscall_trace and we need to
-	 * restore them before calling our syscall.
-	 */
+	/* Create system call register arguments. The 5th and 6th
+	   arguments on stack are already in place at the beginning
+	   of pt_regs. */
 	ldw	r2, PT_R2(sp)
 	ldw	r4, PT_R4(sp)
 	ldw	r5, PT_R5(sp)
 	ldw	r6, PT_R6(sp)
 	ldw	r7, PT_R7(sp)
-	ldw	r8, PT_R8(sp)
-	ldw	r9, PT_R9(sp)
 
 	/* Fetch the syscall function, we don't need to check the boundaries
 	 * since this is already done.
@@ -263,8 +260,6 @@ traced_system_call:
 	 *   Set r7 to 0.
 	 * The sigreturn system calls will skip the code below by
 	 * adding to register ra. To avoid destroying registers
-	 *
-	 * FIXME: We probably need an orig_r7
 	 */
 translate_rc_and_ret2:
 	movi	r1, 0
@@ -276,7 +271,7 @@ translate_rc_and_ret2:
 	stw	r1, PT_R7(sp)
 end_translate_rc_and_ret2:
 	SAVE_SWITCH_STACK
-	call	syscall_trace
+	call	do_syscall_trace_exit
 	RESTORE_SWITCH_STACK
 	br	ret_from_exception
 
@@ -296,13 +291,22 @@ Lsignal_return:
 	beq	r1, r0, restore_all
 	mov	r4, sp			/* pt_regs */
 	SAVE_SWITCH_STACK
-	mov	r5, r0			/* oldset = 0 */
-	movi	r6, 1			/* in_syscall = 1 */
 	call	do_notify_resume
+	beq	r2, r0, no_work_pending
 	RESTORE_SWITCH_STACK
-	br	restore_all
+	/* prepare restart syscall here without leaving kernel */
+	ldw	r2, PT_R2(sp)	/* reload syscall number in r2 */
+	ldw 	r4, PT_R4(sp)	/* reload syscall arguments r4-r9 */
+	ldw 	r5, PT_R5(sp)
+	ldw 	r6, PT_R6(sp)
+	ldw 	r7, PT_R7(sp)
+	ldw 	r8, PT_R8(sp)
+	ldw 	r9, PT_R9(sp)
+	br	local_restart	/* restart syscall */
 
-
+no_work_pending:
+	RESTORE_SWITCH_STACK
+	br	ret_from_exception
 
 /***********************************************************************
  * Handle external interrupts.

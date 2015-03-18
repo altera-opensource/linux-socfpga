@@ -36,5 +36,7 @@ extern void show_regs(struct pt_regs *);
 #define current_pt_regs() \
 	((struct pt_regs *)((unsigned long)current_thread_info() + THREAD_SIZE)\
 		- 1)
+int do_syscall_trace_enter(void);
+void do_syscall_trace_exit(void);
 #endif /* __ASSEMBLY__ */
 #endif /* _ASM_NIOS2_PTRACE_H */
