@@ -65,6 +65,8 @@ struct mm_struct;
 #define PAGE_KERNEL __pgprot(_PAGE_PRESENT | _PAGE_CACHED | _PAGE_READ | \
 			     _PAGE_WRITE | _PAGE_EXEC | _PAGE_GLOBAL)
 
+#define PAGE_SHARED __pgprot(_PAGE_PRESENT | _PAGE_CACHED | _PAGE_READ | \
+			     _PAGE_WRITE | _PAGE_ACCESSED)
 #define PAGE_COPY MKP(0, 0, 1)
 
 #define PGD_ORDER	0
