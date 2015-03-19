@@ -138,7 +138,7 @@ static int altera_gpio_get(struct gpio_chip *gc, unsigned offset)
 {
 	struct of_mm_gpio_chip *mm_gc = to_of_mm_gpio_chip(gc);
 
-	return !!(readl(mm_gc->regs + ALTERA_GPIO_DATA) >> offset);
+	return !!(readl(mm_gc->regs + ALTERA_GPIO_DATA) & (1 << offset));
 }
 
 static void altera_gpio_set(struct gpio_chip *gc, unsigned offset, int value)
