@@ -16,6 +16,7 @@
  */
 #include <linux/dw_apb_timer.h>
 #include <linux/clk-provider.h>
+#include <linux/delay.h>
 #include <linux/irqchip.h>
 #include <linux/of_address.h>
 #include <linux/of_irq.h>
@@ -63,6 +64,12 @@ static struct plat_stmmacenet_data stmmacenet1_data = {
 	.fix_mac_speed = stmmac_fix_mac_speed,
 };
 
+static struct plat_stmmacenet_data stmmacenet2_data = {
+	.init = &stmmac_plat_init,
+	.bus_id = 2,
+	.fix_mac_speed = stmmac_fix_mac_speed,
+};
+
 #ifdef CONFIG_HW_PERF_EVENTS
 static struct arm_pmu_platdata socfpga_pmu_platdata = {
 	.handle_irq = socfpga_pmu_handler,
@@ -73,8 +80,13 @@ static struct arm_pmu_platdata socfpga_pmu_platdata = {
 #endif
 
 static const struct of_dev_auxdata socfpga_auxdata_lookup[] __initconst = {
+	/* Platform data entries for stmmac on Cyclone and Arria 5 */
 	OF_DEV_AUXDATA("snps,dwmac-3.70a", 0xff700000, NULL, &stmmacenet0_data),
 	OF_DEV_AUXDATA("snps,dwmac-3.70a", 0xff702000, NULL, &stmmacenet1_data),
+	/* Platform data entries for stmmac on Arria 10 */
+	OF_DEV_AUXDATA("snps,dwmac-3.72a", 0xff800000, NULL, &stmmacenet0_data),
+	OF_DEV_AUXDATA("snps,dwmac-3.72a", 0xff802000, NULL, &stmmacenet1_data),
+	OF_DEV_AUXDATA("snps,dwmac-3.72a", 0xff804000, NULL, &stmmacenet2_data),
 	OF_DEV_AUXDATA("arm,pl330", 0xffe00000, "dma-pl330",
 		&dma_platform_data),
 	OF_DEV_AUXDATA("arm,pl330", 0xffe01000, "dma-pl330",
@@ -253,7 +265,7 @@ static void stmmac_fix_mac_speed(void *priv, unsigned int speed)
 	adapter_config(priv, speed);
 }
 
-static int stmmac_plat_init(struct platform_device *pdev)
+static int stmmac_init_c5a5(struct platform_device *pdev)
 {
 	u32 ctrl, val, shift;
 	u32 rstmask;
@@ -306,6 +318,117 @@ static int stmmac_plat_init(struct platform_device *pdev)
 	ctrl = readl(rst_manager_base_addr + SOCFPGA_RSTMGR_MODPERRST);
 	ctrl &= ~(rstmask);
 	writel(ctrl, rst_manager_base_addr + SOCFPGA_RSTMGR_MODPERRST);
+
+	return 0;
+}
+
+static int stmmac_init_a10(struct platform_device *pdev)
+{
+	u32 ctrl, val;
+	u32 rstmask;
+	u32 rstmask_ecc;
+	int phymode;
+	int ret;
+	int sysmgr_emac_offs;
+
+	phymode = of_get_phy_mode(pdev->dev.of_node);
+
+	switch (phymode) {
+	case PHY_INTERFACE_MODE_RGMII:
+	case PHY_INTERFACE_MODE_RGMII_ID:
+		val = SYSMGR_EMACGRP_CTRL_PHYSEL_ENUM_RGMII;
+		break;
+	case PHY_INTERFACE_MODE_MII:
+	case PHY_INTERFACE_MODE_GMII:
+	case PHY_INTERFACE_MODE_SGMII:
+		val = SYSMGR_EMACGRP_CTRL_PHYSEL_ENUM_GMII_MII;
+		break;
+	case PHY_INTERFACE_MODE_RMII:
+		val = SYSMGR_EMACGRP_CTRL_PHYSEL_ENUM_RMII;
+		break;
+	default:
+		pr_err("%s bad phy mode %d", __func__, phymode);
+		return -EINVAL;
+	}
+
+	ret = adapter_init(pdev, phymode, &val);
+	if (ret != 0) {
+		pr_err("adapter init fail\n");
+		return ret;
+	}
+
+	if (&stmmacenet2_data == pdev->dev.platform_data) {
+		sysmgr_emac_offs = SOCFPGA_A10_SYSMGR_EMAC2_CTRL;
+		rstmask = RSTMGR_PER0MODRST_A10_EMAC2;
+		rstmask_ecc = RSTMGR_PER0MODRST_A10_EMAC2_ECC;
+	} else if (&stmmacenet1_data == pdev->dev.platform_data) {
+		sysmgr_emac_offs = SOCFPGA_A10_SYSMGR_EMAC1_CTRL;
+		rstmask = RSTMGR_PERMODRST_EMAC1;
+		rstmask_ecc = RSTMGR_PER0MODRST_A10_EMAC1_ECC;
+	} else if (&stmmacenet0_data == pdev->dev.platform_data) {
+		sysmgr_emac_offs = SOCFPGA_A10_SYSMGR_EMAC0_CTRL;
+		rstmask = RSTMGR_PERMODRST_EMAC0;
+		rstmask_ecc = RSTMGR_PER0MODRST_A10_EMAC0_ECC;
+	} else {
+		pr_err("%s unexpected platform data pointer\n", __func__);
+		return -EINVAL;
+	}
+
+	/* Place the EMAC into reset */
+	ctrl = readl(rst_manager_base_addr + SOCFPGA_A10_RSTMGR_PER0MODRST);
+	ctrl |= rstmask_ecc;
+	writel(ctrl, rst_manager_base_addr + SOCFPGA_A10_RSTMGR_PER0MODRST);
+
+	ctrl = readl(rst_manager_base_addr + SOCFPGA_A10_RSTMGR_PER0MODRST);
+	ctrl |= rstmask;
+	writel(ctrl, rst_manager_base_addr + SOCFPGA_A10_RSTMGR_PER0MODRST);
+
+	/* Set the desired phy mode bits */
+	ctrl = readl(sys_manager_base_addr + sysmgr_emac_offs);
+	ctrl &= ~SYSMGR_EMACGRP_CTRL_PHYSEL_MASK;
+	ctrl |= val;
+	writel(ctrl, (sys_manager_base_addr + sysmgr_emac_offs));
+
+	/* Make sure to hold EMAC in reset for a min amount of time */
+	udelay(1);
+
+	/* Take the EMAC out of reset */
+	ctrl = readl(rst_manager_base_addr + SOCFPGA_A10_RSTMGR_PER0MODRST);
+	ctrl &= ~(rstmask);
+	writel(ctrl, rst_manager_base_addr + SOCFPGA_A10_RSTMGR_PER0MODRST);
+
+	ctrl = readl(rst_manager_base_addr + SOCFPGA_A10_RSTMGR_PER0MODRST);
+	ctrl &= ~(rstmask_ecc);
+	writel(ctrl, rst_manager_base_addr + SOCFPGA_A10_RSTMGR_PER0MODRST);
+
+	/* Wait for some min amount of time to make sure the EMAC is reset */
+	udelay(1);
+
+	return 0;
+}
+
+static int socfpga_is_a10(void)
+{
+	return of_machine_is_compatible("altr,socfpga-arria10");
+}
+
+static int socfpga_is_c5(void)
+{
+	return of_machine_is_compatible("altr,socfpga-cyclone5");
+}
+
+static int socfpga_is_a5(void)
+{
+	return of_machine_is_compatible("altr,socfpga-arria5");
+}
+
+static int stmmac_plat_init(struct platform_device *pdev)
+{
+	if (socfpga_is_a10())
+		return stmmac_init_a10(pdev);
+
+	if (socfpga_is_c5() || socfpga_is_a5())
+		return stmmac_init_c5a5(pdev);
 
 	return 0;
 }

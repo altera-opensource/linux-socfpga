@@ -25,6 +25,7 @@
 #define SOCFPGA_RSTMGR_BRGMODRST	0x1c
 
 #define SOCFPGA_A10_RSTMGR_CTRL		0xC
+#define SOCFPGA_A10_RSTMGR_PER0MODRST	0x24
 
 /* System Manager bits */
 #define RSTMGR_CTRL_SWCOLDRSTREQ	0x1	/* Cold Reset */
@@ -38,6 +39,11 @@ extern void socfpga_secondary_startup(void);
 #define SOCFPGA_RSTMGR_MODPERRST	0x14
 #define SOCFPGA_RSTMGR_BRGMODRST	0x1c
 
+/* A10 Sysmgr EMAC control registers */
+#define SOCFPGA_A10_SYSMGR_EMAC0_CTRL	0x44
+#define SOCFPGA_A10_SYSMGR_EMAC1_CTRL	0x48
+#define SOCFPGA_A10_SYSMGR_EMAC2_CTRL	0x4c
+
 /* System Manager bits */
 #define RSTMGR_CTRL_SWCOLDRSTREQ	0x1	/* Cold Reset */
 #define RSTMGR_CTRL_SWWARMRSTREQ	0x2	/* Warm Reset */
@@ -49,8 +55,18 @@ extern void socfpga_secondary_startup(void);
  #define RSTMGR_MPUMODRST_L2		0x10	/*L2 Cache reset*/
 
 /* Peripheral Module Reset Register bits */
+
+/*
+ * EMAC0 and EMAC1 reset bits in permodrst in C5/A5 and per0modrst
+ * in Arria 10 are the same bit locations.
+ */
 #define RSTMGR_PERMODRST_EMAC0	0x1
 #define RSTMGR_PERMODRST_EMAC1	0x2
+#define RSTMGR_PER0MODRST_A10_EMAC2 0x4
+
+#define RSTMGR_PER0MODRST_A10_EMAC0_ECC BIT(8)
+#define RSTMGR_PER0MODRST_A10_EMAC1_ECC BIT(9)
+#define RSTMGR_PER0MODRST_A10_EMAC2_ECC BIT(10)
 
 #define SYSMGR_SILICON_ID1_OFFSET 0x0
 #define SYSMGR_SILICON_ID1_REV_SHIFT 0
