@@ -28,4 +28,10 @@ config SPI_FSL_QUADSPI
 	  This enables support for the Quad SPI controller in master mode.
 	  We only connect the NOR to this controller now.
 
+config SPI_CADENCE_QUADSPI
+	tristate "Cadence Quad SPI controller"
+	depends on ARCH_SOCFPGA
+	help
+	  This enables support for the Cadence Quad SPI controller and NOR flash.
+
 endif # MTD_SPI_NOR
