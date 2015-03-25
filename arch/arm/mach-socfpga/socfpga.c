@@ -52,6 +52,10 @@ unsigned long cpu1start_addr;
 static int stmmac_plat_init(struct platform_device *pdev);
 static void stmmac_fix_mac_speed(void *priv, unsigned int speed);
 
+static int socfpga_is_a5(void);
+static int socfpga_is_c5(void);
+static int socfpga_is_a10(void);
+
 static struct plat_stmmacenet_data stmmacenet0_data = {
 	.init = &stmmac_plat_init,
 	.bus_id = 0,
@@ -172,11 +176,13 @@ static void __init enable_periphs(void)
 	u32 rstval;
 	rstval = RSTMGR_PERMODRST_EMAC0 | RSTMGR_PERMODRST_EMAC1;
 
-	if (of_machine_is_compatible("altr,socfpga-arria10"))
+	if (socfpga_is_a10()) {
 		/* temp hack to enable all periphs from reset for A10 */
-		writel(0x0, rst_manager_base_addr + SOCFPGA_RSTMGR_MODPERRST);
-	else
+		writel(0x0, rst_manager_base_addr + SOCFPGA_A10_RSTMGR_PER0MODRST);
+		writel(0x0, rst_manager_base_addr + SOCFPGA_A10_RSTMGR_PER1MODRST);
+	} else {
 		writel(rstval, rst_manager_base_addr + SOCFPGA_RSTMGR_MODPERRST);
+	}
 }
 
 #define MICREL_KSZ9021_EXTREG_CTRL		11
