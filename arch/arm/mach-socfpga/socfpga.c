@@ -284,6 +284,12 @@ static int stmmac_init_c5a5(struct platform_device *pdev)
 	case PHY_INTERFACE_MODE_SGMII:
 		val = SYSMGR_EMACGRP_CTRL_PHYSEL_ENUM_GMII_MII;
 		break;
+	/*
+	 * RMII case is broken on Cyclone 5 and Arria 5.
+	 * Have the case fall through to failure explicitly
+	 * for documentation and debugging purposes.
+	 */
+	case PHY_INTERFACE_MODE_RMII:
 	default:
 		pr_err("%s bad phy mode %d", __func__, phymode);
 		return -EINVAL;
