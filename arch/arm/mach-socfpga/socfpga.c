@@ -272,9 +272,6 @@ static int stmmac_init_c5a5(struct platform_device *pdev)
 	int phymode;
 	int ret;
 
-	if (of_machine_is_compatible("altr,socfpga-vt"))
-		return 0;
-
 	phymode = of_get_phy_mode(pdev->dev.of_node);
 
 	switch (phymode) {
