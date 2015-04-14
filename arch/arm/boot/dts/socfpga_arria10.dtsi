@@ -408,6 +408,8 @@
 			mac-address = [00 00 00 00 00 00];
 			clocks = <&l4_mp_clk>;
 			clock-names = "stmmaceth";
+			snps,multicast-filter-bins = <256>;
+			snps,perfect-filter-entries = <128>;
 			status = "disabled";
 		};
 
@@ -418,6 +420,8 @@
 			interrupt-names = "macirq";
 			/* Filled in by bootloader */
 			mac-address = [00 00 00 00 00 00];
+			snps,multicast-filter-bins = <256>;
+			snps,perfect-filter-entries = <128>;
 			status = "disabled";
 		};
 
@@ -428,6 +432,8 @@
 			interrupt-names = "macirq";
 			/* Filled in by bootloader */
 			mac-address = [00 00 00 00 00 00];
+			snps,multicast-filter-bins = <256>;
+			snps,perfect-filter-entries = <128>;
 			status = "disabled";
 		};
 
