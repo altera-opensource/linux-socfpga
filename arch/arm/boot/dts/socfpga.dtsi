@@ -507,6 +507,8 @@
 			snps,multicast-filter-bins = <256>;
 			snps,perfect-filter-entries = <128>;
 			max-frame-size = <3800>;
+			tx-fifo-depth = <4096>;
+			rx-fifo-depth = <4096>;
 			status = "disabled";
 		};
 
@@ -522,6 +524,8 @@
 			snps,multicast-filter-bins = <256>;
 			snps,perfect-filter-entries = <128>;
 			max-frame-size = <3800>;
+			tx-fifo-depth = <4096>;
+			rx-fifo-depth = <4096>;
 			status = "disabled";
 		};
 
