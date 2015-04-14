@@ -138,7 +138,6 @@
 &gmac0 {
 	phy-mode = "rgmii";
 	phy-addr = <0xffffffff>; /* probe for phy addr */
-	snps,max-mtu = <0>;
 	status = "okay";
 };
 

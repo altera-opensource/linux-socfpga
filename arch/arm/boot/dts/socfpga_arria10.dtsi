@@ -410,6 +410,7 @@
 			clock-names = "stmmaceth";
 			snps,multicast-filter-bins = <256>;
 			snps,perfect-filter-entries = <128>;
+			max-frame-size = <3800>;
 			status = "disabled";
 		};
 
@@ -422,6 +423,7 @@
 			mac-address = [00 00 00 00 00 00];
 			snps,multicast-filter-bins = <256>;
 			snps,perfect-filter-entries = <128>;
+			max-frame-size = <3800>;
 			status = "disabled";
 		};
 
@@ -434,6 +436,7 @@
 			mac-address = [00 00 00 00 00 00];
 			snps,multicast-filter-bins = <256>;
 			snps,perfect-filter-entries = <128>;
+			max-frame-size = <3800>;
 			status = "disabled";
 		};
 

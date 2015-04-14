@@ -506,6 +506,7 @@
 			reset-names = "stmmaceth";
 			snps,multicast-filter-bins = <256>;
 			snps,perfect-filter-entries = <128>;
+			max-frame-size = <3800>;
 			status = "disabled";
 		};
 
@@ -520,6 +521,7 @@
 			reset-names = "stmmaceth";
 			snps,multicast-filter-bins = <256>;
 			snps,perfect-filter-entries = <128>;
+			max-frame-size = <3800>;
 			status = "disabled";
 		};
 
