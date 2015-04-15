@@ -108,6 +108,10 @@ static int stmmac_probe_config_dt(struct platform_device *pdev,
 	/* Set default value for multicast hash bins */
 	plat->multicast_filter_bins = HASH_TABLE_SIZE;
 
+	of_property_read_u32(np, "tx-fifo-depth", &plat->tx_fifo_size);
+
+	of_property_read_u32(np, "rx-fifo-depth", &plat->rx_fifo_size);
+
 	/* Set default value for unicast filter entries */
 	plat->unicast_filter_entries = 1;
 
