@@ -1208,19 +1208,16 @@ static void free_dma_desc_resources(struct stmmac_priv *priv)
  */
 static void stmmac_dma_operation_mode(struct stmmac_priv *priv)
 {
+	int rxfifosz = priv->plat->rx_fifo_size;
 	if (likely(priv->plat->force_sf_dma_mode ||
 		   ((priv->plat->tx_coe) && (!priv->no_csum_insertion)))) {
-		/*
-		 * In case of GMAC, SF mode can be enabled
-		 * to perform the TX COE in HW. This depends on:
-		 * 1) TX COE if actually supported
-		 * 2) There is no bugged Jumbo frame support
-		 *    that needs to not insert csum in the TDES.
-		 */
-		priv->hw->dma->dma_mode(priv->ioaddr, SF_DMA_MODE, SF_DMA_MODE);
+
+		priv->hw->dma->dma_mode(priv->ioaddr, SF_DMA_MODE, SF_DMA_MODE,
+					rxfifosz);
 		tc = SF_DMA_MODE;
-	} else
-		priv->hw->dma->dma_mode(priv->ioaddr, tc, SF_DMA_MODE);
+	} else 
+		priv->hw->dma->dma_mode(priv->ioaddr, tc, SF_DMA_MODE,
+					rxfifosz);
 }
 
 /**
@@ -1357,6 +1354,7 @@ static void stmmac_tx_err(struct stmmac_priv *priv)
 static void stmmac_dma_interrupt(struct stmmac_priv *priv)
 {
 	int status;
+	int rxfifosz = priv->plat->rx_fifo_size;
 
 	status = priv->hw->dma->dma_interrupt(priv->ioaddr, &priv->xstats);
 	if (likely((status & handle_rx)) || (status & handle_tx)) {
@@ -1369,7 +1367,8 @@ static void stmmac_dma_interrupt(struct stmmac_priv *priv)
 		/* Try to bump up the dma threshold on this failure */
 		if (unlikely(tc != SF_DMA_MODE) && (tc <= 256)) {
 			tc += 64;
-			priv->hw->dma->dma_mode(priv->ioaddr, tc, SF_DMA_MODE);
+			priv->hw->dma->dma_mode(priv->ioaddr, tc, SF_DMA_MODE,
+						rxfifosz);
 			priv->xstats.threshold = tc;
 		}
 	} else if (unlikely(status == tx_hard_error))
