@@ -19,6 +19,18 @@ Optional properties:
 - tx-dma-peri-id : peripheral request id for tx dma channel, required if enable-dma is present
 - rx-dma-peri-id : peripheral request id for rx dma channel, required if enable-dma is present
 
+Optional subnodes:
+Subnodes of the Cadence Quad SPI controller are spi slave nodes with additional
+custom properties:
+- page-size : Size, in bytes, of the device's write page
+- block-size : Size of the device's erase block
+- tshsl-ns : Delay in nanoseconds for the length that the master mode chip select outputs are de-asserted between transactions.
+- tsd2d-ns : Delay in nanoseconds between one chip select being de-activated and the activation of another.
+- tchsh-ns : Delay in nanoseconds between last bit of current transaction and deasserting the device chip select (qspi_n_ss_out).
+- tslch-ns : Delay in nanoseconds between setting qspi_n_ss_out low and first bit transfer.
+
+
+
 Example:
 
 	qspi: spi@ff705000 {
@@ -36,4 +48,13 @@ Example:
 		enable-dma;
 		tx-dma-peri-id = <24>;
 		rx-dma-peri-id = <25>;
+		flash0: n25q00@0 {
+			...
+			page-size = <256>;
+			block-size = <16>;
+			tshsl-ns = <50>;
+			tsd2d-ns = <50>;
+			tchsh-ns = <4>;
+			tslch-ns = <4>;
+		}
 	}
