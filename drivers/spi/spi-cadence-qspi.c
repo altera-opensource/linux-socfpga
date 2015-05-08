@@ -292,12 +292,6 @@ static int cadence_qspi_of_get_pdata(struct platform_device *pdev)
 		}
 		f_pdata->block_size = prop;
 
-		if (of_property_read_u32(nc, "read-delay", &prop)) {
-			dev_err(&pdev->dev, "couldn't determine read-delay\n");
-			return -ENXIO;
-		}
-		f_pdata->read_delay = prop;
-
 		if (of_property_read_u32(nc, "tshsl-ns", &prop)) {
 			dev_err(&pdev->dev, "couldn't determine tshsl-ns\n");
 			return -ENXIO;

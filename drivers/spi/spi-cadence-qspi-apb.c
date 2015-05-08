@@ -96,6 +96,8 @@ static void __hex_dump(unsigned int address_to_print,
 #define CQSPI_NUMSGLREQBYTES (0)
 #define CQSPI_NUMBURSTREQBYTES (4)
 
+#define OPCODE_RDID 0x9f
+
 void cadence_qspi_apb_delay(struct struct_cqspi *cadence_qspi,
 	unsigned int ref_clk, unsigned int sclk_hz);
 
@@ -1113,6 +1115,77 @@ void cadence_qspi_switch_cs(struct struct_cqspi *cadence_qspi,
 	cadence_qspi_apb_controller_enable(iobase);
 	return;
 }
+static int cadence_qspi_apb_calibrate_read_delay(
+					struct struct_cqspi *cadence_qspi,
+					struct cqspi_flash_pdata *f_pdata,
+					unsigned int baud)
+{
+	struct platform_device *pdev = cadence_qspi->pdev;
+	struct cqspi_platform_data *pdata = pdev->dev.platform_data;
+	void __iomem *iobase = cadence_qspi->iobase;
+	unsigned int sclk = 1000000; /*first read of id is done with 1MHz clk*/
+	u8 opcode = OPCODE_RDID;
+	u32 temp = 0, idcode = 0;
+	int i, range_lo = -1, range_hi = -1;
+
+	cadence_qspi_apb_controller_disable(iobase);
+	cadence_qspi_apb_config_baudrate_div(iobase,
+						pdata->master_ref_clk_hz, sclk);
+	cadence_qspi_apb_delay(cadence_qspi,
+				pdata->master_ref_clk_hz, sclk);
+	cadence_qspi_apb_readdata_capture(iobase, 1, 0);
+	cadence_qspi_apb_controller_enable(iobase);
+
+	cadence_qspi_apb_command_read(iobase, sizeof(opcode), &opcode,
+					sizeof(idcode), (u8 *)&idcode);
+
+	sclk = baud;
+
+	cadence_qspi_apb_controller_disable(iobase);
+	cadence_qspi_apb_config_baudrate_div(iobase,
+						pdata->master_ref_clk_hz, sclk);
+	cadence_qspi_apb_delay(cadence_qspi,
+				pdata->master_ref_clk_hz, sclk);
+	cadence_qspi_apb_controller_enable(iobase);
+
+	for (i = 0; i <= CQSPI_REG_READCAPTURE_DELAY_MASK; i++) {
+		cadence_qspi_apb_controller_disable(iobase);
+		cadence_qspi_apb_readdata_capture(iobase, 1, i);
+		cadence_qspi_apb_controller_enable(iobase);
+		cadence_qspi_apb_command_read(iobase, sizeof(opcode), &opcode,
+						sizeof(temp), (u8 *)&temp);
+		/* search for range lo */
+		if (range_lo == -1 && temp == idcode) {
+			range_lo = i;
+			continue;
+		}
+
+		/* search for range hi */
+		if (range_lo != -1 && temp != idcode) {
+			range_hi = i - 1;
+			break;
+		}
+		range_hi = i;
+	}
+
+	if (range_lo == -1) {
+		dev_err(&cadence_qspi->pdev->dev,
+			"failed to calibrate read delay for %d baud", baud);
+		return -EINVAL;
+	}
+	f_pdata->read_delay = DIV_ROUND_UP((range_hi + range_lo), 2);
+	f_pdata->read_delay_baud = baud;
+	dev_info(&cadence_qspi->pdev->dev,
+			"Read data capture delay for %d baud "
+			"calibrated to %i (%i - %i)\n",
+			baud, f_pdata->read_delay, range_lo, range_hi);
+
+	cadence_qspi_apb_controller_disable(iobase);
+	cadence_qspi_apb_readdata_capture(iobase, 1, f_pdata->read_delay);
+	cadence_qspi_apb_controller_enable(iobase);
+
+	return 0;
+}
 
 int cadence_qspi_apb_process_queue(struct struct_cqspi *cadence_qspi,
 				  struct spi_device *spi, unsigned int n_trans,
@@ -1144,14 +1217,21 @@ int cadence_qspi_apb_process_queue(struct struct_cqspi *cadence_qspi,
 	f_pdata = &(pdata->f_pdata[cadence_qspi->current_cs]);
 	sclk = cmd_xfer->speed_hz ?
 		cmd_xfer->speed_hz : spi->max_speed_hz;
-	cadence_qspi_apb_controller_disable(iobase);
-	cadence_qspi_apb_config_baudrate_div(iobase,
-		pdata->master_ref_clk_hz, sclk);
-	cadence_qspi_apb_delay(cadence_qspi,
-		pdata->master_ref_clk_hz, sclk);
-	cadence_qspi_apb_readdata_capture(iobase, 1,
-		f_pdata->read_delay);
-	cadence_qspi_apb_controller_enable(iobase);
+
+	if (sclk == f_pdata->read_delay_baud) {
+		cadence_qspi_apb_controller_disable(iobase);
+		cadence_qspi_apb_config_baudrate_div(iobase,
+			pdata->master_ref_clk_hz, sclk);
+		cadence_qspi_apb_delay(cadence_qspi,
+			pdata->master_ref_clk_hz, sclk);
+		cadence_qspi_apb_readdata_capture(iobase, 1,
+			f_pdata->read_delay);
+		cadence_qspi_apb_controller_enable(iobase);
+	} else {
+		cadence_qspi_apb_calibrate_read_delay(cadence_qspi,
+							f_pdata,
+							sclk);
+	}
 
 	/*
 	 * Use STIG command to send if the transfer length is less than
