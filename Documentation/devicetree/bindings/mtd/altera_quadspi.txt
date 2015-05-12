@@ -1,0 +1,42 @@
+* MTD Altera QUADSPI driver
+
+Required properties:
+- compatible: Should be "altr,quadspi-1.0"
+- reg: Address and length of the register set  for the device. It contains
+  the information of registers in the same order as described by reg-names
+- reg-names: Should contain the reg names
+  "avl_csr": Should contain the register configuration base address
+  "avl_mem": Should contain the data base address
+- #address-cells: Must be <1>.
+- #size-cells: Must be <0>.
+- flash device tree subnode, there must be a node with the following fields:
+	- compatible: Should contain the flash name
+	- #address-cells: please refer to /mtd/partition.txt
+	- #size-cells: please refer to /mtd/partition.txt
+	For partitions inside each flash, please refer to /mtd/partition.txt
+
+Example:
+
+			quadspi_controller_0: quadspi@0x180014a0 {
+				compatible = "altr,quadspi-1.0";
+				reg = <0x180014a0 0x00000020>,
+				      <0x14000000 0x04000000>;
+				reg-names = "avl_csr", "avl_mem";
+				#address-cells = <1>;
+				#size-cells = <0>;
+				flash0: epcq256@0 {
+					compatible = "epcq256-nonjedec";
+					#address-cells = <1>;
+					#size-cells = <1>;
+					partition@0 {
+						/* 16 MB for raw data. */
+						label = "EPCQ Flash 0 raw data";
+						reg = <0x0 0x1000000>;
+					};
+					partition@1000000 {
+						/* 16 MB for jffs2 data. */
+						label = "EPCQ Flash 0 JFFS 2";
+						reg = <0x1000000 0x1000000>;
+					};
+				};
+			}; //end quadspi@0x180014a0 (quadspi_controller_0)
