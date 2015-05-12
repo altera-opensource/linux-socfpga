@@ -221,4 +221,11 @@ config BCH_CONST_T
 	default 4
 endif
 
+config MTD_ALTERA_QUADSPI
+	tristate "Altera Quad SPI Flash Driver"
+	help
+	  This enables access to Altera EPCQ/EPCS/Micron flash chips,
+	  used for data storage. See the driver source for the current list,
+	  or to add other chips.
+
 endmenu
