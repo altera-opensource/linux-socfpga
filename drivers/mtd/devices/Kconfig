@@ -279,4 +279,11 @@ config MTD_DOCPROBE_55AA
 	  LinuxBIOS or if you need to recover a DiskOnChip Millennium on which
 	  you have managed to wipe the first block.
 
+config MTD_ALTERA_QUADSPI
+	tristate "Altera Quad SPI Flash Driver"
+	help
+	  This enables access to Altera EPCQ/EPCS/Micron flash chips,
+	  used for data storage. See the driver source for the current list,
+	  or to add other chips.
+
 endmenu
