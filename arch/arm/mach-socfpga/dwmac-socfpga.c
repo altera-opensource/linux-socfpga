@@ -173,9 +173,10 @@ void adapter_config(void *priv, unsigned int speed)
 
 	u32 val;
 
-	if ((splitter_base) && (tse_pcs_base) && (sgmii_adapter_base)) {
+	if ((tse_pcs_base) && (sgmii_adapter_base)) {
 		config_tx_buffer(SGMII_ADAPTER_DISABLE, sgmii_adapter_base);
-		config_emac_splitter_speed(splitter_base, speed);
+		if (splitter_base)
+			config_emac_splitter_speed(splitter_base, speed);
 
 		if (phy_dev->autoneg == AUTONEG_ENABLE) {
 			val = readw(tse_pcs_base + TSE_PCS_CONTROL_REG);
@@ -250,6 +251,7 @@ int adapter_init(struct platform_device *pdev, int phymode, u32 *val)
 	struct plat_stmmacenet_data *plat = NULL;
 
 	int error = 0;
+	int index = 0;
 
 	bsp_priv = kzalloc(sizeof(*bsp_priv), GFP_KERNEL);
 	if (!bsp_priv) {
@@ -289,56 +291,73 @@ int adapter_init(struct platform_device *pdev, int phymode, u32 *val)
 	np_sgmii = of_parse_phandle(pdev->dev.of_node,
 				"altr,gmii_to_sgmii_converter", 0);
 	if (np_sgmii) {
-		if (of_address_to_resource(np_sgmii, 0, &res_splitter)) {
-			pr_err("%s: ERROR: missing emac splitter address\n",
-			       __func__);
-			error = -EINVAL;
-			goto free_bsp_priv;
-		}
-		bsp_priv->emac_splitter_base =
-			devm_ioremap_resource(&pdev->dev, &res_splitter);
+		index = of_property_match_string(np_sgmii, "reg-names",
+			"hps_emac_interface_splitter_avalon_slave");
 
-		if (IS_ERR(bsp_priv->emac_splitter_base)) {
-			pr_err("%s: ERROR: failed to mapping emac splitter\n",
-			       __func__);
-			error = PTR_ERR(bsp_priv->emac_splitter_base);
-			goto free_bsp_priv;
-		}
+		if (index >= 0) {
+			if (of_address_to_resource(np_sgmii, index,
+			&res_splitter)) {
+				pr_err("%s: ERROR: missing emac splitter "
+					"address\n", __func__);
+				error = -EINVAL;
+				goto free_bsp_priv;
+			}
 
-		if (of_address_to_resource(np_sgmii, 1,
-					   &res_sgmii_adapter)) {
-			pr_err("%s: ERROR: missing adapter address\n",
-			       __func__);
-			error = -EINVAL;
-			goto free_bsp_priv;
-		}
+			bsp_priv->emac_splitter_base = devm_ioremap_resource(
+				&pdev->dev, &res_splitter);
 
-		bsp_priv->sgmii_adapter_base =
-			devm_ioremap_resource(&pdev->dev,
-					      &res_sgmii_adapter);
-
-		if (IS_ERR(bsp_priv->sgmii_adapter_base)) {
-			pr_err("%s: ERROR: failed to mapping adapter\n",
-			       __func__);
-			error = PTR_ERR(bsp_priv->sgmii_adapter_base);
-			goto free_bsp_priv;
+			if (IS_ERR(bsp_priv->emac_splitter_base)) {
+				pr_err("%s: ERROR: failed to mapping emac splitter\n",
+					__func__);
+				error = PTR_ERR(bsp_priv->emac_splitter_base);
+				goto free_bsp_priv;
+			}
 		}
 
-		if (of_address_to_resource(np_sgmii, 2, &res_tse_pcs)) {
-			pr_err("%s: ERROR: missing tse pcs address\n",
-			       __func__);
-			error = -EINVAL;
-			goto free_bsp_priv;
+		index = of_property_match_string(np_sgmii, "reg-names",
+			"gmii_to_sgmii_adapter_avalon_slave");
+
+		if (index >= 0) {
+			if (of_address_to_resource(np_sgmii, index,
+				&res_sgmii_adapter)) {
+				pr_err("%s: ERROR: missing adapter address\n",
+					__func__);
+				error = -EINVAL;
+				goto free_bsp_priv;
+			}
+
+			bsp_priv->sgmii_adapter_base = devm_ioremap_resource(
+				&pdev->dev, &res_sgmii_adapter);
+
+			if (IS_ERR(bsp_priv->sgmii_adapter_base)) {
+				pr_err("%s: ERROR: failed to mapping adapter\n",
+					__func__);
+				error = PTR_ERR(bsp_priv->sgmii_adapter_base);
+				goto free_bsp_priv;
+			}
 		}
 
-		bsp_priv->tse_pcs_base =
-			devm_ioremap_resource(&pdev->dev, &res_tse_pcs);
+		index = of_property_match_string(np_sgmii, "reg-names",
+			"eth_tse_control_port");
 
-		if (IS_ERR(bsp_priv->tse_pcs_base)) {
-			pr_err("%s: ERROR: failed to mapping tse pcs\n",
-			       __func__);
-			error = PTR_ERR(bsp_priv->tse_pcs_base);
-			goto free_bsp_priv;
+		if (index >= 0) {
+			if (of_address_to_resource(np_sgmii, index,
+				&res_tse_pcs)) {
+				pr_err("%s: ERROR: missing tse pcs address\n",
+					__func__);
+				error = -EINVAL;
+				goto free_bsp_priv;
+			}
+
+			bsp_priv->tse_pcs_base = devm_ioremap_resource(
+			&pdev->dev, &res_tse_pcs);
+
+			if (IS_ERR(bsp_priv->tse_pcs_base)) {
+				pr_err("%s: ERROR: failed to mapping tse pcs\n",
+					__func__);
+				error = PTR_ERR(bsp_priv->tse_pcs_base);
+				goto free_bsp_priv;
+			}
 		}
 
 		if (phymode == PHY_INTERFACE_MODE_SGMII) {
