@@ -35,8 +35,14 @@ static int __cpuinit socfpga_boot_secondary(unsigned int cpu, struct task_struct
 
 	if (cpu1start_addr) {
 		/* This will put CPU #1 into reset.*/
-		__raw_writel(RSTMGR_MPUMODRST_CPU1,
-			     rst_manager_base_addr + 0x10);
+		if (of_machine_is_compatible("altr,socfpga-arria10"))
+			__raw_writel(RSTMGR_MPUMODRST_CPU1,
+				     rst_manager_base_addr +
+				     SOCFPGA_A10_RSTMGR_MODMPURST);
+		else
+			__raw_writel(RSTMGR_MPUMODRST_CPU1,
+				     rst_manager_base_addr +
+				     SOCFPGA_RSTMGR_MODMPURST);
 
 		memcpy(phys_to_virt(0), &secondary_trampoline, trampoline_size);
 
@@ -49,9 +55,11 @@ static int __cpuinit socfpga_boot_secondary(unsigned int cpu, struct task_struct
 
 		/* This will release CPU #1 out of reset.*/
 		if (of_machine_is_compatible("altr,socfpga-arria10"))
-			__raw_writel(0, rst_manager_base_addr + 0x20);
+			__raw_writel(0, rst_manager_base_addr +
+				     SOCFPGA_A10_RSTMGR_MODMPURST);
 		else
-			__raw_writel(0, rst_manager_base_addr + 0x10);
+			__raw_writel(0, rst_manager_base_addr +
+				     SOCFPGA_RSTMGR_MODMPURST);
 	}
 
 	return 0;
