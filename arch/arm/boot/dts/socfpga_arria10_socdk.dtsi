@@ -235,3 +235,7 @@
 &usb0 {
 	status = "okay";
 };
+
+&watchdog1 {
+	status = "okay";
+};
