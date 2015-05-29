@@ -216,3 +216,7 @@
 		reg = <0x5c>;
 	};
 };
+
+&watchdog1 {
+	status = "okay";
+};
