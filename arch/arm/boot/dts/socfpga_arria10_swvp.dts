@@ -77,6 +77,47 @@
 		interrupt-parent = <0x2>;
 		ranges;
 
+		qspi: spi@ff809000 {
+			compatible = "cadence,qspi";
+			#address-cells = <1>;
+			#size-cells = <0>;
+			reg = <0xff809000 0x100>,
+				<0xffa00000 0x100000>;
+			interrupts = <0 100 4>;
+			clocks = <0x15>;
+			ext-decoder = <0>;  /* external decoder */
+			num-chipselect = <4>;
+			fifo-depth = <128>;
+			bus-num = <2>;
+			status = "okay";
+			flash0: n25q512a@0 {
+				#address-cells = <1>;
+				#size-cells = <1>;
+				compatible = "n25q512a";
+				reg = <0>;      /* chip select */
+				spi-max-frequency = <18750000>;
+				m25p,fast-read;
+				page-size = <256>;
+				block-size = <16>; /* 2^16, 64KB */
+				read-delay = <4>;  /* delay value in read data capture register */
+				tshsl-ns = <50>;
+				tsd2d-ns = <50>;
+				tchsh-ns = <4>;
+				tslch-ns = <4>;
+
+				partition@qspi-boot {
+					/* 8MB for raw data. */
+					label = "Flash 0 Raw Data";
+					reg = <0x0 0x800000>;
+				};
+				partition@qspi-rootfs {
+					/* 56MB for jffs2 data. */
+					label = "Flash 0 jffs2 Filesystem";
+					reg = <0x800000 0x3800000>;
+				};
+			};
+		};
+
 		clkmgr@ffd04000 {
 			compatible = "altr,clk-mgr";
 			reg = <0xffd04000 0x1000>;
