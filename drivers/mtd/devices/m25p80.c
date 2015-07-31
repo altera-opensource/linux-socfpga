@@ -1311,6 +1311,7 @@ static int m25p_probe(struct spi_device *spi)
 	}
 
 	flash->info = info;
+	flash->jedec_id = info->jedec_id;
 	flash->spi = spi;
 	mutex_init(&flash->lock);
 	dev_set_drvdata(&spi->dev, flash);
