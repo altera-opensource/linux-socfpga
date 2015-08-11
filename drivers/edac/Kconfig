@@ -417,4 +417,11 @@ config EDAC_SYNOPSYS
 	  Support for error detection and correction on the Synopsys DDR
 	  memory controller.
 
+config EDAC_ALTERA_NAND_ECC
+	bool "Altera NAND Flash Controller FIFOs EDAC"
+	depends on EDAC_ALTERA_ECC_MGR
+	help
+	  Support for error detection and correction on the
+	  Altera NAND Flash Controller FIFO memories.
+
 endif # EDAC
