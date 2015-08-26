@@ -455,6 +455,9 @@
 					compatible = "altr,socfpga-a10-gate-clk";
 					clocks = <0x16>;
 					clk-gate = <0xc8 0x8>;
+                                        linux,phandle = <0x18>;
+                                        phandle = <0x18>;
+
 				};
 
 				s2f_usr1_clk {
@@ -635,5 +638,30 @@
                         status = "okay";
                 };
 
+                usbphy0: usbphy@0 {
+                        #phy-cells = <0x0>;
+                        compatible = "usb-nop-xceiv";
+                        status = "okay";
+                 };
+
+                 usb@ffb00000 {
+                        compatible = "snps,dwc2";
+                        reg = <0xffb00000 0x1ffff>;
+                        interrupts = <0x0 0x5f 0x4>;
+                        clocks = <0x18>;
+                        clock-names = "otg";
+                        phys = <&usbphy0>;
+                        phy-names = "usb2-phy";
+                 };
+
+                 usb@ffb40000 {
+                        compatible = "snps,dwc2";
+                        reg = <0xffb40000 0x1ffff>;
+                        interrupts = <0x0 0x60 0x4>;
+                        clocks = <0x18>;
+                        clock-names = "otg";
+                        phys = <&usbphy0>;
+                        phy-names = "usb2-phy";
+                 };
 	};
 };
