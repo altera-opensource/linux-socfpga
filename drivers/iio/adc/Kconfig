@@ -157,4 +157,15 @@ config VIPERBOARD_ADC
 	  Say yes here to access the ADC part of the Nano River
 	  Technologies Viperboard.
 
+config ALT_MODULAR_ADC
+	tristate "Altera Modular ADC driver"
+	select ANON_INODES
+
+	help
+	  Say yes here to have support for Altera Modular ADC. The driver
+	  supports both Altera Modular ADC and Altera Modular Dual ADC.
+
+	  The driver can also be build as a module. If so the module will be
+	  called alt_modular_adc.
+
 endmenu
