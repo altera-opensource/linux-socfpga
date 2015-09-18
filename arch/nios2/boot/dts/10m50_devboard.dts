@@ -70,7 +70,19 @@
 			compatible = "altr,juart-1.0";
 			reg = <0x18001530 0x00000008>;
 			interrupt-parent = <&cpu>;
-			interrupts = <6>;
+			interrupts = <7>;
+		};
+
+		a_16550_uart_0: serial@18001600 {
+			compatible = "altr,16550-FIFO32", "ns16550a";
+			reg = <0x18001600 0x00000200>;
+			interrupt-parent = <&cpu>;
+			interrupts = <1>;
+			auto-flow-control = <1>;
+			clock-frequency = <50000000>;
+			fifo-size = <32>;
+			reg-io-width = <4>;
+			reg-shift = <2>;
 		};
 
 		epcq_controller_0: epcq@180014a0 {
@@ -174,14 +186,14 @@
 			sys_pll_c0: sys_pll_c0 {
 				compatible = "fixed-clock";
 				#clock-cells = <0>;
-				clock-frequency = <100000000>;
+				clock-frequency = <50000000>;
 				clock-output-names = "sys_pll-c0";
 			};
 
 			sys_pll_c1: sys_pll_c1 {
 				compatible = "fixed-clock";
 				#clock-cells = <0>;
-				clock-frequency = <50000000>;
+				clock-frequency = <80000000>;
 				clock-output-names = "sys_pll-c1";
 			};
 
@@ -210,20 +222,11 @@
 			gpio-controller;
 		};
 
-		uart_0: serial@18001420 {
-			compatible = "altr,uart-1.0";
-			reg = <0x18001420 0x00000020>;
-			interrupt-parent = <&cpu>;
-			interrupts = <1>;
-			clock-frequency = <75000000>;
-			current-speed = <115200>;
-		};
-
 		button_pio: gpio@180014c0 {
 			compatible = "altr,pio-1.0";
 			reg = <0x180014c0 0x00000010>;
 			interrupt-parent = <&cpu>;
-			interrupts = <7>;
+			interrupts = <6>;
 			altr,gpio-bank-width = <3>;
 			altr,interrupt_type = <2>;
 			edge_type = <1>;
@@ -239,6 +242,19 @@
 			interrupt-parent = <&cpu>;
 			interrupts = <5>;
 			clock-frequency = <75000000>;
+		};
+
+		modular_adc_0: adc@18002200 {
+			compatible = "altr,modular-adc-1.0";
+			reg = <0x18002000 0x00000008>,
+				<0x18002200 0x00000200>;
+			reg-names = "sequencer_csr", "sample_store_csr";
+			interrupt-parent = <&cpu>;
+			interrupts = <8>;
+			altr,adc-mode = <1>;
+			altr,adc-number = <1>;
+			altr,adc-slot-count = <1>;
+			altr,adc1-slot-sequence-1 = <7>;
 		};
 
 		fpga_leds: leds {
@@ -267,6 +283,6 @@
 	};
 
 	chosen {
-		bootargs = "debug console=ttyAL0,115200 root=/dev/mtdblock1 rw rootfstype=jffs2";
+		bootargs = "debug console=ttyS0,115200 root=/dev/mtdblock1 rw rootfstype=jffs2";
 	};
 };
