@@ -1,0 +1,63 @@
+Altera Modular (Dual) ADC
+
+This binding document describes both Altera Modular ADC and Altera Modular Dual
+ADC. Both options can be configured during generation time in Qsys. This driver
+only supports standard sequencer with Avalon-MM sample storage with up to 64
+memory slots.
+
+Required properties:
+- compatible: must be one of the following strings.
+  "altr,modular-adc-1.0": single ADC configuration
+  "altr,modular-dual-adc-1.0": dual ADC configuration
+
+- reg: address and length of the register set for the device. It contains the
+  information of registers in the same order as described by reg-names.
+
+- reg-names: should contain the reg names.
+  "sequencer_csr": register region for adc sequencer block
+  "sample_store_csr": register region for sample store block
+
+- interrupts: interrupt line for ADC.
+
+- altr,adc-mode : ADC configuration.
+  1: single ADC mode
+  2: dual ADC mode
+
+- altr,adc-slot-count : specify number of conversion slot in use.
+
+- altr,adc<ADC index>-slot-sequence-<slot index>: specify ADC channel
+  conversion sequence.
+  <ADC index>: instantiated ADC number. Ranges from 1 - 2.
+  <slot index>: slot index for ADC memory slot. Ranges from 1 - 64.
+
+- altr,adc-number : specify ADC number when single ADC mode is selected.
+  1: 1st ADC
+  2: 2nd ADC
+
+Example: single ADC
+	modular_adc_0: adc@20000000 {
+		compatible = "altr,modular-adc-1.0";
+		reg = <0x20000000 0x00000008>,
+			<0x20000200 0x00000200>;
+		reg-names = "sequencer_csr", "sample_store_csr";
+		interrupt-parent = <&gic>;
+		interrupts = <8>;
+		altr,adc-mode = <1>;
+		altr,adc-slot-count = <2>;
+		altr,adc1-slot-sequence-1 = <1>;
+		altr,adc-number = <1>;
+	};
+
+Example: dual ADC
+	modular_adc_1: adc@18002000 {
+		compatible = "altr,modular-dual-adc-1.0";
+		reg = <0x18002000 0x00000008>,
+			<0x18002200 0x00000200>;
+		reg-names = "sequencer_csr", "sample_store_csr";
+		interrupt-parent = <&gic>;
+		interrupts = <8>;
+		altr,adc-mode = <2>;
+		altr,adc-slot-count = <1>;
+		altr,adc1-slot-sequence-1 = <6>;
+		altr,adc2-slot-sequence-1 = <6>;
+	};
