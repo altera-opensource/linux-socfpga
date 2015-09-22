@@ -679,6 +679,7 @@
 			interrupts = <0 110 IRQ_TYPE_LEVEL_HIGH>;
 			reg-shift = <2>;
 			reg-io-width = <4>;
+			clocks = <&l4_sp_clk>;
 			status = "disabled";
 		};
 
@@ -713,6 +714,8 @@
 			compatible = "snps,dwc2";
 			reg = <0xffb40000 0xffff>;
 			interrupts = <0 96 IRQ_TYPE_LEVEL_HIGH>;
+			clocks = <&usb_clk>;
+			clock-names = "otg";
 			phys = <&usbphy0>;
 			phy-names = "usb2-phy";
 			status = "disabled";
