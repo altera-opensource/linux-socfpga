@@ -1155,7 +1155,7 @@ static void dwc2_hc_set_even_odd_frame(struct dwc2_hsotg *hsotg,
 	    chan->ep_type == USB_ENDPOINT_XFER_ISOC) {
 
 		/* 1 if _next_ frame is odd, 0 if it's even */
-		if (dwc2_hcd_get_frame_number(hsotg) & 0x1)
+		if (!(dwc2_hcd_get_frame_number(hsotg) & 0x1))
 			*hcchar |= HCCHAR_ODDFRM;
 	}
 }
