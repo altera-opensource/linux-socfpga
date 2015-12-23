@@ -127,11 +127,7 @@ struct hrtimer_sleeper {
 	struct task_struct *task;
 };
 
-#ifdef CONFIG_64BIT
 # define HRTIMER_CLOCK_BASE_ALIGN	64
-#else
-# define HRTIMER_CLOCK_BASE_ALIGN	32
-#endif
 
 /**
  * struct hrtimer_clock_base - the timer base for a specific clock
