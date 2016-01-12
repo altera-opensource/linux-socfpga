@@ -225,10 +225,10 @@ static int ksz9021rlrn_phy_fixup(struct phy_device *phydev)
 }
 
 static void ksz9031_write_mmd_register(struct phy_device *phydev,
+				       unsigned short mmd_address,
 				       unsigned short mmdreg,
 				       unsigned short mmdval)
 {
-	unsigned short mmd_address = 2;
 	unsigned short mmd_address_op = mmd_address |
 		MICREL_KSZ9031_MMD_OP_DATANOINC;
 
@@ -248,20 +248,23 @@ static int ksz9031_phy_fixup(struct phy_device *phydev)
 		 */
 
 		/* set ksz9031, register 8 - clock pad skews */
-		ksz9031_write_mmd_register(phydev, 8,
+		ksz9031_write_mmd_register(phydev, 2, 8,
 					   MICREL_KSZ9031_A10_CLOCK_SKEW);
 
 		/* set ksz9031, register 4 - control skews */
-		ksz9031_write_mmd_register(phydev, 4,
+		ksz9031_write_mmd_register(phydev, 2, 4,
 					   MICREL_KSZ9031_A10_CTRL_SKEW);
 
 		/* set ksz9031, register 5 - RX Data skews */
-		ksz9031_write_mmd_register(phydev, 5,
+		ksz9031_write_mmd_register(phydev, 2, 5,
 					   MICREL_KSZ9031_A10_RXD_SKEW);
 
 		/* set ksz9031, register 6 - TX Data skews */
-		ksz9031_write_mmd_register(phydev, 6,
+		ksz9031_write_mmd_register(phydev, 2, 6,
 					   MICREL_KSZ9031_A10_TXD_SKEW);
+
+		ksz9031_write_mmd_register(phydev, 0, 4, 0x0006);
+		ksz9031_write_mmd_register(phydev, 0, 3, 0x1A80);
 	}
 	return 0;
 }
