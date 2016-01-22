@@ -84,7 +84,8 @@ int socfpga_init_cti(struct platform_device *pdev)
 
 	np = pdev->dev.of_node;
 
-	socfpga_cti = kzalloc(sizeof(socfpga_cti) * ncores, GFP_KERNEL);
+	socfpga_cti = devm_kzalloc(&pdev->dev, sizeof(*socfpga_cti) * ncores,
+				   GFP_KERNEL);
 	if (!socfpga_cti)
 		return -ENOMEM;
 	socfpga_cti_error = socfpga_cti;
@@ -95,7 +96,6 @@ int socfpga_init_cti(struct platform_device *pdev)
 		cti_addr = of_iomap(np2, 0);
 		if (!cti_addr) {
 			dev_err(&pdev->dev, "PMU: ioremap for CTI failed\n");
-			kfree(socfpga_cti_error);
 			return -ENOMEM;
 		}
 		socfpga_cti->cti_addr = cti_addr;
@@ -111,7 +111,7 @@ int socfpga_init_cti(struct platform_device *pdev)
 			PMU_CHANNEL_0);
 
 		socfpga_cti_device->socfpga_cti[i] = socfpga_cti;
-		socfpga_cti += sizeof(socfpga_cti);
+		socfpga_cti++;
 	}
 	platform_set_drvdata(pdev, socfpga_cti_device);
 
