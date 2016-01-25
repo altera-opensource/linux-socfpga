@@ -138,7 +138,8 @@ static void ilc_work(struct work_struct *work)
 
 static irqreturn_t ilc_interrupt_handler(int irq, void *p)
 {
-	unsigned int offset, stp_reg;
+	unsigned int stp_reg;
+	int offset;
 
 	struct altera_ilc *ilc = (struct altera_ilc *)p;
 
