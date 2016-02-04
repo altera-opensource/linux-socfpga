@@ -205,6 +205,11 @@ config ARCH_SEATTLE
 	help
 	  This enables support for AMD Seattle SOC Family
 
+config ARCH_STRATIX10SWVP
+	bool "Altera Stratix10 Software Virtual Platform"
+	help
+	  This enables support for Altera Stratix10 Software Virtual Platform
+
 config ARCH_TEGRA
 	bool "NVIDIA Tegra SoC Family"
 	select ARCH_HAS_RESET_CONTROLLER
