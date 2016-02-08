@@ -107,7 +107,8 @@ struct attribute_group altera_ilc_attr_group = {
 
 static void ilc_work(struct work_struct *work)
 {
-	unsigned int ilc_value, ret, offset, stp_reg;
+	unsigned int ilc_value, ret, stp_reg;
+	int offset;
 	struct altera_ilc *ilc =
 		container_of(work, struct altera_ilc, ilc_work.work);
 
