@@ -16,7 +16,7 @@
 
 /dts-v1/;
 
-/memreserve/   0x0000000080000000 0x0000000000010000;
+/memreserve/   0x0000000000000000 0x0000000000010000;
 
 / {
 	#address-cells = <0x1>;
@@ -60,7 +60,7 @@
 			compatible = "arm,cortex-a53", "arm,armv8";
 			reg = <0x0 0x0>;
 			enable-method = "spin-table";
-			cpu-release-addr = <0x0 0x8000fff8>;
+			cpu-release-addr = <0x0 0x0000fff8>;
 		};
 
 		cpu@1 {
@@ -68,7 +68,7 @@
 			compatible = "arm,cortex-a53", "arm,armv8";
 			reg = <0x0 0x1>;
 			enable-method = "spin-table";
-			cpu-release-addr = <0x0 0x8000fff8>;
+			cpu-release-addr = <0x0 0x0000fff8>;
 		};
 
 		cpu@2 {
@@ -76,7 +76,7 @@
 			compatible = "arm,cortex-a53", "arm,armv8";
 			reg = <0x0 0x2>;
 			enable-method = "spin-table";
-			cpu-release-addr = <0x0 0x8000fff8>;
+			cpu-release-addr = <0x0 0x0000fff8>;
 		};
 
 		cpu@3 {
@@ -84,7 +84,7 @@
 			compatible = "arm,cortex-a53", "arm,armv8";
 			reg = <0x0 0x3>;
 			enable-method = "spin-table";
-			cpu-release-addr = <0x0 0x8000fff8>;
+			cpu-release-addr = <0x0 0x0000fff8>;
 		};
 	};
 
