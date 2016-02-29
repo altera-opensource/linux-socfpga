@@ -347,7 +347,7 @@ static unsigned int cqspi_wait_idle(struct cqspi_st *cqspi)
 		} else {
 			count = 0;
 		}
-		cpu_relax();
+		cond_resched();
 	}
 
 	/* Timeout, in busy mode. */
