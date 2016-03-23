@@ -913,6 +913,8 @@
 			interrupts = <0 125 4>;
 			clocks = <&usb_mp_clk>;
 			clock-names = "otg";
+			resets = <&rst USB0_RESET>;
+			reset-names = "dwc2";
 			phys = <&usbphy0>;
 			phy-names = "usb2-phy";
 			status = "disabled";
@@ -924,6 +926,8 @@
 			interrupts = <0 128 4>;
 			clocks = <&usb_mp_clk>;
 			clock-names = "otg";
+			resets = <&rst USB1_RESET>;
+			reset-names = "dwc2";
 			phys = <&usbphy0>;
 			phy-names = "usb2-phy";
 			status = "disabled";
