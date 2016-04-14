@@ -191,12 +191,6 @@ static void *socfpga_dwmac_probe(struct platform_device *pdev)
 		return ERR_PTR(ret);
 	}
 
-	ret = socfpga_dwmac_setup(dwmac);
-	if (ret) {
-		dev_err(dev, "couldn't setup SoC glue (%d)\n", ret);
-		return ERR_PTR(ret);
-	}
-
 	return dwmac;
 }
 
