@@ -88,6 +88,9 @@ config ARCH_R8A7795
 
 config ARCH_STRATIX10
 	bool "Altera's Stratix 10 SoCFPGA Family"
+	select STMMAC_ETH
+	select MMC_DW
+	select USB_DWC2
 	help
 	  This enables support for Altera's Stratix 10 SoCFPGA Family.
 
