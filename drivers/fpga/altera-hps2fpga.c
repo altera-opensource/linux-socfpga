@@ -167,11 +167,6 @@ static int alt_fpga_bridge_probe(struct platform_device *pdev)
 
 	spin_lock_init(&l3_remap_lock);
 
-	ret = fpga_bridge_register(dev, priv->name, &altera_hps2fpga_br_ops,
-				   priv);
-	if (ret)
-		return ret;
-
 	if (!of_property_read_u32(dev->of_node, "bridge-enable", &enable)) {
 		if (enable > 1) {
 			dev_warn(dev, "invalid bridge-enable %u > 1\n", enable);
@@ -187,7 +182,8 @@ static int alt_fpga_bridge_probe(struct platform_device *pdev)
 		}
 	}
 
-	return ret;
+	return fpga_bridge_register(dev, priv->name, &altera_hps2fpga_br_ops,
+				    priv);
 }
 
 static int alt_fpga_bridge_remove(struct platform_device *pdev)
