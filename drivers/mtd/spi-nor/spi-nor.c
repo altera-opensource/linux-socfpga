@@ -810,6 +810,7 @@ static int spi_nor_write(struct mtd_info *mtd, loff_t to, size_t len,
 	struct spi_nor *nor = mtd_to_spi_nor(mtd);
 	u32 page_offset, page_size, i;
 	int ret;
+	size_t retlen_l = 0;
 
 	dev_dbg(nor->dev, "to 0x%08x, len %zd\n", (u32)to, len);
 
@@ -824,10 +825,12 @@ static int spi_nor_write(struct mtd_info *mtd, loff_t to, size_t len,
 	/* do all the bytes fit onto one page? */
 	if (page_offset + len <= nor->page_size) {
 		nor->write(nor, to, len, retlen, buf);
+		retlen_l += *retlen;
 	} else {
 		/* the size of data remaining on the first page */
 		page_size = nor->page_size - page_offset;
 		nor->write(nor, to, page_size, retlen, buf);
+		retlen_l += *retlen;
 
 		/* write everything in nor->page_size chunks */
 		for (i = page_size; i < len; i += page_size) {
@@ -842,11 +845,13 @@ static int spi_nor_write(struct mtd_info *mtd, loff_t to, size_t len,
 			write_enable(nor);
 
 			nor->write(nor, to + i, page_size, retlen, buf + i);
+			retlen_l += *retlen;
 		}
 	}
 
 	ret = spi_nor_wait_till_ready(nor);
 write_err:
+	*retlen = retlen_l;
 	spi_nor_unlock_and_unprep(nor, SPI_NOR_OPS_WRITE);
 	return ret;
 }
