@@ -1130,11 +1130,15 @@ static int spi_nor_write(struct mtd_info *mtd, loff_t to, size_t len,
 	if (page_offset + len <= nor->page_size) {
 		nor->write(nor, to, len, retlen, buf);
 		retlen_l += *retlen;
+		/* some drivers implementing nor->write might not reset *retlen every time nor-write is called, 
+ 		thus accumulating bytes written. We can zero *retlen here since we are counting bytes written in retlen_l*/
+ 		*retlen = 0;
 	} else {
 		/* the size of data remaining on the first page */
 		page_size = nor->page_size - page_offset;
 		nor->write(nor, to, page_size, retlen, buf);
 		retlen_l += *retlen;
+		*retlen = 0;
 
 		/* write everything in nor->page_size chunks */
 		for (i = page_size; i < len; i += page_size) {
@@ -1150,6 +1154,7 @@ static int spi_nor_write(struct mtd_info *mtd, loff_t to, size_t len,
 
 			nor->write(nor, to + i, page_size, retlen, buf + i);
 			retlen_l += *retlen;
+			*retlen = 0;
 		}
 	}
 
