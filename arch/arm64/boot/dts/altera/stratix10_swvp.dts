@@ -746,7 +746,7 @@
 			compatible = "snps,dw-wdt";
 			reg = <0xffd00200 0x100>;
 			interrupts = <0x0 0x75 0x4>;
-			clocks = <&osc1>;
+			clocks = <&mpu_periph_clk>;
 			status = "okay";
 		};
 
@@ -754,21 +754,21 @@
 			compatible = "snps,dw-wdt";
 			reg = <0xffd00300 0x100>;
 			interrupts = <0x0 0x76 0x4>;
-			status = "okay";
+			status = "disabled";
 		};
 
 		watchdog@ffd00400 {
 			compatible = "snps,dw-wdt";
 			reg = <0xffd00400 0x100>;
 			interrupts = <0x0 0x7d 0x4>;
-			status = "okay";
+			status = "disabled";
 		};
 
 		watchdog@ffd00500 {
 			compatible = "snps,dw-wdt";
 			reg = <0xffd00500 0x100>;
 			interrupts = <0x0 0x7e 0x4>;
-			status = "okay";
+			status = "disabled";
 		};
 
 	};
