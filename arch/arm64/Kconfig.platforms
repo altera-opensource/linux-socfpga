@@ -91,6 +91,8 @@ config ARCH_STRATIX10
 	select STMMAC_ETH
 	select MMC_DW
 	select USB_DWC2
+	select WATCHDOG
+	select DW_WATCHDOG
 	help
 	  This enables support for Altera's Stratix 10 SoCFPGA Family.
 
