@@ -4,7 +4,8 @@
 #
 
 # Core FPGA Manager Framework
-obj-$(CONFIG_FPGA)			+= fpga-mgr.o
+fpga_mgr-objs				:= fpga-mgr.o fpga-mgr-debugfs.o
+obj-$(CONFIG_FPGA)			+= fpga_mgr.o
 
 # FPGA Manager Drivers
 obj-$(CONFIG_FPGA_MGR_ALTERA_CVP)	+= altera-cvp.o
