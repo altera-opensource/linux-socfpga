@@ -213,6 +213,9 @@ struct fpga_manager {
 	const struct fpga_manager_ops *mops;
 	struct module *mops_owner;
 	void *priv;
+#if IS_ENABLED(CONFIG_FPGA_MGR_DEBUG_FS)
+	void *debugfs;
+#endif
 };
 
 #define to_fpga_manager(d) container_of(d, struct fpga_manager, dev)

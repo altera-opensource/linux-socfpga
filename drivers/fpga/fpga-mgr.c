@@ -17,6 +17,7 @@
 #include <linux/slab.h>
 #include <linux/scatterlist.h>
 #include <linux/highmem.h>
+#include "fpga-mgr-debugfs.h"
 
 static DEFINE_IDA(fpga_mgr_ida);
 static const struct class fpga_mgr_class;
@@ -894,6 +895,8 @@ void fpga_mgr_unregister(struct fpga_manager *mgr)
 {
 	dev_info(&mgr->dev, "%s %s\n", __func__, mgr->name);
 
+	fpga_mgr_debugfs_remove(mgr);
+
 	/*
 	 * If the low level driver provides a method for putting fpga into
 	 * a desired state upon unregister, do it.
@@ -993,12 +996,22 @@ static int __init fpga_mgr_class_init(void)
 {
 	pr_info("FPGA manager framework\n");
 
-	return class_register(&fpga_mgr_class);
+	fpga_mgr_class = class_create("fpga_manager");
+	if (IS_ERR(fpga_mgr_class))
+		return PTR_ERR(fpga_mgr_class);
+
+	fpga_mgr_class->dev_groups = fpga_mgr_groups;
+	fpga_mgr_class->dev_release = fpga_mgr_dev_release;
+
+	fpga_mgr_debugfs_init();
+
+	return 0;
 }
 
 static void __exit fpga_mgr_class_exit(void)
 {
-	class_unregister(&fpga_mgr_class);
+	fpga_mgr_debugfs_uninit();
+	class_destroy(fpga_mgr_class);
 	ida_destroy(&fpga_mgr_ida);
 }
 
