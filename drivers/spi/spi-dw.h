@@ -108,6 +108,7 @@ struct dw_spi {
 	int			irq;
 	u32			fifo_len;	/* depth of the FIFO buffer */
 	u32			max_freq;	/* max bus freq supported */
+	u32			cur_freq;	/* current bus frequency */
 
 	u32			reg_io_width;	/* DR I/O width in bytes */
 	u16			bus_num;
