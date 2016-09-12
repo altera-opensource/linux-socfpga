@@ -68,11 +68,8 @@ static struct fpga_region *fpga_region_find(struct device_node *np)
 
 	dev = class_find_device(fpga_region_class, NULL, np,
 				fpga_region_of_node_match);
-	if (!dev) {
-		pr_err("%s did not find FPGA Region in class: %s\n", __func__,
-		       np->full_name);
+	if (!dev)
 		return NULL;
-	}
 
 	return to_fpga_region(dev);
 }
