@@ -94,7 +94,6 @@ struct drm_plane_state {
 	struct drm_atomic_state *state;
 };
 
-
 /**
  * struct drm_plane_funcs - driver plane control functions
  */
