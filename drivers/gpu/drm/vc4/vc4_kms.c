@@ -61,7 +61,7 @@ vc4_atomic_complete_commit(struct vc4_commit *c)
 
 	drm_atomic_helper_cleanup_planes(dev, state);
 
-	drm_atomic_state_free(state);
+	drm_atomic_state_put(state);
 
 	up(&vc4->async_modeset);
 
@@ -190,6 +190,7 @@ static int vc4_atomic_commit(struct drm_device *dev,
 	 * current layout.
 	 */
 
+	drm_atomic_state_get(state);
 	if (nonblock) {
 		vc4_queue_seqno_cb(dev, &c->cb, wait_seqno,
 				   vc4_atomic_complete_commit_seqno_cb);
