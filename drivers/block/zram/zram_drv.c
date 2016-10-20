@@ -568,6 +568,7 @@ static int zram_decompress_page(struct zram *zram, char *mem, u32 index)
 	struct zram_meta *meta = zram->meta;
 	unsigned long handle;
 	unsigned int size;
+	struct zcomp_strm *zstrm;
 
 	zram_lock_table(&meta->table[index]);
 	handle = meta->table[index].handle;
@@ -579,16 +580,15 @@ static int zram_decompress_page(struct zram *zram, char *mem, u32 index)
 		return 0;
 	}
 
+	zstrm = zcomp_stream_get(zram->comp);
 	cmem = zs_map_object(meta->mem_pool, handle, ZS_MM_RO);
 	if (size == PAGE_SIZE) {
 		copy_page(mem, cmem);
 	} else {
-		struct zcomp_strm *zstrm = zcomp_stream_get(zram->comp);
-
 		ret = zcomp_decompress(zstrm, cmem, size, mem);
-		zcomp_stream_put(zram->comp);
 	}
 	zs_unmap_object(meta->mem_pool, handle);
+	zcomp_stream_put(zram->comp);
 	zram_unlock_table(&meta->table[index]);
 
 	/* Should NEVER happen. Return bio error if it does. */
