@@ -76,6 +76,7 @@
 #include <linux/compiler.h>
 #include <linux/sysctl.h>
 #include <linux/kcov.h>
+#include <linux/kprobes.h>
 
 #include <asm/pgtable.h>
 #include <asm/pgalloc.h>
@@ -384,6 +385,15 @@ void __put_task_struct(struct task_struct *tsk)
 	WARN_ON(!tsk->exit_state);
 	WARN_ON(atomic_read(&tsk->usage));
 	WARN_ON(tsk == current);
+
+	/*
+	 * Remove function-return probe instances associated with this
+	 * task and put them back on the free list.
+	 */
+	kprobe_flush_task(tsk);
+
+	/* Task is done with its stack. */
+	put_task_stack(tsk);
 
 	cgroup_free(tsk);
 	task_numa_free(tsk);
