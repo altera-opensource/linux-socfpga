@@ -288,8 +288,8 @@ static void run_ordered_work(struct __btrfs_workqueue *wq)
 		 * we don't want to call the ordered free functions
 		 * with the lock held though
 		 */
-		work->ordered_free(work);
 		trace_btrfs_all_work_done(work);
+		work->ordered_free(work);
 	}
 	spin_unlock_irqrestore(lock, flags);
 }
