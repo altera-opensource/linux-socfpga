@@ -61,6 +61,63 @@ config FB_MACMODES
 	tristate
 	depends on FB
 
+config FB_BACKLIGHT
+	tristate
+	depends on FB
+	select BACKLIGHT_CLASS_DEVICE
+
+config FB_MODE_HELPERS
+	bool "Enable Video Mode Handling Helpers"
+	depends on FB
+	help
+	  This enables functions for handling video modes using the
+	  Generalized Timing Formula and the EDID parser. A few drivers rely
+	  on this feature such as the radeonfb, rivafb, and the i810fb. If
+	  your driver does not take advantage of this feature, choosing Y will
+	  just increase the kernel size by about 5K.
+
+config FB_TILEBLITTING
+	bool "Enable Tile Blitting Support"
+	depends on FB
+	help
+	  This enables tile blitting.  Tile blitting is a drawing technique
+	  where the screen is divided into rectangular sections (tiles), whereas
+	  the standard blitting divides the screen into pixels. Because the
+	  default drawing element is a tile, drawing functions will be passed
+	  parameters in terms of number of tiles instead of number of pixels.
+	  For example, to draw a single character, instead of using bitmaps,
+	  an index to an array of bitmaps will be used.  To clear or move a
+	  rectangular section of a screen, the rectangle will be described in
+	  terms of number of tiles in the x- and y-axis.
+
+	  This is particularly important to one driver, matroxfb.  If
+	  unsure, say N.
+
+comment "Frame buffer hardware drivers"
+	depends on FB
+
+config FB_ALTERA_VIP_FB2
+	tristate "Altera VIP Frame Buffer II framebuffer support"
+	depends on FB
+	select FB_CFB_FILLRECT
+	select FB_CFB_COPYAREA
+	select FB_CFB_IMAGEBLIT
+	help
+	  This driver supports the Altera Video and Image Processing(VIP)
+	  Frame Buffer II. This core driver only supports Arria 10 HW and newer
+	  families of FPGA
+
+config FB_ALTERA_VIP_FB2_PLAT
+	tristate "Altera VIP Frame Buffer II framebuffer support OF Device"
+	depends on FB && OF
+	select FB_CFB_FILLRECT
+	select FB_CFB_COPYAREA
+	select FB_CFB_IMAGEBLIT
+	help
+	  This driver supports the Altera Video and Image Processing(VIP)
+	  Frame Buffer II. This driver only supports Arria 10 HW
+	  and newer families of FPGA on the OF Device
+
 config FB_GRVGA
 	tristate "Aeroflex Gaisler framebuffer support"
 	depends on FB && SPARC
