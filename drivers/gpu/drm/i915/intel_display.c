@@ -6262,36 +6262,25 @@ skl_dpll0_disable(struct drm_i915_private *dev_priv)
 	dev_priv->cdclk_pll.vco = 0;
 }
 
-static bool skl_cdclk_pcu_ready(struct drm_i915_private *dev_priv)
-{
-	int ret;
-	u32 val;
-
-	/* inform PCU we want to change CDCLK */
-	val = SKL_CDCLK_PREPARE_FOR_CHANGE;
-	mutex_lock(&dev_priv->rps.hw_lock);
-	ret = sandybridge_pcode_read(dev_priv, SKL_PCODE_CDCLK_CONTROL, &val);
-	mutex_unlock(&dev_priv->rps.hw_lock);
-
-	return ret == 0 && (val & SKL_CDCLK_READY_FOR_CHANGE);
-}
-
-static bool skl_cdclk_wait_for_pcu_ready(struct drm_i915_private *dev_priv)
-{
-	return _wait_for(skl_cdclk_pcu_ready(dev_priv), 3000, 10) == 0;
-}
-
 static void skl_set_cdclk(struct drm_i915_private *dev_priv, int cdclk, int vco)
 {
 	struct drm_device *dev = &dev_priv->drm;
 	u32 freq_select, pcu_ack;
+	int ret;
 
 	WARN_ON((cdclk == 24000) != (vco == 0));
 
 	DRM_DEBUG_DRIVER("Changing CDCLK to %d kHz (VCO %d kHz)\n", cdclk, vco);
 
-	if (!skl_cdclk_wait_for_pcu_ready(dev_priv)) {
-		DRM_ERROR("failed to inform PCU about cdclk change\n");
+	mutex_lock(&dev_priv->rps.hw_lock);
+	ret = skl_pcode_request(dev_priv, SKL_PCODE_CDCLK_CONTROL,
+				SKL_CDCLK_PREPARE_FOR_CHANGE,
+				SKL_CDCLK_READY_FOR_CHANGE,
+				SKL_CDCLK_READY_FOR_CHANGE, 3);
+	mutex_unlock(&dev_priv->rps.hw_lock);
+	if (ret) {
+		DRM_ERROR("Failed to inform PCU about cdclk change (%d)\n",
+			  ret);
 		return;
 	}
 
@@ -13970,8 +13959,9 @@ static int intel_modeset_checks(struct drm_atomic_state *state)
 
 		DRM_DEBUG_KMS("New cdclk calculated to be atomic %u, actual %u\n",
 			      intel_state->cdclk, intel_state->dev_cdclk);
-	} else
+	} else {
 		to_intel_atomic_state(state)->cdclk = dev_priv->atomic_cdclk_freq;
+	}
 
 	intel_modeset_clear_plls(state);
 
@@ -14072,8 +14062,9 @@ static int intel_atomic_check(struct drm_device *dev,
 
 		if (ret)
 			return ret;
-	} else
-		intel_state->cdclk = dev_priv->cdclk_freq;
+	} else {
+		intel_state->cdclk = dev_priv->atomic_cdclk_freq;
+	}
 
 	ret = drm_atomic_helper_check_planes(dev, state);
 	if (ret)
@@ -16441,6 +16432,7 @@ void intel_modeset_init(struct drm_device *dev)
 
 	intel_update_czclk(dev_priv);
 	intel_update_cdclk(dev);
+	dev_priv->atomic_cdclk_freq = dev_priv->cdclk_freq;
 
 	intel_shared_dpll_init(dev);
 
