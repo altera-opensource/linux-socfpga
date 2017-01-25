@@ -111,6 +111,6 @@
 	status = "okay";
 };
 
-&watchdog0 {
+&watchdog1 {
 	status = "okay";
 };
