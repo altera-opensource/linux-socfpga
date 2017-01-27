@@ -70,6 +70,7 @@
 				clock-names = "apb_pclk";
 				resets = <&rst DMA_RESET>, <&rst DMA_OCP_RESET>;
 				reset-names = "dma", "dma-ocp";
+				microcode-cached;
 			};
 		};
 
