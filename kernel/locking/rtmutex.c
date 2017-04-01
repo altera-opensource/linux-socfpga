@@ -2011,21 +2011,32 @@ rt_mutex_fastunlock(struct rt_mutex *lock,
 }
 
 /**
+ * rt_mutex_lock_state - lock a rt_mutex with a given state
+ *
+ * @lock:	The rt_mutex to be locked
+ * @state:	The state to set when blocking on the rt_mutex
+ */
+int __sched rt_mutex_lock_state(struct rt_mutex *lock, int state)
+{
+	might_sleep();
+
+	return rt_mutex_fastlock(lock, state, NULL, rt_mutex_slowlock);
+}
+
+/**
  * rt_mutex_lock - lock a rt_mutex
  *
  * @lock: the rt_mutex to be locked
  */
 void __sched rt_mutex_lock(struct rt_mutex *lock)
 {
-	might_sleep();
-
-	rt_mutex_fastlock(lock, TASK_UNINTERRUPTIBLE, NULL, rt_mutex_slowlock);
+	rt_mutex_lock_state(lock, TASK_UNINTERRUPTIBLE);
 }
 EXPORT_SYMBOL_GPL(rt_mutex_lock);
 
 /**
  * rt_mutex_lock_interruptible - lock a rt_mutex interruptible
- *
+ **
  * @lock:		the rt_mutex to be locked
  *
  * Returns:
@@ -2034,19 +2045,9 @@ EXPORT_SYMBOL_GPL(rt_mutex_lock);
  */
 int __sched rt_mutex_lock_interruptible(struct rt_mutex *lock)
 {
-	might_sleep();
-
-	return rt_mutex_fastlock(lock, TASK_INTERRUPTIBLE, NULL, rt_mutex_slowlock);
+	return rt_mutex_lock_state(lock, TASK_INTERRUPTIBLE);
 }
 EXPORT_SYMBOL_GPL(rt_mutex_lock_interruptible);
-
-/*
- * Futex variant, must not use fastpath.
- */
-int __sched rt_mutex_futex_trylock(struct rt_mutex *lock)
-{
-	return rt_mutex_slowtrylock(lock);
-}
 
 /**
  * rt_mutex_lock_killable - lock a rt_mutex killable
@@ -2057,15 +2058,20 @@ int __sched rt_mutex_futex_trylock(struct rt_mutex *lock)
  * Returns:
  *  0          on success
  * -EINTR      when interrupted by a signal
- * -EDEADLK    when the lock would deadlock (when deadlock detection is on)
  */
 int __sched rt_mutex_lock_killable(struct rt_mutex *lock)
 {
-	might_sleep();
-
-	return rt_mutex_fastlock(lock, TASK_KILLABLE, NULL, rt_mutex_slowlock);
+	return rt_mutex_lock_state(lock, TASK_KILLABLE);
 }
 EXPORT_SYMBOL_GPL(rt_mutex_lock_killable);
+
+/*
+ * Futex variant, must not use fastpath.
+ */
+int __sched rt_mutex_futex_trylock(struct rt_mutex *lock)
+{
+	return rt_mutex_slowtrylock(lock);
+}
 
 /**
  * rt_mutex_timed_lock - lock a rt_mutex interruptible
