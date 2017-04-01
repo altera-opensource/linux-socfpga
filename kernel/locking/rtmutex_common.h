@@ -129,6 +129,15 @@ extern bool __rt_mutex_futex_unlock(struct rt_mutex *lock,
 
 extern void rt_mutex_adjust_prio(struct task_struct *task);
 
+/* RW semaphore special interface */
+struct ww_acquire_ctx;
+
+int __sched rt_mutex_slowlock_locked(struct rt_mutex *lock, int state,
+				     struct hrtimer_sleeper *timeout,
+				     enum rtmutex_chainwalk chwalk,
+				     struct ww_acquire_ctx *ww_ctx,
+				     struct rt_mutex_waiter *waiter);
+
 #ifdef CONFIG_DEBUG_RT_MUTEXES
 # include "rtmutex-debug.h"
 #else
