@@ -14,8 +14,8 @@ endif
 ifneq ($(CONFIG_PREEMPT_RT_FULL),y)
 obj-y += mutex.o
 obj-$(CONFIG_DEBUG_MUTEXES) += mutex-debug.o
-obj-y += rwsem.o
 endif
+obj-y += rwsem.o
 obj-$(CONFIG_LOCKDEP) += lockdep.o
 ifeq ($(CONFIG_PROC_FS),y)
 obj-$(CONFIG_LOCKDEP) += lockdep_proc.o
@@ -32,6 +32,6 @@ ifneq ($(CONFIG_PREEMPT_RT_FULL),y)
 obj-$(CONFIG_RWSEM_GENERIC_SPINLOCK) += rwsem-spinlock.o
 obj-$(CONFIG_RWSEM_XCHGADD_ALGORITHM) += rwsem-xadd.o
 endif
-obj-$(CONFIG_PREEMPT_RT_FULL) += rt.o
+obj-$(CONFIG_PREEMPT_RT_FULL) += rt.o rwsem-rt.o
 obj-$(CONFIG_QUEUED_RWLOCKS) += qrwlock.o
 obj-$(CONFIG_LOCK_TORTURE_TEST) += locktorture.o

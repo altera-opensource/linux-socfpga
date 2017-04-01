@@ -110,6 +110,13 @@ static inline int rwsem_is_contended(struct rw_semaphore *sem)
 	return !list_empty(&sem->wait_list);
 }
 
+#endif /* !PREEMPT_RT_FULL */
+
+/*
+ * The functions below are the same for all rwsem implementations including
+ * the RT specific variant.
+ */
+
 /*
  * lock for reading
  */
@@ -187,7 +194,5 @@ extern void up_read_non_owner(struct rw_semaphore *sem);
 # define down_read_non_owner(sem)		down_read(sem)
 # define up_read_non_owner(sem)			up_read(sem)
 #endif
-
-#endif /* !PREEMPT_RT_FULL */
 
 #endif /* _LINUX_RWSEM_H */
