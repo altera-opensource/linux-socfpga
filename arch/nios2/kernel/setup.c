@@ -7,7 +7,7 @@
  *
  * This file is subject to the terms and conditions of the GNU General Public
  * License. See the file "COPYING" in the main directory of this archive
- * for more details.
+ * for more details.!
  */
 
 #include <linux/export.h>
@@ -18,6 +18,7 @@
 #include <linux/bootmem.h>
 #include <linux/initrd.h>
 #include <linux/of_fdt.h>
+#include <linux/screen_info.h>
 
 #include <asm/mmu_context.h>
 #include <asm/sections.h>
@@ -35,6 +36,10 @@ unsigned long memory_size;
 static struct pt_regs fake_regs = { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
 					0, 0, 0, 0, 0, 0,
 					0};
+
+#if defined(CONFIG_VT)
+struct screen_info screen_info;
+#endif
 
 /* Copy a short hook instruction sequence to the exception address */
 static inline void copy_exception_handler(unsigned int addr)
