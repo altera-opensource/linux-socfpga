@@ -1863,6 +1863,9 @@ static int renesas_usb3_stop(struct usb_gadget *gadget)
 	pm_runtime_put(usb3_to_dev(usb3));
 	pm_runtime_disable(usb3_to_dev(usb3));
 
+	pm_runtime_put(usb3_to_dev(usb3));
+	pm_runtime_disable(usb3_to_dev(usb3));
+
 	return 0;
 }
 
