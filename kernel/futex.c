@@ -1025,7 +1025,8 @@ static int attach_to_pi_state(u32 __user *uaddr, u32 uval,
 			      struct futex_pi_state **ps)
 {
 	pid_t pid = uval & FUTEX_TID_MASK;
-	int ret, uval2;
+	u32 uval2;
+	int ret;
 
 	/*
 	 * Userspace might have messed up non-PI and PI futexes [3]
@@ -1379,10 +1380,11 @@ static void mark_wake_futex(struct wake_q_head *wake_q, struct futex_q *q)
 	wake_q_add(wake_q, p);
 	__unqueue_futex(q);
 	/*
-	 * The waiting task can free the futex_q as soon as
-	 * q->lock_ptr = NULL is written, without taking any locks. A
-	 * memory barrier is required here to prevent the following
-	 * store to lock_ptr from getting ahead of the plist_del.
+	 * The waiting task can free the futex_q as soon as q->lock_ptr = NULL
+	 * is written, without taking any locks. This is possible in the event
+	 * of a spurious wakeup, for example. A memory barrier is required here
+	 * to prevent the following store to lock_ptr from getting ahead of the
+	 * plist_del in __unqueue_futex().
 	 */
 	smp_store_release(&q->lock_ptr, NULL);
 }
@@ -1394,7 +1396,7 @@ static int wake_futex_pi(u32 __user *uaddr, u32 uval, struct futex_pi_state *pi_
 {
 	u32 uninitialized_var(curval), newval;
 	struct task_struct *new_owner;
-	bool deboost = false;
+	bool postunlock = false;
 	WAKE_Q(wake_q);
 	WAKE_Q(wake_sleeper_q);
 	int ret = 0;
@@ -1442,6 +1444,11 @@ static int wake_futex_pi(u32 __user *uaddr, u32 uval, struct futex_pi_state *pi_
 	if (ret)
 		goto out_unlock;
 
+	/*
+	 * This is a point of no return; once we modify the uval there is no
+	 * going back and subsequent operations must not fail.
+	 */
+
 	raw_spin_lock(&pi_state->owner->pi_lock);
 	WARN_ON(list_empty(&pi_state->list));
 	list_del_init(&pi_state->list);
@@ -1453,20 +1460,13 @@ static int wake_futex_pi(u32 __user *uaddr, u32 uval, struct futex_pi_state *pi_
 	pi_state->owner = new_owner;
 	raw_spin_unlock(&new_owner->pi_lock);
 
-	/*
-	 * We've updated the uservalue, this unlock cannot fail.
-	 */
-	deboost = __rt_mutex_futex_unlock(&pi_state->pi_mutex, &wake_q,
-					  &wake_sleeper_q);
-
+	postunlock = __rt_mutex_futex_unlock(&pi_state->pi_mutex, &wake_q,
+					     &wake_sleeper_q);
 out_unlock:
 	raw_spin_unlock_irq(&pi_state->pi_mutex.wait_lock);
 
-	if (deboost) {
-		wake_up_q(&wake_q);
-		wake_up_q_sleeper(&wake_sleeper_q);
-		rt_mutex_adjust_prio(current);
-	}
+	if (postunlock)
+		rt_mutex_postunlock(&wake_q, &wake_sleeper_q);
 
 	return ret;
 }
@@ -2760,8 +2760,10 @@ out_unlock_put_key:
 out_put_key:
 	put_futex_key(&q.key);
 out:
-	if (to)
+	if (to) {
+		hrtimer_cancel(&to->timer);
 		destroy_hrtimer_on_stack(&to->timer);
+	}
 	return ret != -EINTR ? ret : -ERESTARTNOINTR;
 
 uaddr_faulted:

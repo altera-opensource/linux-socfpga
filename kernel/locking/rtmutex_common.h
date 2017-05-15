@@ -34,6 +34,7 @@ struct rt_mutex_waiter {
 	struct rt_mutex		*deadlock_lock;
 #endif
 	int prio;
+	u64 deadline;
 };
 
 /*
@@ -127,7 +128,8 @@ extern bool __rt_mutex_futex_unlock(struct rt_mutex *lock,
 				 struct wake_q_head *wqh,
 				 struct wake_q_head *wq_sleeper);
 
-extern void rt_mutex_adjust_prio(struct task_struct *task);
+extern void rt_mutex_postunlock(struct wake_q_head *wake_q,
+				struct wake_q_head *wq_sleeper);
 
 /* RW semaphore special interface */
 struct ww_acquire_ctx;

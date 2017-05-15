@@ -234,12 +234,25 @@ static inline bool unlock_rt_mutex_safe(struct rt_mutex *lock,
 }
 #endif
 
+#define STEAL_NORMAL  0
+#define STEAL_LATERAL 1
+/*
+ * Only use with rt_mutex_waiter_{less,equal}()
+ */
+#define task_to_waiter(p)	\
+	&(struct rt_mutex_waiter){ .prio = (p)->prio, .deadline = (p)->dl.deadline }
+
 static inline int
 rt_mutex_waiter_less(struct rt_mutex_waiter *left,
-		     struct rt_mutex_waiter *right)
+		     struct rt_mutex_waiter *right, int mode)
 {
-	if (left->prio < right->prio)
-		return 1;
+	if (mode == STEAL_NORMAL) {
+		if (left->prio < right->prio)
+			return 1;
+	} else {
+		if (left->prio <= right->prio)
+			return 1;
+	}
 
 	/*
 	 * If both waiters have dl_prio(), we check the deadlines of the
@@ -248,10 +261,28 @@ rt_mutex_waiter_less(struct rt_mutex_waiter *left,
 	 * then right waiter has a dl_prio() too.
 	 */
 	if (dl_prio(left->prio))
-		return dl_time_before(left->task->dl.deadline,
-				      right->task->dl.deadline);
+		return dl_time_before(left->deadline, right->deadline);
 
 	return 0;
+}
+
+static inline int
+rt_mutex_waiter_equal(struct rt_mutex_waiter *left,
+		      struct rt_mutex_waiter *right)
+{
+	if (left->prio != right->prio)
+		return 0;
+
+	/*
+	 * If both waiters have dl_prio(), we check the deadlines of the
+	 * associated tasks.
+	 * If left waiter has a dl_prio(), and we didn't return 0 above,
+	 * then right waiter has a dl_prio() too.
+	 */
+	if (dl_prio(left->prio))
+		return left->deadline == right->deadline;
+
+	return 1;
 }
 
 static void
@@ -265,7 +296,7 @@ rt_mutex_enqueue(struct rt_mutex *lock, struct rt_mutex_waiter *waiter)
 	while (*link) {
 		parent = *link;
 		entry = rb_entry(parent, struct rt_mutex_waiter, tree_entry);
-		if (rt_mutex_waiter_less(waiter, entry)) {
+		if (rt_mutex_waiter_less(waiter, entry, STEAL_NORMAL)) {
 			link = &parent->rb_left;
 		} else {
 			link = &parent->rb_right;
@@ -304,7 +335,7 @@ rt_mutex_enqueue_pi(struct task_struct *task, struct rt_mutex_waiter *waiter)
 	while (*link) {
 		parent = *link;
 		entry = rb_entry(parent, struct rt_mutex_waiter, pi_tree_entry);
-		if (rt_mutex_waiter_less(waiter, entry)) {
+		if (rt_mutex_waiter_less(waiter, entry, STEAL_NORMAL)) {
 			link = &parent->rb_left;
 		} else {
 			link = &parent->rb_right;
@@ -332,72 +363,16 @@ rt_mutex_dequeue_pi(struct task_struct *task, struct rt_mutex_waiter *waiter)
 	RB_CLEAR_NODE(&waiter->pi_tree_entry);
 }
 
-/*
- * Calculate task priority from the waiter tree priority
- *
- * Return task->normal_prio when the waiter tree is empty or when
- * the waiter is not allowed to do priority boosting
- */
-int rt_mutex_getprio(struct task_struct *task)
+static void rt_mutex_adjust_prio(struct task_struct *p)
 {
-	if (likely(!task_has_pi_waiters(task)))
-		return task->normal_prio;
+	struct task_struct *pi_task = NULL;
 
-	return min(task_top_pi_waiter(task)->prio,
-		   task->normal_prio);
-}
+	lockdep_assert_held(&p->pi_lock);
 
-struct task_struct *rt_mutex_get_top_task(struct task_struct *task)
-{
-	if (likely(!task_has_pi_waiters(task)))
-		return NULL;
+	if (task_has_pi_waiters(p))
+		pi_task = task_top_pi_waiter(p)->task;
 
-	return task_top_pi_waiter(task)->task;
-}
-
-/*
- * Called by sched_setscheduler() to get the priority which will be
- * effective after the change.
- */
-int rt_mutex_get_effective_prio(struct task_struct *task, int newprio)
-{
-	if (!task_has_pi_waiters(task))
-		return newprio;
-
-	if (task_top_pi_waiter(task)->task->prio <= newprio)
-		return task_top_pi_waiter(task)->task->prio;
-	return newprio;
-}
-
-/*
- * Adjust the priority of a task, after its pi_waiters got modified.
- *
- * This can be both boosting and unboosting. task->pi_lock must be held.
- */
-static void __rt_mutex_adjust_prio(struct task_struct *task)
-{
-	int prio = rt_mutex_getprio(task);
-
-	if (task->prio != prio || dl_prio(prio))
-		rt_mutex_setprio(task, prio);
-}
-
-/*
- * Adjust task priority (undo boosting). Called from the exit path of
- * rt_mutex_slowunlock() and rt_mutex_slowlock().
- *
- * (Note: We do this outside of the protection of lock->wait_lock to
- * allow the lock to be taken while or before we readjust the priority
- * of task. We do not use the spin_xx_mutex() variants here as we are
- * outside of the debug path.)
- */
-void rt_mutex_adjust_prio(struct task_struct *task)
-{
-	unsigned long flags;
-
-	raw_spin_lock_irqsave(&task->pi_lock, flags);
-	__rt_mutex_adjust_prio(task);
-	raw_spin_unlock_irqrestore(&task->pi_lock, flags);
+	rt_mutex_setprio(p, pi_task);
 }
 
 /*
@@ -629,7 +604,7 @@ static int rt_mutex_adjust_prio_chain(struct task_struct *task,
 	 * enabled we continue, but stop the requeueing in the chain
 	 * walk.
 	 */
-	if (waiter->prio == task->prio) {
+	if (rt_mutex_waiter_equal(waiter, task_to_waiter(task))) {
 		if (!detect_deadlock)
 			goto out_unlock_pi;
 		else
@@ -725,7 +700,26 @@ static int rt_mutex_adjust_prio_chain(struct task_struct *task,
 
 	/* [7] Requeue the waiter in the lock waiter tree. */
 	rt_mutex_dequeue(lock, waiter);
+
+	/*
+	 * Update the waiter prio fields now that we're dequeued.
+	 *
+	 * These values can have changed through either:
+	 *
+	 *   sys_sched_set_scheduler() / sys_sched_setattr()
+	 *
+	 * or
+	 *
+	 *   DL CBS enforcement advancing the effective deadline.
+	 *
+	 * Even though pi_waiters also uses these fields, and that tree is only
+	 * updated in [11], we can do this here, since we hold [L], which
+	 * serializes all pi_waiters access and rb_erase() does not care about
+	 * the values of the node being removed.
+	 */
 	waiter->prio = task->prio;
+	waiter->deadline = task->dl.deadline;
+
 	rt_mutex_enqueue(lock, waiter);
 
 	/* [8] Release the task */
@@ -769,7 +763,7 @@ static int rt_mutex_adjust_prio_chain(struct task_struct *task,
 		 */
 		rt_mutex_dequeue_pi(task, prerequeue_top_waiter);
 		rt_mutex_enqueue_pi(task, waiter);
-		__rt_mutex_adjust_prio(task);
+		rt_mutex_adjust_prio(task);
 
 	} else if (prerequeue_top_waiter == waiter) {
 		/*
@@ -785,7 +779,7 @@ static int rt_mutex_adjust_prio_chain(struct task_struct *task,
 		rt_mutex_dequeue_pi(task, waiter);
 		waiter = rt_mutex_top_waiter(lock);
 		rt_mutex_enqueue_pi(task, waiter);
-		__rt_mutex_adjust_prio(task);
+		rt_mutex_adjust_prio(task);
 	} else {
 		/*
 		 * Nothing changed. No need to do any priority
@@ -843,24 +837,6 @@ static int rt_mutex_adjust_prio_chain(struct task_struct *task,
 }
 
 
-#define STEAL_NORMAL  0
-#define STEAL_LATERAL 1
-
-/*
- * Note that RT tasks are excluded from lateral-steals to prevent the
- * introduction of an unbounded latency
- */
-static inline int lock_is_stealable(struct task_struct *task,
-				    struct task_struct *pendowner, int mode)
-{
-    if (mode == STEAL_NORMAL || rt_task(task)) {
-	    if (task->prio >= pendowner->prio)
-		    return 0;
-    } else if (task->prio > pendowner->prio)
-	    return 0;
-    return 1;
-}
-
 /*
  * Try to take an rt-mutex
  *
@@ -875,6 +851,8 @@ static int __try_to_take_rt_mutex(struct rt_mutex *lock,
 				  struct task_struct *task,
 				  struct rt_mutex_waiter *waiter, int mode)
 {
+	lockdep_assert_held(&lock->wait_lock);
+
 	/*
 	 * Before testing whether we can acquire @lock, we set the
 	 * RT_MUTEX_HAS_WAITERS bit in @lock->owner. This forces all
@@ -911,7 +889,7 @@ static int __try_to_take_rt_mutex(struct rt_mutex *lock,
 		 * @lock, give up.
 		 */
 		if (waiter != rt_mutex_top_waiter(lock)) {
-			/* XXX lock_is_stealable() ? */
+			/* XXX rt_mutex_waiter_less() ? */
 			return 0;
 		}
 
@@ -933,7 +911,23 @@ static int __try_to_take_rt_mutex(struct rt_mutex *lock,
 		if (rt_mutex_has_waiters(lock)) {
 			struct task_struct *pown = rt_mutex_top_waiter(lock)->task;
 
-			if (task != pown && !lock_is_stealable(task, pown, mode))
+			if (task != pown)
+				return 0;
+
+			/*
+			 * Note that RT tasks are excluded from lateral-steals
+			 * to prevent the introduction of an unbounded latency.
+			 */
+			if (rt_task(task))
+				mode = STEAL_NORMAL;
+			/*
+			 * If @task->prio is greater than or equal to
+			 * the top waiter priority (kernel view),
+			 * @task lost.
+			 */
+			if (!rt_mutex_waiter_less(task_to_waiter(task),
+						  rt_mutex_top_waiter(lock),
+						  mode))
 				return 0;
 			/*
 			 * The current top waiter stays enqueued. We
@@ -1142,9 +1136,9 @@ static void  noinline __sched rt_spin_lock_slowlock(struct rt_mutex *lock,
 	debug_rt_mutex_free_waiter(&waiter);
 }
 
-static void mark_wakeup_next_waiter(struct wake_q_head *wake_q,
-				    struct wake_q_head *wake_sleeper_q,
-				    struct rt_mutex *lock);
+static bool __sched __rt_mutex_unlock_common(struct rt_mutex *lock,
+					     struct wake_q_head *wake_q,
+					     struct wake_q_head *wq_sleeper);
 /*
  * Slow path to release a rt_mutex spin_lock style
  */
@@ -1153,25 +1147,14 @@ static void  noinline __sched rt_spin_lock_slowunlock(struct rt_mutex *lock)
 	unsigned long flags;
 	WAKE_Q(wake_q);
 	WAKE_Q(wake_sleeper_q);
+	bool postunlock;
 
 	raw_spin_lock_irqsave(&lock->wait_lock, flags);
-
-	debug_rt_mutex_unlock(lock);
-
-	if (!rt_mutex_has_waiters(lock)) {
-		lock->owner = NULL;
-		raw_spin_unlock_irqrestore(&lock->wait_lock, flags);
-		return;
-	}
-
-	mark_wakeup_next_waiter(&wake_q, &wake_sleeper_q, lock);
-
+	postunlock = __rt_mutex_unlock_common(lock, &wake_q, &wake_sleeper_q);
 	raw_spin_unlock_irqrestore(&lock->wait_lock, flags);
-	wake_up_q(&wake_q);
-	wake_up_q_sleeper(&wake_sleeper_q);
 
-	/* Undo pi boosting.when necessary */
-	rt_mutex_adjust_prio(current);
+	if (postunlock)
+		rt_mutex_postunlock(&wake_q, &wake_sleeper_q);
 }
 
 void __lockfunc rt_spin_lock__no_mg(spinlock_t *lock)
@@ -1384,6 +1367,8 @@ static int task_blocks_on_rt_mutex(struct rt_mutex *lock,
 	struct rt_mutex *next_lock;
 	int chain_walk = 0, res;
 
+	lockdep_assert_held(&lock->wait_lock);
+
 	/*
 	 * Early deadlock detection. We really don't want the task to
 	 * enqueue on itself just to untangle the mess later. It's not
@@ -1414,10 +1399,11 @@ static int task_blocks_on_rt_mutex(struct rt_mutex *lock,
 
 	BUG_ON(rt_mutex_real_waiter(task->pi_blocked_on));
 
-	__rt_mutex_adjust_prio(task);
+	rt_mutex_adjust_prio(task);
 	waiter->task = task;
 	waiter->lock = lock;
 	waiter->prio = task->prio;
+	waiter->deadline = task->dl.deadline;
 
 	/* Get the top priority waiter on the lock */
 	if (rt_mutex_has_waiters(lock))
@@ -1436,7 +1422,7 @@ static int task_blocks_on_rt_mutex(struct rt_mutex *lock,
 		rt_mutex_dequeue_pi(owner, top_waiter);
 		rt_mutex_enqueue_pi(owner, waiter);
 
-		__rt_mutex_adjust_prio(owner);
+		rt_mutex_adjust_prio(owner);
 		if (rt_mutex_real_waiter(owner->pi_blocked_on))
 			chain_walk = 1;
 	} else if (rt_mutex_cond_detect_deadlock(waiter, chwalk)) {
@@ -1489,12 +1475,14 @@ static void mark_wakeup_next_waiter(struct wake_q_head *wake_q,
 	waiter = rt_mutex_top_waiter(lock);
 
 	/*
-	 * Remove it from current->pi_waiters. We do not adjust a
-	 * possible priority boost right now. We execute wakeup in the
-	 * boosted mode and go back to normal after releasing
-	 * lock->wait_lock.
+	 * Remove it from current->pi_waiters and deboost.
+	 *
+	 * We must in fact deboost here in order to ensure we call
+	 * rt_mutex_setprio() to update p->pi_top_task before the
+	 * task unblocks.
 	 */
 	rt_mutex_dequeue_pi(current, waiter);
+	rt_mutex_adjust_prio(current);
 
 	/*
 	 * As we are waking up the top waiter, and the waiter stays
@@ -1506,12 +1494,22 @@ static void mark_wakeup_next_waiter(struct wake_q_head *wake_q,
 	 */
 	lock->owner = (void *) RT_MUTEX_HAS_WAITERS;
 
-	raw_spin_unlock(&current->pi_lock);
-
+	/*
+	 * We deboosted before waking the top waiter task such that we don't
+	 * run two tasks with the 'same' priority (and ensure the
+	 * p->pi_top_task pointer points to a blocked task). This however can
+	 * lead to priority inversion if we would get preempted after the
+	 * deboost but before waking our donor task, hence the preempt_disable()
+	 * before unlock.
+	 *
+	 * Pairs with preempt_enable() in rt_mutex_postunlock();
+	 */
+	preempt_disable();
 	if (waiter->savestate)
 		wake_q_add(wake_sleeper_q, waiter->task);
 	else
 		wake_q_add(wake_q, waiter->task);
+	raw_spin_unlock(&current->pi_lock);
 }
 
 /*
@@ -1526,6 +1524,8 @@ static void remove_waiter(struct rt_mutex *lock,
 	bool is_top_waiter = (waiter == rt_mutex_top_waiter(lock));
 	struct task_struct *owner = rt_mutex_owner(lock);
 	struct rt_mutex *next_lock = NULL;
+
+	lockdep_assert_held(&lock->wait_lock);
 
 	raw_spin_lock(&current->pi_lock);
 	rt_mutex_dequeue(lock, waiter);
@@ -1546,7 +1546,7 @@ static void remove_waiter(struct rt_mutex *lock,
 	if (rt_mutex_has_waiters(lock))
 		rt_mutex_enqueue_pi(owner, rt_mutex_top_waiter(lock));
 
-	__rt_mutex_adjust_prio(owner);
+	rt_mutex_adjust_prio(owner);
 
 	/* Store the lock on which owner is blocked or NULL */
 	if (rt_mutex_real_waiter(owner->pi_blocked_on))
@@ -1586,8 +1586,8 @@ void rt_mutex_adjust_pi(struct task_struct *task)
 	raw_spin_lock_irqsave(&task->pi_lock, flags);
 
 	waiter = task->pi_blocked_on;
-	if (!rt_mutex_real_waiter(waiter) || (waiter->prio == task->prio &&
-			!dl_prio(task->prio))) {
+	if (!rt_mutex_real_waiter(waiter) ||
+	    rt_mutex_waiter_equal(waiter, task_to_waiter(task))) {
 		raw_spin_unlock_irqrestore(&task->pi_lock, flags);
 		return;
 	}
@@ -1886,7 +1886,8 @@ static inline int rt_mutex_slowtrylock(struct rt_mutex *lock)
 
 /*
  * Slow path to release a rt-mutex.
- * Return whether the current task needs to undo a potential priority boosting.
+ *
+ * Return whether the current task needs to call rt_mutex_postunlock().
  */
 static bool __sched rt_mutex_slowunlock(struct rt_mutex *lock,
 					struct wake_q_head *wake_q,
@@ -1945,11 +1946,9 @@ static bool __sched rt_mutex_slowunlock(struct rt_mutex *lock,
 	 * Queue the next waiter for wakeup once we release the wait_lock.
 	 */
 	mark_wakeup_next_waiter(wake_q, wake_sleeper_q, lock);
-
 	raw_spin_unlock_irqrestore(&lock->wait_lock, flags);
 
-	/* check PI boosting */
-	return true;
+	return true; /* call rt_mutex_postunlock() */
 }
 
 /*
@@ -1999,6 +1998,19 @@ rt_mutex_fasttrylock(struct rt_mutex *lock,
 	return slowfn(lock);
 }
 
+/*
+ * Performs the wakeup of the the top-waiter and re-enables preemption.
+ */
+void rt_mutex_postunlock(struct wake_q_head *wake_q,
+			 struct wake_q_head *wq_sleeper)
+{
+	wake_up_q(wake_q);
+	wake_up_q_sleeper(wq_sleeper);
+
+	/* Pairs with preempt_disable() in rt_mutex_slowunlock() */
+	preempt_enable();
+}
+
 static inline void
 rt_mutex_fastunlock(struct rt_mutex *lock,
 		    bool (*slowfn)(struct rt_mutex *lock,
@@ -2007,19 +2019,12 @@ rt_mutex_fastunlock(struct rt_mutex *lock,
 {
 	WAKE_Q(wake_q);
 	WAKE_Q(wake_sleeper_q);
-	bool deboost;
 
 	if (likely(rt_mutex_cmpxchg_release(lock, current, NULL)))
 		return;
 
-	deboost = slowfn(lock, &wake_q, &wake_sleeper_q);
-
-	wake_up_q(&wake_q);
-	wake_up_q_sleeper(&wake_sleeper_q);
-
-	/* Undo pi boosting if necessary: */
-	if (deboost)
-		rt_mutex_adjust_prio(current);
+	if (slowfn(lock, &wake_q,  &wake_sleeper_q))
+		rt_mutex_postunlock(&wake_q, &wake_sleeper_q);
 }
 
 /**
@@ -2145,13 +2150,9 @@ void __sched rt_mutex_unlock(struct rt_mutex *lock)
 }
 EXPORT_SYMBOL_GPL(rt_mutex_unlock);
 
-/**
- * Futex variant, that since futex variants do not use the fast-path, can be
- * simple and will not need to retry.
- */
-bool __sched __rt_mutex_futex_unlock(struct rt_mutex *lock,
-				    struct wake_q_head *wake_q,
-				    struct wake_q_head *wq_sleeper)
+static bool __sched __rt_mutex_unlock_common(struct rt_mutex *lock,
+					     struct wake_q_head *wake_q,
+					     struct wake_q_head *wq_sleeper)
 {
 	lockdep_assert_held(&lock->wait_lock);
 
@@ -2162,25 +2163,40 @@ bool __sched __rt_mutex_futex_unlock(struct rt_mutex *lock,
 		return false; /* done */
 	}
 
+	/*
+	 * We've already deboosted, mark_wakeup_next_waiter() will
+	 * retain preempt_disabled when we drop the wait_lock, to
+	 * avoid inversion prior to the wakeup.  preempt_disable()
+	 * therein pairs with rt_mutex_postunlock().
+	 */
 	mark_wakeup_next_waiter(wake_q, wq_sleeper, lock);
-	return true; /* deboost and wakeups */
+
+	return true; /* call postunlock() */
+}
+
+/**
+ * Futex variant, that since futex variants do not use the fast-path, can be
+ * simple and will not need to retry.
+ */
+bool __sched __rt_mutex_futex_unlock(struct rt_mutex *lock,
+				    struct wake_q_head *wake_q,
+				    struct wake_q_head *wq_sleeper)
+{
+	return __rt_mutex_unlock_common(lock, wake_q, wq_sleeper);
 }
 
 void __sched rt_mutex_futex_unlock(struct rt_mutex *lock)
 {
 	WAKE_Q(wake_q);
 	WAKE_Q(wake_sleeper_q);
-	bool deboost;
+	bool postunlock;
 
 	raw_spin_lock_irq(&lock->wait_lock);
-	deboost = __rt_mutex_futex_unlock(lock, &wake_q, &wake_sleeper_q);
+	postunlock = __rt_mutex_futex_unlock(lock, &wake_q, &wake_sleeper_q);
 	raw_spin_unlock_irq(&lock->wait_lock);
 
-	if (deboost) {
-		wake_up_q(&wake_q);
-		wake_up_q_sleeper(&wake_sleeper_q);
-		rt_mutex_adjust_prio(current);
-	}
+	if (postunlock)
+		rt_mutex_postunlock(&wake_q, &wake_sleeper_q);
 }
 
 /**
