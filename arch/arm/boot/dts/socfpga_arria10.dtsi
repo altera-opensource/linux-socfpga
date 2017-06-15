@@ -642,6 +642,7 @@
 			interrupts = <0 99 4>;
 			dma-mask = <0xffffffff>;
 			clocks = <&nand_clk>;
+			have-hw-ecc-fixup;
 			status = "disabled";
 		};
 
