@@ -1506,7 +1506,7 @@ static void mark_wakeup_next_waiter(struct wake_q_head *wake_q,
 	 */
 	preempt_disable();
 	if (waiter->savestate)
-		wake_q_add(wake_sleeper_q, waiter->task);
+		wake_q_add_sleeper(wake_sleeper_q, waiter->task);
 	else
 		wake_q_add(wake_q, waiter->task);
 	raw_spin_unlock(&current->pi_lock);
