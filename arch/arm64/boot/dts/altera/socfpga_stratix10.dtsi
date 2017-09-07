@@ -564,6 +564,8 @@
 			mac-address = [00 00 00 00 00 00];
 			resets = <&rst EMAC0_RESET>;
 			reset-names = "stmmaceth";
+			clocks = <&emac0_clk>;
+			clock-names = "stmmaceth";
 			status = "disabled";
 		};
 
@@ -688,6 +690,8 @@
 			fifo-depth = <0x400>;
 			resets = <&rst SDMMC_RESET>;
 			reset-names = "reset";
+			clocks = <&l4_mp_clk>, <&sdmmc_clk>;
+			clock-names = "biu", "ciu";
 			status = "disabled";
 		};
 
