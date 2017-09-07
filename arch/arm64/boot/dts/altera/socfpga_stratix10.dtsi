@@ -559,6 +559,8 @@
 			interrupts = <0 90 4>;
 			interrupt-names = "macirq";
 			mac-address = [00 00 00 00 00 00];
+			clocks = <&emac0_clk>;
+			clock-names = "stmmaceth";
 			status = "disabled";
 		};
 
@@ -670,6 +672,8 @@
 			reg = <0xff808000 0x1000>;
 			interrupts = <0 96 4>;
 			fifo-depth = <0x400>;
+			clocks = <&l4_mp_clk>, <&sdmmc_clk>;
+			clock-names = "biu", "ciu";
 			status = "disabled";
 		};
 
