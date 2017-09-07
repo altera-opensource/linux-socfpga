@@ -46,6 +46,12 @@ config FPGA_MGR_SOCFPGA_A10
 	help
 	  FPGA manager driver support for Altera Arria10 SoCFPGA.
 
+config FPGA_MGR_STRATIX10_SOC
+	tristate "Intel Stratix10 SoC FPGA Manager"
+	depends on (ARCH_STRATIX10 && INTEL_SERVICE)
+	help
+	  FPGA manager driver support for the Intel Stratix10 SoC.
+
 config FPGA_MGR_TS73XX
 	tristate "Technologic Systems TS-73xx SBC FPGA Manager"
 	depends on ARCH_EP93XX && MACH_TS72XX
