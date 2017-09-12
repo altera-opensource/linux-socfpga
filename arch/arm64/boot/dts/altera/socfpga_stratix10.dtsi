@@ -327,7 +327,7 @@
 				noc_clk: noc_clk@30 {
 					#clock-cells = <0>;
 					compatible = "altr,socfpga-s10-perip-clk";
-					clocks = <&boot_clk>, <&noc_free_clk>;
+					clocks = <&noc_free_clk>, <&boot_clk>;
 					bypass-reg = <0x3c 1>;
 				};
 
