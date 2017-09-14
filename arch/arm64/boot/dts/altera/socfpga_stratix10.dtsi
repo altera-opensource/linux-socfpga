@@ -751,7 +751,7 @@
 			compatible = "snps,dw-apb-timer";
 			interrupts = <0 113 4>;
 			reg = <0xffc03000 0x100>;
-			clock-frequency = <100000000>;
+			clocks = <&l4_sp_clk>;
 			clock-names = "timer";
 		};
 
@@ -759,7 +759,7 @@
 			compatible = "snps,dw-apb-timer";
 			interrupts = <0 114 4>;
 			reg = <0xffc03100 0x100>;
-			clock-frequency = <100000000>;
+			clocks = <&l4_sp_clk>;
 			clock-names = "timer";
 		};
 
@@ -767,7 +767,7 @@
 			compatible = "snps,dw-apb-timer";
 			interrupts = <0 115 4>;
 			reg = <0xffd00000 0x100>;
-			clock-frequency = <100000000>;
+			clocks = <&l4_sys_free_clk>;
 			clock-names = "timer";
 		};
 
@@ -775,7 +775,7 @@
 			compatible = "snps,dw-apb-timer";
 			interrupts = <0 116 4>;
 			reg = <0xffd00100 0x100>;
-			clock-frequency = <100000000>;
+			clocks = <&l4_sys_free_clk>;
 			clock-names = "timer";
 		};
 
@@ -786,6 +786,7 @@
 			reg-shift = <2>;
 			reg-io-width = <4>;
 			resets = <&rst UART0_RESET>;
+			clocks = <&l4_sp_clk>;
 			status = "disabled";
 		};
 
@@ -796,6 +797,7 @@
 			reg-shift = <2>;
 			reg-io-width = <4>;
 			resets = <&rst UART1_RESET>;
+			clocks = <&l4_sp_clk>;
 			status = "disabled";
 		};
 
