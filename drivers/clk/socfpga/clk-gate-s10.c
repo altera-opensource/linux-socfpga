@@ -25,6 +25,7 @@
 #define streq(a, b) (strcmp((a), (b)) == 0)
 
 #define SOCFPGA_CS_PDBG_CLK	"cs_pdbg_clk"
+#define SOCFPGA_L4_SP_CLK	"l4_sp_clk"
 
 #define to_socfpga_gate_clk(p) container_of(p, struct socfpga_gate_clk, hw.hw)
 
@@ -104,7 +105,7 @@ static u8 socfpga_gate_get_parent(struct clk_hw *hwclk)
 {
 	struct socfpga_gate_clk *socfpgaclk = to_socfpga_gate_clk(hwclk);
 	u32 mask;
-	u8 parent;
+	u8 parent = 0;
 
 	if (socfpgaclk->bypass_reg) {
 		mask = (0x1 << socfpgaclk->bypass_shift);
@@ -192,7 +193,10 @@ static void __init __socfpga_gate_init(struct device_node *node,
 
 	init.name = clk_name;
 	init.ops = ops;
-	init.flags = 0;
+	if (streq(clk_name, SOCFPGA_L4_SP_CLK))
+		init.flags = CLK_IS_CRITICAL;
+	else
+		init.flags = 0;
 
 	init.num_parents = of_clk_parent_fill(node, parent_names, SOCFPGA_MAX_PARENTS);
 	init.parent_names = parent_names;
