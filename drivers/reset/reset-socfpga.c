@@ -37,8 +37,9 @@ static int socfpga_reset_assert(struct reset_controller_dev *rcdev,
 	struct socfpga_reset_data *data = container_of(rcdev,
 						     struct socfpga_reset_data,
 						     rcdev);
-	int bank = id / BITS_PER_LONG;
-	int offset = id % BITS_PER_LONG;
+	int reg_width = sizeof(u32);
+	int bank = id / (reg_width * BITS_PER_BYTE);
+	int offset = id % (reg_width * BITS_PER_BYTE);
 	unsigned long flags;
 	u32 reg;
 
@@ -58,8 +59,9 @@ static int socfpga_reset_deassert(struct reset_controller_dev *rcdev,
 						     struct socfpga_reset_data,
 						     rcdev);
 
-	int bank = id / BITS_PER_LONG;
-	int offset = id % BITS_PER_LONG;
+	int reg_width = sizeof(u32);
+	int bank = id / (reg_width * BITS_PER_BYTE);
+	int offset = id % (reg_width * BITS_PER_BYTE);
 	unsigned long flags;
 	u32 reg;
 
@@ -78,8 +80,9 @@ static int socfpga_reset_status(struct reset_controller_dev *rcdev,
 {
 	struct socfpga_reset_data *data = container_of(rcdev,
 						struct socfpga_reset_data, rcdev);
-	int bank = id / BITS_PER_LONG;
-	int offset = id % BITS_PER_LONG;
+	int reg_width = sizeof(u32);
+	int bank = id / (reg_width * BITS_PER_BYTE);
+	int offset = id % (reg_width * BITS_PER_BYTE);
 	u32 reg;
 
 	reg = readl(data->membase + (bank * NR_BANKS));
@@ -129,7 +132,7 @@ static int socfpga_reset_probe(struct platform_device *pdev)
 	spin_lock_init(&data->lock);
 
 	data->rcdev.owner = THIS_MODULE;
-	data->rcdev.nr_resets = NR_BANKS * BITS_PER_LONG;
+	data->rcdev.nr_resets = NR_BANKS * (sizeof(u32) * BITS_PER_BYTE);
 	data->rcdev.ops = &socfpga_reset_ops;
 	data->rcdev.of_node = pdev->dev.of_node;
 
