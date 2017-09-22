@@ -2590,16 +2590,16 @@ rb_wakeups(struct ring_buffer *buffer, struct ring_buffer_per_cpu *cpu_buffer)
  *  IRQ context
  *  NMI context
  *
- * If for some reason the ring buffer starts to recurse, we
- * only allow that to happen at most 4 times (one for each
- * context). If it happens 5 times, then we consider this a
- * recusive loop and do not let it go further.
+ * If for some reason the ring buffer starts to recurse, we only allow
+ * that to happen at most 6 times (one for each context, plus possibly
+ * two levels of synthetic event generation). If it happens 7 times,
+ * then we consider this a recusive loop and do not let it go further.
  */
 
 static __always_inline int
 trace_recursive_lock(struct ring_buffer_per_cpu *cpu_buffer)
 {
-	if (cpu_buffer->current_context >= 4)
+	if (cpu_buffer->current_context >= 6)
 		return 1;
 
 	cpu_buffer->current_context++;
