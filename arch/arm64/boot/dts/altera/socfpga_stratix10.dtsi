@@ -546,6 +546,12 @@
 					clocks = <&l4_main_clk>;
 					clk-gate = <0xa4 10>;
 				};
+
+				qspi_clk: qspi_clk {
+					#clock-cells = <0>;
+					compatible = "fixed-clock";
+					clock-frequency = <400000000>;
+				};
 			};
 		};
 
@@ -852,6 +858,22 @@
 			reg = <0xffd00500 0x100>;
 			interrupts = <0 126 4>;
 			resets = <&rst WATCHDOG3_RESET>;
+			status = "disabled";
+		};
+
+		qspi: spi@ff8d2000 {
+			compatible = "cdns,qspi-nor";
+			#address-cells = <1>;
+			#size-cells = <0>;
+			reg = <0xff8d2000 0x100>,
+			      <0xff900000 0x100000>;
+			interrupts = <0 3 4>;
+			cdns,fifo-depth = <128>;
+			cdns,fifo-width = <4>;
+			cdns,trigger-address = <0x00000000>;
+			clocks = <&qspi_clk>;
+			bus-num = <1>;
+
 			status = "disabled";
 		};
 	};
