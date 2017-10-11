@@ -24,6 +24,7 @@
 #include <linux/of_irq.h>
 #include <linux/platform_device.h>
 #include <linux/property.h>
+#include <linux/reset.h>
 #include <linux/spinlock.h>
 #include <linux/platform_data/gpio-dwapb.h>
 #include <linux/slab.h>
@@ -87,6 +88,7 @@ struct dwapb_gpio {
 	struct dwapb_gpio_port	*ports;
 	unsigned int		nr_ports;
 	struct irq_domain	*domain;
+	struct reset_control	*rst;
 };
 
 static inline u32 dwapb_read(struct dwapb_gpio *gpio, unsigned int offset)
@@ -545,6 +547,12 @@ static int dwapb_gpio_probe(struct platform_device *pdev)
 	gpio->dev = &pdev->dev;
 	gpio->nr_ports = pdata->nports;
 
+	gpio->rst = devm_reset_control_get_optional_shared(dev, NULL);
+	if (IS_ERR(gpio->rst))
+		return PTR_ERR(gpio->rst);
+
+	reset_control_deassert(gpio->rst);
+
 	gpio->ports = devm_kcalloc(&pdev->dev, gpio->nr_ports,
 				   sizeof(*gpio->ports), GFP_KERNEL);
 	if (!gpio->ports)
@@ -577,6 +585,7 @@ static int dwapb_gpio_remove(struct platform_device *pdev)
 
 	dwapb_gpio_unregister(gpio);
 	dwapb_irq_teardown(gpio);
+	reset_control_assert(gpio->rst);
 
 	return 0;
 }
