@@ -58,16 +58,12 @@ struct ipmmu_vmsa_domain {
 	struct mutex mutex;			/* Protects mappings */
 };
 
-struct ipmmu_vmsa_iommu_priv {
-	struct ipmmu_vmsa_device *mmu;
-};
-
 static struct ipmmu_vmsa_domain *to_vmsa_domain(struct iommu_domain *dom)
 {
 	return container_of(dom, struct ipmmu_vmsa_domain, io_domain);
 }
 
-static struct ipmmu_vmsa_iommu_priv *to_priv(struct device *dev)
+static struct ipmmu_vmsa_device *to_ipmmu(struct device *dev)
 {
 	return dev->iommu_fwspec ? dev->iommu_fwspec->iommu_priv : NULL;
 }
@@ -568,14 +564,13 @@ static void ipmmu_domain_free(struct iommu_domain *io_domain)
 static int ipmmu_attach_device(struct iommu_domain *io_domain,
 			       struct device *dev)
 {
-	struct ipmmu_vmsa_iommu_priv *priv = to_priv(dev);
 	struct iommu_fwspec *fwspec = dev->iommu_fwspec;
-	struct ipmmu_vmsa_device *mmu = priv->mmu;
+	struct ipmmu_vmsa_device *mmu = to_ipmmu(dev);
 	struct ipmmu_vmsa_domain *domain = to_vmsa_domain(io_domain);
 	unsigned int i;
 	int ret = 0;
 
-	if (!priv || !priv->mmu) {
+	if (!mmu) {
 		dev_err(dev, "Cannot attach to IPMMU\n");
 		return -ENXIO;
 	}
@@ -664,18 +659,12 @@ static int ipmmu_init_platform_device(struct device *dev,
 				      struct of_phandle_args *args)
 {
 	struct platform_device *ipmmu_pdev;
-	struct ipmmu_vmsa_iommu_priv *priv;
 
 	ipmmu_pdev = of_find_device_by_node(args->np);
 	if (!ipmmu_pdev)
 		return -ENODEV;
 
-	priv = kzalloc(sizeof(*priv), GFP_KERNEL);
-	if (!priv)
-		return -ENOMEM;
-
-	priv->mmu = platform_get_drvdata(ipmmu_pdev);
-	dev->iommu_fwspec->iommu_priv = priv;
+	dev->iommu_fwspec->iommu_priv = platform_get_drvdata(ipmmu_pdev);
 	return 0;
 }
 
@@ -685,7 +674,7 @@ static int ipmmu_of_xlate(struct device *dev,
 	iommu_fwspec_add_ids(dev, spec->args, 1);
 
 	/* Initialize once - xlate() will call multiple times */
-	if (to_priv(dev))
+	if (to_ipmmu(dev))
 		return 0;
 
 	return ipmmu_init_platform_device(dev, spec);
@@ -695,14 +684,14 @@ static int ipmmu_of_xlate(struct device *dev,
 
 static int ipmmu_add_device(struct device *dev)
 {
-	struct ipmmu_vmsa_device *mmu = NULL;
+	struct ipmmu_vmsa_device *mmu = to_ipmmu(dev);
 	struct iommu_group *group;
 	int ret;
 
 	/*
 	 * Only let through devices that have been verified in xlate()
 	 */
-	if (!to_priv(dev))
+	if (!mmu)
 		return -ENODEV;
 
 	/* Create a device group and add the device to it. */
@@ -731,7 +720,6 @@ static int ipmmu_add_device(struct device *dev)
 	 * - Make the mapping size configurable ? We currently use a 2GB mapping
 	 *   at a 1GB offset to ensure that NULL VAs will fault.
 	 */
-	mmu = to_priv(dev)->mmu;
 	if (!mmu->mapping) {
 		struct dma_iommu_mapping *mapping;
 
@@ -797,7 +785,7 @@ static int ipmmu_add_device_dma(struct device *dev)
 	/*
 	 * Only let through devices that have been verified in xlate()
 	 */
-	if (!to_priv(dev))
+	if (!to_ipmmu(dev))
 		return -ENODEV;
 
 	group = iommu_group_get_for_dev(dev);
@@ -814,15 +802,15 @@ static void ipmmu_remove_device_dma(struct device *dev)
 
 static struct iommu_group *ipmmu_find_group(struct device *dev)
 {
-	struct ipmmu_vmsa_iommu_priv *priv = to_priv(dev);
+	struct ipmmu_vmsa_device *mmu = to_ipmmu(dev);
 	struct iommu_group *group;
 
-	if (priv->mmu->group)
-		return iommu_group_ref_get(priv->mmu->group);
+	if (mmu->group)
+		return iommu_group_ref_get(mmu->group);
 
 	group = iommu_group_alloc();
 	if (!IS_ERR(group))
-		priv->mmu->group = group;
+		mmu->group = group;
 
 	return group;
 }
