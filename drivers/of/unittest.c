@@ -1228,7 +1228,7 @@ static void of_unittest_untrack_overlay(int id)
 
 static void of_unittest_destroy_tracked_overlays(void)
 {
-	int id, ret, defers;
+	int id, ret, defers, ovcs_id;
 
 	if (overlay_first_id < 0)
 		return;
@@ -1241,7 +1241,8 @@ static void of_unittest_destroy_tracked_overlays(void)
 			if (!(overlay_id_bits[BIT_WORD(id)] & BIT_MASK(id)))
 				continue;
 
-			ret = of_overlay_remove(id + overlay_first_id);
+			ovcs_id = id + overlay_first_id;
+			ret = of_overlay_remove(&ovcs_id);
 			if (ret == -ENODEV) {
 				pr_warn("%s: no overlay to destroy for #%d\n",
 					__func__, id + overlay_first_id);
@@ -1263,7 +1264,7 @@ static int of_unittest_apply_overlay(int overlay_nr, int unittest_nr,
 		int *overlay_id)
 {
 	struct device_node *np = NULL;
-	int ret, id = -1;
+	int ret;
 
 	np = of_find_node_by_path(overlay_path(overlay_nr));
 	if (np == NULL) {
@@ -1273,22 +1274,19 @@ static int of_unittest_apply_overlay(int overlay_nr, int unittest_nr,
 		goto out;
 	}
 
-	ret = of_overlay_apply(np);
+	*overlay_id = 0;
+	ret = of_overlay_apply(np, overlay_id);
 	if (ret < 0) {
 		unittest(0, "could not create overlay from \"%s\"\n",
 				overlay_path(overlay_nr));
 		goto out;
 	}
-	id = ret;
-	of_unittest_track_overlay(id);
+	of_unittest_track_overlay(*overlay_id);
 
 	ret = 0;
 
 out:
 	of_node_put(np);
-
-	if (overlay_id)
-		*overlay_id = id;
 
 	return ret;
 }
@@ -1297,7 +1295,7 @@ out:
 static int of_unittest_apply_overlay_check(int overlay_nr, int unittest_nr,
 		int before, int after, enum overlay_type ovtype)
 {
-	int ret;
+	int ret, ovcs_id;
 
 	/* unittest device must not be in before state */
 	if (of_unittest_device_exists(unittest_nr, ovtype) != before) {
@@ -1308,7 +1306,8 @@ static int of_unittest_apply_overlay_check(int overlay_nr, int unittest_nr,
 		return -EINVAL;
 	}
 
-	ret = of_unittest_apply_overlay(overlay_nr, unittest_nr, NULL);
+	ovcs_id = 0;
+	ret = of_unittest_apply_overlay(overlay_nr, unittest_nr, &ovcs_id);
 	if (ret != 0) {
 		/* of_unittest_apply_overlay already called unittest() */
 		return ret;
@@ -1331,7 +1330,7 @@ static int of_unittest_apply_revert_overlay_check(int overlay_nr,
 		int unittest_nr, int before, int after,
 		enum overlay_type ovtype)
 {
-	int ret, ov_id;
+	int ret, ovcs_id;
 
 	/* unittest device must be in before state */
 	if (of_unittest_device_exists(unittest_nr, ovtype) != before) {
@@ -1343,7 +1342,8 @@ static int of_unittest_apply_revert_overlay_check(int overlay_nr,
 	}
 
 	/* apply the overlay */
-	ret = of_unittest_apply_overlay(overlay_nr, unittest_nr, &ov_id);
+	ovcs_id = 0;
+	ret = of_unittest_apply_overlay(overlay_nr, unittest_nr, &ovcs_id);
 	if (ret != 0) {
 		/* of_unittest_apply_overlay already called unittest() */
 		return ret;
@@ -1358,7 +1358,7 @@ static int of_unittest_apply_revert_overlay_check(int overlay_nr,
 		return -EINVAL;
 	}
 
-	ret = of_overlay_remove(ov_id);
+	ret = of_overlay_remove(&ovcs_id);
 	if (ret != 0) {
 		unittest(0, "overlay @\"%s\" failed to be destroyed @\"%s\"\n",
 				overlay_path(overlay_nr),
@@ -1460,7 +1460,7 @@ static void of_unittest_overlay_5(void)
 static void of_unittest_overlay_6(void)
 {
 	struct device_node *np;
-	int ret, i, ov_id[2];
+	int ret, i, ov_id[2], ovcs_id;
 	int overlay_nr = 6, unittest_nr = 6;
 	int before = 0, after = 1;
 
@@ -1487,13 +1487,14 @@ static void of_unittest_overlay_6(void)
 			return;
 		}
 
-		ret = of_overlay_apply(np);
+		ovcs_id = 0;
+		ret = of_overlay_apply(np, &ovcs_id);
 		if (ret < 0)  {
 			unittest(0, "could not create overlay from \"%s\"\n",
 					overlay_path(overlay_nr + i));
 			return;
 		}
-		ov_id[i] = ret;
+		ov_id[i] = ovcs_id;
 		of_unittest_track_overlay(ov_id[i]);
 	}
 
@@ -1511,7 +1512,8 @@ static void of_unittest_overlay_6(void)
 	}
 
 	for (i = 1; i >= 0; i--) {
-		ret = of_overlay_remove(ov_id[i]);
+		ovcs_id = ov_id[i];
+		ret = of_overlay_remove(&ovcs_id);
 		if (ret != 0) {
 			unittest(0, "overlay @\"%s\" failed destroy @\"%s\"\n",
 					overlay_path(overlay_nr + i),
@@ -1542,7 +1544,7 @@ static void of_unittest_overlay_6(void)
 static void of_unittest_overlay_8(void)
 {
 	struct device_node *np;
-	int ret, i, ov_id[2];
+	int ret, i, ov_id[2], ovcs_id;
 	int overlay_nr = 8, unittest_nr = 8;
 
 	/* we don't care about device state in this test */
@@ -1557,18 +1559,20 @@ static void of_unittest_overlay_8(void)
 			return;
 		}
 
-		ret = of_overlay_apply(np);
+		ovcs_id = 0;
+		ret = of_overlay_apply(np, &ovcs_id);
 		if (ret < 0)  {
 			unittest(0, "could not create overlay from \"%s\"\n",
 					overlay_path(overlay_nr + i));
 			return;
 		}
-		ov_id[i] = ret;
+		ov_id[i] = ovcs_id;
 		of_unittest_track_overlay(ov_id[i]);
 	}
 
 	/* now try to remove first overlay (it should fail) */
-	ret = of_overlay_remove(ov_id[0]);
+	ovcs_id = ov_id[0];
+	ret = of_overlay_remove(&ovcs_id);
 	if (ret == 0) {
 		unittest(0, "overlay @\"%s\" was destroyed @\"%s\"\n",
 				overlay_path(overlay_nr + 0),
@@ -1579,7 +1583,8 @@ static void of_unittest_overlay_8(void)
 
 	/* removing them in order should work */
 	for (i = 1; i >= 0; i--) {
-		ret = of_overlay_remove(ov_id[i]);
+		ovcs_id = ov_id[i];
+		ret = of_overlay_remove(&ovcs_id);
 		if (ret != 0) {
 			unittest(0, "overlay @\"%s\" not destroyed @\"%s\"\n",
 					overlay_path(overlay_nr + i),
@@ -2160,13 +2165,11 @@ static int __init overlay_data_add(int onum)
 		goto out_free_np_overlay;
 	}
 
-	ret = of_overlay_apply(info->np_overlay);
+	info->overlay_id = 0;
+	ret = of_overlay_apply(info->np_overlay, &info->overlay_id);
 	if (ret < 0) {
 		pr_err("of_overlay_apply() (ret=%d), %d\n", ret, onum);
 		goto out_free_np_overlay;
-	} else {
-		info->overlay_id = ret;
-		ret = 0;
 	}
 
 	pr_debug("__dtb_overlay_begin applied, overlay id %d\n", ret);
