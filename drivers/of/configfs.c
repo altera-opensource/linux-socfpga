@@ -64,13 +64,12 @@ static int create_overlay(struct cfs_overlay_item *overlay, void *blob)
 	}
 	pr_debug("%s: resolved OK\n", __func__);
 
-	err = of_overlay_create(overlay->overlay);
+	err = of_overlay_apply(overlay->overlay, &overlay->ov_id);
 	if (err < 0) {
 		pr_err("%s: Failed to create overlay (err=%d)\n",
 				__func__, err);
 		goto out_err;
 	}
-	overlay->ov_id = err;
 
 out_err:
 	return err;
@@ -211,7 +210,7 @@ static void cfs_overlay_release(struct config_item *item)
 	struct cfs_overlay_item *overlay = to_cfs_overlay_item(item);
 
 	if (overlay->ov_id >= 0)
-		of_overlay_destroy(overlay->ov_id);
+		of_overlay_remove(&overlay->ov_id);
 	if (overlay->fw)
 		release_firmware(overlay->fw);
 	/* kfree with NULL is safe */
