@@ -457,19 +457,33 @@ static inline void hrtimer_update_next_timer(struct hrtimer_cpu_base *cpu_base,
 #endif
 }
 
+static struct hrtimer_clock_base *
+__next_base(struct hrtimer_cpu_base *cpu_base, unsigned int *active)
+{
+	struct hrtimer_clock_base *base = NULL;
+
+	if (*active) {
+		unsigned int idx = __ffs(*active);
+		*active &= ~(1U << idx);
+		base = &cpu_base->clock_base[idx];
+	}
+
+	return base;
+}
+
+#define for_each_active_base(base, cpu_base, active)	\
+	while ((base = __next_base((cpu_base), &(active))))
+
 static ktime_t __hrtimer_get_next_event(struct hrtimer_cpu_base *cpu_base)
 {
-	struct hrtimer_clock_base *base = cpu_base->clock_base;
+	struct hrtimer_clock_base *base;
 	unsigned int active = cpu_base->active_bases;
 	ktime_t expires, expires_next = KTIME_MAX;
 
 	hrtimer_update_next_timer(cpu_base, NULL);
-	for (; active; base++, active >>= 1) {
+	for_each_active_base(base, cpu_base, active) {
 		struct timerqueue_node *next;
 		struct hrtimer *timer;
-
-		if (!(active & 0x01))
-			continue;
 
 		next = timerqueue_getnext(&base->active);
 		timer = container_of(next, struct hrtimer, node);
@@ -1243,15 +1257,12 @@ static void __run_hrtimer(struct hrtimer_cpu_base *cpu_base,
 
 static void __hrtimer_run_queues(struct hrtimer_cpu_base *cpu_base, ktime_t now)
 {
-	struct hrtimer_clock_base *base = cpu_base->clock_base;
+	struct hrtimer_clock_base *base;
 	unsigned int active = cpu_base->active_bases;
 
-	for (; active; base++, active >>= 1) {
+	for_each_active_base(base, cpu_base, active) {
 		struct timerqueue_node *node;
 		ktime_t basenow;
-
-		if (!(active & 0x01))
-			continue;
 
 		basenow = ktime_add(now, base->offset);
 
