@@ -634,6 +634,9 @@ static int dwc2_driver_probe(struct platform_device *dev)
 	/* Validate parameter values */
 	dwc2_set_parameters(hsotg, params);
 
+	if (of_find_property(hsotg->dev->of_node, "disable-over-current", NULL)) 
+		hsotg->core_params->oc_disable = true;
+
 	dwc2_force_dr_mode(hsotg);
 
 	if (hsotg->dr_mode != USB_DR_MODE_HOST) {
