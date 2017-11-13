@@ -150,14 +150,25 @@ static inline void tick_nohz_init(void) { }
 
 #ifdef CONFIG_NO_HZ_COMMON
 extern unsigned long tick_nohz_active;
-#else
-#define tick_nohz_active (0)
-#endif
+extern void timers_update_nohz(void);
+extern struct static_key_false timers_nohz_active;
 
-#if defined(CONFIG_SMP) && defined(CONFIG_NO_HZ_COMMON)
-extern void timers_update_migration(bool update_nohz);
+static inline bool is_timers_nohz_active(void)
+{
+	return static_branch_unlikely(&timers_nohz_active);
+}
+
+#ifdef CONFIG_SMP
+extern struct static_key_false timers_migration_enabled;
+#endif
 #else
-static inline void timers_update_migration(bool update_nohz) { }
+static inline void timers_update_nohz(void) { }
+#define tick_nohz_active (0)
+
+static inline bool is_timers_nohz_active(void)
+{
+	return false;
+}
 #endif
 
 DECLARE_PER_CPU(struct hrtimer_cpu_base, hrtimer_bases);
