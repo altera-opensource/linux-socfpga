@@ -2246,7 +2246,7 @@ rb_move_tail(struct ring_buffer_per_cpu *cpu_buffer,
 }
 
 /* Slow path, do not inline */
-static struct noinline ring_buffer_event *
+static noinline struct ring_buffer_event *
 rb_add_time_stamp(struct ring_buffer_event *event, u64 delta, bool abs)
 {
 	if (abs)
@@ -2519,10 +2519,6 @@ rb_update_write_stamp(struct ring_buffer_per_cpu *cpu_buffer,
 {
 	u64 delta;
 
-	/* In TIME_STAMP mode, write_stamp is unused, nothing to do */
-	if (event->type_len == RINGBUF_TYPE_TIME_STAMP)
-		return;
-
 	/*
 	 * The event first in the commit queue updates the
 	 * time stamp.
@@ -2538,6 +2534,9 @@ rb_update_write_stamp(struct ring_buffer_per_cpu *cpu_buffer,
 		else if (event->type_len == RINGBUF_TYPE_TIME_EXTEND) {
 			delta = ring_buffer_event_time_stamp(event);
 			cpu_buffer->write_stamp += delta;
+		} else if (event->type_len == RINGBUF_TYPE_TIME_STAMP) {
+			delta = ring_buffer_event_time_stamp(event);
+			cpu_buffer->write_stamp = delta;
 		} else
 			cpu_buffer->write_stamp += event->time_delta;
 	}
@@ -3459,7 +3458,8 @@ rb_update_read_stamp(struct ring_buffer_per_cpu *cpu_buffer,
 		return;
 
 	case RINGBUF_TYPE_TIME_STAMP:
-		/* In TIME_STAMP mode, write_stamp is unused, nothing to do */
+		delta = ring_buffer_event_time_stamp(event);
+		cpu_buffer->read_stamp = delta;
 		return;
 
 	case RINGBUF_TYPE_DATA:
@@ -3488,7 +3488,8 @@ rb_update_iter_read_stamp(struct ring_buffer_iter *iter,
 		return;
 
 	case RINGBUF_TYPE_TIME_STAMP:
-		/* In TIME_STAMP mode, write_stamp is unused, nothing to do */
+		delta = ring_buffer_event_time_stamp(event);
+		iter->read_stamp = delta;
 		return;
 
 	case RINGBUF_TYPE_DATA:
