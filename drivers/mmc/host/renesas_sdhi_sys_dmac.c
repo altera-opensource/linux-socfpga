@@ -141,12 +141,15 @@ static void renesas_sdhi_sys_dmac_abort_dma(struct tmio_mmc_host *host)
 
 static void renesas_sdhi_sys_dmac_dataend_dma(struct tmio_mmc_host *host)
 {
-	complete(&host->dma_dataend);
+	struct renesas_sdhi *priv = host_to_priv(host);
+
+	complete(&priv->dma_priv.dma_dataend);
 }
 
 static void renesas_sdhi_sys_dmac_dma_callback(void *arg)
 {
 	struct tmio_mmc_host *host = arg;
+	struct renesas_sdhi *priv = host_to_priv(host);
 
 	spin_lock_irq(&host->lock);
 
@@ -164,7 +167,7 @@ static void renesas_sdhi_sys_dmac_dma_callback(void *arg)
 
 	spin_unlock_irq(&host->lock);
 
-	wait_for_completion(&host->dma_dataend);
+	wait_for_completion(&priv->dma_priv.dma_dataend);
 
 	spin_lock_irq(&host->lock);
 	tmio_mmc_do_data_irq(host);
@@ -174,6 +177,7 @@ out:
 
 static void renesas_sdhi_sys_dmac_start_dma_rx(struct tmio_mmc_host *host)
 {
+	struct renesas_sdhi *priv = host_to_priv(host);
 	struct scatterlist *sg = host->sg_ptr, *sg_tmp;
 	struct dma_async_tx_descriptor *desc = NULL;
 	struct dma_chan *chan = host->chan_rx;
@@ -217,7 +221,7 @@ static void renesas_sdhi_sys_dmac_start_dma_rx(struct tmio_mmc_host *host)
 					       DMA_CTRL_ACK);
 
 	if (desc) {
-		reinit_completion(&host->dma_dataend);
+		reinit_completion(&priv->dma_priv.dma_dataend);
 		desc->callback = renesas_sdhi_sys_dmac_dma_callback;
 		desc->callback_param = host;
 
@@ -248,6 +252,7 @@ pio:
 
 static void renesas_sdhi_sys_dmac_start_dma_tx(struct tmio_mmc_host *host)
 {
+	struct renesas_sdhi *priv = host_to_priv(host);
 	struct scatterlist *sg = host->sg_ptr, *sg_tmp;
 	struct dma_async_tx_descriptor *desc = NULL;
 	struct dma_chan *chan = host->chan_tx;
@@ -296,7 +301,7 @@ static void renesas_sdhi_sys_dmac_start_dma_tx(struct tmio_mmc_host *host)
 					       DMA_CTRL_ACK);
 
 	if (desc) {
-		reinit_completion(&host->dma_dataend);
+		reinit_completion(&priv->dma_priv.dma_dataend);
 		desc->callback = renesas_sdhi_sys_dmac_dma_callback;
 		desc->callback_param = host;
 
@@ -425,7 +430,7 @@ static void renesas_sdhi_sys_dmac_request_dma(struct tmio_mmc_host *host,
 		if (!host->bounce_buf)
 			goto ebouncebuf;
 
-		init_completion(&host->dma_dataend);
+		init_completion(&priv->dma_priv.dma_dataend);
 		tasklet_init(&host->dma_issue,
 			     renesas_sdhi_sys_dmac_issue_tasklet_fn,
 			     (unsigned long)host);
