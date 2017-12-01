@@ -808,6 +808,8 @@
 			interrupts = <0 93 4>;
 			resets = <&rst USB0_RESET>;
 			reset-names = "dwc2";
+			clocks = <&usb_clk>;
+			clock-names = "otg";
 			status = "disabled";
 		};
 
@@ -817,6 +819,8 @@
 			interrupts = <0 94 4>;
 			resets = <&rst USB1_RESET>;
 			reset-names = "dwc2";
+			clocks = <&usb_clk>;
+			clock-names = "otg";
 			status = "disabled";
 		};
 
