@@ -821,6 +821,8 @@
 			phy-names = "usb2-phy";
 			resets = <&rst USB0_RESET>, <&rst USB0_OCP_RESET>;
 			reset-names = "dwc2", "dwc2-ecc";
+			clocks = <&usb_clk>;
+			clock-names = "otg";
 			status = "disabled";
 		};
 
@@ -832,6 +834,8 @@
 			phy-names = "usb2-phy";
 			resets = <&rst USB1_RESET>, <&rst USB1_OCP_RESET>;
 			reset-names = "dwc2", "dwc2-ecc";
+			clocks = <&usb_clk>;
+			clock-names = "otg";
 			status = "disabled";
 		};
 
