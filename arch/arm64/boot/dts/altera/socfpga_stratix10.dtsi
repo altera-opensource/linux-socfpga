@@ -802,18 +802,10 @@
 			status = "disabled";
 		};
 
-		usbphy0: usbphy@0 {
-			#phy-cells = <0>;
-			compatible = "usb-nop-xceiv";
-			status = "okay";
-		};
-
 		usb0: usb@ffb00000 {
 			compatible = "snps,dwc2";
 			reg = <0xffb00000 0x40000>;
 			interrupts = <0 93 4>;
-			phys = <&usbphy0>;
-			phy-names = "usb2-phy";
 			resets = <&rst USB0_RESET>;
 			reset-names = "dwc2";
 			status = "disabled";
@@ -823,8 +815,6 @@
 			compatible = "snps,dwc2";
 			reg = <0xffb40000 0x40000>;
 			interrupts = <0 94 4>;
-			phys = <&usbphy0>;
-			phy-names = "usb2-phy";
 			resets = <&rst USB1_RESET>;
 			reset-names = "dwc2";
 			status = "disabled";
