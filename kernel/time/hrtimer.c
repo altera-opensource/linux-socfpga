@@ -422,8 +422,10 @@ static inline void debug_hrtimer_activate(struct hrtimer *timer,
 	 * Check whether the HRTIMER_MODE_SOFT bit and hrtimer.is_soft
 	 * match, when a timer is started via__hrtimer_start_range_ns().
 	 */
+#ifndef CONFIG_PREEMPT_RT_BASE
 	if (modecheck)
-		WARN_ON_ONCE((mode & HRTIMER_MODE_SOFT) & !timer->is_soft);
+		WARN_ON_ONCE(!(mode & HRTIMER_MODE_SOFT) ^ !timer->is_soft);
+#endif
 
 	debug_object_activate(timer, &hrtimer_debug_descr);
 }
