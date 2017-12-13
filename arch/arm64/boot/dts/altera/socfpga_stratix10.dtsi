@@ -806,10 +806,10 @@
 			compatible = "snps,dwc2";
 			reg = <0xffb00000 0x40000>;
 			interrupts = <0 93 4>;
-			resets = <&rst USB0_RESET>;
-			reset-names = "dwc2";
 			clocks = <&usb_clk>;
 			clock-names = "otg";
+			resets = <&rst USB0_RESET>, <&rst USB0_OCP_RESET>;
+			reset-names = "dwc2", "dwc2-ecc";
 			status = "disabled";
 		};
 
@@ -817,10 +817,10 @@
 			compatible = "snps,dwc2";
 			reg = <0xffb40000 0x40000>;
 			interrupts = <0 94 4>;
-			resets = <&rst USB1_RESET>;
-			reset-names = "dwc2";
 			clocks = <&usb_clk>;
 			clock-names = "otg";
+			resets = <&rst USB1_RESET>, <&rst USB1_OCP_RESET>;
+			reset-names = "dwc2", "dwc2-ecc";
 			status = "disabled";
 		};
 
