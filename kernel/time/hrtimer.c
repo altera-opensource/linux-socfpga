@@ -801,16 +801,18 @@ static void hrtimer_reprogram(struct hrtimer *timer, bool reprogram)
 		expires = 0;
 
 	if (timer->is_soft) {
-		if (cpu_base->softirq_activated)
+		struct hrtimer_cpu_base *timer_cpu_base = base->cpu_base;
+
+		if (timer_cpu_base->softirq_activated)
 			return;
 
-		if (!ktime_before(expires, cpu_base->softirq_expires_next))
+		if (!ktime_before(expires, timer_cpu_base->softirq_expires_next))
 			return;
 
-		cpu_base->softirq_next_timer = timer;
-		cpu_base->softirq_expires_next = expires;
+		timer_cpu_base->softirq_next_timer = timer;
+		timer_cpu_base->softirq_expires_next = expires;
 
-		if (!ktime_before(expires, cpu_base->expires_next) ||
+		if (!ktime_before(expires, timer_cpu_base->expires_next) ||
 		    !reprogram)
 			return;
 	}
