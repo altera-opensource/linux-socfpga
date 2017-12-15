@@ -1108,7 +1108,7 @@ static int release_all_synth_events(void)
 {
 	struct list_head release_events;
 	struct synth_event *event, *e;
-	int ret = 0, err = 0;
+	int ret = 0;
 
 	INIT_LIST_HEAD(&release_events);
 
@@ -1121,8 +1121,7 @@ static int release_all_synth_events(void)
 		}
 	}
 
-	list_for_each_entry_safe(event, e, &synth_event_list, list)
-		list_move(&event->list, &release_events);
+	list_splice_init(&event->list, &release_events);
 
 	mutex_unlock(&synth_event_mutex);
 
@@ -1132,9 +1131,6 @@ static int release_all_synth_events(void)
 		ret = unregister_synth_event(event);
 		add_or_delete_synth_event(event, !ret);
 	}
-
-	if (err)
-		ret = err;
 
 	return ret;
 }
@@ -1267,7 +1263,7 @@ check_field_for_var_refs(struct hist_trigger_data *hist_data,
 	struct hist_field *found = NULL;
 	unsigned int i;
 
-	if (level > 2)
+	if (level > 3)
 		return found;
 
 	if (!hist_field)
@@ -1373,7 +1369,7 @@ static bool field_has_hist_vars(struct hist_field *hist_field,
 {
 	int i;
 
-	if (level > 2)
+	if (level > 3)
 		return false;
 
 	if (!hist_field)
@@ -2040,6 +2036,23 @@ static const char *get_hist_field_flags(struct hist_field *hist_field)
 	return flags_str;
 }
 
+static void expr_field_str(struct hist_field *field, char *expr)
+{
+	if (field->flags & HIST_FIELD_FL_VAR_REF)
+		strcat(expr, "$");
+
+	strcat(expr, hist_field_name(field, 0));
+
+	if (field->flags) {
+		const char *flags_str = get_hist_field_flags(field);
+
+		if (flags_str) {
+			strcat(expr, ".");
+			strcat(expr, flags_str);
+		}
+	}
+}
+
 static char *expr_str(struct hist_field *field, unsigned int level)
 {
 	char *expr;
@@ -2050,6 +2063,11 @@ static char *expr_str(struct hist_field *field, unsigned int level)
 	expr = kzalloc(MAX_FILTER_STR_VAL, GFP_KERNEL);
 	if (!expr)
 		return NULL;
+
+	if (!field->operands[0]) {
+		expr_field_str(field, expr);
+		return expr;
+	}
 
 	if (field->operator == FIELD_OP_UNARY_MINUS) {
 		char *subexpr;
@@ -2068,17 +2086,7 @@ static char *expr_str(struct hist_field *field, unsigned int level)
 		return expr;
 	}
 
-	if (field->operands[0]->flags & HIST_FIELD_FL_VAR_REF)
-		strcat(expr, "$");
-	strcat(expr, hist_field_name(field->operands[0], 0));
-	if (field->operands[0]->flags) {
-		const char *flags_str = get_hist_field_flags(field->operands[0]);
-
-		if (flags_str) {
-			strcat(expr, ".");
-			strcat(expr, flags_str);
-		}
-	}
+	expr_field_str(field->operands[0], expr);
 
 	switch (field->operator) {
 	case FIELD_OP_MINUS:
@@ -2092,17 +2100,7 @@ static char *expr_str(struct hist_field *field, unsigned int level)
 		return NULL;
 	}
 
-	if (field->operands[1]->flags & HIST_FIELD_FL_VAR_REF)
-		strcat(expr, "$");
-	strcat(expr, hist_field_name(field->operands[1], 0));
-	if (field->operands[1]->flags) {
-		const char *flags_str = get_hist_field_flags(field->operands[1]);
-
-		if (flags_str) {
-			strcat(expr, ".");
-			strcat(expr, flags_str);
-		}
-	}
+	expr_field_str(field->operands[1], expr);
 
 	return expr;
 }
@@ -2138,7 +2136,7 @@ static void destroy_hist_field(struct hist_field *hist_field,
 {
 	unsigned int i;
 
-	if (level > 2)
+	if (level > 3)
 		return;
 
 	if (!hist_field)
@@ -2290,6 +2288,8 @@ static int init_var_ref(struct hist_field *ref_field,
 	ref_field->var.hist_data = var_field->hist_data;
 	ref_field->size = var_field->size;
 	ref_field->is_signed = var_field->is_signed;
+	ref_field->flags |= var_field->flags &
+		(HIST_FIELD_FL_TIMESTAMP | HIST_FIELD_FL_TIMESTAMP_USECS);
 
 	if (system) {
 		ref_field->system = kstrdup(system, GFP_KERNEL);
@@ -2305,10 +2305,18 @@ static int init_var_ref(struct hist_field *ref_field,
 		}
 	}
 
-	ref_field->name = kstrdup(var_field->var.name, GFP_KERNEL);
-	if (!ref_field->name) {
-		err = -ENOMEM;
-		goto free;
+	if (var_field->var.name) {
+		ref_field->name = kstrdup(var_field->var.name, GFP_KERNEL);
+		if (!ref_field->name) {
+			err = -ENOMEM;
+			goto free;
+		}
+	} else if (var_field->name) {
+		ref_field->name = kstrdup(var_field->name, GFP_KERNEL);
+		if (!ref_field->name) {
+			err = -ENOMEM;
+			goto free;
+		}
 	}
 
 	ref_field->type = kstrdup(var_field->type, GFP_KERNEL);
@@ -2496,9 +2504,9 @@ static struct hist_field *create_alias(struct hist_trigger_data *hist_data,
 	return alias;
 }
 
-struct hist_field *parse_atom(struct hist_trigger_data *hist_data,
-			      struct trace_event_file *file, char *str,
-			      unsigned long *flags, char *var_name)
+static struct hist_field *parse_atom(struct hist_trigger_data *hist_data,
+				     struct trace_event_file *file, char *str,
+				     unsigned long *flags, char *var_name)
 {
 	char *s, *ref_system = NULL, *ref_event = NULL, *ref_var = str;
 	struct ftrace_event_field *field = NULL;
@@ -2575,7 +2583,8 @@ static struct hist_field *parse_unary(struct hist_trigger_data *hist_data,
 
 	// we support only -(xxx) i.e. explicit parens required
 
-	if (level > 2) {
+	if (level > 3) {
+		hist_err("Too many subexpressions (3 max): ", str);
 		ret = -EINVAL;
 		goto free;
 	}
@@ -2590,17 +2599,11 @@ static struct hist_field *parse_unary(struct hist_trigger_data *hist_data,
 		goto free;
 	}
 
-	s = strchr(str, ')');
+	s = strrchr(str, ')');
 	if (s)
 		*s = '\0';
 	else {
 		ret = -EINVAL; // no closing ')'
-		goto free;
-	}
-
-	strsep(&str, "(");
-	if (!str) {
-		ret = -EINVAL;
 		goto free;
 	}
 
@@ -2618,6 +2621,8 @@ static struct hist_field *parse_unary(struct hist_trigger_data *hist_data,
 		goto free;
 	}
 
+	expr->flags |= operand1->flags &
+		(HIST_FIELD_FL_TIMESTAMP | HIST_FIELD_FL_TIMESTAMP_USECS);
 	expr->fn = hist_field_unary_minus;
 	expr->operands[0] = operand1;
 	expr->operator = FIELD_OP_UNARY_MINUS;
@@ -2679,8 +2684,10 @@ static struct hist_field *parse_expr(struct hist_trigger_data *hist_data,
 	int field_op, ret = -EINVAL;
 	char *sep, *operand1_str;
 
-	if (level > 2)
+	if (level > 3) {
+		hist_err("Too many subexpressions (3 max): ", str);
 		return ERR_PTR(-EINVAL);
+	}
 
 	field_op = contains_operator(str);
 
@@ -2728,6 +2735,10 @@ static struct hist_field *parse_expr(struct hist_trigger_data *hist_data,
 		goto free;
 
 	flags |= HIST_FIELD_FL_EXPR;
+
+	flags |= operand1->flags &
+		(HIST_FIELD_FL_TIMESTAMP | HIST_FIELD_FL_TIMESTAMP_USECS);
+
 	expr = create_hist_field(hist_data, NULL, flags, var_name);
 	if (!expr) {
 		ret = -ENOMEM;
