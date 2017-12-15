@@ -613,7 +613,7 @@ static enum print_line_t print_synth_event(struct trace_iterator *iter,
 		/* parameter values */
 		if (se->fields[i]->is_string) {
 			trace_seq_printf(s, print_fmt, se->fields[i]->name,
-					 (char *)(long)entry->fields[n_u64],
+					 (char *)&entry->fields[n_u64],
 					 i == se->n_fields - 1 ? "" : " ");
 			n_u64 += STR_VAR_LEN_MAX / sizeof(u64);
 		} else {
@@ -1500,37 +1500,25 @@ static struct trace_event_file *find_var_file(struct trace_array *tr,
 {
 	struct hist_trigger_data *var_hist_data;
 	struct hist_var_data *var_data;
-	struct trace_event_call *call;
 	struct trace_event_file *file, *found = NULL;
-	const char *name;
+
+	if (system)
+		return find_event_file(tr, system, event_name);
 
 	list_for_each_entry(var_data, &tr->hist_vars, list) {
 		var_hist_data = var_data->hist_data;
 		file = var_hist_data->event_file;
 		if (file == found)
 			continue;
-		call = file->event_call;
-		name = trace_event_name(call);
 
-		if (!system || !event_name) {
-			if (find_var(var_hist_data, file, var_name)) {
-				if (found) {
-					hist_err_event("Variable name not unique, need to use fully qualified name (subsys.event.var) for variable: ", system, event_name, var_name);
-					return NULL;
-				}
-
-				found = file;
+		if (find_var_field(var_hist_data, var_name)) {
+			if (found) {
+				hist_err_event("Variable name not unique, need to use fully qualified name (subsys.event.var) for variable: ", system, event_name, var_name);
+				return NULL;
 			}
-			continue;
+
+			found = file;
 		}
-
-		if (strcmp(event_name, name) != 0)
-			continue;
-		if (strcmp(system, call->class->system) != 0)
-			continue;
-
-		found = file;
-		break;
 	}
 
 	return found;
@@ -1977,7 +1965,7 @@ static void hist_trigger_elt_data_free(struct tracing_map_elt *elt)
 static int hist_trigger_elt_data_alloc(struct tracing_map_elt *elt)
 {
 	struct hist_trigger_data *hist_data = elt->map->private_data;
-	unsigned int size = TASK_COMM_LEN + 1;
+	unsigned int size = TASK_COMM_LEN;
 	struct hist_elt_data *elt_data;
 	struct hist_field *key_field;
 	unsigned int i, n_str;
