@@ -288,8 +288,8 @@ struct hist_trigger_data {
 	struct action_data		*actions[HIST_ACTIONS_MAX];
 	unsigned int			n_actions;
 
-	struct hist_field		*synth_var_refs[SYNTH_FIELDS_MAX];
-	unsigned int			n_synth_var_refs;
+	struct hist_field               *synth_var_refs[SYNTH_FIELDS_MAX];
+	unsigned int                    n_synth_var_refs;
 	struct field_var		*field_vars[SYNTH_FIELDS_MAX];
 	unsigned int			n_field_vars;
 	unsigned int			n_field_var_str;
@@ -575,7 +575,7 @@ static const char *synth_field_fmt(char *type)
 		fmt = "%lu";
 	else if (strcmp(type, "pid_t") == 0)
 		fmt = "%d";
-	else if (strchr(type, '[') != NULL)
+	else if (synth_field_is_string(type))
 		fmt = "%s";
 
 	return fmt;
@@ -664,7 +664,7 @@ static notrace void trace_event_raw_event_synth(void *__data,
 			strncpy(str_field, str_val, STR_VAR_LEN_MAX);
 			n_u64 += STR_VAR_LEN_MAX / sizeof(u64);
 		} else {
-			entry->fields[i] = var_ref_vals[var_ref_idx + i];
+			entry->fields[n_u64] = var_ref_vals[var_ref_idx + i];
 			n_u64++;
 		}
 	}
@@ -989,6 +989,20 @@ struct hist_var_data {
 	struct hist_trigger_data *hist_data;
 };
 
+static void add_or_delete_synth_event(struct synth_event *event, int delete)
+{
+	if (delete)
+		free_synth_event(event);
+	else {
+		mutex_lock(&synth_event_mutex);
+		if (!find_synth_event(event->name))
+			list_add(&event->list, &synth_event_list);
+		else
+			free_synth_event(event);
+		mutex_unlock(&synth_event_mutex);
+	}
+}
+
 static int create_synth_event(int argc, char **argv)
 {
 	struct synth_field *field, *fields[SYNTH_FIELDS_MAX];
@@ -1072,23 +1086,10 @@ static int create_synth_event(int argc, char **argv)
 	if (event) {
 		if (delete_event) {
 			ret = unregister_synth_event(event);
-			if (!ret)
-				free_synth_event(event);
-			else {
-				mutex_lock(&synth_event_mutex);
-				if (!find_synth_event(event->name))
-					list_add(&event->list, &synth_event_list);
-				mutex_unlock(&synth_event_mutex);
-			}
+			add_or_delete_synth_event(event, !ret);
 		} else {
 			ret = register_synth_event(event);
-			if (!ret) {
-				mutex_lock(&synth_event_mutex);
-				if (!find_synth_event(event->name))
-					list_add(&event->list, &synth_event_list);
-				mutex_unlock(&synth_event_mutex);
-			} else
-				free_synth_event(event);
+			add_or_delete_synth_event(event, ret);
 		}
 	}
 
@@ -1120,10 +1121,8 @@ static int release_all_synth_events(void)
 		}
 	}
 
-	list_for_each_entry_safe(event, e, &synth_event_list, list) {
-		list_del(&event->list);
-		list_add(&event->list, &release_events);
-	}
+	list_for_each_entry_safe(event, e, &synth_event_list, list)
+		list_move(&event->list, &release_events);
 
 	mutex_unlock(&synth_event_mutex);
 
@@ -1131,15 +1130,7 @@ static int release_all_synth_events(void)
 		list_del(&event->list);
 
 		ret = unregister_synth_event(event);
-		if (ret == 0)
-			free_synth_event(event);
-		else {
-			err = ret;
-			mutex_lock(&synth_event_mutex);
-			if (!find_synth_event(event->name))
-				list_add(&event->list, &synth_event_list);
-			mutex_unlock(&synth_event_mutex);
-		}
+		add_or_delete_synth_event(event, !ret);
 	}
 
 	if (err)
@@ -1314,6 +1305,14 @@ static struct hist_field *find_var_ref(struct hist_trigger_data *hist_data,
 			return found;
 	}
 
+	for (i = 0; i < hist_data->n_synth_var_refs; i++) {
+		hist_field = hist_data->synth_var_refs[i];
+		found = check_field_for_var_refs(hist_data, hist_field,
+						 var_data, var_idx, 0);
+		if (found)
+			return found;
+	}
+
 	return found;
 }
 
@@ -1324,11 +1323,9 @@ static struct hist_field *find_any_var_ref(struct hist_trigger_data *hist_data,
 	struct hist_field *found = NULL;
 	struct hist_var_data *var_data;
 
-	found = find_var_ref(hist_data, hist_data, var_idx);
-	if (found)
-		return found;
-
 	list_for_each_entry(var_data, &tr->hist_vars, list) {
+		if (var_data->hist_data == hist_data)
+			continue;
 		found = find_var_ref(var_data->hist_data, hist_data, var_idx);
 		if (found)
 			break;
@@ -1696,7 +1693,7 @@ static const char *hist_field_name(struct hist_field *field,
 		 field->flags & HIST_FIELD_FL_ALIAS)
 		field_name = hist_field_name(field->operands[0], ++level);
 	else if (field->flags & HIST_FIELD_FL_TIMESTAMP)
-		field_name = "$common_timestamp";
+		field_name = "common_timestamp";
 	else if (field->flags & HIST_FIELD_FL_CPU)
 		field_name = "cpu";
 	else if (field->flags & HIST_FIELD_FL_EXPR ||
@@ -2078,6 +2075,8 @@ static char *expr_str(struct hist_field *field, unsigned int level)
 		strcat(expr, subexpr);
 		strcat(expr, ")");
 
+		kfree(subexpr);
+
 		return expr;
 	}
 
@@ -2228,7 +2227,7 @@ static struct hist_field *create_hist_field(struct hist_trigger_data *hist_data,
 	if (flags & HIST_FIELD_FL_CPU) {
 		hist_field->fn = hist_field_cpu;
 		hist_field->size = sizeof(int);
-		hist_field->type = kstrdup("int", GFP_KERNEL);
+		hist_field->type = kstrdup("unsigned int", GFP_KERNEL);
 		if (!hist_field->type)
 			goto free;
 		goto out;
@@ -2356,18 +2355,9 @@ static struct hist_field *create_var_ref(struct hist_field *var_field,
 	return ref_field;
 }
 
-static bool is_common_field(char *var_name)
-{
-	if (strncmp(var_name, "$common_timestamp", strlen("$common_timestamp")) == 0)
-		return true;
-
-	return false;
-}
-
 static bool is_var_ref(char *var_name)
 {
-	if (!var_name || strlen(var_name) < 2 || var_name[0] != '$' ||
-	    is_common_field(var_name))
+	if (!var_name || strlen(var_name) < 2 || var_name[0] != '$')
 		return false;
 
 	return true;
@@ -2394,8 +2384,24 @@ static char *field_name_from_var(struct hist_trigger_data *hist_data,
 }
 
 static char *local_field_var_ref(struct hist_trigger_data *hist_data,
+				 char *system, char *event_name,
 				 char *var_name)
 {
+	struct trace_event_call *call;
+
+	if (system && event_name) {
+		call = hist_data->event_file->event_call;
+
+		if (strcmp(system, call->class->system) != 0)
+			return NULL;
+
+		if (strcmp(event_name, trace_event_name(call)) != 0)
+			return NULL;
+	}
+
+	if (!!system != !!event_name)
+		return NULL;
+
 	if (!is_var_ref(var_name))
 		return NULL;
 
@@ -2460,7 +2466,7 @@ parse_field(struct hist_trigger_data *hist_data, struct trace_event_file *file,
 		}
 	}
 
-	if (strcmp(field_name, "$common_timestamp") == 0) {
+	if (strcmp(field_name, "common_timestamp") == 0) {
 		*flags |= HIST_FIELD_FL_TIMESTAMP;
 		hist_data->enable_timestamps = true;
 		if (*flags & HIST_FIELD_FL_TIMESTAMP_USECS)
@@ -2529,7 +2535,7 @@ struct hist_field *parse_atom(struct hist_trigger_data *hist_data,
 		}
 	}
 
-	s = local_field_var_ref(hist_data, ref_var);
+	s = local_field_var_ref(hist_data, ref_system, ref_event, ref_var);
 	if (!s) {
 		hist_field = parse_var_ref(hist_data, ref_system, ref_event, ref_var);
 		if (hist_field) {
@@ -2947,7 +2953,7 @@ create_field_var_hist(struct hist_trigger_data *target_hist_data,
 	/* See if a synthetic field variable has already been created */
 	event_var = find_synthetic_field_var(target_hist_data, subsys_name,
 					     event_name, field_name);
-	if (event_var && !IS_ERR(event_var))
+	if (!IS_ERR_OR_NULL(event_var))
 		return event_var;
 
 	var_hist = kzalloc(sizeof(*var_hist), GFP_KERNEL);
@@ -3011,8 +3017,7 @@ create_field_var_hist(struct hist_trigger_data *target_hist_data,
 	/* If we can't find the variable, something went wrong */
 	event_var = find_synthetic_field_var(target_hist_data, subsys_name,
 					     event_name, field_name);
-	if (!event_var || IS_ERR(event_var)) {
-		kfree(cmd);
+	if (IS_ERR_OR_NULL(event_var)) {
 		kfree(var_hist->cmd);
 		kfree(var_hist);
 		hist_err_event("onmatch: Couldn't find synthetic variable: ",
@@ -3300,13 +3305,11 @@ static void onmax_destroy(struct action_data *data)
 static int onmax_create(struct hist_trigger_data *hist_data,
 			struct action_data *data)
 {
-	struct trace_event_call *call = hist_data->event_file->event_call;
 	struct trace_event_file *file = hist_data->event_file;
 	struct hist_field *var_field, *ref_field, *max_var;
 	unsigned int var_ref_idx = hist_data->n_var_refs;
 	struct field_var *field_var;
 	char *onmax_var_str, *param;
-	const char *event_name;
 	unsigned long flags;
 	unsigned int i;
 	int ret = 0;
@@ -3318,7 +3321,6 @@ static int onmax_create(struct hist_trigger_data *hist_data,
 	}
 	onmax_var_str++;
 
-	event_name = trace_event_name(call);
 	var_field = find_target_event_var(hist_data, NULL, NULL, onmax_var_str);
 	if (!var_field) {
 		hist_err("onmax: Couldn't find onmax variable: ", onmax_var_str);
@@ -3419,8 +3421,11 @@ static struct action_data *onmax_parse(char *str)
 		return ERR_PTR(-ENOMEM);
 
 	onmax_var_str = strsep(&str, ")");
-	if (!onmax_var_str || !str)
-		return ERR_PTR(-EINVAL);
+	if (!onmax_var_str || !str) {
+		ret = -EINVAL;
+		goto free;
+	}
+
 	data->onmax.var_str = kstrdup(onmax_var_str, GFP_KERNEL);
 	if (!data->onmax.var_str) {
 		ret = -ENOMEM;
@@ -3638,6 +3643,7 @@ static int onmatch_create(struct hist_trigger_data *hist_data,
 		mutex_unlock(&synth_event_mutex);
 		return -EINVAL;
 	}
+	event->ref++;
 	mutex_unlock(&synth_event_mutex);
 
 	var_ref_idx = hist_data->n_var_refs;
@@ -3648,7 +3654,7 @@ static int onmatch_create(struct hist_trigger_data *hist_data,
 		p = param = kstrdup(data->params[i], GFP_KERNEL);
 		if (!param) {
 			ret = -ENOMEM;
-			goto out;
+			goto err;
 		}
 
 		system = strsep(&param, ".");
@@ -3660,7 +3666,7 @@ static int onmatch_create(struct hist_trigger_data *hist_data,
 			if (!param) {
 				kfree(p);
 				ret = -EINVAL;
-				goto out;
+				goto err;
 			}
 		}
 
@@ -3676,7 +3682,7 @@ static int onmatch_create(struct hist_trigger_data *hist_data,
 		if (!hist_field) {
 			kfree(p);
 			ret = -EINVAL;
-			goto out;
+			goto err;
 		}
 
 		if (check_synth_field(event, hist_field, field_pos) == 0) {
@@ -3684,7 +3690,7 @@ static int onmatch_create(struct hist_trigger_data *hist_data,
 			if (!var_ref) {
 				kfree(p);
 				ret = -ENOMEM;
-				goto out;
+				goto err;
 			}
 
 			save_synth_var_ref(hist_data, var_ref);
@@ -3697,21 +3703,26 @@ static int onmatch_create(struct hist_trigger_data *hist_data,
 			       system, event_name, param);
 		kfree(p);
 		ret = -EINVAL;
-		goto out;
+		goto err;
 	}
 
 	if (field_pos != event->n_fields) {
 		hist_err("onmatch: Param count doesn't match synthetic event field count: ", event->name);
 		ret = -EINVAL;
-		goto out;
+		goto err;
 	}
 
 	data->fn = action_trace;
 	data->onmatch.synth_event = event;
 	data->onmatch.var_ref_idx = var_ref_idx;
-	event->ref++;
  out:
 	return ret;
+ err:
+	mutex_lock(&synth_event_mutex);
+	event->ref--;
+	mutex_unlock(&synth_event_mutex);
+
+	goto out;
 }
 
 static struct action_data *onmatch_parse(struct trace_array *tr, char *str)
@@ -4840,7 +4851,7 @@ static void hist_field_print(struct seq_file *m, struct hist_field *hist_field)
 		seq_printf(m, "%s=", hist_field->var.name);
 
 	if (hist_field->flags & HIST_FIELD_FL_TIMESTAMP)
-		seq_puts(m, "$common_timestamp");
+		seq_puts(m, "common_timestamp");
 	else if (hist_field->flags & HIST_FIELD_FL_CPU)
 		seq_puts(m, "cpu");
 	else if (field_name) {
@@ -4980,6 +4991,21 @@ static int event_hist_trigger_init(struct event_trigger_ops *ops,
 	return 0;
 }
 
+static void unregister_field_var_hists(struct hist_trigger_data *hist_data)
+{
+	struct trace_event_file *file;
+	unsigned int i;
+	char *cmd;
+	int ret;
+
+	for (i = 0; i < hist_data->n_field_var_hists; i++) {
+		file = hist_data->field_var_hists[i]->hist_data->event_file;
+		cmd = hist_data->field_var_hists[i]->cmd;
+		ret = event_hist_trigger_func(&trigger_hist_cmd, file,
+					      "!hist", "hist", cmd);
+	}
+}
+
 static void event_hist_trigger_free(struct event_trigger_ops *ops,
 				    struct event_trigger_data *data)
 {
@@ -4996,6 +5022,8 @@ static void event_hist_trigger_free(struct event_trigger_ops *ops,
 		trigger_data_free(data);
 
 		remove_hist_vars(hist_data);
+
+		unregister_field_var_hists(hist_data);
 
 		destroy_hist_data(hist_data);
 	}
@@ -5201,7 +5229,6 @@ static int hist_register_trigger(char *glob, struct event_trigger_ops *ops,
 		data->paused = true;
 
 	if (named_data) {
-		destroy_hist_data(data->private_data);
 		data->private_data = named_data->private_data;
 		set_named_trigger_data(data, named_data);
 		data->ops = &event_hist_trigger_named_ops;
@@ -5224,6 +5251,9 @@ static int hist_register_trigger(char *glob, struct event_trigger_ops *ops,
 
 		tracing_set_time_stamp_abs(file->tr, true);
 	}
+
+	if (named_data)
+		destroy_hist_data(hist_data);
 
 	ret++;
  out:
@@ -5293,21 +5323,6 @@ static bool hist_trigger_check_refs(struct event_trigger_data *data,
 	return false;
 }
 
-static void unregister_field_var_hists(struct hist_trigger_data *hist_data)
-{
-	struct trace_event_file *file;
-	unsigned int i;
-	char *cmd;
-	int ret;
-
-	for (i = 0; i < hist_data->n_field_var_hists; i++) {
-		file = hist_data->field_var_hists[i]->hist_data->event_file;
-		cmd = hist_data->field_var_hists[i]->cmd;
-		ret = event_hist_trigger_func(&trigger_hist_cmd, file,
-					      "!hist", "hist", cmd);
-	}
-}
-
 static void hist_unregister_trigger(char *glob, struct event_trigger_ops *ops,
 				    struct event_trigger_data *data,
 				    struct trace_event_file *file)
@@ -5323,7 +5338,6 @@ static void hist_unregister_trigger(char *glob, struct event_trigger_ops *ops,
 		if (test->cmd_ops->trigger_type == ETT_EVENT_HIST) {
 			if (!hist_trigger_match(data, test, named_data, false))
 				continue;
-			unregister_field_var_hists(test->private_data);
 			unregistered = true;
 			list_del_rcu(&test->list);
 			trace_event_trigger_enable_disable(file, 0);
@@ -5370,7 +5384,6 @@ static void hist_unreg_all(struct trace_event_file *file)
 	list_for_each_entry_safe(test, n, &file->triggers, list) {
 		if (test->cmd_ops->trigger_type == ETT_EVENT_HIST) {
 			hist_data = test->private_data;
-			unregister_field_var_hists(hist_data);
 			list_del_rcu(&test->list);
 			trace_event_trigger_enable_disable(file, 0);
 
@@ -5382,10 +5395,10 @@ static void hist_unreg_all(struct trace_event_file *file)
 			mutex_unlock(&synth_event_mutex);
 
 			update_cond_flag(file);
-			if (test->ops->free)
-				test->ops->free(test->ops, test);
 			if (hist_data->enable_timestamps)
 				tracing_set_time_stamp_abs(file->tr, false);
+			if (test->ops->free)
+				test->ops->free(test->ops, test);
 		}
 	}
 }
@@ -5561,8 +5574,8 @@ enable:
 	remove_hist_vars(hist_data);
 
 	kfree(trigger_data);
-	destroy_hist_data(hist_data);
 
+	destroy_hist_data(hist_data);
 	goto out;
 }
 

@@ -36,13 +36,13 @@ fi
 
 echo "Test combined histogram"
 
-echo 'hist:keys=pid:ts0=$common_timestamp.usecs if comm=="ping"' > events/sched/sched_waking/trigger
-echo 'hist:keys=pid:waking_lat=$common_timestamp.usecs-$ts0:onmatch(sched.sched_waking).waking_latency($waking_lat,pid) if comm=="ping"' > events/sched/sched_wakeup/trigger
+echo 'hist:keys=pid:ts0=common_timestamp.usecs if comm=="ping"' > events/sched/sched_waking/trigger
+echo 'hist:keys=pid:waking_lat=common_timestamp.usecs-$ts0:onmatch(sched.sched_waking).waking_latency($waking_lat,pid) if comm=="ping"' > events/sched/sched_wakeup/trigger
 echo 'hist:keys=pid,lat:sort=pid,lat' > events/synthetic/waking_latency/trigger
 
 echo 'wakeup_latency u64 lat pid_t pid' >> synthetic_events
-echo 'hist:keys=pid:ts1=$common_timestamp.usecs if comm=="ping"' >> events/sched/sched_wakeup/trigger
-echo 'hist:keys=next_pid:wakeup_lat=$common_timestamp.usecs-$ts1:onmatch(sched.sched_wakeup).wakeup_latency($wakeup_lat,next_pid) if next_comm=="ping"' > events/sched/sched_switch/trigger
+echo 'hist:keys=pid:ts1=common_timestamp.usecs if comm=="ping"' >> events/sched/sched_wakeup/trigger
+echo 'hist:keys=next_pid:wakeup_lat=common_timestamp.usecs-$ts1:onmatch(sched.sched_wakeup).wakeup_latency($wakeup_lat,next_pid) if next_comm=="ping"' > events/sched/sched_switch/trigger
 
 echo 'waking+wakeup_latency u64 lat; pid_t pid' >> synthetic_events
 echo 'hist:keys=pid,lat:sort=pid,lat:ww_lat=$waking_lat+$wakeup_lat:onmatch(synthetic.wakeup_latency).waking+wakeup_latency($ww_lat,pid)' >> events/synthetic/wakeup_latency/trigger

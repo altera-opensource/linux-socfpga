@@ -74,7 +74,7 @@
 	.syscall    display a syscall id as a system call name
 	.execname   display a common_pid as a program name
 	.log2       display log2 value rather than raw number
-	.usecs      display a $common_timestamp in microseconds
+	.usecs      display a common_timestamp in microseconds
 
   Note that in general the semantics of a given field aren't
   interpreted when applying a modifier to it, but there are some
@@ -180,11 +180,9 @@
   they were actual event fields, but aren't really part of the event's
   field definition or format file.  They are however available for any
   event, and can be used anywhere an actual event field could be.
-  'Special' field names are always prefixed with a '$' character to
-  indicate that they're not normal fields (with the exception of
-  'cpu', for compatibility with existing filter usage):
+  They are:
 
-    $common_timestamp      u64 - timestamp (from ring buffer) associated
+    common_timestamp       u64 - timestamp (from ring buffer) associated
                                  with the event, in nanoseconds.  May be
 				 modified by .usecs to have timestamps
 				 interpreted as microseconds.
@@ -1666,15 +1664,14 @@ features have been added to the hist trigger support:
   - Trace events don't have a 'timestamp' associated with them, but
     there is an implicit timestamp saved along with an event in the
     underlying ftrace ring buffer.  This timestamp is now exposed as a
-    a synthetic field named '$common_timestamp' which can be used in
-    histograms as if it were any other event field.  Note that it has
-    a '$' prefixed to it - this is meant to indicate that it isn't an
-    actual field in the trace format but rather is a synthesized value
-    that nonetheless can be used as if it were an actual field.  By
-    default it is in units of nanoseconds; appending '.usecs' to a
+    a synthetic field named 'common_timestamp' which can be used in
+    histograms as if it were any other event field; it isn't an actual
+    field in the trace format but rather is a synthesized value that
+    nonetheless can be used as if it were an actual field.  By default
+    it is in units of nanoseconds; appending '.usecs' to a
     common_timestamp field changes the units to microseconds.
 
-A note on inter-event timestamps: If $common_timestamp is used in a
+A note on inter-event timestamps: If common_timestamp is used in a
 histogram, the trace buffer is automatically switched over to using
 absolute timestamps and the "global" trace clock, in order to avoid
 bogus timestamp differences with other clocks that aren't coherent
@@ -1711,7 +1708,7 @@ Either keys or values can be saved and retrieved in this way.  This
 creates a variable named 'ts0' for a histogram entry with the key
 'next_pid':
 
-  # echo 'hist:keys=next_pid:vals=$ts0:ts0=$common_timestamp ... >> \
+  # echo 'hist:keys=next_pid:vals=$ts0:ts0=common_timestamp ... >> \
 	event/trigger
 
 The ts0 variable can be accessed by any subsequent event having the
@@ -1721,7 +1718,7 @@ Variable references are formed by prepending the variable name with
 the '$' sign.  Thus for example, the ts0 variable above would be
 referenced as '$ts0' in expressions.
 
-Because 'vals=' is used, the $common_timestamp variable value above
+Because 'vals=' is used, the common_timestamp variable value above
 will also be summed as a normal histogram value would (though for a
 timestamp it makes little sense).
 
@@ -1733,35 +1730,35 @@ If a variable isn't a key variable or prefixed with 'vals=', the
 associated event field will be saved in a variable but won't be summed
 as a value:
 
-  # echo 'hist:keys=next_pid:ts1=$common_timestamp ... >> event/trigger
+  # echo 'hist:keys=next_pid:ts1=common_timestamp ... >> event/trigger
 
 Multiple variables can be assigned at the same time.  The below would
 result in both ts0 and b being created as variables, with both
 common_timestamp and field1 additionally being summed as values:
 
-  # echo 'hist:keys=pid:vals=$ts0,$b:ts0=$common_timestamp,b=field1 ... >> \
+  # echo 'hist:keys=pid:vals=$ts0,$b:ts0=common_timestamp,b=field1 ... >> \
 	event/trigger
 
 Note that variable assignments can appear either preceding or
 following their use.  The command below behaves identically to the
 command above:
 
-  # echo 'hist:keys=pid:ts0=$common_timestamp,b=field1:vals=$ts0,$b ... >> \
+  # echo 'hist:keys=pid:ts0=common_timestamp,b=field1:vals=$ts0,$b ... >> \
 	event/trigger
 
 Any number of variables not bound to a 'vals=' prefix can also be
 assigned by simply separating them with colons.  Below is the same
 thing but without the values being summed in the histogram:
 
-  # echo 'hist:keys=pid:ts0=$common_timestamp:b=field1 ... >> event/trigger
+  # echo 'hist:keys=pid:ts0=common_timestamp:b=field1 ... >> event/trigger
 
 Variables set as above can be referenced and used in expressions on
 another event.
 
 For example, here's how a latency can be calculated:
 
-  # echo 'hist:keys=pid,prio:ts0=$common_timestamp ... >> event1/trigger
-  # echo 'hist:keys=next_pid:wakeup_lat=$common_timestamp-$ts0 ... >> event2/trigger
+  # echo 'hist:keys=pid,prio:ts0=common_timestamp ... >> event1/trigger
+  # echo 'hist:keys=next_pid:wakeup_lat=common_timestamp-$ts0 ... >> event2/trigger
 
 In the first line above, the event's timetamp is saved into the
 variable ts0.  In the next line, ts0 is subtracted from the second
@@ -1918,7 +1915,7 @@ hist trigger specification.
     Next, we specify that whenever we see a sched_waking event for a
     cyclictest thread, save the timestamp in a 'ts0' variable:
 
-    # echo 'hist:keys=$saved_pid:saved_pid=pid:ts0=$common_timestamp.usecs \
+    # echo 'hist:keys=$saved_pid:saved_pid=pid:ts0=common_timestamp.usecs \
             if comm=="cyclictest"' >> \
 	    /sys/kernel/debug/tracing/events/sched/sched_waking/trigger
 
@@ -1927,7 +1924,7 @@ hist trigger specification.
     along with another variable and an event field to generate a
     wakeup_latency synthetic event:
 
-    # echo 'hist:keys=next_pid:wakeup_lat=$common_timestamp.usecs-$ts0:\
+    # echo 'hist:keys=next_pid:wakeup_lat=common_timestamp.usecs-$ts0:\
             onmatch(sched.sched_waking).wakeup_latency($wakeup_lat,\
 	            $saved_pid,next_prio) if next_comm=="cyclictest"' >> \
 	    /sys/kernel/debug/tracing/events/sched/sched_switch/trigger
@@ -1966,12 +1963,12 @@ hist trigger specification.
     maximum latency, the values specified in the save() fields are
     recoreded:
 
-    # echo 'hist:keys=pid:ts0=$common_timestamp.usecs \
+    # echo 'hist:keys=pid:ts0=common_timestamp.usecs \
             if comm=="cyclictest"' >> \
             /sys/kernel/debug/tracing/events/sched/sched_waking/trigger
 
     # echo 'hist:keys=next_pid:\
-            wakeup_lat=$common_timestamp.usecs-$ts0:\
+            wakeup_lat=common_timestamp.usecs-$ts0:\
             onmax($wakeup_lat).save(next_comm,prev_pid,prev_prio,prev_comm) \
             if next_comm=="cyclictest"' >> \
             /sys/kernel/debug/tracing/events/sched/sched_switch/trigger
