@@ -68,9 +68,6 @@
 #define HRTIMER_ACTIVE_SOFT	(HRTIMER_ACTIVE_HARD << MASK_SHIFT)
 #define HRTIMER_ACTIVE_ALL	(HRTIMER_ACTIVE_SOFT | HRTIMER_ACTIVE_HARD)
 
-/* Define for debug mode check */
-#define HRTIMER_MODECHECK	true
-
 /*
  * The timer bases:
  *
@@ -415,18 +412,8 @@ static inline void debug_hrtimer_init(struct hrtimer *timer)
 }
 
 static inline void debug_hrtimer_activate(struct hrtimer *timer,
-					  enum hrtimer_mode mode,
-					  bool modecheck)
+					  enum hrtimer_mode mode)
 {
-	/*
-	 * Check whether the HRTIMER_MODE_SOFT bit and hrtimer.is_soft
-	 * match, when a timer is started via__hrtimer_start_range_ns().
-	 */
-#ifndef CONFIG_PREEMPT_RT_BASE
-	if (modecheck)
-		WARN_ON_ONCE(!(mode & HRTIMER_MODE_SOFT) ^ !timer->is_soft);
-#endif
-
 	debug_object_activate(timer, &hrtimer_debug_descr);
 }
 
@@ -461,8 +448,7 @@ EXPORT_SYMBOL_GPL(destroy_hrtimer_on_stack);
 
 static inline void debug_hrtimer_init(struct hrtimer *timer) { }
 static inline void debug_hrtimer_activate(struct hrtimer *timer,
-					  enum hrtimer_mode mode,
-					  bool modecheck) { }
+					  enum hrtimer_mode mode) { }
 static inline void debug_hrtimer_deactivate(struct hrtimer *timer) { }
 #endif
 
@@ -475,10 +461,9 @@ debug_init(struct hrtimer *timer, clockid_t clockid,
 }
 
 static inline void debug_activate(struct hrtimer *timer,
-				  enum hrtimer_mode mode,
-				  bool modecheck)
+				  enum hrtimer_mode mode)
 {
-	debug_hrtimer_activate(timer, mode, modecheck);
+	debug_hrtimer_activate(timer, mode);
 	trace_hrtimer_start(timer, mode);
 }
 
@@ -491,15 +476,15 @@ static inline void debug_deactivate(struct hrtimer *timer)
 static struct hrtimer_clock_base *
 __next_base(struct hrtimer_cpu_base *cpu_base, unsigned int *active)
 {
-	struct hrtimer_clock_base *base = NULL;
+	unsigned int idx;
 
-	if (*active) {
-		unsigned int idx = __ffs(*active);
-		*active &= ~(1U << idx);
-		base = &cpu_base->clock_base[idx];
-	}
+	if (!*active)
+		return NULL;
 
-	return base;
+	idx = __ffs(*active);
+	*active &= ~(1U << idx);
+
+	return &cpu_base->clock_base[idx];
 }
 
 #define for_each_active_base(base, cpu_base, active)	\
@@ -546,11 +531,11 @@ static ktime_t __hrtimer_next_event_base(struct hrtimer_cpu_base *cpu_base,
  * hrtimer_run_softirq(), hrtimer_update_softirq_timer() will re-add these bases.
  *
  * Therefore softirq values are those from the HRTIMER_ACTIVE_SOFT clock bases.
- * The !softirq values are the minima across HRTIMER_ACTIVE, unless an actual
+ * The !softirq values are the minima across HRTIMER_ACTIVE_ALL, unless an actual
  * softirq is pending, in which case they're the minima of HRTIMER_ACTIVE_HARD.
  *
  * @active_mask must be one of:
- *  - HRTIMER_ACTIVE,
+ *  - HRTIMER_ACTIVE_ALL,
  *  - HRTIMER_ACTIVE_SOFT, or
  *  - HRTIMER_ACTIVE_HARD.
  */
@@ -801,6 +786,13 @@ static void hrtimer_reprogram(struct hrtimer *timer, bool reprogram)
 		expires = 0;
 
 	if (timer->is_soft) {
+		/*
+		 * soft hrtimer could be started on a remote CPU. In this
+		 * case softirq_expires_next needs to be updated on the
+		 * remote CPU. The soft hrtimer will not expire before the
+		 * first hard hrtimer on the remote CPU -
+		 * hrtimer_check_target() prevents this case.
+		 */
 		struct hrtimer_cpu_base *timer_cpu_base = base->cpu_base;
 
 		if (timer_cpu_base->softirq_activated)
@@ -995,10 +987,9 @@ void hrtimer_wait_for_timer(const struct hrtimer *timer)
  */
 static int enqueue_hrtimer(struct hrtimer *timer,
 			   struct hrtimer_clock_base *base,
-			   enum hrtimer_mode mode,
-			   bool modecheck)
+			   enum hrtimer_mode mode)
 {
-	debug_activate(timer, mode, modecheck);
+	debug_activate(timer, mode);
 
 	base->cpu_base->active_bases |= 1 << base->index;
 
@@ -1104,7 +1095,7 @@ hrtimer_update_softirq_timer(struct hrtimer_cpu_base *cpu_base, bool reprogram)
 	 * hrtimer expires at the same time than the next hard
 	 * hrtimer. cpu_base->softirq_expires_next needs to be updated!
 	 */
-	if (!reprogram || expires == KTIME_MAX)
+	if (expires == KTIME_MAX)
 		return;
 
 	/*
@@ -1133,8 +1124,9 @@ static int __hrtimer_start_range_ns(struct hrtimer *timer, ktime_t tim,
 	/* Switch the timer base, if necessary: */
 	new_base = switch_hrtimer_base(timer, base, mode & HRTIMER_MODE_PINNED);
 
-	return enqueue_hrtimer(timer, new_base, mode, HRTIMER_MODECHECK);
+	return enqueue_hrtimer(timer, new_base, mode);
 }
+
 /**
  * hrtimer_start_range_ns - (re)start an hrtimer
  * @timer:	the timer to be added
@@ -1149,6 +1141,14 @@ void hrtimer_start_range_ns(struct hrtimer *timer, ktime_t tim,
 {
 	struct hrtimer_clock_base *base;
 	unsigned long flags;
+
+	/*
+	 * Check whether the HRTIMER_MODE_SOFT bit and hrtimer.is_soft
+	 * match.
+	 */
+#ifndef CONFIG_PREEMPT_RT_BASE
+	WARN_ON_ONCE(!(mode & HRTIMER_MODE_SOFT) ^ !timer->is_soft);
+#endif
 
 	base = lock_hrtimer_base(timer, &flags);
 
@@ -1424,8 +1424,7 @@ static void __run_hrtimer(struct hrtimer_cpu_base *cpu_base,
 	 */
 	if (restart != HRTIMER_NORESTART &&
 	    !(timer->state & HRTIMER_STATE_ENQUEUED))
-		enqueue_hrtimer(timer, base, HRTIMER_MODE_ABS,
-				!HRTIMER_MODECHECK);
+		enqueue_hrtimer(timer, base, HRTIMER_MODE_ABS);
 
 	/*
 	 * Separate the ->running assignment from the ->state assignment.
@@ -1939,8 +1938,7 @@ static void migrate_hrtimer_list(struct hrtimer_clock_base *old_base,
 		 * sort out already expired timers and reprogram the
 		 * event device.
 		 */
-		enqueue_hrtimer(timer, new_base, HRTIMER_MODE_ABS,
-				!HRTIMER_MODECHECK);
+		enqueue_hrtimer(timer, new_base, HRTIMER_MODE_ABS);
 	}
 }
 
@@ -1952,6 +1950,12 @@ int hrtimers_dead_cpu(unsigned int scpu)
 	BUG_ON(cpu_online(scpu));
 	tick_cancel_sched_timer(scpu);
 
+	/*
+	 * this BH disable ensures that raise_softirq_irqoff() does
+	 * not wakeup ksoftirqd (and acquire the pi-lock) while
+	 * holding the cpu_base lock
+	 */
+	local_bh_disable();
 	local_irq_disable();
 	old_base = &per_cpu(hrtimer_bases, scpu);
 	new_base = this_cpu_ptr(&hrtimer_bases);
@@ -1979,6 +1983,7 @@ int hrtimers_dead_cpu(unsigned int scpu)
 	/* Check, if we got expired work to do */
 	__hrtimer_peek_ahead_timers();
 	local_irq_enable();
+	local_bh_enable();
 	return 0;
 }
 
