@@ -349,7 +349,7 @@ static void renesas_sdhi_sys_dmac_issue_tasklet_fn(unsigned long priv)
 
 	spin_lock_irq(&host->lock);
 
-	if (host && host->data) {
+	if (host->data) {
 		if (host->data->flags & MMC_DATA_READ)
 			chan = host->chan_rx;
 		else
