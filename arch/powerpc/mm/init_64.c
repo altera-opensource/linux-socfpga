@@ -68,11 +68,11 @@
 
 #include "mmu_decl.h"
 
-#ifdef CONFIG_PPC_STD_MMU_64
+#ifdef CONFIG_PPC_BOOK3S_64
 #if H_PGTABLE_RANGE > USER_VSID_RANGE
 #warning Limited user VSID range means pagetable space is wasted
 #endif
-#endif /* CONFIG_PPC_STD_MMU_64 */
+#endif /* CONFIG_PPC_BOOK3S_64 */
 
 phys_addr_t memstart_addr = ~0;
 EXPORT_SYMBOL_GPL(memstart_addr);
@@ -214,9 +214,8 @@ int __meminit vmemmap_populate(unsigned long start, unsigned long end, int node)
 
 		rc = vmemmap_create_mapping(start, page_size, __pa(p));
 		if (rc < 0) {
-			pr_warning(
-				"vmemmap_populate: Unable to create vmemmap mapping: %d\n",
-				rc);
+			pr_warn("%s: Unable to create vmemmap mapping: %d\n",
+				__func__, rc);
 			return -EFAULT;
 		}
 	}
@@ -367,11 +366,20 @@ EXPORT_SYMBOL_GPL(realmode_pfn_to_page);
 
 #endif /* CONFIG_SPARSEMEM_VMEMMAP */
 
-#ifdef CONFIG_PPC_STD_MMU_64
-static bool disable_radix;
+#ifdef CONFIG_PPC_BOOK3S_64
+static bool disable_radix = !IS_ENABLED(CONFIG_PPC_RADIX_MMU_DEFAULT);
+
 static int __init parse_disable_radix(char *p)
 {
-	disable_radix = true;
+	bool val;
+
+	if (strlen(p) == 0)
+		val = true;
+	else if (kstrtobool(p, &val))
+		return -EINVAL;
+
+	disable_radix = val;
+
 	return 0;
 }
 early_param("disable_radix", parse_disable_radix);
@@ -444,4 +452,4 @@ void __init mmu_early_init_devtree(void)
 	else
 		hash__early_init_devtree();
 }
-#endif /* CONFIG_PPC_STD_MMU_64 */
+#endif /* CONFIG_PPC_BOOK3S_64 */

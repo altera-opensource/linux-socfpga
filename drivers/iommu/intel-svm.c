@@ -276,6 +276,7 @@ static void intel_mm_release(struct mmu_notifier *mn, struct mm_struct *mm)
 }
 
 static const struct mmu_notifier_ops intel_mmuops = {
+	.flags = MMU_INVALIDATE_DOES_NOT_BLOCK,
 	.release = intel_mm_release,
 	.change_pte = intel_change_pte,
 	.invalidate_range = intel_invalidate_range,
@@ -292,7 +293,7 @@ int intel_svm_bind_mm(struct device *dev, int *pasid, int flags, struct svm_dev_
 	int pasid_max;
 	int ret;
 
-	if (WARN_ON(!iommu))
+	if (WARN_ON(!iommu || !iommu->pasid_table))
 		return -EINVAL;
 
 	if (dev_is_pci(dev)) {
@@ -458,6 +459,8 @@ int intel_svm_unbind_mm(struct device *dev, int pasid)
 				kfree_rcu(sdev, rcu);
 
 				if (list_empty(&svm->devs)) {
+					svm->iommu->pasid_table[svm->pasid].val = 0;
+					wmb();
 
 					idr_remove(&svm->iommu->pasid_idr, svm->pasid);
 					if (svm->mm)

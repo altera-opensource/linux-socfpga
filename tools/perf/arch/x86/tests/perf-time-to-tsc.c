@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: GPL-2.0
 #include <errno.h>
 #include <inttypes.h>
 #include <stdio.h>
@@ -83,7 +84,7 @@ int test__perf_time_to_tsc(struct test *test __maybe_unused, int subtest __maybe
 
 	CHECK__(perf_evlist__open(evlist));
 
-	CHECK__(perf_evlist__mmap(evlist, UINT_MAX, false));
+	CHECK__(perf_evlist__mmap(evlist, UINT_MAX));
 
 	pc = evlist->mmap[0].base;
 	ret = perf_read_tsc_conversion(pc, &tc);

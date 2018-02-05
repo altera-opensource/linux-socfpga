@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: GPL-2.0
 /*
  * Simple program to generate defines out of facility lists that use the bit
  * numbering scheme from the Princples of Operations: most significant bit
@@ -127,8 +128,8 @@ static void print_facility_lists(void)
 
 int main(int argc, char **argv)
 {
-	printf("#ifndef __ASM_S390_FACILITIES__\n");
-	printf("#define __ASM_S390_FACILITIES__\n");
+	printf("#ifndef __ASM_S390_FACILITY_DEFS__\n");
+	printf("#define __ASM_S390_FACILITY_DEFS__\n");
 	printf("/*\n");
 	printf(" * DO NOT MODIFY.\n");
 	printf(" *\n");

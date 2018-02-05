@@ -38,6 +38,9 @@
 #include "dccp.h"
 #include "feat.h"
 
+#define CREATE_TRACE_POINTS
+#include "trace.h"
+
 DEFINE_SNMP_STAT(struct dccp_mib, dccp_statistics) __read_mostly;
 
 EXPORT_SYMBOL_GPL(dccp_statistics);
@@ -110,7 +113,7 @@ void dccp_set_state(struct sock *sk, const int state)
 	/* Change state AFTER socket is unhashed to avoid closed
 	 * socket sitting in hash tables.
 	 */
-	sk->sk_state = state;
+	inet_sk_set_state(sk, state);
 }
 
 EXPORT_SYMBOL_GPL(dccp_set_state);
@@ -259,6 +262,7 @@ int dccp_disconnect(struct sock *sk, int flags)
 {
 	struct inet_connection_sock *icsk = inet_csk(sk);
 	struct inet_sock *inet = inet_sk(sk);
+	struct dccp_sock *dp = dccp_sk(sk);
 	int err = 0;
 	const int old_state = sk->sk_state;
 
@@ -278,6 +282,10 @@ int dccp_disconnect(struct sock *sk, int flags)
 		sk->sk_err = ECONNRESET;
 
 	dccp_clear_xmit_timers(sk);
+	ccid_hc_rx_delete(dp->dccps_hc_rx_ccid, sk);
+	ccid_hc_tx_delete(dp->dccps_hc_tx_ccid, sk);
+	dp->dccps_hc_rx_ccid = NULL;
+	dp->dccps_hc_tx_ccid = NULL;
 
 	__skb_queue_purge(&sk->sk_receive_queue);
 	__skb_queue_purge(&sk->sk_write_queue);
@@ -313,10 +321,10 @@ EXPORT_SYMBOL_GPL(dccp_disconnect);
  *	take care of normal races (between the test and the event) and we don't
  *	go look at any of the socket buffers directly.
  */
-unsigned int dccp_poll(struct file *file, struct socket *sock,
+__poll_t dccp_poll(struct file *file, struct socket *sock,
 		       poll_table *wait)
 {
-	unsigned int mask;
+	__poll_t mask;
 	struct sock *sk = sock->sk;
 
 	sock_poll_wait(file, sk_sleep(sk), wait);
@@ -755,6 +763,8 @@ int dccp_sendmsg(struct sock *sk, struct msghdr *msg, size_t len)
 	struct sk_buff *skb;
 	int rc, size;
 	long timeo;
+
+	trace_dccp_probe(sk, len);
 
 	if (len > dp->dccps_mss_cache)
 		return -EMSGSIZE;

@@ -17,15 +17,25 @@
 #include <linux/slab.h>
 #include <linux/ethtool.h>
 #include <linux/io.h>
+#include <net/dsa.h>
 #include "stmmac_pcs.h"
 #include "dwmac4.h"
 
-static void dwmac4_core_init(struct mac_device_info *hw, int mtu)
+static void dwmac4_core_init(struct mac_device_info *hw,
+			     struct net_device *dev)
 {
 	void __iomem *ioaddr = hw->pcsr;
 	u32 value = readl(ioaddr + GMAC_CONFIG);
+	int mtu = dev->mtu;
 
 	value |= GMAC_CORE_INIT;
+
+	/* Clear ACS bit because Ethernet switch tagging formats such as
+	 * Broadcom tags can look like invalid LLC/SNAP packets and cause the
+	 * hardware to truncate packets on reception.
+	 */
+	if (netdev_uses_dsa(dev))
+		value &= ~GMAC_CONFIG_ACS;
 
 	if (mtu > 1500)
 		value |= GMAC_CONFIG_2K;
@@ -578,6 +588,25 @@ static int dwmac4_irq_status(struct mac_device_info *hw,
 	if (unlikely(intr_status & pmt_irq)) {
 		readl(ioaddr + GMAC_PMT);
 		x->irq_receive_pmt_irq_n++;
+	}
+
+	/* MAC tx/rx EEE LPI entry/exit interrupts */
+	if (intr_status & lpi_irq) {
+		/* Clear LPI interrupt by reading MAC_LPI_Control_Status */
+		u32 status = readl(ioaddr + GMAC4_LPI_CTRL_STATUS);
+
+		if (status & GMAC4_LPI_CTRL_STATUS_TLPIEN) {
+			ret |= CORE_IRQ_TX_PATH_IN_LPI_MODE;
+			x->irq_tx_path_in_lpi_mode_n++;
+		}
+		if (status & GMAC4_LPI_CTRL_STATUS_TLPIEX) {
+			ret |= CORE_IRQ_TX_PATH_EXIT_LPI_MODE;
+			x->irq_tx_path_exit_lpi_mode_n++;
+		}
+		if (status & GMAC4_LPI_CTRL_STATUS_RLPIEN)
+			x->irq_rx_path_in_lpi_mode_n++;
+		if (status & GMAC4_LPI_CTRL_STATUS_RLPIEX)
+			x->irq_rx_path_exit_lpi_mode_n++;
 	}
 
 	dwmac_pcs_isr(ioaddr, GMAC_PCS_BASE, intr_status, x);

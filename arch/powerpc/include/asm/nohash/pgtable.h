@@ -1,3 +1,4 @@
+/* SPDX-License-Identifier: GPL-2.0 */
 #ifndef _ASM_POWERPC_NOHASH_PGTABLE_H
 #define _ASM_POWERPC_NOHASH_PGTABLE_H
 
@@ -42,6 +43,29 @@ static inline int pmd_protnone(pmd_t pmd)
 static inline int pte_present(pte_t pte)
 {
 	return pte_val(pte) & _PAGE_PRESENT;
+}
+
+/*
+ * We only find page table entry in the last level
+ * Hence no need for other accessors
+ */
+#define pte_access_permitted pte_access_permitted
+static inline bool pte_access_permitted(pte_t pte, bool write)
+{
+	unsigned long pteval = pte_val(pte);
+	/*
+	 * A read-only access is controlled by _PAGE_USER bit.
+	 * We have _PAGE_READ set for WRITE and EXECUTE
+	 */
+	unsigned long need_pte_bits = _PAGE_PRESENT | _PAGE_USER;
+
+	if (write)
+		need_pte_bits |= _PAGE_WRITE;
+
+	if ((pteval & need_pte_bits) != need_pte_bits)
+		return false;
+
+	return true;
 }
 
 /* Conversion functions: convert a page and protection to a page entry,
@@ -102,7 +126,7 @@ static inline pte_t pte_mkspecial(pte_t pte)
 
 static inline pte_t pte_mkhuge(pte_t pte)
 {
-	return pte;
+	return __pte(pte_val(pte) | _PAGE_HUGE);
 }
 
 static inline pte_t pte_modify(pte_t pte, pgprot_t newprot)
@@ -211,8 +235,10 @@ extern int ptep_set_access_flags(struct vm_area_struct *vma, unsigned long addre
 #define pgprot_cached(prot)       (__pgprot((pgprot_val(prot) & ~_PAGE_CACHE_CTL) | \
 				            _PAGE_COHERENT))
 
+#if _PAGE_WRITETHRU != 0
 #define pgprot_cached_wthru(prot) (__pgprot((pgprot_val(prot) & ~_PAGE_CACHE_CTL) | \
 				            _PAGE_COHERENT | _PAGE_WRITETHRU))
+#endif
 
 #define pgprot_cached_noncoherent(prot) \
 		(__pgprot(pgprot_val(prot) & ~_PAGE_CACHE_CTL))

@@ -1,3 +1,4 @@
+/* SPDX-License-Identifier: GPL-2.0 */
 
 #ifndef _BCACHE_UTIL_H
 #define _BCACHE_UTIL_H
@@ -441,10 +442,10 @@ struct bch_ratelimit {
 	uint64_t		next;
 
 	/*
-	 * Rate at which we want to do work, in units per nanosecond
+	 * Rate at which we want to do work, in units per second
 	 * The units here correspond to the units passed to bch_next_delay()
 	 */
-	unsigned		rate;
+	uint32_t		rate;
 };
 
 static inline void bch_ratelimit_reset(struct bch_ratelimit *d)
@@ -557,6 +558,7 @@ static inline unsigned fract_exp_two(unsigned x, unsigned fract_bits)
 }
 
 void bch_bio_map(struct bio *bio, void *base);
+int bch_bio_alloc_pages(struct bio *bio, gfp_t gfp_mask);
 
 static inline sector_t bdev_sectors(struct block_device *bdev)
 {

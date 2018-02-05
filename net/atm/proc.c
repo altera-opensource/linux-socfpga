@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: GPL-2.0
 /* net/atm/proc.c - ATM /proc interface
  *
  * Written 1995-2000 by Werner Almesberger, EPFL LRC/ICA
@@ -36,7 +37,6 @@ static ssize_t proc_dev_atm_read(struct file *file, char __user *buf,
 				 size_t count, loff_t *pos);
 
 static const struct file_operations proc_atm_dev_ops = {
-	.owner =	THIS_MODULE,
 	.read =		proc_dev_atm_read,
 	.llseek =	noop_llseek,
 };

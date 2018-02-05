@@ -1,4 +1,5 @@
 #!/bin/bash
+# SPDX-License-Identifier: GPL-2.0
 #please run as root
 
 #we need 256M, below is the size in kB
@@ -174,6 +175,17 @@ if [ $? -ne 0 ]; then
 	exitcode=1
 else
 	echo "[PASS]"
+fi
+
+echo "-----------------------------"
+echo "running virtual address 128TB switch test"
+echo "-----------------------------"
+./va_128TBswitch
+if [ $? -ne 0 ]; then
+    echo "[FAIL]"
+    exitcode=1
+else
+    echo "[PASS]"
 fi
 
 exit $exitcode

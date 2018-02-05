@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: GPL-2.0
 /*
  * cdc-wdm.c
  *
@@ -483,7 +484,7 @@ static ssize_t wdm_read
 	if (rv < 0)
 		return -ERESTARTSYS;
 
-	cntr = ACCESS_ONCE(desc->length);
+	cntr = READ_ONCE(desc->length);
 	if (cntr == 0) {
 		desc->read = 0;
 retry:
@@ -594,11 +595,11 @@ static int wdm_flush(struct file *file, fl_owner_t id)
 	return usb_translate_errors(desc->werr);
 }
 
-static unsigned int wdm_poll(struct file *file, struct poll_table_struct *wait)
+static __poll_t wdm_poll(struct file *file, struct poll_table_struct *wait)
 {
 	struct wdm_device *desc = file->private_data;
 	unsigned long flags;
-	unsigned int mask = 0;
+	__poll_t mask = 0;
 
 	spin_lock_irqsave(&desc->iuspin, flags);
 	if (test_bit(WDM_DISCONNECTING, &desc->flags)) {

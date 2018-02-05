@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: GPL-2.0
 subdir-ccflags-y += -I$(srctree)/drivers/staging/lustre/include
 subdir-ccflags-y += -I$(srctree)/drivers/staging/lustre/lustre/include
 
@@ -14,7 +15,7 @@ libcfs-linux-objs += linux-mem.o
 libcfs-linux-objs := $(addprefix linux/,$(libcfs-linux-objs))
 
 libcfs-all-objs := debug.o fail.o module.o tracefile.o \
-		   libcfs_string.o hash.o prng.o workitem.o \
+		   libcfs_string.o hash.o \
 		   libcfs_cpu.o libcfs_mem.o libcfs_lock.o
 
 libcfs-objs := $(libcfs-linux-objs) $(libcfs-all-objs)

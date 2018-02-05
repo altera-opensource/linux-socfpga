@@ -1,3 +1,4 @@
+/* SPDX-License-Identifier: GPL-2.0 WITH Linux-syscall-note */
 /*
  * Copyright 2010 Tilera Corporation. All Rights Reserved.
  *
@@ -22,13 +23,5 @@
 #endif
 
 #include <asm-generic/siginfo.h>
-
-/*
- * Additional Tile-specific SIGILL si_codes
- */
-#define ILL_DBLFLT	9	/* double fault */
-#define ILL_HARDWALL	10	/* user networks hardwall violation */
-#undef NSIGILL
-#define NSIGILL		10
 
 #endif /* _ASM_TILE_SIGINFO_H */

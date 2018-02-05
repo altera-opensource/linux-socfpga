@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: GPL-2.0
 #include <linux/in.h>
 #include <linux/inet.h>
 #include <linux/list.h>
@@ -246,7 +247,6 @@ static int kcm_seq_show(struct seq_file *seq, void *v)
 }
 
 static const struct file_operations kcm_seq_fops = {
-	.owner		= THIS_MODULE,
 	.open		= kcm_seq_open,
 	.read		= seq_read,
 	.llseek		= seq_lseek,
@@ -396,7 +396,6 @@ static int kcm_stats_seq_open(struct inode *inode, struct file *file)
 }
 
 static const struct file_operations kcm_stats_seq_fops = {
-	.owner   = THIS_MODULE,
 	.open    = kcm_stats_seq_open,
 	.read    = seq_read,
 	.llseek  = seq_lseek,

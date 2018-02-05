@@ -1,3 +1,4 @@
+/* SPDX-License-Identifier: GPL-2.0 */
 #ifndef _SCSI_SCSI_HOST_H
 #define _SCSI_SCSI_HOST_H
 
@@ -569,6 +570,8 @@ struct Scsi_Host {
 		struct blk_queue_tag	*bqt;
 		struct blk_mq_tag_set	tag_set;
 	};
+
+	struct rcu_head rcu;
 
 	atomic_t host_busy;		   /* commands actually active on low-level */
 	atomic_t host_blocked;

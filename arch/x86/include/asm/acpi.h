@@ -49,7 +49,7 @@ extern int acpi_fix_pin2_polarity;
 extern int acpi_disable_cmcff;
 
 extern u8 acpi_sci_flags;
-extern int acpi_sci_override_gsi;
+extern u32 acpi_sci_override_gsi;
 void acpi_pic_sci_set_trigger(unsigned int, u16);
 
 struct device;
@@ -149,6 +149,8 @@ static inline void disable_acpi(void) { }
 #ifdef CONFIG_ACPI_NUMA
 extern int x86_acpi_numa_init(void);
 #endif /* CONFIG_ACPI_NUMA */
+
+#define acpi_unlazy_tlb(x)	leave_mm(x)
 
 #ifdef CONFIG_ACPI_APEI
 static inline pgprot_t arch_apei_get_mem_attribute(phys_addr_t addr)

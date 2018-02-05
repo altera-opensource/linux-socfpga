@@ -1,3 +1,4 @@
+/* SPDX-License-Identifier: GPL-2.0 */
 #ifndef _ASM_M32R_IO_H
 #define _ASM_M32R_IO_H
 
@@ -189,8 +190,6 @@ static inline void _writel(unsigned long l, unsigned long addr)
 #define iowrite32be(v, addr)	writel(cpu_to_be32(v), (addr))
 
 #define mmiowb()
-
-#define flush_write_buffers() do { } while (0)  /* M32R_FIXME */
 
 static inline void
 memset_io(volatile void __iomem *addr, unsigned char val, int count)

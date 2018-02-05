@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: GPL-2.0
 /*
 ** PARISC 1.1 Dynamic DMA mapping support.
 ** This implementation is for PA-RISC platforms that do not support
@@ -73,11 +74,6 @@ void dump_resmap(void)
 #else
 static inline void dump_resmap(void) {;}
 #endif
-
-static int pa11_dma_supported( struct device *dev, u64 mask)
-{
-	return 1;
-}
 
 static inline int map_pte_uncached(pte_t * pte,
 		unsigned long vaddr,
@@ -571,8 +567,13 @@ static void pa11_dma_sync_sg_for_device(struct device *dev, struct scatterlist *
 		flush_kernel_vmap_range(sg_virt(sg), sg->length);
 }
 
+static void pa11_dma_cache_sync(struct device *dev, void *vaddr, size_t size,
+	       enum dma_data_direction direction)
+{
+	flush_kernel_dcache_range((unsigned long)vaddr, size);
+}
+
 const struct dma_map_ops pcxl_dma_ops = {
-	.dma_supported =	pa11_dma_supported,
 	.alloc =		pa11_dma_alloc,
 	.free =			pa11_dma_free,
 	.map_page =		pa11_dma_map_page,
@@ -583,6 +584,7 @@ const struct dma_map_ops pcxl_dma_ops = {
 	.sync_single_for_device = pa11_dma_sync_single_for_device,
 	.sync_sg_for_cpu =	pa11_dma_sync_sg_for_cpu,
 	.sync_sg_for_device =	pa11_dma_sync_sg_for_device,
+	.cache_sync =		pa11_dma_cache_sync,
 };
 
 static void *pcx_dma_alloc(struct device *dev, size_t size,
@@ -608,7 +610,6 @@ static void pcx_dma_free(struct device *dev, size_t size, void *vaddr,
 }
 
 const struct dma_map_ops pcx_dma_ops = {
-	.dma_supported =	pa11_dma_supported,
 	.alloc =		pcx_dma_alloc,
 	.free =			pcx_dma_free,
 	.map_page =		pa11_dma_map_page,
@@ -619,4 +620,5 @@ const struct dma_map_ops pcx_dma_ops = {
 	.sync_single_for_device = pa11_dma_sync_single_for_device,
 	.sync_sg_for_cpu =	pa11_dma_sync_sg_for_cpu,
 	.sync_sg_for_device =	pa11_dma_sync_sg_for_device,
+	.cache_sync =		pa11_dma_cache_sync,
 };

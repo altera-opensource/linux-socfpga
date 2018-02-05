@@ -1,3 +1,4 @@
+/* SPDX-License-Identifier: ((GPL-2.0 WITH Linux-syscall-note) OR BSD-2-Clause) */
 /*
  * Broadcom NetXtreme-E RoCE driver.
  *
@@ -79,6 +80,15 @@ struct bnxt_re_qp_req {
 struct bnxt_re_qp_resp {
 	__u32 qpid;
 	__u32 rsvd;
+};
+
+struct bnxt_re_srq_req {
+	__u64 srqva;
+	__u64 srq_handle;
+};
+
+struct bnxt_re_srq_resp {
+	__u32 srqid;
 };
 
 enum bnxt_re_shpg_offt {

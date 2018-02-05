@@ -278,6 +278,7 @@ static int report_error_detected(struct pci_dev *dev, void *data)
 	} else {
 		err_handler = dev->driver->err_handler;
 		vote = err_handler->error_detected(dev, result_data->state);
+		pci_uevent_ers(dev, PCI_ERS_RESULT_NONE);
 	}
 
 	result_data->result = merge_result(result_data->result, vote);
@@ -341,6 +342,7 @@ static int report_resume(struct pci_dev *dev, void *data)
 
 	err_handler = dev->driver->err_handler;
 	err_handler->resume(dev);
+	pci_uevent_ers(dev, PCI_ERS_RESULT_RECOVERED);
 out:
 	device_unlock(&dev->dev);
 	return 0;
@@ -390,7 +392,14 @@ static pci_ers_result_t broadcast_error_message(struct pci_dev *dev,
 		 * If the error is reported by an end point, we think this
 		 * error is related to the upstream link of the end point.
 		 */
-		pci_walk_bus(dev->bus, cb, &result_data);
+		if (state == pci_channel_io_normal)
+			/*
+			 * the error is non fatal so the bus is ok, just invoke
+			 * the callback for the function that logged the error.
+			 */
+			cb(dev, &result_data);
+		else
+			pci_walk_bus(dev->bus, cb, &result_data);
 	}
 
 	return result_data.result;
@@ -534,6 +543,7 @@ static void do_recovery(struct pci_dev *dev, int severity)
 	return;
 
 failed:
+	pci_uevent_ers(dev, PCI_ERS_RESULT_DISCONNECT);
 	/* TODO: Should kernel panic here? */
 	dev_info(&dev->dev, "AER: Device recovery failed\n");
 }

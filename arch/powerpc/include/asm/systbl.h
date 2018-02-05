@@ -1,3 +1,4 @@
+/* SPDX-License-Identifier: GPL-2.0 */
 /*
  * List of powerpc syscalls. For the meaning of the _SPU suffix see
  * arch/powerpc/platforms/cell/spu_callbacks.c
@@ -388,3 +389,6 @@ COMPAT_SYS_SPU(preadv2)
 COMPAT_SYS_SPU(pwritev2)
 SYSCALL(kexec_file_load)
 SYSCALL(statx)
+SYSCALL(pkey_alloc)
+SYSCALL(pkey_free)
+SYSCALL(pkey_mprotect)

@@ -1,7 +1,10 @@
+# SPDX-License-Identifier: GPL-2.0
 # Makefile for staging directory
 
 obj-y				+= media/
 obj-y				+= typec/
+obj-$(CONFIG_IPX)		+= ipx/
+obj-$(CONFIG_NCP_FS)		+= ncpfs/
 obj-$(CONFIG_IRDA)		+= irda/net/
 obj-$(CONFIG_IRDA)		+= irda/drivers/
 obj-$(CONFIG_PRISM2_USB)	+= wlan-ng/

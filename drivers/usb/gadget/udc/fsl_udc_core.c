@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: GPL-2.0+
 /*
  * Copyright (C) 2004-2007,2011-2012 Freescale Semiconductor, Inc.
  * All rights reserved.
@@ -10,11 +11,6 @@
  * This can be found on MPC8349E/MPC8313E/MPC5121E cpus.
  * The driver is previously named as mpc_udc.  Based on bare board
  * code from Dave Liu and Shlomi Gridish.
- *
- * This program is free software; you can redistribute  it and/or modify it
- * under  the terms of  the GNU General  Public License as published by the
- * Free Software Foundation;  either version 2 of the  License, or (at your
- * option) any later version.
  */
 
 #undef VERBOSE
@@ -1547,7 +1543,7 @@ static void ep0_req_complete(struct fsl_udc *udc, struct fsl_ep *ep0,
 		udc->ep0_state = WAIT_FOR_SETUP;
 		break;
 	case WAIT_FOR_SETUP:
-		ERR("Unexpect ep0 packets\n");
+		ERR("Unexpected ep0 packets\n");
 		break;
 	default:
 		ep0stall(udc);

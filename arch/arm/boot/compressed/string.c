@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: GPL-2.0
 /*
  * arch/arm/boot/compressed/string.c
  *
@@ -128,9 +129,4 @@ void *memset(void *s, int c, size_t count)
 	while (count--)
 		*xs++ = c;
 	return s;
-}
-
-void __memzero(void *s, size_t count)
-{
-	memset(s, 0, count);
 }

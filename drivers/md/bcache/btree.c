@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: GPL-2.0
 /*
  * Copyright (C) 2010 Kent Overstreet <kent.overstreet@gmail.com>
  *
@@ -418,7 +419,7 @@ static void do_btree_node_write(struct btree *b)
 	SET_PTR_OFFSET(&k.key, 0, PTR_OFFSET(&k.key, 0) +
 		       bset_sector_offset(&b->keys, i));
 
-	if (!bio_alloc_pages(b->bio, __GFP_NOWARN|GFP_NOWAIT)) {
+	if (!bch_bio_alloc_pages(b->bio, __GFP_NOWARN|GFP_NOWAIT)) {
 		int j;
 		struct bio_vec *bv;
 		void *base = (void *) ((unsigned long) i & ~(PAGE_SIZE - 1));
@@ -431,6 +432,7 @@ static void do_btree_node_write(struct btree *b)
 
 		continue_at(cl, btree_node_write_done, NULL);
 	} else {
+		/* No problem for multipage bvec since the bio is just allocated */
 		b->bio->bi_vcnt = 0;
 		bch_bio_map(b->bio, i);
 
@@ -806,7 +808,10 @@ int bch_btree_cache_alloc(struct cache_set *c)
 	c->shrink.scan_objects = bch_mca_scan;
 	c->shrink.seeks = 4;
 	c->shrink.batch = c->btree_pages * 2;
-	register_shrinker(&c->shrink);
+
+	if (register_shrinker(&c->shrink))
+		pr_warn("bcache: %s: could not register shrinker",
+				__func__);
 
 	return 0;
 }
@@ -1240,6 +1245,11 @@ void bch_initial_mark_key(struct cache_set *c, int level, struct bkey *k)
 	__bch_btree_mark_key(c, level, k);
 }
 
+void bch_update_bucket_in_use(struct cache_set *c, struct gc_stat *stats)
+{
+	stats->in_use = (c->nbuckets - c->avail_nbuckets) * 100 / c->nbuckets;
+}
+
 static bool btree_gc_mark_node(struct btree *b, struct gc_stat *gc)
 {
 	uint8_t stale = 0;
@@ -1651,9 +1661,8 @@ static void btree_gc_start(struct cache_set *c)
 	mutex_unlock(&c->bucket_lock);
 }
 
-static size_t bch_btree_gc_finish(struct cache_set *c)
+static void bch_btree_gc_finish(struct cache_set *c)
 {
-	size_t available = 0;
 	struct bucket *b;
 	struct cache *ca;
 	unsigned i;
@@ -1670,7 +1679,7 @@ static size_t bch_btree_gc_finish(struct cache_set *c)
 
 	/* don't reclaim buckets to which writeback keys point */
 	rcu_read_lock();
-	for (i = 0; i < c->nr_uuids; i++) {
+	for (i = 0; i < c->devices_max_used; i++) {
 		struct bcache_device *d = c->devices[i];
 		struct cached_dev *dc;
 		struct keybuf_key *w, *n;
@@ -1690,6 +1699,7 @@ static size_t bch_btree_gc_finish(struct cache_set *c)
 	}
 	rcu_read_unlock();
 
+	c->avail_nbuckets = 0;
 	for_each_cache(ca, c, i) {
 		uint64_t *i;
 
@@ -1711,18 +1721,16 @@ static size_t bch_btree_gc_finish(struct cache_set *c)
 			BUG_ON(!GC_MARK(b) && GC_SECTORS_USED(b));
 
 			if (!GC_MARK(b) || GC_MARK(b) == GC_MARK_RECLAIMABLE)
-				available++;
+				c->avail_nbuckets++;
 		}
 	}
 
 	mutex_unlock(&c->bucket_lock);
-	return available;
 }
 
 static void bch_btree_gc(struct cache_set *c)
 {
 	int ret;
-	unsigned long available;
 	struct gc_stat stats;
 	struct closure writes;
 	struct btree_op op;
@@ -1745,14 +1753,14 @@ static void bch_btree_gc(struct cache_set *c)
 			pr_warn("gc failed!");
 	} while (ret);
 
-	available = bch_btree_gc_finish(c);
+	bch_btree_gc_finish(c);
 	wake_up_allocators(c);
 
 	bch_time_stats_update(&c->btree_gc_time, start_time);
 
 	stats.key_bytes *= sizeof(uint64_t);
 	stats.data	<<= 9;
-	stats.in_use	= (c->nbuckets - available) * 100 / c->nbuckets;
+	bch_update_bucket_in_use(c, &stats);
 	memcpy(&c->gc_stats, &stats, sizeof(struct gc_stat));
 
 	trace_bcache_gc_end(c);
@@ -1796,10 +1804,7 @@ static int bch_gc_thread(void *arg)
 int bch_gc_thread_start(struct cache_set *c)
 {
 	c->gc_thread = kthread_run(bch_gc_thread, c, "bcache_gc");
-	if (IS_ERR(c->gc_thread))
-		return PTR_ERR(c->gc_thread);
-
-	return 0;
+	return PTR_ERR_OR_ZERO(c->gc_thread);
 }
 
 /* Initial partial gc */

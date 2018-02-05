@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: GPL-2.0
 /dts-v1/;
 #include "bcm2835.dtsi"
 #include "bcm2835-rpi.dtsi"
@@ -9,12 +10,12 @@
 
 	leds {
 		act {
-			gpios = <&gpio 47 0>;
+			gpios = <&gpio 47 GPIO_ACTIVE_HIGH>;
 		};
 
 		pwr {
 			label = "PWR";
-			gpios = <&gpio 35 0>;
+			gpios = <&gpio 35 GPIO_ACTIVE_HIGH>;
 			default-state = "keep";
 			linux,default-trigger = "default-on";
 		};

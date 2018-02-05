@@ -2689,16 +2689,15 @@ qla4xxx_iface_set_param(struct Scsi_Host *shost, void *data, uint32_t len)
 	uint32_t rem = len;
 	struct nlattr *attr;
 
-	init_fw_cb = dma_alloc_coherent(&ha->pdev->dev,
-					sizeof(struct addr_ctrl_blk),
-					&init_fw_cb_dma, GFP_KERNEL);
+	init_fw_cb = dma_zalloc_coherent(&ha->pdev->dev,
+					 sizeof(struct addr_ctrl_blk),
+					 &init_fw_cb_dma, GFP_KERNEL);
 	if (!init_fw_cb) {
 		ql4_printk(KERN_ERR, ha, "%s: Unable to alloc init_cb\n",
 			   __func__);
 		return -ENOMEM;
 	}
 
-	memset(init_fw_cb, 0, sizeof(struct addr_ctrl_blk));
 	memset(&mbox_cmd, 0, sizeof(mbox_cmd));
 	memset(&mbox_sts, 0, sizeof(mbox_sts));
 
@@ -3955,16 +3954,15 @@ exit_session_conn_param:
 /*
  * Timer routines
  */
+static void qla4xxx_timer(struct timer_list *t);
 
-static void qla4xxx_start_timer(struct scsi_qla_host *ha, void *func,
+static void qla4xxx_start_timer(struct scsi_qla_host *ha,
 				unsigned long interval)
 {
 	DEBUG(printk("scsi: %s: Starting timer thread for adapter %d\n",
 		     __func__, ha->host->host_no));
-	init_timer(&ha->timer);
+	timer_setup(&ha->timer, qla4xxx_timer, 0);
 	ha->timer.expires = jiffies + interval * HZ;
-	ha->timer.data = (unsigned long)ha;
-	ha->timer.function = (void (*)(unsigned long))func;
 	add_timer(&ha->timer);
 	ha->timer_active = 1;
 }
@@ -4197,15 +4195,14 @@ static int qla4xxx_mem_alloc(struct scsi_qla_host *ha)
 			  sizeof(struct shadow_regs) +
 			  MEM_ALIGN_VALUE +
 			  (PAGE_SIZE - 1)) & ~(PAGE_SIZE - 1);
-	ha->queues = dma_alloc_coherent(&ha->pdev->dev, ha->queues_len,
-					&ha->queues_dma, GFP_KERNEL);
+	ha->queues = dma_zalloc_coherent(&ha->pdev->dev, ha->queues_len,
+					 &ha->queues_dma, GFP_KERNEL);
 	if (ha->queues == NULL) {
 		ql4_printk(KERN_WARNING, ha,
 		    "Memory Allocation failed - queues.\n");
 
 		goto mem_alloc_error_exit;
 	}
-	memset(ha->queues, 0, ha->queues_len);
 
 	/*
 	 * As per RISC alignment requirements -- the bus-address must be a
@@ -4508,8 +4505,9 @@ static void qla4xxx_check_relogin_flash_ddb(struct iscsi_cls_session *cls_sess)
  * qla4xxx_timer - checks every second for work to do.
  * @ha: Pointer to host adapter structure.
  **/
-static void qla4xxx_timer(struct scsi_qla_host *ha)
+static void qla4xxx_timer(struct timer_list *t)
 {
+	struct scsi_qla_host *ha = from_timer(ha, t, timer);
 	int start_dpc = 0;
 	uint16_t w;
 
@@ -8805,7 +8803,7 @@ skip_retry_init:
 	ha->isp_ops->enable_intrs(ha);
 
 	/* Start timer thread. */
-	qla4xxx_start_timer(ha, qla4xxx_timer, 1);
+	qla4xxx_start_timer(ha, 1);
 
 	set_bit(AF_INIT_DONE, &ha->flags);
 

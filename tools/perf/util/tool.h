@@ -1,3 +1,4 @@
+/* SPDX-License-Identifier: GPL-2.0 */
 #ifndef __PERF_TOOL_H
 #define __PERF_TOOL_H
 
@@ -75,6 +76,7 @@ struct perf_tool {
 	bool		ordered_events;
 	bool		ordering_requires_timestamps;
 	bool		namespace_events;
+	bool		no_warn;
 	enum show_feature_header show_feat_hdr;
 };
 

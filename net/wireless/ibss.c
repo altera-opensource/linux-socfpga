@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: GPL-2.0
 /*
  * Some IBSS support code for cfg80211.
  *
@@ -125,6 +126,11 @@ static int __cfg80211_join_ibss(struct cfg80211_registered_device *rdev,
 	wdev->ibss_fixed = params->channel_fixed;
 	wdev->ibss_dfs_possible = params->userspace_handles_dfs;
 	wdev->chandef = params->chandef;
+	if (connkeys) {
+		params->wep_keys = connkeys->params;
+		params->wep_tx_key = connkeys->def;
+	}
+
 #ifdef CONFIG_CFG80211_WEXT
 	wdev->wext.ibss.chandef = params->chandef;
 #endif

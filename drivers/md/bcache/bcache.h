@@ -1,3 +1,4 @@
+/* SPDX-License-Identifier: GPL-2.0 */
 #ifndef _BCACHE_H
 #define _BCACHE_H
 
@@ -184,6 +185,7 @@
 #include <linux/mutex.h>
 #include <linux/rbtree.h>
 #include <linux/rwsem.h>
+#include <linux/refcount.h>
 #include <linux/types.h>
 #include <linux/workqueue.h>
 
@@ -265,9 +267,6 @@ struct bcache_device {
 	atomic_t		*stripe_sectors_dirty;
 	unsigned long		*full_dirty_stripes;
 
-	unsigned long		sectors_dirty_last;
-	long			sectors_dirty_derivative;
-
 	struct bio_set		*bio_split;
 
 	unsigned		data_csum:1;
@@ -299,7 +298,7 @@ struct cached_dev {
 	struct semaphore	sb_write_mutex;
 
 	/* Refcount on the cache set. Always nonzero when we're caching. */
-	atomic_t		count;
+	refcount_t		count;
 	struct work_struct	detach;
 
 	/*
@@ -321,14 +320,15 @@ struct cached_dev {
 	 */
 	atomic_t		has_dirty;
 
+	/*
+	 * Set to zero by things that touch the backing volume-- except
+	 * writeback.  Incremented by writeback.  Used to determine when to
+	 * accelerate idle writeback.
+	 */
+	atomic_t		backing_idle;
+
 	struct bch_ratelimit	writeback_rate;
 	struct delayed_work	writeback_rate_update;
-
-	/*
-	 * Internal to the writeback code, so read_dirty() can keep track of
-	 * where it's at.
-	 */
-	sector_t		last_read;
 
 	/* Limit number of writeback bios in flight */
 	struct semaphore	in_flight;
@@ -336,6 +336,14 @@ struct cached_dev {
 	struct workqueue_struct	*writeback_write_wq;
 
 	struct keybuf		writeback_keys;
+
+	/*
+	 * Order the write-half of writeback operations strongly in dispatch
+	 * order.  (Maintain LBA order; don't allow reads completing out of
+	 * order to re-order the writes...)
+	 */
+	struct closure_waitlist writeback_ordering_wait;
+	atomic_t		writeback_sequence_next;
 
 	/* For tracking sequential IO */
 #define RECENT_IO_BITS	7
@@ -362,12 +370,14 @@ struct cached_dev {
 
 	uint64_t		writeback_rate_target;
 	int64_t			writeback_rate_proportional;
-	int64_t			writeback_rate_derivative;
-	int64_t			writeback_rate_change;
+	int64_t			writeback_rate_integral;
+	int64_t			writeback_rate_integral_scaled;
+	int32_t			writeback_rate_change;
 
 	unsigned		writeback_rate_update_seconds;
-	unsigned		writeback_rate_d_term;
+	unsigned		writeback_rate_i_term_inverse;
 	unsigned		writeback_rate_p_term_inverse;
+	unsigned		writeback_rate_minimum;
 };
 
 enum alloc_reserve {
@@ -487,6 +497,7 @@ struct cache_set {
 	int			caches_loaded;
 
 	struct bcache_device	**devices;
+	unsigned		devices_max_used;
 	struct list_head	cached_devs;
 	uint64_t		cached_dev_sectors;
 	struct closure		caching;
@@ -581,6 +592,7 @@ struct cache_set {
 	uint8_t			need_gc;
 	struct gc_stat		gc_stats;
 	size_t			nbuckets;
+	size_t			avail_nbuckets;
 
 	struct task_struct	*gc_thread;
 	/* Where in the btree gc currently is */
@@ -806,13 +818,13 @@ do {									\
 
 static inline void cached_dev_put(struct cached_dev *dc)
 {
-	if (atomic_dec_and_test(&dc->count))
+	if (refcount_dec_and_test(&dc->count))
 		schedule_work(&dc->detach);
 }
 
 static inline bool cached_dev_get(struct cached_dev *dc)
 {
-	if (!atomic_inc_not_zero(&dc->count))
+	if (!refcount_inc_not_zero(&dc->count))
 		return false;
 
 	/* Paired with the mb in cached_dev_attach */
@@ -850,7 +862,7 @@ static inline void wake_up_allocators(struct cache_set *c)
 
 /* Forward declarations */
 
-void bch_count_io_errors(struct cache *, blk_status_t, const char *);
+void bch_count_io_errors(struct cache *, blk_status_t, int, const char *);
 void bch_bbio_count_io_errors(struct cache_set *, struct bio *,
 			      blk_status_t, const char *);
 void bch_bbio_endio(struct cache_set *, struct bio *, blk_status_t,

@@ -1,3 +1,4 @@
+/* SPDX-License-Identifier: GPL-2.0 */
 /*
  * Copyright (C) 1995, 1996, 1997 Olaf Kirch <okir@monad.swb.de>
  *
@@ -10,6 +11,7 @@
 #include <linux/crc32.h>
 #include <linux/sunrpc/svc.h>
 #include <uapi/linux/nfsd/nfsfh.h>
+#include <linux/iversion.h>
 
 static inline __u32 ino_t_to_u32(ino_t ino)
 {
@@ -258,7 +260,7 @@ static inline u64 nfsd4_change_attribute(struct inode *inode)
 	chattr =  inode->i_ctime.tv_sec;
 	chattr <<= 30;
 	chattr += inode->i_ctime.tv_nsec;
-	chattr += inode->i_version;
+	chattr += inode_query_iversion(inode);
 	return chattr;
 }
 

@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: GPL-2.0
 #include <errno.h>
 #include <linux/kernel.h>
 #include <linux/types.h>
@@ -638,7 +639,7 @@ static int do_test_code_reading(bool try_kcore)
 		break;
 	}
 
-	ret = perf_evlist__mmap(evlist, UINT_MAX, false);
+	ret = perf_evlist__mmap(evlist, UINT_MAX);
 	if (ret < 0) {
 		pr_debug("perf_evlist__mmap failed\n");
 		goto out_put;

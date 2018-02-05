@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: GPL-2.0
 #
 # Makefile for the kernel miscellaneous SPARC device drivers.
 #
@@ -16,3 +17,4 @@ obj-$(CONFIG_SUN_OPENPROMIO)		+= openprom.o
 obj-$(CONFIG_TADPOLE_TS102_UCTRL)	+= uctrl.o
 obj-$(CONFIG_SUN_JSFLASH)		+= jsflash.o
 obj-$(CONFIG_BBC_I2C)			+= bbc.o
+obj-$(CONFIG_ORACLE_DAX) 		+= oradax.o

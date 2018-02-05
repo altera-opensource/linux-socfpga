@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: GPL-2.0
 #include <linux/compiler.h>
 #include <linux/types.h>
 #include <inttypes.h>
@@ -172,6 +173,7 @@ int test__dwarf_unwind(struct test *test __maybe_unused, int subtest __maybe_unu
 	}
 
 	callchain_param.record_mode = CALLCHAIN_DWARF;
+	dwarf_callchain_users = true;
 
 	if (init_live_machine(machine)) {
 		pr_err("Could not init machine\n");

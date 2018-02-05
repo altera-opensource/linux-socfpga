@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: GPL-2.0
 #include <linux/netdevice.h>
 #include <linux/proc_fs.h>
 #include <linux/seq_file.h>
@@ -181,7 +182,6 @@ static int dev_seq_open(struct inode *inode, struct file *file)
 }
 
 static const struct file_operations dev_seq_fops = {
-	.owner	 = THIS_MODULE,
 	.open    = dev_seq_open,
 	.read    = seq_read,
 	.llseek  = seq_lseek,
@@ -201,7 +201,6 @@ static int softnet_seq_open(struct inode *inode, struct file *file)
 }
 
 static const struct file_operations softnet_seq_fops = {
-	.owner	 = THIS_MODULE,
 	.open    = softnet_seq_open,
 	.read    = seq_read,
 	.llseek  = seq_lseek,
@@ -305,7 +304,6 @@ static int ptype_seq_open(struct inode *inode, struct file *file)
 }
 
 static const struct file_operations ptype_seq_fops = {
-	.owner	 = THIS_MODULE,
 	.open    = ptype_seq_open,
 	.read    = seq_read,
 	.llseek  = seq_lseek,
@@ -386,7 +384,6 @@ static int dev_mc_seq_open(struct inode *inode, struct file *file)
 }
 
 static const struct file_operations dev_mc_seq_fops = {
-	.owner	 = THIS_MODULE,
 	.open    = dev_mc_seq_open,
 	.read    = seq_read,
 	.llseek  = seq_lseek,

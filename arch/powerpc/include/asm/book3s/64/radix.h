@@ -1,3 +1,4 @@
+/* SPDX-License-Identifier: GPL-2.0 */
 #ifndef _ASM_POWERPC_PGTABLE_RADIX_H
 #define _ASM_POWERPC_PGTABLE_RADIX_H
 
@@ -267,12 +268,6 @@ static inline pmd_t radix__pmd_mkhuge(pmd_t pmd)
 	if (cpu_has_feature(CPU_FTR_POWER9_DD1))
 		return __pmd(pmd_val(pmd) | _PAGE_PTE | R_PAGE_LARGE);
 	return __pmd(pmd_val(pmd) | _PAGE_PTE);
-}
-static inline void radix__pmdp_huge_split_prepare(struct vm_area_struct *vma,
-					    unsigned long address, pmd_t *pmdp)
-{
-	/* Nothing to do for radix. */
-	return;
 }
 
 extern unsigned long radix__pmd_hugepage_update(struct mm_struct *mm, unsigned long addr,

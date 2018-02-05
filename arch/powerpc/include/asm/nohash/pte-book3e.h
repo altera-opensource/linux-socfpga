@@ -1,3 +1,4 @@
+/* SPDX-License-Identifier: GPL-2.0 */
 #ifndef _ASM_POWERPC_NOHASH_PTE_BOOK3E_H
 #define _ASM_POWERPC_NOHASH_PTE_BOOK3E_H
 #ifdef __KERNEL__
@@ -54,6 +55,7 @@
 #define _PAGE_KERNEL_RWX	(_PAGE_BAP_SW | _PAGE_BAP_SR | _PAGE_DIRTY | _PAGE_BAP_SX)
 #define _PAGE_KERNEL_ROX	(_PAGE_BAP_SR | _PAGE_BAP_SX)
 #define _PAGE_USER		(_PAGE_BAP_UR | _PAGE_BAP_SR) /* Can be read */
+#define _PAGE_PRIVILEGED	(_PAGE_BAP_SR)
 
 #define _PAGE_HASHPTE	0
 #define _PAGE_BUSY	0

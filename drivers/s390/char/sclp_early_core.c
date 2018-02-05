@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: GPL-2.0
 /*
  *    Copyright IBM Corp. 2015
  *    Author(s): Martin Schwidefsky <schwidefsky@de.ibm.com>
@@ -11,8 +12,8 @@
 #include "sclp.h"
 #include "sclp_rw.h"
 
-char sclp_early_sccb[PAGE_SIZE] __aligned(PAGE_SIZE) __section(data);
-int sclp_init_state __section(data) = sclp_init_state_uninitialized;
+char sclp_early_sccb[PAGE_SIZE] __aligned(PAGE_SIZE) __section(.data);
+int sclp_init_state __section(.data) = sclp_init_state_uninitialized;
 
 void sclp_early_wait_irq(void)
 {

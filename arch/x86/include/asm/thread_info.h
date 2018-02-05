@@ -1,3 +1,4 @@
+/* SPDX-License-Identifier: GPL-2.0 */
 /* thread_info.h: low-level thread information
  *
  * Copyright (C) 2002  David Howells (dhowells@redhat.com)
@@ -54,14 +55,13 @@ struct task_struct;
 
 struct thread_info {
 	unsigned long		flags;		/* low level flags */
+	u32			status;		/* thread synchronous flags */
 };
 
 #define INIT_THREAD_INFO(tsk)			\
 {						\
 	.flags		= 0,			\
 }
-
-#define init_stack		(init_thread_union.stack)
 
 #else /* !__ASSEMBLY__ */
 
@@ -206,7 +206,7 @@ static inline int arch_within_stack_frames(const void * const stack,
 #else /* !__ASSEMBLY__ */
 
 #ifdef CONFIG_X86_64
-# define cpu_current_top_of_stack (cpu_tss + TSS_sp0)
+# define cpu_current_top_of_stack (cpu_tss_rw + TSS_sp1)
 #endif
 
 #endif
@@ -220,7 +220,7 @@ static inline int arch_within_stack_frames(const void * const stack,
 #define in_ia32_syscall() true
 #else
 #define in_ia32_syscall() (IS_ENABLED(CONFIG_IA32_EMULATION) && \
-			   current->thread.status & TS_COMPAT)
+			   current_thread_info()->status & TS_COMPAT)
 #endif
 
 /*

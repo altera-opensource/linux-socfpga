@@ -85,9 +85,10 @@ led_tg(struct sk_buff *skb, const struct xt_action_param *par)
 	return XT_CONTINUE;
 }
 
-static void led_timeout_callback(unsigned long data)
+static void led_timeout_callback(struct timer_list *t)
 {
-	struct xt_led_info_internal *ledinternal = (struct xt_led_info_internal *)data;
+	struct xt_led_info_internal *ledinternal = from_timer(ledinternal, t,
+							      timer);
 
 	led_trigger_event(&ledinternal->netfilter_led_trigger, LED_OFF);
 }
@@ -143,8 +144,7 @@ static int led_tg_check(const struct xt_tgchk_param *par)
 
 	/* See if we need to set up a timer */
 	if (ledinfo->delay > 0)
-		setup_timer(&ledinternal->timer, led_timeout_callback,
-			    (unsigned long)ledinternal);
+		timer_setup(&ledinternal->timer, led_timeout_callback, 0);
 
 	list_add_tail(&ledinternal->list, &xt_led_triggers);
 
@@ -198,6 +198,7 @@ static struct xt_target led_tg_reg __read_mostly = {
 	.family		= NFPROTO_UNSPEC,
 	.target		= led_tg,
 	.targetsize	= sizeof(struct xt_led_info),
+	.usersize	= offsetof(struct xt_led_info, internal_data),
 	.checkentry	= led_tg_check,
 	.destroy	= led_tg_destroy,
 	.me		= THIS_MODULE,

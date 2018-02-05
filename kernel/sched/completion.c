@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: GPL-2.0
 /*
  * Generic wait-for-completion handler;
  *
@@ -32,11 +33,6 @@ void complete(struct completion *x)
 	unsigned long flags;
 
 	spin_lock_irqsave(&x->wait.lock, flags);
-
-	/*
-	 * Perform commit of crossrelease here.
-	 */
-	complete_release_commit(x);
 
 	if (x->done != UINT_MAX)
 		x->done++;

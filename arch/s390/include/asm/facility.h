@@ -1,3 +1,4 @@
+/* SPDX-License-Identifier: GPL-2.0 */
 /*
  * Copyright IBM Corp. 1999, 2009
  *
@@ -7,7 +8,7 @@
 #ifndef __ASM_FACILITY_H
 #define __ASM_FACILITY_H
 
-#include <generated/facilities.h>
+#include <asm/facility-defs.h>
 #include <linux/string.h>
 #include <linux/preempt.h>
 #include <asm/lowcore.h>
