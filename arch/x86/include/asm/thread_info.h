@@ -55,8 +55,9 @@ struct task_struct;
 
 struct thread_info {
 	unsigned long		flags;		/* low level flags */
-	int                     preempt_lazy_count;     /* 0 => lazy preemptable
-							   <0 => BUG */
+	u32			status;		/* thread synchronous flags */
+	int			preempt_lazy_count;	/* 0 => lazy preemptable
+							  <0 => BUG */
 };
 
 #define INIT_THREAD_INFO(tsk)			\
@@ -232,7 +233,7 @@ static inline int arch_within_stack_frames(const void * const stack,
 #define in_ia32_syscall() true
 #else
 #define in_ia32_syscall() (IS_ENABLED(CONFIG_IA32_EMULATION) && \
-			   current->thread.status & TS_COMPAT)
+			   current_thread_info()->status & TS_COMPAT)
 #endif
 
 /*
