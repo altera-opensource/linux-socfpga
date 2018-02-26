@@ -155,6 +155,7 @@ static __init void __socfpga_periph_init(struct device_node *node,
 
 err_clk:
 	clk_unregister(clk);
+	kfree(periph_clk);
 }
 
 void __init socfpga_s10_periph_init(struct device_node *node)
