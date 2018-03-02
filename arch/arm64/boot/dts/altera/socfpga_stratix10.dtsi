@@ -874,6 +874,7 @@
 			reg = <0xffd00200 0x100>;
 			interrupts = <0 117 4>;
 			resets = <&rst WATCHDOG0_RESET>;
+			clocks = <&l4_sys_free_clk>;
 			status = "disabled";
 		};
 
@@ -882,6 +883,7 @@
 			reg = <0xffd00300 0x100>;
 			interrupts = <0 118 4>;
 			resets = <&rst WATCHDOG1_RESET>;
+			clocks = <&l4_sys_free_clk>;
 			status = "disabled";
 		};
 
@@ -890,6 +892,7 @@
 			reg = <0xffd00400 0x100>;
 			interrupts = <0 125 4>;
 			resets = <&rst WATCHDOG2_RESET>;
+			clocks = <&l4_sys_free_clk>;
 			status = "disabled";
 		};
 
@@ -898,6 +901,7 @@
 			reg = <0xffd00500 0x100>;
 			interrupts = <0 126 4>;
 			resets = <&rst WATCHDOG3_RESET>;
+			clocks = <&l4_sys_free_clk>;
 			status = "disabled";
 		};
 
