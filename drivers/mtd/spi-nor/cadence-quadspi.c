@@ -495,7 +495,8 @@ static int cqspi_indirect_read_execute(struct spi_nor *nor,
 	void __iomem *reg_base = cqspi->iobase;
 	void __iomem *ahb_base = cqspi->ahb_base;
 	unsigned int remaining = n_rx;
-	unsigned int bytes_to_read = 0;
+	unsigned int mod_bytes, words_to_read, bytes_to_read = 0;
+	u8 *rxbuf_end = rxbuf + n_rx;
 	int ret = 0;
 
 	writel(remaining, reg_base + CQSPI_REG_INDIRECTRDBYTES);
@@ -526,8 +527,21 @@ static int cqspi_indirect_read_execute(struct spi_nor *nor,
 			bytes_to_read *= cqspi->fifo_width;
 			bytes_to_read = bytes_to_read > remaining ?
 					remaining : bytes_to_read;
-			readsl(ahb_base, rxbuf, DIV_ROUND_UP(bytes_to_read, 4));
-			rxbuf += bytes_to_read;
+			/* Read 4 byte chunks before using single byte mode */
+			words_to_read = bytes_to_read / 4;
+			mod_bytes = bytes_to_read % 4;
+			if (words_to_read) {
+				readsl(ahb_base, rxbuf, words_to_read);
+				rxbuf += (words_to_read * 4);
+			}
+			if (mod_bytes) {
+				unsigned int temp = readl(ahb_base);
+
+				memcpy(rxbuf, &temp, min((unsigned int)
+							 (rxbuf_end - rxbuf),
+							 mod_bytes));
+				rxbuf += mod_bytes;
+			}
 			remaining -= bytes_to_read;
 			bytes_to_read = cqspi_get_rd_sram_level(cqspi);
 		}
@@ -594,7 +608,7 @@ static int cqspi_indirect_write_execute(struct spi_nor *nor,
 	struct cqspi_st *cqspi = f_pdata->cqspi;
 	void __iomem *reg_base = cqspi->iobase;
 	unsigned int remaining = n_tx;
-	unsigned int write_bytes;
+	unsigned int mod_bytes, write_bytes, write_words;
 	int ret;
 
 	writel(remaining, reg_base + CQSPI_REG_INDIRECTWRBYTES);
@@ -610,8 +624,20 @@ static int cqspi_indirect_write_execute(struct spi_nor *nor,
 
 	while (remaining > 0) {
 		write_bytes = remaining > page_size ? page_size : remaining;
-		writesl(cqspi->ahb_base, txbuf, DIV_ROUND_UP(write_bytes, 4));
+		write_words = write_bytes / 4;
+		mod_bytes = write_bytes % 4;
+		/* Write 4 bytes at a time then single bytes. */
+		if (write_words) {
+			writesl(cqspi->ahb_base, txbuf, write_words);
+			txbuf += (write_words * 4);
+		}
+		if (mod_bytes) {
+			unsigned int temp = 0xFFFFFFFF;
 
+			memcpy(&temp, txbuf, min(sizeof(temp), mod_bytes));
+			writel(temp, cqspi->ahb_base);
+			txbuf += mod_bytes;
+		}
 		ret = wait_for_completion_timeout(&cqspi->transfer_complete,
 						  msecs_to_jiffies
 						  (CQSPI_TIMEOUT_MS));
@@ -621,7 +647,6 @@ static int cqspi_indirect_write_execute(struct spi_nor *nor,
 			goto failwr;
 		}
 
-		txbuf += write_bytes;
 		remaining -= write_bytes;
 
 		if (remaining > 0)
