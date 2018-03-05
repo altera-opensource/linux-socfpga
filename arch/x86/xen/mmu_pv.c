@@ -1300,12 +1300,12 @@ static void xen_flush_tlb(void)
 	preempt_enable();
 }
 
-static void xen_flush_tlb_single(unsigned long addr)
+static void xen_flush_tlb_one_user(unsigned long addr)
 {
 	struct mmuext_op *op;
 	struct multicall_space mcs;
 
-	trace_xen_mmu_flush_tlb_single(addr);
+	trace_xen_mmu_flush_tlb_one_user(addr);
 
 	preempt_disable();
 
@@ -1902,6 +1902,18 @@ void __init xen_setup_kernel_pagetable(pgd_t *pgd, unsigned long max_pfn)
 	/* Graft it onto L4[511][510] */
 	copy_page(level2_kernel_pgt, l2);
 
+	/*
+	 * Zap execute permission from the ident map. Due to the sharing of
+	 * L1 entries we need to do this in the L2.
+	 */
+	if (__supported_pte_mask & _PAGE_NX) {
+		for (i = 0; i < PTRS_PER_PMD; ++i) {
+			if (pmd_none(level2_ident_pgt[i]))
+				continue;
+			level2_ident_pgt[i] = pmd_set_flags(level2_ident_pgt[i], _PAGE_NX);
+		}
+	}
+
 	/* Copy the initial P->M table mappings if necessary. */
 	i = pgd_index(xen_start_info->mfn_list);
 	if (i && i < pgd_index(__START_KERNEL_map))
@@ -2360,7 +2372,7 @@ static const struct pv_mmu_ops xen_mmu_ops __initconst = {
 
 	.flush_tlb_user = xen_flush_tlb,
 	.flush_tlb_kernel = xen_flush_tlb,
-	.flush_tlb_single = xen_flush_tlb_single,
+	.flush_tlb_one_user = xen_flush_tlb_one_user,
 	.flush_tlb_others = xen_flush_tlb_others,
 
 	.pgd_alloc = xen_pgd_alloc,

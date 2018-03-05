@@ -3115,6 +3115,11 @@ static int hwsim_new_radio_nl(struct sk_buff *msg, struct genl_info *info)
 	if (info->attrs[HWSIM_ATTR_CHANNELS])
 		param.channels = nla_get_u32(info->attrs[HWSIM_ATTR_CHANNELS]);
 
+	if (param.channels > CFG80211_MAX_NUM_DIFFERENT_CHANNELS) {
+		GENL_SET_ERR_MSG(info, "too many channels specified");
+		return -EINVAL;
+	}
+
 	if (info->attrs[HWSIM_ATTR_NO_VIF])
 		param.no_vif = true;
 
@@ -3211,7 +3216,7 @@ static int hwsim_get_radio_nl(struct sk_buff *msg, struct genl_info *info)
 		if (!net_eq(wiphy_net(data->hw->wiphy), genl_info_net(info)))
 			continue;
 
-		skb = nlmsg_new(NLMSG_DEFAULT_SIZE, GFP_KERNEL);
+		skb = nlmsg_new(NLMSG_DEFAULT_SIZE, GFP_ATOMIC);
 		if (!skb) {
 			res = -ENOMEM;
 			goto out_err;
