@@ -117,6 +117,7 @@
 
 &usb0 {
 	status = "okay";
+	disable-over-current;
 };
 
 &i2c1 {
