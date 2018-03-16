@@ -1358,7 +1358,8 @@ static int xhci_urb_enqueue(struct usb_hcd *hcd, struct urb *urb, gfp_t mem_flag
 	struct xhci_hcd *xhci = hcd_to_xhci(hcd);
 	unsigned long flags;
 	int ret = 0;
-	unsigned int slot_id, ep_index, ep_state;
+	unsigned int slot_id, ep_index;
+	unsigned int *ep_state;
 	struct urb_priv	*urb_priv;
 	int num_tds;
 
@@ -1368,6 +1369,7 @@ static int xhci_urb_enqueue(struct usb_hcd *hcd, struct urb *urb, gfp_t mem_flag
 
 	slot_id = urb->dev->slot_id;
 	ep_index = xhci_get_endpoint_index(&urb->ep->desc);
+	ep_state = &xhci->devs[slot_id]->eps[ep_index].ep_state;
 
 	if (!HCD_HW_ACCESSIBLE(hcd)) {
 		if (!in_interrupt())
@@ -1419,6 +1421,12 @@ static int xhci_urb_enqueue(struct usb_hcd *hcd, struct urb *urb, gfp_t mem_flag
 		ret = -ESHUTDOWN;
 		goto free_priv;
 	}
+	if (*ep_state & (EP_GETTING_STREAMS | EP_GETTING_NO_STREAMS)) {
+		xhci_warn(xhci, "WARN: Can't enqueue URB, ep in streams transition state %x\n",
+			  *ep_state);
+		ret = -EINVAL;
+		goto free_priv;
+	}
 
 	switch (usb_endpoint_type(&urb->ep->desc)) {
 
@@ -1427,23 +1435,13 @@ static int xhci_urb_enqueue(struct usb_hcd *hcd, struct urb *urb, gfp_t mem_flag
 					 slot_id, ep_index);
 		break;
 	case USB_ENDPOINT_XFER_BULK:
-		ep_state = xhci->devs[slot_id]->eps[ep_index].ep_state;
-		if (ep_state & (EP_GETTING_STREAMS | EP_GETTING_NO_STREAMS)) {
-			xhci_warn(xhci, "WARN: Can't enqueue URB, ep in streams transition state %x\n",
-				  ep_state);
-			ret = -EINVAL;
-			break;
-		}
 		ret = xhci_queue_bulk_tx(xhci, GFP_ATOMIC, urb,
 					 slot_id, ep_index);
 		break;
-
-
 	case USB_ENDPOINT_XFER_INT:
 		ret = xhci_queue_intr_tx(xhci, GFP_ATOMIC, urb,
 				slot_id, ep_index);
 		break;
-
 	case USB_ENDPOINT_XFER_ISOC:
 		ret = xhci_queue_isoc_tx_prepare(xhci, GFP_ATOMIC, urb,
 				slot_id, ep_index);
