@@ -2652,6 +2652,7 @@ static int renesas_usb3_probe(struct platform_device *pdev)
 	if (ret < 0)
 		goto err_alloc_prd;
 
+	pm_runtime_enable(&pdev->dev);
 	ret = usb_add_gadget_udc(&pdev->dev, &usb3->gadget);
 	if (ret < 0)
 		goto err_add_udc;
@@ -2673,7 +2674,6 @@ static int renesas_usb3_probe(struct platform_device *pdev)
 	renesas_usb3_debugfs_init(usb3, &pdev->dev);
 
 	dev_info(&pdev->dev, "probed%s\n", usb3->phy ? " with phy" : "");
-	pm_runtime_enable(usb3_to_dev(usb3));
 
 	return 0;
 
