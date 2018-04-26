@@ -915,6 +915,21 @@
 			status = "disabled";
 		};
 
+		eccmgr: eccmgr {
+			compatible = "altr,socfpga-s10-ecc-manager";
+			#address-cells = <1>;
+			#size-cells = <1>;
+			interrupts = <0 15 4>, <0 95 4>;
+			interrupt-controller;
+			#interrupt-cells = <2>;
+			ranges;
+
+			sdramedac {
+				compatible = "altr,sdram-edac-s10";
+				interrupts = <16 4>, <48 4>;
+			};
+		};
+
 		qspi: spi@ff8d2000 {
 			compatible = "cdns,qspi-nor";
 			#address-cells = <1>;
