@@ -359,56 +359,56 @@
 				emaca_free_clk: emaca_free_clk {
 					#clock-cells = <0>;
 					compatible = "altr,socfpga-s10-perip-clk";
-					clocks = <&boot_clk>, <&main_emaca_clk>;
+					clocks = <&main_emaca_clk>, <&boot_clk>;
 					bypass-reg = <0xb0 0>;
 				};
 
 				emacb_free_clk: emacb_free_clk {
 					#clock-cells = <0>;
 					compatible = "altr,socfpga-s10-perip-clk";
-					clocks = <&boot_clk>, <&main_emacb_clk>;
+					clocks = <&main_emacb_clk>, <&boot_clk>;
 					bypass-reg = <0xb0 1>;
 				};
 
 				emac_ptp_free_clk: emac_ptp_free_clk {
 					#clock-cells = <0>;
 					compatible = "altr,socfpga-s10-perip-clk";
-					clocks = <&boot_clk>, <&peri_emac_ptp_clk>;
+					clocks = <&peri_emac_ptp_clk>, <&boot_clk>;
 					bypass-reg = <0xb0 2>;
 				};
 
 				gpio_db_free_clk: gpio_db_free_clk {
 					#clock-cells = <0>;
 					compatible = "altr,socfpga-s10-perip-clk";
-					clocks = <&boot_clk>, <&peri_gpio_db_clk>;
+					clocks = <&peri_gpio_db_clk>, <&boot_clk>;
 					bypass-reg = <0xb0 3>;
 				};
 
 				sdmmc_free_clk: sdmmc_free_clk {
 					#clock-cells = <0>;
 					compatible = "altr,socfpga-s10-perip-clk";
-					clocks = <&boot_clk>, <&peri_sdmmc_clk>;
+					clocks = <&peri_sdmmc_clk>, <&boot_clk>;
 					bypass-reg = <0xb0 4>;
 				};
 
 				s2f_user1_free_clk: s2f_user1_free_clk {
 					#clock-cells = <0>;
 					compatible = "altr,socfpga-s10-perip-clk";
-					clocks = <&boot_clk>, <&peri_s2f_usr1_clk>;
+					clocks = <&peri_s2f_usr1_clk>, <&boot_clk>;
 					bypass-reg = <0xb0 5>;
 				};
 
 				psi_ref_free_clk: psi_ref_free_clk {
 					#clock-cells = <0>;
 					compatible = "altr,socfpga-s10-perip-clk";
-					clocks = <&boot_clk>, <&peri_psi_ref_clk>;
+					clocks = <&peri_psi_ref_clk>, <&boot_clk>;
 					bypass-reg = <0xb0 6>;
 				};
 
 				mpu_clk: mpu_clk@30 {
 					#clock-cells = <0>;
 					compatible = "altr,socfpga-s10-gate-clk";
-					clocks = <&boot_clk>, <&mpu_free_clk>;
+					clocks =  <&mpu_free_clk>, <&boot_clk>;
 					bypass-reg = <0x3c 0>;
 					clk-gate = <0x30 0>;
 				};
@@ -487,7 +487,7 @@
 				s2f_user0_clk: s2f_user0_clk@3c {
 					#clock-cells = <0>;
 					compatible = "altr,socfpga-s10-gate-clk";
-					clocks = <&boot_clk>, <&f2s_free_clk>;
+					clocks =  <&f2s_free_clk>, <&boot_clk>;
 					bypass-reg = <0x3c 2>;
 					clk-gate = <0x30 6>;
 				};
