@@ -342,6 +342,13 @@
 					reg = <0x64>;
 				};
 
+				l3_main_free_clk: l3_main_free_clk {
+					#clock-cells = <0>;
+					compatible = "altr,socfpga-s10-perip-clk";
+					clocks = <&noc_free_clk>;
+					fixed-divider = <1>;
+				};
+
 				l4_sys_free_clk: l4_sys_free_clk {
 					#clock-cells = <0>;
 					compatible = "altr,socfpga-s10-perip-clk";
