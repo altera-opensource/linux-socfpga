@@ -234,14 +234,14 @@
 						#clock-cells = <0>;
 						compatible = "altr,socfpga-s10-perip-clk";
 						clocks = <&periph_pll>;
-						reg = <0xf4 0 8>;
+						div-reg = <0xf4 0 8>;
 					};
 
 					peri_noc_base_clk: peri_noc_base_clk {
 						#clock-cells = <0>;
 						compatible = "altr,socfpga-s10-perip-clk";
 						clocks = <&periph_pll>;
-						reg = <0xf8 0 8>;
+						div-reg = <0xf8 0 8>;
 					};
 
 					peri_emaca_clk: peri_emaca_clk@e8 {
