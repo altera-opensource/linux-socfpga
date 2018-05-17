@@ -196,7 +196,7 @@
 						#clock-cells = <0>;
 						compatible = "altr,socfpga-s10-perip-clk"
 ;
-						clocks = <&main_pll>;
+						clocks = <&main_noc_base_clk>;
 						reg = <0x60>;
 					};
 
@@ -395,7 +395,7 @@
 				sdmmc_free_clk: sdmmc_free_clk {
 					#clock-cells = <0>;
 					compatible = "altr,socfpga-s10-perip-clk";
-					clocks = <&peri_sdmmc_clk>, <&boot_clk>;
+					clocks = <&main_sdmmc_clk>, <&boot_clk>;
 					bypass-reg = <0xb0 4>;
 				};
 
