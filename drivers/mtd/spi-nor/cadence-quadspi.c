@@ -634,7 +634,8 @@ static int cqspi_indirect_write_execute(struct spi_nor *nor,
 		if (mod_bytes) {
 			unsigned int temp = 0xFFFFFFFF;
 
-			memcpy(&temp, txbuf, min(sizeof(temp), mod_bytes));
+			memcpy(&temp, txbuf, min_t(unsigned int, sizeof(temp),
+						   mod_bytes));
 			writel(temp, cqspi->ahb_base);
 			txbuf += mod_bytes;
 		}
