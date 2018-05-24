@@ -41,7 +41,6 @@ static const char * const mpu_free_mux[] = {"main_mpu_base_clk",
 					    "peri_mpu_base_clk",
 					    "osc1", "cb_intosc_hs_div2_clk",
 					    "f2s_free_clk"};
-
 /* clocks in AO (always on) controller */
 static const struct stratix10_pll_clock s10_pll_clks[] = {
 	{ STRATIX10_BOOT_CLK, "boot_clk", boot_mux, ARRAY_SIZE(boot_mux), 0,
