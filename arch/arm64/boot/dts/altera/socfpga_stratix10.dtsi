@@ -957,7 +957,6 @@
 			cdns,fifo-width = <4>;
 			cdns,trigger-address = <0x00000000>;
 			clocks = <&qspi_clk>;
-			bus-num = <1>;
 
 			status = "disabled";
 		};
