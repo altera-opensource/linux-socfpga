@@ -614,6 +614,8 @@
 			mac-address = [00 00 00 00 00 00];
 			resets = <&rst EMAC1_RESET>;
 			reset-names = "stmmaceth";
+			clocks = <&emac1_clk>;
+			clock-names = "stmmaceth";
 			status = "disabled";
 		};
 
@@ -625,6 +627,8 @@
 			mac-address = [00 00 00 00 00 00];
 			resets = <&rst EMAC2_RESET>;
 			reset-names = "stmmaceth";
+			clocks = <&emac2_clk>;
+			clock-names = "stmmaceth";
 			status = "disabled";
 		};
 
