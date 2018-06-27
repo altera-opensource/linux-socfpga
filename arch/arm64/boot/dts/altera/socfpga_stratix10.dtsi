@@ -341,6 +341,7 @@
 			resets = <&rst SPIM0_RESET>;
 			reg-io-width = <4>;
 			num-cs = <4>;
+			clocks = <&clkmgr STRATIX10_L4_MAIN_CLK>;
 			status = "disabled";
 		};
 
@@ -353,6 +354,7 @@
 			resets = <&rst SPIM1_RESET>;
 			reg-io-width = <4>;
 			num-cs = <4>;
+			clocks = <&clkmgr STRATIX10_L4_MAIN_CLK>;
 			status = "disabled";
 		};
 
