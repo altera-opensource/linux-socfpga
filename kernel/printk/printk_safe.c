@@ -22,6 +22,7 @@
 #include <linux/cpumask.h>
 #include <linux/irq_work.h>
 #include <linux/printk.h>
+#include <linux/console.h>
 
 #include "internal.h"
 
@@ -311,24 +312,33 @@ static __printf(1, 0) int vprintk_nmi(const char *fmt, va_list args)
 
 void printk_nmi_enter(void)
 {
-	/*
-	 * The size of the extra per-CPU buffer is limited. Use it only when
-	 * the main one is locked. If this CPU is not in the safe context,
-	 * the lock must be taken on another CPU and we could wait for it.
-	 */
-	if ((this_cpu_read(printk_context) & PRINTK_SAFE_CONTEXT_MASK) &&
-	    raw_spin_is_locked(&logbuf_lock)) {
-		this_cpu_or(printk_context, PRINTK_NMI_CONTEXT_MASK);
-	} else {
-		this_cpu_or(printk_context, PRINTK_NMI_DEFERRED_CONTEXT_MASK);
-	}
+	this_cpu_or(printk_context, PRINTK_NMI_CONTEXT_MASK);
 }
 
 void printk_nmi_exit(void)
 {
-	this_cpu_and(printk_context,
-		     ~(PRINTK_NMI_CONTEXT_MASK |
-		       PRINTK_NMI_DEFERRED_CONTEXT_MASK));
+	this_cpu_and(printk_context, ~PRINTK_NMI_CONTEXT_MASK);
+}
+
+/*
+ * Marks a code that might produce many messages in NMI context
+ * and the risk of losing them is more critical than eventual
+ * reordering.
+ *
+ * It has effect only when called in NMI context. Then printk()
+ * will try to store the messages into the main logbuf directly
+ * and use the per-CPU buffers only as a fallback when the lock
+ * is not available.
+ */
+void printk_nmi_direct_enter(void)
+{
+	if (this_cpu_read(printk_context) & PRINTK_NMI_CONTEXT_MASK)
+		this_cpu_or(printk_context, PRINTK_NMI_DIRECT_CONTEXT_MASK);
+}
+
+void printk_nmi_direct_exit(void)
+{
+	this_cpu_and(printk_context, ~PRINTK_NMI_DIRECT_CONTEXT_MASK);
 }
 
 #else
@@ -364,8 +374,88 @@ void __printk_safe_exit(void)
 	this_cpu_dec(printk_context);
 }
 
+#ifdef CONFIG_EARLY_PRINTK
+struct console *early_console;
+
+static void early_vprintk(const char *fmt, va_list ap)
+{
+	if (early_console) {
+		char buf[512];
+		int n = vscnprintf(buf, sizeof(buf), fmt, ap);
+
+		early_console->write(early_console, buf, n);
+	}
+}
+
+asmlinkage void early_printk(const char *fmt, ...)
+{
+	va_list ap;
+
+	va_start(ap, fmt);
+	early_vprintk(fmt, ap);
+	va_end(ap);
+}
+
+/*
+ * This is independent of any log levels - a global
+ * kill switch that turns off all of printk.
+ *
+ * Used by the NMI watchdog if early-printk is enabled.
+ */
+static bool __read_mostly printk_killswitch;
+
+static int __init force_early_printk_setup(char *str)
+{
+	printk_killswitch = true;
+	return 0;
+}
+early_param("force_early_printk", force_early_printk_setup);
+
+void printk_kill(void)
+{
+	printk_killswitch = true;
+}
+
+#ifdef CONFIG_PRINTK
+static int forced_early_printk(const char *fmt, va_list ap)
+{
+	if (!printk_killswitch)
+		return 0;
+	early_vprintk(fmt, ap);
+	return 1;
+}
+#endif
+
+#else
+static inline int forced_early_printk(const char *fmt, va_list ap)
+{
+	return 0;
+}
+#endif
+
 __printf(1, 0) int vprintk_func(const char *fmt, va_list args)
 {
+	/*
+	 * Fall back to early_printk if a debugging subsystem has
+	 * killed printk output
+	 */
+	if (unlikely(forced_early_printk(fmt, args)))
+		return 1;
+
+	/*
+	 * Try to use the main logbuf even in NMI. But avoid calling console
+	 * drivers that might have their own locks.
+	 */
+	if ((this_cpu_read(printk_context) & PRINTK_NMI_DIRECT_CONTEXT_MASK) &&
+	    raw_spin_trylock(&logbuf_lock)) {
+		int len;
+
+		len = vprintk_store(0, LOGLEVEL_DEFAULT, NULL, 0, fmt, args);
+		raw_spin_unlock(&logbuf_lock);
+		defer_console_output();
+		return len;
+	}
+
 	/* Use extra buffer in NMI when logbuf_lock is taken or in safe mode. */
 	if (this_cpu_read(printk_context) & PRINTK_NMI_CONTEXT_MASK)
 		return vprintk_nmi(fmt, args);
@@ -373,13 +463,6 @@ __printf(1, 0) int vprintk_func(const char *fmt, va_list args)
 	/* Use extra buffer to prevent a recursion deadlock in safe mode. */
 	if (this_cpu_read(printk_context) & PRINTK_SAFE_CONTEXT_MASK)
 		return vprintk_safe(fmt, args);
-
-	/*
-	 * Use the main logbuf when logbuf_lock is available in NMI.
-	 * But avoid calling console drivers that might have their own locks.
-	 */
-	if (this_cpu_read(printk_context) & PRINTK_NMI_DEFERRED_CONTEXT_MASK)
-		return vprintk_deferred(fmt, args);
 
 	/* No obstacles. */
 	return vprintk_default(fmt, args);
