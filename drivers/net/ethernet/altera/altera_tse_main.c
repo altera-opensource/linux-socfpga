@@ -18,14 +18,17 @@
  */
 
 #include <linux/atomic.h>
+#include <linux/clk.h>
 #include <linux/delay.h>
 #include <linux/etherdevice.h>
+#include <linux/if_ether.h>
 #include <linux/if_vlan.h>
 #include <linux/init.h>
 #include <linux/interrupt.h>
 #include <linux/kernel.h>
 #include <linux/module.h>
 #include <linux/mii.h>
+#include <linux/net_tstamp.h>
 #include <linux/netdevice.h>
 #include <linux/of_device.h>
 #include <linux/of_mdio.h>
@@ -40,6 +43,7 @@
 #include "altera_tse.h"
 #include "altera_sgdma.h"
 #include "altera_msgdma.h"
+#include "intel_fpga_tod.h"
 
 static atomic_t instance_count = ATOMIC_INIT(~0);
 /* Module parameters */
@@ -598,7 +602,11 @@ static netdev_tx_t tse_start_xmit(struct sk_buff *skb, struct net_device *dev)
 	if (ret)
 		goto out;
 
-	skb_tx_timestamp(skb);
+	if (unlikely((skb_shinfo(skb)->tx_flags & SKBTX_HW_TSTAMP) &&
+		     priv->hwts_tx_en))
+		skb_shinfo(skb)->tx_flags |= SKBTX_IN_PROGRESS;
+	else
+		skb_tx_timestamp(skb);
 
 	priv->tx_prod++;
 	dev->stats.tx_bytes += skb->len;
@@ -1238,6 +1246,13 @@ static int tse_open(struct net_device *dev)
 	if (dev->phydev)
 		phy_start(dev->phydev);
 
+	ret = intel_fpga_tod_init(&priv->ptp_priv);
+	if (ret)
+		netdev_warn(dev, "Failed PTP initialization\n");
+
+	priv->hwts_tx_en = 0;
+	priv->hwts_rx_en = 0;
+
 	napi_enable(&priv->napi);
 	netif_start_queue(dev);
 
@@ -1309,6 +1324,83 @@ static int tse_shutdown(struct net_device *dev)
 	return 0;
 }
 
+/* ioctl to configure timestamping */
+static int tse_do_ioctl(struct net_device *dev, struct ifreq *ifr, int cmd)
+{
+	struct altera_tse_private *priv = netdev_priv(dev);
+	struct hwtstamp_config config;
+
+	if (!netif_running(dev))
+		return -EINVAL;
+
+	if (!priv->ptp_enable)	{
+		netdev_alert(priv->dev, "Timestamping not supported");
+		return -EOPNOTSUPP;
+	}
+
+	if (cmd == SIOCSHWTSTAMP) {
+		if (copy_from_user(&config, ifr->ifr_data,
+				   sizeof(struct hwtstamp_config)))
+			return -EFAULT;
+
+		if (config.flags)
+			return -EINVAL;
+
+		switch (config.tx_type) {
+		case HWTSTAMP_TX_OFF:
+			priv->hwts_tx_en = 0;
+			break;
+		case HWTSTAMP_TX_ON:
+			priv->hwts_tx_en = 1;
+			break;
+		default:
+			return -ERANGE;
+		}
+
+		switch (config.rx_filter) {
+		case HWTSTAMP_FILTER_NONE:
+			priv->hwts_rx_en = 0;
+			config.rx_filter = HWTSTAMP_FILTER_NONE;
+			break;
+		default:
+			priv->hwts_rx_en = 1;
+			config.rx_filter = HWTSTAMP_FILTER_ALL;
+			break;
+		}
+
+		if (copy_to_user(ifr->ifr_data, &config,
+				 sizeof(struct hwtstamp_config)))
+			return -EFAULT;
+		else
+			return 0;
+	}
+
+	if (cmd == SIOCGHWTSTAMP) {
+		config.flags = 0;
+
+		if (priv->hwts_tx_en)
+			config.tx_type = HWTSTAMP_TX_ON;
+		else
+			config.tx_type = HWTSTAMP_TX_OFF;
+
+		if (priv->hwts_rx_en)
+			config.rx_filter = HWTSTAMP_FILTER_ALL;
+		else
+			config.rx_filter = HWTSTAMP_FILTER_NONE;
+
+		if (copy_to_user(ifr->ifr_data, &config,
+				 sizeof(struct hwtstamp_config)))
+			return -EFAULT;
+		else
+			return 0;
+	}
+
+	if (!dev->phydev)
+		return -EINVAL;
+
+	return phy_mii_ioctl(dev->phydev, ifr, cmd);
+}
+
 static struct net_device_ops altera_tse_netdev_ops = {
 	.ndo_open		= tse_open,
 	.ndo_stop		= tse_shutdown,
@@ -1317,6 +1409,7 @@ static struct net_device_ops altera_tse_netdev_ops = {
 	.ndo_set_rx_mode	= tse_set_rx_mode,
 	.ndo_change_mtu		= tse_change_mtu,
 	.ndo_validate_addr	= eth_validate_addr,
+	.ndo_do_ioctl		= tse_do_ioctl,
 };
 
 static int request_and_map(struct platform_device *pdev, const char *name,
@@ -1597,6 +1690,27 @@ static int altera_tse_probe(struct platform_device *pdev)
 		netdev_err(ndev, "Cannot attach to PHY (error: %d)\n", ret);
 		goto err_init_phy;
 	}
+
+	priv->ptp_enable = of_property_read_bool(pdev->dev.of_node,
+						 "altr,has-ptp");
+	dev_info(&pdev->dev, "PTP Enable: %d\n", priv->ptp_enable);
+
+	if (priv->ptp_enable) {
+		/* MAP PTP */
+		ret = intel_fpga_tod_probe(pdev, &priv->ptp_priv);
+		if (ret) {
+			dev_err(&pdev->dev, "cannot map PTP\n");
+			goto err_init_phy;
+		}
+		ret = intel_fpga_tod_register(&priv->ptp_priv,
+					      priv->device);
+		if (ret) {
+			dev_err(&pdev->dev, "Failed to register PTP clock\n");
+			ret = -ENXIO;
+			goto err_init_phy;
+		}
+	}
+
 	return 0;
 
 err_init_phy:
@@ -1624,6 +1738,8 @@ static int altera_tse_remove(struct platform_device *pdev)
 	}
 
 	platform_set_drvdata(pdev, NULL);
+	if (priv->ptp_enable)
+		intel_fpga_tod_unregister(&priv->ptp_priv);
 	altera_tse_mdio_destroy(ndev);
 	unregister_netdev(ndev);
 	free_netdev(ndev);
