@@ -3,7 +3,8 @@ config ALTERA_TSE
 	tristate "Altera Triple-Speed Ethernet MAC support"
 	depends on HAS_DMA
 	select PHYLIB
-	help
+	imply PTP_1588_CLOCK
+	---help---
 	  This driver supports the Altera Triple-Speed (TSE) Ethernet MAC.
 
 	  To compile this driver as a module, choose M here. The module
