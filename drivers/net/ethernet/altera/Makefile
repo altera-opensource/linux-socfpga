@@ -6,4 +6,4 @@
 obj-$(CONFIG_ALTERA_TSE) += altera_tse.o
 altera_tse-objs := altera_tse_main.o altera_tse_ethtool.o \
 		   altera_msgdma.o altera_sgdma.o altera_utils.o \
-		   intel_fpga_tod.o
+		   intel_fpga_tod.o altera_msgdma_prefetcher.o
