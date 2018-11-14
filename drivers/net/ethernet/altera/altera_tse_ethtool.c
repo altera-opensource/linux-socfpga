@@ -19,6 +19,7 @@
 #include <linux/ethtool.h>
 #include <linux/kernel.h>
 #include <linux/netdevice.h>
+#include <linux/net_tstamp.h>
 #include <linux/phy.h>
 
 #include "altera_tse.h"
@@ -223,6 +224,32 @@ static void tse_get_regs(struct net_device *dev, struct ethtool_regs *regs,
 		buf[i] = csrrd32(priv->mac_dev, i * 4);
 }
 
+static int tse_get_ts_info(struct net_device *dev,
+			   struct ethtool_ts_info *info)
+{
+	struct altera_tse_private *priv = netdev_priv(dev);
+
+	if (priv->ptp_enable) {
+		if (priv->ptp_priv.ptp_clock)
+			info->phc_index =
+				ptp_clock_index(priv->ptp_priv.ptp_clock);
+
+		info->so_timestamping = SOF_TIMESTAMPING_TX_HARDWARE |
+					SOF_TIMESTAMPING_RX_HARDWARE |
+					SOF_TIMESTAMPING_RAW_HARDWARE;
+
+		info->tx_types = (1 << HWTSTAMP_TX_OFF) |
+						 (1 << HWTSTAMP_TX_ON);
+
+		info->rx_filters = (1 << HWTSTAMP_FILTER_NONE) |
+						   (1 << HWTSTAMP_FILTER_ALL);
+
+		return 0;
+	} else {
+		return ethtool_op_get_ts_info(dev, info);
+	}
+}
+
 static const struct ethtool_ops tse_ethtool_ops = {
 	.get_drvinfo = tse_get_drvinfo,
 	.get_regs_len = tse_reglen,
@@ -235,6 +262,7 @@ static const struct ethtool_ops tse_ethtool_ops = {
 	.set_msglevel = tse_set_msglevel,
 	.get_link_ksettings = phy_ethtool_get_link_ksettings,
 	.set_link_ksettings = phy_ethtool_set_link_ksettings,
+	.get_ts_info = tse_get_ts_info,
 };
 
 void altera_tse_set_ethtool_ops(struct net_device *netdev)
