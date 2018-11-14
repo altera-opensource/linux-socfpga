@@ -382,6 +382,7 @@ struct altera_tse_private;
 
 #define ALTERA_DTYPE_SGDMA 1
 #define ALTERA_DTYPE_MSGDMA 2
+#define ALTERA_DTYPE_MSGDMA_PREF 3
 
 /* standard DMA interface for SGDMA and MSGDMA */
 struct altera_dmaops {
@@ -433,6 +434,19 @@ struct altera_tse_private {
 	/* mSGDMA Tx Dispatcher address space */
 	void __iomem *tx_dma_csr;
 	void __iomem *tx_dma_desc;
+
+	/* mSGDMA Rx Prefecher address space */
+	void __iomem *rx_pref_csr;
+	struct msgdma_pref_extended_desc *pref_rxdesc;
+	dma_addr_t pref_rxdescphys;
+	u32 pref_rx_prod;
+
+	/* mSGDMA Tx Prefecher address space */
+	void __iomem *tx_pref_csr;
+	struct msgdma_pref_extended_desc *pref_txdesc;
+	dma_addr_t pref_txdescphys;
+	u32 rx_poll_freq;
+	u32 tx_poll_freq;
 
 	/* Rx buffers queue */
 	struct tse_buffer *rx_ring;
