@@ -6,6 +6,8 @@ config ALTERA_TSE
 	select PHYLINK
 	select PCS_ALTERA_TSE
 	help
+	imply PTP_1588_CLOCK
+	---help---
 	  This driver supports the Altera Triple-Speed (TSE) Ethernet MAC.
 
 	  To compile this driver as a module, choose M here. The module
