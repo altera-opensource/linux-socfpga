@@ -46,6 +46,7 @@
 #include "altera_sgdma.h"
 #include "altera_msgdma.h"
 #include "intel_fpga_tod.h"
+#include "altera_msgdma_prefetcher.h"
 
 static atomic_t instance_count = ATOMIC_INIT(~0);
 /* Module parameters */
@@ -1322,6 +1323,34 @@ static int altera_tse_probe(struct platform_device *pdev)
 		priv->rxdescmem = resource_size(dma_res);
 		priv->rxdescmem_busaddr = dma_res->start;
 
+	} else if (priv->dmaops &&
+			   priv->dmaops->altera_dtype ==
+			   ALTERA_DTYPE_MSGDMA_PREF) {
+		/* mSGDMA Rx Prefetcher address space */
+		ret = request_and_map(pdev, "rx_pref", &dma_res,
+				      &priv->rx_pref_csr);
+		if (ret)
+			goto err_free_netdev;
+
+		/* mSGDMA Tx Prefetcher address space */
+		ret = request_and_map(pdev, "tx_pref", &dma_res,
+				      &priv->tx_pref_csr);
+		if (ret)
+			goto err_free_netdev;
+
+		/* get prefetcher rx poll frequency from device tree */
+		if (of_property_read_u32(pdev->dev.of_node, "rx-poll-freq",
+					 &priv->rx_poll_freq)) {
+			dev_info(&pdev->dev, "Defaulting RX Poll Frequency to 128\n");
+			priv->rx_poll_freq = 128;
+		}
+
+		/* get prefetcher rx poll frequency from device tree */
+		if (of_property_read_u32(pdev->dev.of_node, "tx-poll-freq",
+					 &priv->tx_poll_freq)) {
+			dev_info(&pdev->dev, "Defaulting TX Poll Frequency to 128\n");
+			priv->tx_poll_freq = 128;
+		}
 	} else {
 		ret = -ENODEV;
 		goto err_free_netdev;
@@ -1606,7 +1635,29 @@ static const struct altera_dmaops altera_dtype_msgdma = {
 	.start_txdma = NULL,
 };
 
+static const struct altera_dmaops altera_dtype_prefetcher = {
+	.altera_dtype = ALTERA_DTYPE_MSGDMA_PREF,
+	.dmamask = 64,
+	.reset_dma = msgdma_pref_reset,
+	.enable_txirq = msgdma_pref_enable_txirq,
+	.enable_rxirq = msgdma_pref_enable_rxirq,
+	.disable_txirq = msgdma_pref_disable_txirq,
+	.disable_rxirq = msgdma_pref_disable_rxirq,
+	.clear_txirq = msgdma_pref_clear_txirq,
+	.clear_rxirq = msgdma_pref_clear_rxirq,
+	.tx_buffer = msgdma_pref_tx_buffer,
+	.tx_completions = msgdma_pref_tx_completions,
+	.add_rx_desc = msgdma_pref_add_rx_desc,
+	.get_rx_status = msgdma_pref_rx_status,
+	.init_dma = msgdma_pref_initialize,
+	.uninit_dma = msgdma_pref_uninitialize,
+	.start_rxdma = msgdma_pref_start_rxdma,
+	.start_txdma = msgdma_pref_start_txdma,
+};
+
 static const struct of_device_id altera_tse_ids[] = {
+	{ .compatible = "altr,tse-msgdma-2.0",
+		.data = &altera_dtype_prefetcher, },
 	{ .compatible = "altr,tse-msgdma-1.0", .data = &altera_dtype_msgdma, },
 	{ .compatible = "altr,tse-1.0", .data = &altera_dtype_sgdma, },
 	{ .compatible = "ALTR,tse-1.0", .data = &altera_dtype_sgdma, },
