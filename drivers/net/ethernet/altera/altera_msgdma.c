@@ -106,7 +106,8 @@ void msgdma_clear_txirq(struct altera_tse_private *priv)
 }
 
 /* return 0 to indicate transmit is pending */
-int msgdma_tx_buffer(struct altera_tse_private *priv, struct tse_buffer *buffer)
+netdev_tx_t
+msgdma_tx_buffer(struct altera_tse_private *priv, struct tse_buffer *buffer)
 {
 	csrwr32(lower_32_bits(buffer->dma_addr), priv->tx_dma_desc,
 		msgdma_descroffs(read_addr_lo));
@@ -120,7 +121,7 @@ int msgdma_tx_buffer(struct altera_tse_private *priv, struct tse_buffer *buffer)
 		msgdma_descroffs(stride));
 	csrwr32(MSGDMA_DESC_CTL_TX_SINGLE, priv->tx_dma_desc,
 		msgdma_descroffs(control));
-	return 0;
+	return NETDEV_TX_OK;
 }
 
 u32 msgdma_tx_completions(struct altera_tse_private *priv)
