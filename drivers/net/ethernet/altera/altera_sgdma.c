@@ -166,7 +166,8 @@ void sgdma_clear_txirq(struct altera_tse_private *priv)
  *   will now actually look at the code, so from now, 0 is good and return
  *   NETDEV_TX_BUSY when busy.
  */
-int sgdma_tx_buffer(struct altera_tse_private *priv, struct tse_buffer *buffer)
+netdev_tx_t
+sgdma_tx_buffer(struct altera_tse_private *priv, struct tse_buffer *buffer)
 {
 	struct sgdma_descrip __iomem *descbase =
 		(struct sgdma_descrip __iomem *)priv->tx_dma_desc;
@@ -196,7 +197,7 @@ int sgdma_tx_buffer(struct altera_tse_private *priv, struct tse_buffer *buffer)
 	/* enqueue the request to the pending transmit queue */
 	queue_tx(priv, buffer);
 
-	return 0;
+	return NETDEV_TX_OK;
 }
 
 
