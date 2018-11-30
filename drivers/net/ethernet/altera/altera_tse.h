@@ -382,8 +382,8 @@ struct altera_dmaops {
 	void (*disable_rxirq)(struct altera_tse_private *priv);
 	void (*clear_txirq)(struct altera_tse_private *priv);
 	void (*clear_rxirq)(struct altera_tse_private *priv);
-	int (*tx_buffer)(struct altera_tse_private *priv,
-			 struct tse_buffer *buffer);
+	netdev_tx_t (*tx_buffer)(struct altera_tse_private *priv,
+				 struct tse_buffer *buffer);
 	u32 (*tx_completions)(struct altera_tse_private *priv);
 	void (*add_rx_desc)(struct altera_tse_private *priv,
 			    struct tse_buffer *buffer);
