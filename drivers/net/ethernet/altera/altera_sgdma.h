@@ -13,8 +13,8 @@ void sgdma_disable_rxirq(struct altera_tse_private *priv);
 void sgdma_disable_txirq(struct altera_tse_private *priv);
 void sgdma_clear_rxirq(struct altera_tse_private *priv);
 void sgdma_clear_txirq(struct altera_tse_private *priv);
-int sgdma_tx_buffer(struct altera_tse_private *priv,
-		    struct tse_buffer *buffer);
+netdev_tx_t sgdma_tx_buffer(struct altera_tse_private *priv,
+			    struct tse_buffer *buffer);
 u32 sgdma_tx_completions(struct altera_tse_private *priv);
 void sgdma_add_rx_desc(struct altera_tse_private *priv,
 		       struct tse_buffer *buffer);
