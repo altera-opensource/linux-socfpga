@@ -16,8 +16,8 @@ void msgdma_clear_txirq(struct altera_tse_private *priv);
 u32 msgdma_tx_completions(struct altera_tse_private *priv);
 void msgdma_add_rx_desc(struct altera_tse_private *priv,
 			struct tse_buffer *buffer);
-int msgdma_tx_buffer(struct altera_tse_private *priv,
-		     struct tse_buffer *buffer);
+netdev_tx_t msgdma_tx_buffer(struct altera_tse_private *priv,
+			     struct tse_buffer *buffer);
 u32 msgdma_rx_status(struct altera_tse_private *priv);
 int msgdma_initialize(struct altera_tse_private *priv);
 void msgdma_uninitialize(struct altera_tse_private *priv);
