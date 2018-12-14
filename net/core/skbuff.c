@@ -1858,8 +1858,9 @@ int pskb_trim_rcsum_slow(struct sk_buff *skb, unsigned int len)
 	if (skb->ip_summed == CHECKSUM_COMPLETE) {
 		int delta = skb->len - len;
 
-		skb->csum = csum_sub(skb->csum,
-				     skb_checksum(skb, len, delta, 0));
+		skb->csum = csum_block_sub(skb->csum,
+					   skb_checksum(skb, len, delta, 0),
+					   len);
 	}
 	return __pskb_trim(skb, len);
 }
@@ -4895,6 +4896,10 @@ void skb_scrub_packet(struct sk_buff *skb, bool xnet)
 	secpath_reset(skb);
 	nf_reset(skb);
 	nf_reset_trace(skb);
+
+#ifdef CONFIG_NET_SWITCHDEV
+	skb->offload_fwd_mark = 0;
+#endif
 
 	if (!xnet)
 		return;
