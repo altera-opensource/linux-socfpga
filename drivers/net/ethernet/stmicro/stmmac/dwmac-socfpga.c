@@ -179,7 +179,8 @@ static const struct regmap_config s10_emac_regmap_cfg = {
 	.max_register = 0xffffffff,
 	.reg_read = s10_protected_reg_read,
 	.reg_write = s10_protected_reg_write,
-	.use_single_rw = true,
+	.use_single_read = true,
+	.use_single_write = true,
 };
 #endif
 
