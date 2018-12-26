@@ -52,7 +52,7 @@ static ssize_t altera_sysid_show_timestamp(struct device *dev,
 
 	reg = readl(sysid->regs + SYSID_REG_TIMESTAMP);
 
-	time_to_tm(reg, 0, &timestamp);
+	time64_to_tm(reg, 0, &timestamp);
 
 	return sprintf(buf, "%u (%u-%u-%u %u:%u:%u UTC)\n", reg,
 		(unsigned int)(timestamp.tm_year + 1900),
