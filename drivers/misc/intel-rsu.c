@@ -12,7 +12,7 @@
 
 #include <linux/arm-smccc.h>
 #include <linux/completion.h>
-#include <linux/intel-service-client.h>
+#include <linux/firmware/intel/stratix10-svc-client.h>
 #include <linux/kobject.h>
 #include <linux/module.h>
 #include <linux/of.h>
