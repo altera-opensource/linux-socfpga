@@ -16,6 +16,7 @@
 #include <linux/kobject.h>
 #include <linux/module.h>
 #include <linux/of.h>
+#include <linux/of_platform.h>
 #include <linux/platform_device.h>
 #include <linux/string.h>
 #include <linux/sysfs.h>
@@ -26,8 +27,8 @@
  * Private data structure
  */
 struct intel_rsu_priv {
-	struct intel_svc_chan *chan;
-	struct intel_svc_client client;
+	struct stratix10_svc_chan *chan;
+	struct stratix10_svc_client client;
 	struct completion svc_completion;
 	struct {
 		unsigned long current_image;
@@ -46,8 +47,8 @@ struct intel_rsu_priv {
  * client - returned context from intel-service layer
  * data - SMC response data
  */
-static void status_svc_callback(struct intel_svc_client *client,
-				struct intel_svc_c_data *data)
+static void status_svc_callback(struct stratix10_svc_client *client,
+				struct stratix10_svc_cb_data *data)
 {
 	struct intel_rsu_priv *priv = client->priv;
 	struct arm_smccc_res *res = (struct arm_smccc_res *)data->kaddr1;
@@ -86,7 +87,7 @@ static void status_svc_callback(struct intel_svc_client *client,
  */
 static int get_status(struct intel_rsu_priv *priv)
 {
-	struct intel_svc_client_msg msg;
+	struct stratix10_svc_client_msg msg;
 	int ret;
 	unsigned long timeout;
 
@@ -94,7 +95,7 @@ static int get_status(struct intel_rsu_priv *priv)
 	priv->client.receive_cb = status_svc_callback;
 
 	msg.command = COMMAND_RSU_STATUS;
-	ret = intel_svc_send(priv->chan, &msg);
+	ret = stratix10_svc_send(priv->chan, &msg);
 	if (ret < 0)
 		goto status_done;
 
@@ -117,7 +118,7 @@ static int get_status(struct intel_rsu_priv *priv)
 	ret = 0;
 
 status_done:
-	intel_svc_done(priv->chan);
+	stratix10_svc_done(priv->chan);
 	return ret;
 }
 
@@ -199,8 +200,8 @@ static ssize_t error_details_show(struct device *dev,
  * client - returned context from intel-service layer
  * data - SMC repsonse data
  */
-static void update_svc_callback(struct intel_svc_client *client,
-				struct intel_svc_c_data *data)
+static void update_svc_callback(struct stratix10_svc_client *client,
+				struct stratix10_svc_cb_data *data)
 {
 	struct intel_rsu_priv *priv = client->priv;
 
@@ -222,7 +223,7 @@ static void update_svc_callback(struct intel_svc_client *client,
 static int send_update(struct intel_rsu_priv *priv,
 		       unsigned long address)
 {
-	struct intel_svc_client_msg msg;
+	struct stratix10_svc_client_msg msg;
 	int ret;
 	unsigned long timeout;
 
@@ -232,7 +233,7 @@ static int send_update(struct intel_rsu_priv *priv,
 	msg.command = COMMAND_RSU_UPDATE;
 	msg.arg[0] = address;
 
-	ret = intel_svc_send(priv->chan, &msg);
+	ret = stratix10_svc_send(priv->chan, &msg);
 	if (ret < 0)
 		goto update_done;
 
@@ -254,7 +255,7 @@ static int send_update(struct intel_rsu_priv *priv,
 	ret = 0;
 
 update_done:
-	intel_svc_done(priv->chan);
+	stratix10_svc_done(priv->chan);
 	return ret;
 }
 
@@ -331,7 +332,8 @@ static int intel_rsu_probe(struct platform_device *pdev)
 	priv->status.version = 0;
 	priv->status.state = 0;
 
-	priv->chan = request_svc_channel_byname(&priv->client, SVC_CLIENT_RSU);
+	priv->chan = stratix10_svc_request_channel_byname(&priv->client,
+							 SVC_CLIENT_RSU);
 	if (IS_ERR(priv->chan)) {
 		dev_err(dev, "couldn't get service channel (%s)\n",
 			SVC_CLIENT_RSU);
@@ -345,14 +347,15 @@ static int intel_rsu_probe(struct platform_device *pdev)
 	ret = get_status(priv);
 	if (ret) {
 		dev_err(dev, "Error getting RSU status (%i)\n", ret);
-		free_svc_channel(priv->chan);
+		stratix10_svc_free_channel(priv->chan);
 		return ret;
 	}
 
 	ret = sysfs_create_group(&dev->kobj, &attr_group);
 	if (ret)
-		free_svc_channel(priv->chan);
+		stratix10_svc_free_channel(priv->chan);
 
+	pr_info("Intel RSU Driver Initialized\n");
 	return ret;
 }
 
@@ -360,7 +363,7 @@ static int intel_rsu_remove(struct platform_device *pdev)
 {
 	struct intel_rsu_priv *priv = platform_get_drvdata(pdev);
 
-	free_svc_channel(priv->chan);
+	stratix10_svc_free_channel(priv->chan);
 
 	return 0;
 }
@@ -380,7 +383,35 @@ static struct platform_driver intel_rsu_driver = {
 		   },
 };
 
-module_platform_driver(intel_rsu_driver);
+static int __init stratix_rsu_init(void)
+{
+	struct device_node *fw_np;
+        struct device_node *np;
+        int ret;
+
+        fw_np = of_find_node_by_name(NULL, "svc");
+        if (!fw_np)
+                return -ENODEV;
+
+        np = of_find_matching_node(fw_np, intel_rsu_of_match);
+        if (!np)
+                return -ENODEV;
+
+        of_node_put(np);
+        ret = of_platform_populate(fw_np, intel_rsu_of_match, NULL, NULL);
+        if (ret)
+                return ret;
+
+        return platform_driver_register(&intel_rsu_driver);
+}
+
+static void __exit stratix_rsu_exit(void)
+{
+	return platform_driver_unregister(&intel_rsu_driver);
+}
+
+module_init(stratix_rsu_init);
+module_exit(stratix_rsu_exit);
 
 MODULE_LICENSE("GPL v2");
 MODULE_DESCRIPTION("Intel Remote System Update SysFS Driver");
