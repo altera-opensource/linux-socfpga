@@ -536,6 +536,10 @@
 				fpga_mgr: fpga-mgr {
 					compatible = "intel,stratix10-soc-fpga-mgr";
 				};
+
+				rsu {
+					compatible = "intel,stratix10-rsu";
+				};
 			};
 		};
 	};
