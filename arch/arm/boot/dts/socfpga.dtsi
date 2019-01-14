@@ -592,6 +592,7 @@
 			compatible = "snps,dw-apb-gpio";
 			reg = <0xff708000 0x1000>;
 			clocks = <&l4_mp_clk>;
+			resets = <&rst GPIO0_RESET>;
 			status = "disabled";
 
 			porta: gpio-controller@0 {
@@ -612,6 +613,7 @@
 			compatible = "snps,dw-apb-gpio";
 			reg = <0xff709000 0x1000>;
 			clocks = <&l4_mp_clk>;
+			resets = <&rst GPIO1_RESET>;
 			status = "disabled";
 
 			portb: gpio-controller@0 {
@@ -632,6 +634,7 @@
 			compatible = "snps,dw-apb-gpio";
 			reg = <0xff70a000 0x1000>;
 			clocks = <&l4_mp_clk>;
+			resets = <&rst GPIO2_RESET>;
 			status = "disabled";
 
 			portc: gpio-controller@0 {
@@ -738,6 +741,7 @@
 			#size-cells = <0>;
 			clocks = <&l4_mp_clk>, <&sdmmc_clk_divided>;
 			clock-names = "biu", "ciu";
+			resets = <&rst SDMMC_RESET>;
 			status = "disabled";
 		};
 
@@ -751,6 +755,7 @@
 			interrupts = <0x0 0x90 0x4>;
 			dma-mask = <0xffffffff>;
 			clocks = <&nand_x_clk>;
+			resets = <&rst NAND_RESET>;
 			status = "disabled";
 		};
 
@@ -770,6 +775,7 @@
 			cdns,fifo-width = <4>;
 			cdns,trigger-address = <0x00000000>;
 			clocks = <&qspi_clk>;
+			resets = <&rst QSPI_RESET>;
 			status = "disabled";
 		};
 
@@ -804,6 +810,7 @@
 			interrupts = <0 154 4>;
 			num-cs = <4>;
 			clocks = <&spi_m_clk>;
+			resets = <&rst SPIM0_RESET>;
 			status = "disabled";
 		};
 
@@ -815,6 +822,7 @@
 			interrupts = <0 155 4>;
 			num-cs = <4>;
 			clocks = <&spi_m_clk>;
+			resets = <&rst SPIM1_RESET>;
 			status = "disabled";
 		};
 
@@ -881,6 +889,7 @@
 			dmas = <&pdma 28>,
 			       <&pdma 29>;
 			dma-names = "tx", "rx";
+			resets = <&rst UART0_RESET>;
 		};
 
 		uart1: serial1@ffc03000 {
@@ -893,6 +902,7 @@
 			dmas = <&pdma 30>,
 			       <&pdma 31>;
 			dma-names = "tx", "rx";
+			resets = <&rst UART1_RESET>;
 		};
 
 		usbphy0: usbphy {
@@ -932,6 +942,7 @@
 			reg = <0xffd02000 0x1000>;
 			interrupts = <0 171 4>;
 			clocks = <&osc1>;
+			resets = <&rst L4WD0_RESET>;
 			status = "disabled";
 		};
 
@@ -940,6 +951,7 @@
 			reg = <0xffd03000 0x1000>;
 			interrupts = <0 172 4>;
 			clocks = <&osc1>;
+			resets = <&rst L4WD1_RESET>;
 			status = "disabled";
 		};
 	};
