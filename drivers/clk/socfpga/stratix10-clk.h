@@ -63,6 +63,9 @@ struct stratix10_gate_clock {
 struct clk *s10_register_pll(const char *, const char *const *, u8,
 			     unsigned long, void __iomem *, unsigned long);
 
+struct clk *agilex_register_pll(const char *, const char *const *, u8,
+				unsigned long, void __iomem *, unsigned long);
+
 struct clk *s10_register_periph(const char *, const char *,
 				const char * const *, u8, unsigned long,
 				void __iomem *, unsigned long);
