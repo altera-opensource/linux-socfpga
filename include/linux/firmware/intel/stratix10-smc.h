@@ -328,6 +328,45 @@ INTEL_SIP_SMC_FAST_CALL_VAL(INTEL_SIP_SMC_FUNCID_FPGA_CONFIG_COMPLETED_WRITE)
 #define INTEL_SIP_SMC_ECC_DBE \
 	INTEL_SIP_SMC_FAST_CALL_VAL(INTEL_SIP_SMC_FUNCID_ECC_DBE)
 
+/**
+ * Request INTEL_SIP_SMC_RSU_NOTIFY
+ *
+ * Sync call used by service driver at EL1 to report hard processor
+ * system state to firmware
+ *
+ * Call register usage:
+ * a0 INTEL_SIP_SMC_RSU_NOTIFY
+ * a1 32bit value representing hard processor system state
+ * a2-7 not used
+ *
+ * Return status
+ * a0 INTEL_SIP_SMC_STATUS_OK
+ */
+#define INTEL_SIP_SMC_FUNCID_RSU_NOTIFY 14
+#define INTEL_SIP_SMC_RSU_NOTIFY \
+	INTEL_SIP_SMC_FAST_CALL_VAL(INTEL_SIP_SMC_FUNCID_RSU_NOTIFY)
+
+/**
+ * Request INTEL_SIP_SMC_RSU_RETRY_COUNTER
+ *
+ * Sync call used by service driver at EL1 to query RSU retry counter
+ *
+ * Call register usage:
+ * a0 INTEL_SIP_SMC_RSU_RETRY_COUNTER
+ * a1-7 not used
+ *
+ * Return status
+ * a0 INTEL_SIP_SMC_STATUS_OK
+ * a1 the retry counter
+ *
+ * Or
+ *
+ * a0 INTEL_SIP_SMC_RSU_ERROR
+ */
+#define INTEL_SIP_SMC_FUNCID_RSU_RETRY_COUNTER 15
+#define INTEL_SIP_SMC_RSU_RETRY_COUNTER \
+	INTEL_SIP_SMC_FAST_CALL_VAL(INTEL_SIP_SMC_FUNCID_RSU_RETRY_COUNTER)
+
 #endif
 
 /**
