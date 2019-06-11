@@ -80,6 +80,7 @@
 		device_type = "soc";
 		interrupt-parent = <&intc>;
 		ranges = <0 0 0 0xffffffff>;
+		dma-ranges = <0x00000000 0x00000000 0x00000000 0x80000000>;
 
 		gmac0: ethernet@ff800000 {
 			compatible = "altr,socfpga-stmmac", "snps,dwmac-3.74a", "snps,dwmac";
@@ -93,6 +94,7 @@
 			rx-fifo-depth = <16384>;
 			snps,multicast-filter-bins = <256>;
 			iommus = <&smmu 1>;
+			clock-frequency = <250000000>;
 			status = "disabled";
 		};
 
@@ -108,6 +110,7 @@
 			rx-fifo-depth = <16384>;
 			snps,multicast-filter-bins = <256>;
 			iommus = <&smmu 2>;
+			clock-frequency = <250000000>;
 			status = "disabled";
 		};
 
@@ -123,6 +126,7 @@
 			rx-fifo-depth = <16384>;
 			snps,multicast-filter-bins = <256>;
 			iommus = <&smmu 3>;
+			clock-frequency = <250000000>;
 			status = "disabled";
 		};
 
@@ -226,6 +230,7 @@
 			resets = <&rst SDMMC_RESET>;
 			reset-names = "reset";
 			iommus = <&smmu 5>;
+			clock-frequency = <50000000>;
 			status = "disabled";
 		};
 
@@ -320,24 +325,28 @@
 			compatible = "snps,dw-apb-timer";
 			interrupts = <0 113 4>;
 			reg = <0xffc03000 0x100>;
+			clock-frequency = <100000000>;
 		};
 
 		timer1: timer1@ffc03100 {
 			compatible = "snps,dw-apb-timer";
 			interrupts = <0 114 4>;
 			reg = <0xffc03100 0x100>;
+			clock-frequency = <100000000>;
 		};
 
 		timer2: timer2@ffd00000 {
 			compatible = "snps,dw-apb-timer";
 			interrupts = <0 115 4>;
 			reg = <0xffd00000 0x100>;
+			clock-frequency = <100000000>;
 		};
 
 		timer3: timer3@ffd00100 {
 			compatible = "snps,dw-apb-timer";
 			interrupts = <0 116 4>;
 			reg = <0xffd00100 0x100>;
+			clock-frequency = <100000000>;
 		};
 
 		uart0: serial0@ffc02000 {
@@ -348,6 +357,7 @@
 			reg-io-width = <4>;
 			resets = <&rst UART0_RESET>;
 			status = "disabled";
+			clock-frequency = <100000000>;
 		};
 
 		uart1: serial1@ffc02100 {
