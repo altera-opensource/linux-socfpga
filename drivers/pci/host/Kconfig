@@ -137,7 +137,7 @@ config PCIE_IPROC_MSI
 	  PCIe controller
 
 config PCIE_ALTERA
-	bool "Altera PCIe controller"
+	tristate "Altera PCIe controller"
 	depends on ARM || NIOS2 || ARM64
 	depends on OF_PCI
 	select PCI_DOMAINS
