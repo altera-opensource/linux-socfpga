@@ -20,7 +20,7 @@
 #define RSU_VERSION_MASK		GENMASK_ULL(63, 32)
 #define RSU_ERROR_LOCATION_MASK		GENMASK_ULL(31, 0)
 #define RSU_ERROR_DETAIL_MASK		GENMASK_ULL(63, 32)
-#define RSU_FW_VERSION_MASK		GENMASK_ULL(3, 0)
+#define RSU_FW_VERSION_MASK		GENMASK_ULL(15, 0)
 
 #define RSU_TIMEOUT	(msecs_to_jiffies(SVC_RSU_REQUEST_TIMEOUT_MS))
 
@@ -59,7 +59,7 @@ struct stratix10_rsu_priv {
 };
 
 /**
- * rsu_status_callback() - Status callback from Intel service layer
+ * rsu_status_callback() - Status callback from Intel Service Layer
  * @client: pointer to service client
  * @data: pointer to callback data structure
  *
@@ -98,7 +98,7 @@ static void rsu_status_callback(struct stratix10_svc_client *client,
 }
 
 /**
- * rsu_command_callback() - Update callback from Intel service layer
+ * rsu_command_callback() - Update callback from Intel Service Layer
  * @client: pointer to client
  * @data: pointer to callback data structure
  *
@@ -323,6 +323,25 @@ static ssize_t notify_store(struct device *dev,
 		return ret;
 	}
 
+	/* to get the updated state */
+	ret = rsu_send_msg(priv, COMMAND_RSU_STATUS,
+			   0, rsu_status_callback);
+	if (ret) {
+		dev_err(dev, "Error, getting RSU status %i\n", ret);
+		return ret;
+	}
+
+	/* only 19.3 or late version FW supports retry counter feature */
+	if (FIELD_GET(RSU_FW_VERSION_MASK, priv->status.version)) {
+		ret = rsu_send_msg(priv, COMMAND_RSU_RETRY,
+				   0, rsu_retry_callback);
+		if (ret) {
+			dev_err(dev,
+				"Error, getting RSU retry %i\n", ret);
+			return ret;
+		}
+	}
+
 	return count;
 }
 
@@ -384,7 +403,7 @@ static int stratix10_rsu_probe(struct platform_device *pdev)
 	init_completion(&priv->completion);
 	platform_set_drvdata(pdev, priv);
 
-	/* status is only updated after reboot */
+	/* get the initial state from firmware */
 	ret = rsu_send_msg(priv, COMMAND_RSU_STATUS,
 			   0, rsu_status_callback);
 	if (ret) {
@@ -392,10 +411,10 @@ static int stratix10_rsu_probe(struct platform_device *pdev)
 		stratix10_svc_free_channel(priv->chan);
 	}
 
-	/* only version 1 firmware supports retry counter feature */
+	/* only 19.3 or late version FW supports retry counter feature */
 	if (FIELD_GET(RSU_FW_VERSION_MASK, priv->status.version)) {
-		ret = rsu_send_msg(priv, COMMAND_RSU_RETRY,
-				   0, rsu_retry_callback);
+		ret = rsu_send_msg(priv, COMMAND_RSU_RETRY, 0,
+				   rsu_retry_callback);
 		if (ret) {
 			dev_err(dev,
 				"Error, getting RSU retry %i\n", ret);
