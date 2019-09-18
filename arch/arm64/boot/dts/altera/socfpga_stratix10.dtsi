@@ -340,6 +340,7 @@
 			#dma-requests = <32>;
 			clocks = <&clkmgr STRATIX10_L4_MAIN_CLK>;
 			clock-names = "apb_pclk";
+			resets = <&rst DMA_RESET>;
 		};
 
 		rst: rstmgr@ffd11000 {
