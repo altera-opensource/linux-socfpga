@@ -878,6 +878,9 @@ static void __noreturn local_cpu_stop(unsigned int cpu)
 	cpu_park_loop();
 }
 
+#ifndef CONFIG_EDAC_ALTERA_ARM64_WARM_RESET
+/* In ECC_DBE_WARM_RESET case, use EDAC panic_smp_self_stop() */
+
 /*
  * We need to implement panic_smp_self_stop() for parallel panic() calls, so
  * that cpu_online_mask gets correctly updated and smp_send_stop() can skip
@@ -887,6 +890,7 @@ void __noreturn panic_smp_self_stop(void)
 {
 	local_cpu_stop(smp_processor_id());
 }
+#endif
 
 static void __noreturn ipi_cpu_crash_stop(unsigned int cpu, struct pt_regs *regs)
 {
