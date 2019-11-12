@@ -150,6 +150,7 @@
 			iommus = <&smmu 1>;
 			clocks = <&clkmgr AGILEX_EMAC0_CLK>;
 			clock-names = "stmmaceth";
+			altr,sysmgr-syscon = <&sysmgr 0x44 0>;
 			status = "disabled";
 		};
 
@@ -167,6 +168,7 @@
 			iommus = <&smmu 2>;
 			clocks = <&clkmgr AGILEX_EMAC1_CLK>;
 			clock-names = "stmmaceth";
+			altr,sysmgr-syscon = <&sysmgr 0x48 8>;
 			status = "disabled";
 		};
 
@@ -184,6 +186,7 @@
 			iommus = <&smmu 3>;
 			clocks = <&clkmgr AGILEX_EMAC2_CLK>;
 			clock-names = "stmmaceth";
+			altr,sysmgr-syscon = <&sysmgr 0x4c 16>;
 			status = "disabled";
 		};
 
