@@ -1,0 +1,112 @@
+* Altera Quad-Speed Ethernet MAC driver (QSE)
+
+Required properties:
+- compatible: Should be "altr,qse-msgdma-2.0" for MSGDMA with prefetcher based
+		implementations.
+- reg: Address and length of the register set for the device. It contains
+  the information of registers in the same order as described by reg-names
+- reg-names: Should contain the reg names
+- interrupts: Should contain the QSE interrupts and it's mode.
+- interrupt-names: Should contain the interrupt names
+  "rx_irq":       DMA Rx dispatcher interrupt
+  "tx_irq":       DMA Tx dispatcher interrupt
+- rx-fifo-depth: MAC receive FIFO buffer depth in bytes
+- tx-fifo-depth: MAC transmit FIFO buffer depth in bytes
+- rx-fifo-almost-full: Value that indicates RX FIFO buffer is getting full
+- rx-fifo-almost-empty: Value that indicates RX FIFO buffer is getting empty
+- phy-mode: See ethernet.txt in the same directory.
+- sfp: See sff,sfp.txt in the same directory.
+- dma-coherent: Present if DMA operations are coherent.
+
+- altr,has-supplementary-unicast:
+		If present, QSE supports additional unicast addresses.
+		Otherwise additional unicast addresses are not supported.
+- altr,has-ptp:
+		If present, QSE supports 1588 timestamping.  Currently only
+		supported with the msgdma prefetcher.
+- altr,tx-pma-delay-ns:
+		MAC Tx PMA digital delay in nanoseconds.
+- altr,rx-pma-delay-ns:
+		MAC RX PMA digital delay in nanoseconds.
+- altr,tx-pma-delay-fns:
+		MAX TX PMA digital delay in fractional nanoseconds.
+- altr,rx-pma-delay-fns:
+		MAX RX PMA digital delay in fractional nanoseconds.
+- tx-poll-freq:
+		Optional cycle count for Tx prefetcher to poll descriptor
+		list.  If not present, defaults to 128, which at 125MHz is
+		roughly 1usec.
+- rx-poll-freq:
+		Optional cycle count for Rx prefetcher to poll descriptor
+		list.  If not present, defaults to 128, which at 125MHz is
+		roughly 1usec.
+
+Required registers by compatibility string:
+- "altr,qse-msgdma-2.0"
+	"control_port":		MAC configuration space region.
+	"xcvr_ctrl":		PHY transceiver (XCVR) address space region.
+	"tx_csr":		DMA Tx dispatcher control and status space region.
+	"tx_pref":		DMA Tx prefetcher configuration space region.
+	"rx_csr" :		DMA Rx dispatcher control and status space region.
+	"rx_pref":		DMA Rx prefetcher configuration space region.
+	"tod_ctrl":		Time of Day Control register only required when
+				timestamping support is enabled.  Timestamping is
+				only supported with the msgdma-2.0 implementation.
+	"rx_fifo":		RX FIFO address space region.
+	"phy_reconfig_csr":	PHY reconfiguration controller address space region.
+	"chan_ready":		Channel ready address space region.
+
+Optional properties:
+- local-mac-address: See ethernet.txt in the same directory.
+- max-frame-size: See ethernet.txt in the same directory.
+
+Example:
+
+	qse_0_qse: ethernet@0x100020000 {
+		compatible = "altr,qse-msgdma-2.0";
+		reg-names = "control_port", "xcvr_ctrl", "tod_ctrl",
+				"tx_csr", "tx_pref", "rx_csr", "rx_pref",
+				"rx_fifo", "phy_reconfig_csr", "chan_ready";
+		reg = <0x00000001 0x00020000 0x00001000>,
+			<0x00000001 0x00022000 0x00002000>,
+			<0x00000001 0x00026000 0x00000040>,
+			<0x00000001 0x00000420 0x00000020>,
+			<0x00000001 0x00000400 0x00000020>,
+			<0x00000001 0x00000520 0x00000020>,
+			<0x00000001 0x00000500 0x00000020>,
+			<0x00000001 0x00000540 0x00000020>,
+			<0x00000001 0x00030100 0x00000010>,
+			<0x00000001 0x00000330 0x00000010>;
+		dma-coherent;
+		phy-mode = "10gbase-kr";
+		sfp = <&sfp_eth0>;
+		clocks = <&ptp_ctrl_10G_clk>;
+		clock-names = "tod_clk";
+		interrupt-parent = <&intc>;
+		interrupt-names = "tx_irq", "rx_irq";
+		interrupts = <0 21 4>,
+				<0 22 4>;
+		rx-fifo-depth = <0x4000>;
+		tx-fifo-depth = <0x4000>;
+		rx-fifo-almost-full = <0x10000>;
+		rx-fifo-almost-empty = <0x8000>;
+		local-mac-address = [00 00 00 00 00 00];
+		altr,tx-pma-delay-ns = <0xb>;
+		altr,rx-pma-delay-ns = <0xb>;
+		altr,tx-pma-delay-fns = <0>;
+		altr,rx-pma-delay-fns = <0>;
+		altr,has-ptp;
+	};
+
+	sfp_eth0: sfp-eth0 {
+		compatible = "sff,sfp";
+		i2c-bus = <&i2c0>;
+		los-gpio = <&sfp_gpio 0 GPIO_ACTIVE_HIGH>;
+		mod-def0-gpio = <&sfp_gpio 2 GPIO_ACTIVE_LOW>;
+		maximum-power-milliwatt = <1000>;
+		pinctrl-names = "default";
+		pinctrl-0 = <&sfp_gpio>;
+		tx-disable-gpio = <&sfp_gpio 0 GPIO_ACTIVE_HIGH>;
+		tx-fault-gpio = <&sfp_gpio 1 GPIO_ACTIVE_HIGH>;
+		rate-select0-gpio = <&sfp_gpio 2 GPIO_ACTIVE_HIGH>;
+	};
