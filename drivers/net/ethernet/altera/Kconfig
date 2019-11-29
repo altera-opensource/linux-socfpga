@@ -1,11 +1,35 @@
 # SPDX-License-Identifier: GPL-2.0-only
+config NET_ALTERA_ETH
+	tristate "Altera Ethernet drivers"
+	depends on HAS_DMA
+	---help---
+	  This driver supports ethernet drivers built around Altera
+	  Ethernet and DMA IP.
+
+	  If you have a network (Ethernet) IP belonging to this class, say Y.
+
+if NET_ALTERA_ETH
+
 config ALTERA_TSE
 	tristate "Altera Triple-Speed Ethernet MAC support"
-	depends on HAS_DMA
+	select PTP_1588_CLOCK
 	select PHYLIB
-	imply PTP_1588_CLOCK
 	---help---
 	  This driver supports the Altera Triple-Speed (TSE) Ethernet MAC.
 
 	  To compile this driver as a module, choose M here. The module
 	  will be called alteratse.
+
+config INTEL_FPGA_QSE_LL
+	tristate "Intel FPGA Quad-Speed Low Latency Ethernet MAC support"
+	select PTP_1588_CLOCK
+	select PHYLINK
+	---help---
+	  This driver supports the Intel FPGA Low Latency Quad-Speed (QSE)
+	  Ethernet MAC.
+
+	  To compile this driver as a module, choose M here. The module
+	  will be called intel_fpga_qse_ll.
+
+endif
+
