@@ -9,14 +9,14 @@
 #include <linux/list.h>
 #include <linux/netdevice.h>
 #include <linux/net_tstamp.h>
-#include "altera_tse.h"
+#include "altera_eth_dma.h"
 #include "altera_msgdma.h"
 #include "altera_msgdmahw.h"
 #include "altera_msgdma_prefetcher.h"
 #include "altera_msgdmahw_prefetcher.h"
 #include "altera_utils.h"
 
-int msgdma_pref_initialize(struct altera_tse_private *priv)
+int msgdma_pref_initialize(struct altera_dma_private *priv)
 {
 	int i;
 	struct msgdma_pref_extended_desc *rx_descs;
@@ -94,11 +94,11 @@ int msgdma_pref_initialize(struct altera_tse_private *priv)
 	}
 
 	if (netif_msg_ifup(priv))
-		netdev_info(priv->dev, "%s: RX Desc mem at 0x%x\n", __func__,
+		netdev_info(priv->dev, "%s: RX Desc mem at 0x%llx\n", __func__,
 			    priv->pref_rxdescphys);
 
 	if (netif_msg_ifup(priv))
-		netdev_info(priv->dev, "%s: TX Desc mem at 0x%x\n", __func__,
+		netdev_info(priv->dev, "%s: TX Desc mem at 0x%llx\n", __func__,
 			    priv->pref_txdescphys);
 
 	return 0;
@@ -112,7 +112,7 @@ err_rx:
 	return -ENOMEM;
 }
 
-void msgdma_pref_uninitialize(struct altera_tse_private *priv)
+void msgdma_pref_uninitialize(struct altera_dma_private *priv)
 {
 	if (priv->pref_rxdesc)
 		dma_free_coherent(priv->device,
@@ -127,37 +127,37 @@ void msgdma_pref_uninitialize(struct altera_tse_private *priv)
 				  priv->pref_txdesc, priv->pref_txdescphys);
 }
 
-void msgdma_pref_enable_txirq(struct altera_tse_private *priv)
+void msgdma_pref_enable_txirq(struct altera_dma_private *priv)
 {
 	tse_set_bit(priv->tx_pref_csr, msgdma_pref_csroffs(control),
 		    MSGDMA_PREF_CTL_GLOBAL_INTR);
 }
 
-void msgdma_pref_disable_txirq(struct altera_tse_private *priv)
+void msgdma_pref_disable_txirq(struct altera_dma_private *priv)
 {
 	tse_clear_bit(priv->tx_pref_csr, msgdma_pref_csroffs(control),
 		      MSGDMA_PREF_CTL_GLOBAL_INTR);
 }
 
-void msgdma_pref_clear_txirq(struct altera_tse_private *priv)
+void msgdma_pref_clear_txirq(struct altera_dma_private *priv)
 {
 	csrwr32(MSGDMA_PREF_STAT_IRQ, priv->tx_pref_csr,
 		msgdma_pref_csroffs(status));
 }
 
-void msgdma_pref_enable_rxirq(struct altera_tse_private *priv)
+void msgdma_pref_enable_rxirq(struct altera_dma_private *priv)
 {
 	tse_set_bit(priv->rx_pref_csr, msgdma_pref_csroffs(control),
 		    MSGDMA_PREF_CTL_GLOBAL_INTR);
 }
 
-void msgdma_pref_disable_rxirq(struct altera_tse_private *priv)
+void msgdma_pref_disable_rxirq(struct altera_dma_private *priv)
 {
 	tse_clear_bit(priv->rx_pref_csr, msgdma_pref_csroffs(control),
 		      MSGDMA_PREF_CTL_GLOBAL_INTR);
 }
 
-void msgdma_pref_clear_rxirq(struct altera_tse_private *priv)
+void msgdma_pref_clear_rxirq(struct altera_dma_private *priv)
 {
 	csrwr32(MSGDMA_PREF_STAT_IRQ, priv->rx_pref_csr,
 		msgdma_pref_csroffs(status));
@@ -185,8 +185,8 @@ static u64 timestamp_to_ns(struct msgdma_pref_extended_desc *desc)
  *   -> this should never be called when a descriptor isn't available
  */
 
-netdev_tx_t msgdma_pref_tx_buffer(struct altera_tse_private *priv,
-				  struct tse_buffer *buffer)
+netdev_tx_t msgdma_pref_tx_buffer(struct altera_dma_private *priv,
+				  struct altera_dma_buffer *buffer)
 {
 	u32 desc_entry = priv->tx_prod % (priv->tx_ring_size * 2);
 	struct msgdma_pref_extended_desc *tx_descs = priv->pref_txdesc;
@@ -215,7 +215,7 @@ netdev_tx_t msgdma_pref_tx_buffer(struct altera_tse_private *priv,
 	return NETDEV_TX_OK;
 }
 
-u32 msgdma_pref_tx_completions(struct altera_tse_private *priv)
+u32 msgdma_pref_tx_completions(struct altera_dma_private *priv)
 {
 	u32 control;
 	u32 ready = 0;
@@ -224,7 +224,7 @@ u32 msgdma_pref_tx_completions(struct altera_tse_private *priv)
 	u32 ringsize = priv->tx_ring_size;
 	u64 ns = 0;
 	struct msgdma_pref_extended_desc *cur;
-	struct tse_buffer *tx_buff;
+	struct altera_dma_buffer *tx_buff;
 	struct skb_shared_hwtstamps shhwtstamp;
 	int i;
 
@@ -269,7 +269,7 @@ u32 msgdma_pref_tx_completions(struct altera_tse_private *priv)
 	return ready;
 }
 
-void msgdma_pref_reset(struct altera_tse_private *priv)
+void msgdma_pref_reset(struct altera_dma_private *priv)
 {
 	int counter;
 
@@ -326,7 +326,7 @@ void msgdma_pref_reset(struct altera_tse_private *priv)
 }
 
 /* Setup the RX and TX prefetchers to poll the descriptor chain */
-void msgdma_pref_start_rxdma(struct altera_tse_private *priv)
+void msgdma_pref_start_rxdma(struct altera_dma_private *priv)
 {
 	csrwr32(priv->rx_poll_freq, priv->rx_pref_csr,
 		msgdma_pref_csroffs(desc_poll_freq));
@@ -338,7 +338,7 @@ void msgdma_pref_start_rxdma(struct altera_tse_private *priv)
 		    MSGDMA_PREF_CTL_DESC_POLL_EN | MSGDMA_PREF_CTL_RUN);
 }
 
-void msgdma_pref_start_txdma(struct altera_tse_private *priv)
+void msgdma_pref_start_txdma(struct altera_dma_private *priv)
 {
 	csrwr32(priv->tx_poll_freq, priv->tx_pref_csr,
 		msgdma_pref_csroffs(desc_poll_freq));
@@ -353,8 +353,8 @@ void msgdma_pref_start_txdma(struct altera_tse_private *priv)
 /* Add MSGDMA Prefetcher Descriptor to descriptor list
  *   -> This should never be called when a descriptor isn't available
  */
-void msgdma_pref_add_rx_desc(struct altera_tse_private *priv,
-			     struct tse_buffer *rxbuffer)
+void msgdma_pref_add_rx_desc(struct altera_dma_private *priv,
+			     struct altera_dma_buffer *rxbuffer)
 {
 	struct msgdma_pref_extended_desc *rx_descs = priv->pref_rxdesc;
 	u32 desc_entry = priv->pref_rx_prod % (priv->rx_ring_size * 2);
@@ -386,7 +386,7 @@ void msgdma_pref_add_rx_desc(struct altera_tse_private *priv,
 	}
 }
 
-u32 msgdma_pref_rx_status(struct altera_tse_private *priv)
+u32 msgdma_pref_rx_status(struct altera_dma_private *priv)
 {
 	u32 rxstatus = 0;
 	u32 pktlength;
@@ -396,7 +396,7 @@ u32 msgdma_pref_rx_status(struct altera_tse_private *priv)
 	u32 desc_entry = priv->rx_prod % (priv->rx_ring_size * 2);
 	struct msgdma_pref_extended_desc *rx_descs = priv->pref_rxdesc;
 	struct skb_shared_hwtstamps *shhwtstamp = NULL;
-	struct tse_buffer *rx_buff = priv->rx_ring;
+	struct altera_dma_buffer *rx_buff = priv->rx_ring;
 
 	/* if the current entry is not owned by hardware, process it */
 	if (!(rx_descs[desc_entry].desc_control
