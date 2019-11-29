@@ -22,6 +22,7 @@
 #include <linux/net_tstamp.h>
 #include <linux/phy.h>
 
+#include "altera_eth_dma.h"
 #include "altera_tse.h"
 
 #define TSE_STATS_LEN	31
