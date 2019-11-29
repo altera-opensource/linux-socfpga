@@ -3,6 +3,7 @@
  * Copyright (C) 2014 Altera Corporation. All rights reserved
  */
 
+#include "altera_eth_dma.h"
 #include "altera_tse.h"
 #include "altera_utils.h"
 
