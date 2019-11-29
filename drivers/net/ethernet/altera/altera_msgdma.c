@@ -5,25 +5,25 @@
 
 #include <linux/netdevice.h>
 #include "altera_utils.h"
-#include "altera_tse.h"
+#include "altera_eth_dma.h"
 #include "altera_msgdmahw.h"
 #include "altera_msgdma.h"
 
 /* No initialization work to do for MSGDMA */
-int msgdma_initialize(struct altera_tse_private *priv)
+int msgdma_initialize(struct altera_dma_private *priv)
 {
 	return 0;
 }
 
-void msgdma_uninitialize(struct altera_tse_private *priv)
+void msgdma_uninitialize(struct altera_dma_private *priv)
 {
 }
 
-void msgdma_start_rxdma(struct altera_tse_private *priv)
+void msgdma_start_rxdma(struct altera_dma_private *priv)
 {
 }
 
-void msgdma_reset(struct altera_tse_private *priv)
+void msgdma_reset(struct altera_dma_private *priv)
 {
 	int counter;
 
@@ -71,43 +71,43 @@ void msgdma_reset(struct altera_tse_private *priv)
 	csrwr32(MSGDMA_CSR_STAT_MASK, priv->tx_dma_csr, msgdma_csroffs(status));
 }
 
-void msgdma_disable_rxirq(struct altera_tse_private *priv)
+void msgdma_disable_rxirq(struct altera_dma_private *priv)
 {
 	tse_clear_bit(priv->rx_dma_csr, msgdma_csroffs(control),
 		      MSGDMA_CSR_CTL_GLOBAL_INTR);
 }
 
-void msgdma_enable_rxirq(struct altera_tse_private *priv)
+void msgdma_enable_rxirq(struct altera_dma_private *priv)
 {
 	tse_set_bit(priv->rx_dma_csr, msgdma_csroffs(control),
 		    MSGDMA_CSR_CTL_GLOBAL_INTR);
 }
 
-void msgdma_disable_txirq(struct altera_tse_private *priv)
+void msgdma_disable_txirq(struct altera_dma_private *priv)
 {
 	tse_clear_bit(priv->tx_dma_csr, msgdma_csroffs(control),
 		      MSGDMA_CSR_CTL_GLOBAL_INTR);
 }
 
-void msgdma_enable_txirq(struct altera_tse_private *priv)
+void msgdma_enable_txirq(struct altera_dma_private *priv)
 {
 	tse_set_bit(priv->tx_dma_csr, msgdma_csroffs(control),
 		    MSGDMA_CSR_CTL_GLOBAL_INTR);
 }
 
-void msgdma_clear_rxirq(struct altera_tse_private *priv)
+void msgdma_clear_rxirq(struct altera_dma_private *priv)
 {
 	csrwr32(MSGDMA_CSR_STAT_IRQ, priv->rx_dma_csr, msgdma_csroffs(status));
 }
 
-void msgdma_clear_txirq(struct altera_tse_private *priv)
+void msgdma_clear_txirq(struct altera_dma_private *priv)
 {
 	csrwr32(MSGDMA_CSR_STAT_IRQ, priv->tx_dma_csr, msgdma_csroffs(status));
 }
 
 /* return 0 to indicate transmit is pending */
-netdev_tx_t
-msgdma_tx_buffer(struct altera_tse_private *priv, struct tse_buffer *buffer)
+netdev_tx_t msgdma_tx_buffer(struct altera_dma_private *priv,
+			     struct altera_dma_buffer *buffer)
 {
 	csrwr32(lower_32_bits(buffer->dma_addr), priv->tx_dma_desc,
 		msgdma_descroffs(read_addr_lo));
@@ -124,7 +124,7 @@ msgdma_tx_buffer(struct altera_tse_private *priv, struct tse_buffer *buffer)
 	return NETDEV_TX_OK;
 }
 
-u32 msgdma_tx_completions(struct altera_tse_private *priv)
+u32 msgdma_tx_completions(struct altera_dma_private *priv)
 {
 	u32 ready = 0;
 	u32 inuse;
@@ -150,8 +150,8 @@ u32 msgdma_tx_completions(struct altera_tse_private *priv)
 
 /* Put buffer to the mSGDMA RX FIFO
  */
-void msgdma_add_rx_desc(struct altera_tse_private *priv,
-			struct tse_buffer *rxbuffer)
+void msgdma_add_rx_desc(struct altera_dma_private *priv,
+			struct altera_dma_buffer *rxbuffer)
 {
 	u32 len = priv->rx_dma_buf_sz;
 	dma_addr_t dma_addr = rxbuffer->dma_addr;
@@ -177,7 +177,7 @@ void msgdma_add_rx_desc(struct altera_tse_private *priv,
 /* status is returned on upper 16 bits,
  * length is returned in lower 16 bits
  */
-u32 msgdma_rx_status(struct altera_tse_private *priv)
+u32 msgdma_rx_status(struct altera_dma_private *priv)
 {
 	u32 rxstatus = 0;
 	u32 pktlength;
