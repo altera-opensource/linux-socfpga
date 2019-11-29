@@ -8237,6 +8237,13 @@ F:	drivers/net/ethernet/intel/
 F:	drivers/net/ethernet/intel/*/
 F:	include/linux/avf/virtchnl.h
 
+INTEL FPGA QUAD SPEED ETHERNET DRIVER
+M:      Joyce Ooi <joyce.ooi@intel.com>
+L:      netdev@vger.kernel.org
+S:      Maintained
+F:      Documentation/devicetree/bindings/net/intel_fpga_qse.txt
+F:      drivers/net/ethernet/altera/intel_fpga_qse_ll
+
 INTEL FRAMEBUFFER DRIVER (excluding 810 and 815)
 M:	Maik Broemme <mbroemme@libmpq.org>
 L:	linux-fbdev@vger.kernel.org
