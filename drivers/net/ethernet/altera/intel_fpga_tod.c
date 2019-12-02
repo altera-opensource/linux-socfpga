@@ -98,7 +98,8 @@ static int intel_fpga_tod_adjust_fine(struct ptp_clock_info *ptp,
 	unsigned long flags;
 	unsigned long rate;
 	int ret = 0;
-	u64 ppb;
+	s64 ppb;
+	u64 new_ppb;
 
 	rate = clk_get_rate(priv->tod_clk);
 
@@ -107,9 +108,9 @@ static int intel_fpga_tod_adjust_fine(struct ptp_clock_info *ptp,
 	ppb *= 125;
 	ppb >>= 13;
 
-	ppb += NOMINAL_PPB;
+	new_ppb = (s32)ppb + NOMINAL_PPB;
 
-	tod_period = div_u64_rem(ppb << 16, rate, &tod_rem);
+	tod_period = div_u64_rem(new_ppb << 16, rate, &tod_rem);
 	if (tod_period > TOD_PERIOD_MAX) {
 		ret = -ERANGE;
 		goto out;
