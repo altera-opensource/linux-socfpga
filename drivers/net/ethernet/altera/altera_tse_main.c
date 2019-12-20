@@ -1477,6 +1477,7 @@ static int altera_tse_probe(struct platform_device *pdev)
 	priv->dma_priv.device = &pdev->dev;
 	priv->dev = ndev;
 	priv->dma_priv.dev = ndev;
+	priv->ptp_priv.dev = ndev;
 	priv->msg_enable = netif_msg_init(debug, default_msg_level);
 	priv->dma_priv.msg_enable = netif_msg_init(debug, default_msg_level);
 
