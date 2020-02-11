@@ -20,10 +20,16 @@
 #define RSU_VERSION_MASK		GENMASK_ULL(63, 32)
 #define RSU_ERROR_LOCATION_MASK		GENMASK_ULL(31, 0)
 #define RSU_ERROR_DETAIL_MASK		GENMASK_ULL(63, 32)
+#define RSU_DCMF0_MASK			GENMASK_ULL(31, 0)
+#define RSU_DCMF1_MASK			GENMASK_ULL(63, 32)
+#define RSU_DCMF2_MASK			GENMASK_ULL(31, 0)
+#define RSU_DCMF3_MASK			GENMASK_ULL(63, 32)
 
 #define RSU_TIMEOUT	(msecs_to_jiffies(SVC_RSU_REQUEST_TIMEOUT_MS))
 
 #define INVALID_RETRY_COUNTER		0xFFFFFFFF
+#define INVALID_DCMF_VERSION		0xff
+
 
 typedef void (*rsu_callback)(struct stratix10_svc_client *client,
 			     struct stratix10_svc_cb_data *data);
@@ -35,11 +41,15 @@ typedef void (*rsu_callback)(struct stratix10_svc_client *client,
  * @lock: a mutex to protect callback completion state
  * @status.current_image: address of image currently running in flash
  * @status.fail_image: address of failed image in flash
- * @status.version: the version number of RSU firmware
+ * @status.version: the interface version number of RSU firmware
  * @status.state: the state of RSU system
  * @status.error_details: error code
  * @status.error_location: the error offset inside the image that failed
  * @retry_counter: the current image's retry counter
+ * @dcmf_version.dcmf0: Quartus dcmf0 version
+ * @dcmf_version.dcmf1: Quartus dcmf1 version
+ * @dcmf_version.dcmf2: Quartus dcmf2 version
+ * @dcmf_version.dcmf3: Quartus dcmf3 version
  */
 struct stratix10_rsu_priv {
 	struct stratix10_svc_chan *chan;
@@ -54,6 +64,14 @@ struct stratix10_rsu_priv {
 		unsigned int error_details;
 		unsigned int error_location;
 	} status;
+
+	struct {
+		unsigned int dcmf0;
+		unsigned int dcmf1;
+		unsigned int dcmf2;
+		unsigned int dcmf3;
+	} dcmf_version;
+
 	unsigned int retry_counter;
 };
 
@@ -140,6 +158,32 @@ static void rsu_retry_callback(struct stratix10_svc_client *client,
 	else
 		dev_err(client->dev, "Failed to get retry counter %lu\n",
 			BIT(data->status));
+
+	complete(&priv->completion);
+}
+
+/**
+ * rsu_dcmf_version_callback() - Callback from Intel service layer for getting
+ * the DCMF version
+ * @client: pointer to client
+ * @data: pointer to callback data structure
+ *
+ * Callback from Intel service layer for DCMF version number
+ */
+static void rsu_dcmf_version_callback(struct stratix10_svc_client *client,
+				      struct stratix10_svc_cb_data *data)
+{
+	struct stratix10_rsu_priv *priv = client->priv;
+	unsigned long long *value1 = (unsigned long long *)data->kaddr1;
+	unsigned long long *value2 = (unsigned long long *)data->kaddr2;
+
+	if (data->status == BIT(SVC_STATUS_RSU_OK)) {
+		priv->dcmf_version.dcmf0 = FIELD_GET(RSU_DCMF0_MASK, *value1);
+		priv->dcmf_version.dcmf1 = FIELD_GET(RSU_DCMF1_MASK, *value1);
+		priv->dcmf_version.dcmf2 = FIELD_GET(RSU_DCMF2_MASK, *value2);
+		priv->dcmf_version.dcmf3 = FIELD_GET(RSU_DCMF3_MASK, *value2);
+	} else
+		dev_err(client->dev, "failed to get DCMF version\n");
 
 	complete(&priv->completion);
 }
@@ -282,6 +326,50 @@ static ssize_t retry_counter_show(struct device *dev,
 	return sprintf(buf, "0x%08x\n", priv->retry_counter);
 }
 
+static ssize_t dcmf0_show(struct device *dev,
+			  struct device_attribute *attr, char *buf)
+{
+	struct stratix10_rsu_priv *priv = dev_get_drvdata(dev);
+
+	if (!priv)
+		return -ENODEV;
+
+	return sprintf(buf, "0x%08x\n", priv->dcmf_version.dcmf0);
+}
+
+static ssize_t dcmf1_show(struct device *dev,
+			  struct device_attribute *attr, char *buf)
+{
+	struct stratix10_rsu_priv *priv = dev_get_drvdata(dev);
+
+	if (!priv)
+		return -ENODEV;
+
+	return sprintf(buf, "0x%08x\n", priv->dcmf_version.dcmf1);
+}
+
+static ssize_t dcmf2_show(struct device *dev,
+			  struct device_attribute *attr, char *buf)
+{
+	struct stratix10_rsu_priv *priv = dev_get_drvdata(dev);
+
+	if (!priv)
+		return -ENODEV;
+
+	return sprintf(buf, "0x%08x\n", priv->dcmf_version.dcmf2);
+}
+
+static ssize_t dcmf3_show(struct device *dev,
+			  struct device_attribute *attr, char *buf)
+{
+	struct stratix10_rsu_priv *priv = dev_get_drvdata(dev);
+
+	if (!priv)
+		return -ENODEV;
+
+	return sprintf(buf, "0x%08x\n", priv->dcmf_version.dcmf3);
+}
+
 static ssize_t reboot_image_store(struct device *dev,
 				  struct device_attribute *attr,
 				  const char *buf, size_t count)
@@ -353,6 +441,10 @@ static DEVICE_ATTR_RO(version);
 static DEVICE_ATTR_RO(error_location);
 static DEVICE_ATTR_RO(error_details);
 static DEVICE_ATTR_RO(retry_counter);
+static DEVICE_ATTR_RO(dcmf0);
+static DEVICE_ATTR_RO(dcmf1);
+static DEVICE_ATTR_RO(dcmf2);
+static DEVICE_ATTR_RO(dcmf3);
 static DEVICE_ATTR_WO(reboot_image);
 static DEVICE_ATTR_WO(notify);
 
@@ -364,6 +456,10 @@ static struct attribute *rsu_attrs[] = {
 	&dev_attr_error_location.attr,
 	&dev_attr_error_details.attr,
 	&dev_attr_retry_counter.attr,
+	&dev_attr_dcmf0.attr,
+	&dev_attr_dcmf1.attr,
+	&dev_attr_dcmf2.attr,
+	&dev_attr_dcmf3.attr,
 	&dev_attr_reboot_image.attr,
 	&dev_attr_notify.attr,
 	NULL
@@ -391,6 +487,10 @@ static int stratix10_rsu_probe(struct platform_device *pdev)
 	priv->status.version = 0;
 	priv->status.state = 0;
 	priv->retry_counter = INVALID_RETRY_COUNTER;
+	priv->dcmf_version.dcmf0 = INVALID_DCMF_VERSION;
+	priv->dcmf_version.dcmf1 = INVALID_DCMF_VERSION;
+	priv->dcmf_version.dcmf2 = INVALID_DCMF_VERSION;
+	priv->dcmf_version.dcmf3 = INVALID_DCMF_VERSION;
 
 	mutex_init(&priv->lock);
 	priv->chan = stratix10_svc_request_channel_byname(&priv->client,
@@ -409,6 +509,14 @@ static int stratix10_rsu_probe(struct platform_device *pdev)
 			   0, rsu_status_callback);
 	if (ret) {
 		dev_err(dev, "Error, getting RSU status %i\n", ret);
+		stratix10_svc_free_channel(priv->chan);
+	}
+
+	/* get DCMF version from firmware */
+	ret = rsu_send_msg(priv, COMMAND_RSU_DCMF_VERSION,
+			   0, rsu_dcmf_version_callback);
+	if (ret) {
+		dev_err(dev, "Error, getting dcmf version %i\n", ret);
 		stratix10_svc_free_channel(priv->chan);
 	}
 
