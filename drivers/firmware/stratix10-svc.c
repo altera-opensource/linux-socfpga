@@ -314,6 +314,11 @@ static void svc_thread_recv_status_ok(struct stratix10_svc_data *p_data,
 		cb_data->status = BIT(SVC_STATUS_RSU_OK);
 		cb_data->kaddr1 = &res.a1;
 		break;
+	case COMMAND_RSU_DCMF_VERSION:
+		cb_data->status = BIT(SVC_STATUS_RSU_OK);
+		cb_data->kaddr1 = &res.a1;
+		cb_data->kaddr2 = &res.a2;
+		break;
 	default:
 		pr_warn("it shouldn't happen\n");
 		break;
@@ -412,6 +417,11 @@ static int svc_normal_to_secure_thread(void *data)
 			a1 = 0;
 			a2 = 0;
 			break;
+		case COMMAND_RSU_DCMF_VERSION:
+			a0 = INTEL_SIP_SMC_RSU_DCMF_VERSION;
+			a1 = 0;
+			a2 = 0;
+			break;
 		default:
 			pr_warn("it shouldn't happen\n");
 			break;
@@ -481,6 +491,7 @@ static int svc_normal_to_secure_thread(void *data)
 			case COMMAND_RSU_UPDATE:
 			case COMMAND_RSU_NOTIFY:
 			case COMMAND_RSU_RETRY:
+			case COMMAND_RSU_DCMF_VERSION:
 				cbdata->status =
 					BIT(SVC_STATUS_RSU_ERROR);
 				break;
