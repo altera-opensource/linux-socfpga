@@ -621,7 +621,7 @@
 				memory-region = <&service_reserved>;
 
 				fpga_mgr: fpga-mgr {
-					compatible = "intel,stratix10-soc-fpga-mgr";
+					compatible = "intel,agilex-soc-fpga-mgr";
 				};
 			};
 		};
