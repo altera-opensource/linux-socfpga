@@ -178,7 +178,8 @@ int altvipfb2_remove(struct device *dev)
 			(void *)&fbpriv->info.screen_base,
 			fbpriv->info.fix.smem_start);
 
-	return unregister_framebuffer(&fbpriv->info);
+	unregister_framebuffer(&fbpriv->info);
+	return 0;
 }
 EXPORT_SYMBOL_GPL(altvipfb2_remove);
 
