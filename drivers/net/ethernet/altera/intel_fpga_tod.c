@@ -190,6 +190,9 @@ static int intel_fpga_tod_adjust_time(struct ptp_clock_info *ptp, s64 delta)
 	 * just set the time.
 	 */
 	if (count > TOD_ADJUST_COUNT_MAX) {
+		if (neg_adj)
+			delta = -delta;
+
 		/* Perform the coarse time offset adjustment */
 		ret = coarse_adjust_tod_clock(priv, delta);
 	} else {
