@@ -133,7 +133,7 @@ int altvipfb2_probe(struct device *dev, void __iomem *base)
 	void *fbmem_virt;
 	struct altvipfb2_priv *fbpriv = dev_get_drvdata(dev);
 
-	fbmem_virt = dma_alloc_coherent(NULL,
+	fbmem_virt = dma_alloc_coherent(dev,
 					fbpriv->info.fix.smem_len,
 					(void *)&fbpriv->info.fix.smem_start,
 					GFP_KERNEL);
@@ -163,7 +163,7 @@ int altvipfb2_probe(struct device *dev, void __iomem *base)
 
 err_dma_free:
 	fb_dealloc_cmap(&fbpriv->info.cmap);
-	dma_free_coherent(NULL, fbpriv->info.fix.smem_len, fbmem_virt,
+	dma_free_coherent(dev, fbpriv->info.fix.smem_len, fbmem_virt,
 			  fbpriv->info.fix.smem_start);
 	return retval;
 }
@@ -174,7 +174,7 @@ int altvipfb2_remove(struct device *dev)
 	struct altvipfb2_priv *fbpriv = dev_get_drvdata(dev);
 
 	altvipfb2_disable_hw(fbpriv->base);
-	dma_free_coherent(NULL, fbpriv->info.fix.smem_len,
+	dma_free_coherent(dev, fbpriv->info.fix.smem_len,
 			(void *)&fbpriv->info.screen_base,
 			fbpriv->info.fix.smem_start);
 
