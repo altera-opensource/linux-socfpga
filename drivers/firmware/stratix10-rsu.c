@@ -90,7 +90,7 @@ static void rsu_status_callback(struct stratix10_svc_client *client,
 	struct stratix10_rsu_priv *priv = client->priv;
 	struct arm_smccc_res *res = (struct arm_smccc_res *)data->kaddr1;
 
-	if (data->status == BIT(SVC_STATUS_RSU_OK)) {
+	if (data->status == BIT(SVC_STATUS_OK)) {
 		priv->status.version = FIELD_GET(RSU_VERSION_MASK,
 						 res->a2);
 		priv->status.state = FIELD_GET(RSU_STATE_MASK, res->a2);
@@ -126,9 +126,9 @@ static void rsu_command_callback(struct stratix10_svc_client *client,
 {
 	struct stratix10_rsu_priv *priv = client->priv;
 
-	if (data->status == BIT(SVC_STATUS_RSU_NO_SUPPORT))
+	if (data->status == BIT(SVC_STATUS_NO_SUPPORT))
 		dev_warn(client->dev, "Secure FW doesn't support notify\n");
-	else if (data->status == BIT(SVC_STATUS_RSU_ERROR))
+	else if (data->status == BIT(SVC_STATUS_ERROR))
 		dev_err(client->dev, "Failure, returned status is %lu\n",
 			BIT(data->status));
 
@@ -151,9 +151,9 @@ static void rsu_retry_callback(struct stratix10_svc_client *client,
 	struct stratix10_rsu_priv *priv = client->priv;
 	unsigned int *counter = (unsigned int *)data->kaddr1;
 
-	if (data->status == BIT(SVC_STATUS_RSU_OK))
+	if (data->status == BIT(SVC_STATUS_OK))
 		priv->retry_counter = *counter;
-	else if (data->status == BIT(SVC_STATUS_RSU_NO_SUPPORT))
+	else if (data->status == BIT(SVC_STATUS_NO_SUPPORT))
 		dev_warn(client->dev, "Secure FW doesn't support retry\n");
 	else
 		dev_err(client->dev, "Failed to get retry counter %lu\n",
@@ -177,7 +177,7 @@ static void rsu_dcmf_version_callback(struct stratix10_svc_client *client,
 	unsigned long long *value1 = (unsigned long long *)data->kaddr1;
 	unsigned long long *value2 = (unsigned long long *)data->kaddr2;
 
-	if (data->status == BIT(SVC_STATUS_RSU_OK)) {
+	if (data->status == BIT(SVC_STATUS_OK)) {
 		priv->dcmf_version.dcmf0 = FIELD_GET(RSU_DCMF0_MASK, *value1);
 		priv->dcmf_version.dcmf1 = FIELD_GET(RSU_DCMF1_MASK, *value1);
 		priv->dcmf_version.dcmf2 = FIELD_GET(RSU_DCMF2_MASK, *value2);
