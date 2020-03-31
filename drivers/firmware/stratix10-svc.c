@@ -309,7 +309,7 @@ static void svc_thread_recv_status_ok(struct stratix10_svc_data *p_data,
 		cb_data->kaddr1 = &res.a1;
 		break;
 	case COMMAND_RSU_DCMF_VERSION:
-		cb_data->status = BIT(SVC_STATUS_RSU_OK);
+		cb_data->status = BIT(SVC_STATUS_OK);
 		cb_data->kaddr1 = &res.a1;
 		cb_data->kaddr2 = &res.a2;
 		break;

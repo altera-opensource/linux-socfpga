@@ -101,7 +101,7 @@ struct stratix10_svc_chan;
  * return status is SVC_STATUS_OK or SVC_STATUS_ERROR
  *
  * @COMMAND_RSU_DCMF_VERSION: query firmware for the DCMF version, return status
- * is SVC_STATUS_RSU_OK or SVC_STATUS_RSU_ERROR
+ * return status is SVC_STATUS_OK or SVC_STATUS_ERROR
  */
 enum stratix10_svc_command_code {
 	COMMAND_NOOP = 0,

@@ -177,7 +177,7 @@ static void rsu_dcmf_version_callback(struct stratix10_svc_client *client,
 	unsigned long long *value1 = (unsigned long long *)data->kaddr1;
 	unsigned long long *value2 = (unsigned long long *)data->kaddr2;
 
-	if (data->status == BIT(SVC_STATUS_RSU_OK)) {
+	if (data->status == BIT(SVC_STATUS_OK)) {
 		priv->dcmf_version.dcmf0 = FIELD_GET(RSU_DCMF0_MASK, *value1);
 		priv->dcmf_version.dcmf1 = FIELD_GET(RSU_DCMF1_MASK, *value1);
 		priv->dcmf_version.dcmf2 = FIELD_GET(RSU_DCMF2_MASK, *value2);
