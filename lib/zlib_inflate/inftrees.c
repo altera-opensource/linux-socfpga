@@ -40,7 +40,7 @@ int zlib_inflate_table(codetype type, unsigned short *lens, unsigned codes,
     code *next;             /* next available space in table */
     const unsigned short *base;     /* base value table to use */
     const unsigned short *extra;    /* extra bits table to use */
-    int end;                    /* use base and extra for symbol > end */
+    int match;                      /* use base and extra for symbol >= match */
     unsigned short count[MAXBITS+1];    /* number of codes of each length */
     unsigned short offs[MAXBITS+1];     /* offsets in table for each length */
     static const unsigned short lbase[31] = { /* Length codes 257..285 base */
@@ -168,19 +168,17 @@ int zlib_inflate_table(codetype type, unsigned short *lens, unsigned codes,
     switch (type) {
     case CODES:
         base = extra = work;    /* dummy value--not used */
-        end = 19;
+        match = 20;
         break;
     case LENS:
         base = lbase;
-        base -= 257;
         extra = lext;
-        extra -= 257;
-        end = 256;
+        match = 257;
         break;
     default:            /* DISTS */
         base = dbase;
         extra = dext;
-        end = -1;
+        match = 0;
     }
 
     /* initialize state for loop */
@@ -202,15 +200,13 @@ int zlib_inflate_table(codetype type, unsigned short *lens, unsigned codes,
     for (;;) {
         /* create table entry */
         this.bits = (unsigned char)(len - drop);
-        if ((int)(work[sym]) < end) {
+        if (work[sym] + 1 < match) {
             this.op = (unsigned char)0;
             this.val = work[sym];
-        }
-        else if ((int)(work[sym]) > end) {
-            this.op = (unsigned char)(extra[work[sym]]);
-            this.val = base[work[sym]];
-        }
-        else {
+        } else if (work[sym] >= match) {
+            this.op = (unsigned char)(extra[work[sym] - match]);
+            this.val = base[work[sym] - match];
+        } else {
             this.op = (unsigned char)(32 + 64);         /* end of block */
             this.val = 0;
         }
