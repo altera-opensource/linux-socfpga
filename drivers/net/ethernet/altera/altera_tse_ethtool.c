@@ -22,6 +22,7 @@
 #include <linux/phy.h>
 
 #include "altera_tse.h"
+#include "altera_utils.h"
 
 #define TSE_STATS_LEN	31
 #define TSE_NUM_REGS	128
