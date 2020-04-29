@@ -25,7 +25,6 @@
 #include <linux/if_vlan.h>
 #include <linux/init.h>
 #include <linux/interrupt.h>
-#include <linux/io.h>
 #include <linux/kernel.h>
 #include <linux/module.h>
 #include <linux/mii.h>
@@ -37,7 +36,7 @@
 #include <linux/of_platform.h>
 #include <linux/pcs-altera-tse.h>
 #include <linux/phy.h>
-#include <linux/platform_device.h>
+#include <linux/ptp_classify.h>
 #include <linux/skbuff.h>
 #include <asm/cacheflush.h>
 
@@ -1152,103 +1151,6 @@ static struct net_device_ops altera_tse_netdev_ops = {
 	.ndo_validate_addr	= eth_validate_addr,
 	.ndo_do_ioctl		= tse_do_ioctl,
 };
-
-static void alt_tse_mac_an_restart(struct phylink_config *config)
-{
-}
-
-static void alt_tse_mac_config(struct phylink_config *config, unsigned int mode,
-			       const struct phylink_link_state *state)
-{
-	struct net_device *ndev = to_net_dev(config->dev);
-	struct altera_tse_private *priv = netdev_priv(ndev);
-
-	spin_lock(&priv->mac_cfg_lock);
-	reset_mac(priv);
-	tse_set_mac(priv, true);
-	spin_unlock(&priv->mac_cfg_lock);
-}
-
-static void alt_tse_mac_link_down(struct phylink_config *config,
-				  unsigned int mode, phy_interface_t interface)
-{
-}
-
-static void alt_tse_mac_link_up(struct phylink_config *config,
-				struct phy_device *phy, unsigned int mode,
-				phy_interface_t interface, int speed,
-				int duplex, bool tx_pause, bool rx_pause)
-{
-	struct net_device *ndev = to_net_dev(config->dev);
-	struct altera_tse_private *priv = netdev_priv(ndev);
-	u32 ctrl;
-
-	ctrl = csrrd32(priv->mac_dev, tse_csroffs(command_config));
-	ctrl &= ~(MAC_CMDCFG_ENA_10 | MAC_CMDCFG_ETH_SPEED | MAC_CMDCFG_HD_ENA);
-
-	if (duplex == DUPLEX_HALF)
-		ctrl |= MAC_CMDCFG_HD_ENA;
-
-	if (speed == SPEED_1000)
-		ctrl |= MAC_CMDCFG_ETH_SPEED;
-	else if (speed == SPEED_10)
-		ctrl |= MAC_CMDCFG_ENA_10;
-
-	spin_lock(&priv->mac_cfg_lock);
-	csrwr32(ctrl, priv->mac_dev, tse_csroffs(command_config));
-	spin_unlock(&priv->mac_cfg_lock);
-}
-
-static struct phylink_pcs *alt_tse_select_pcs(struct phylink_config *config,
-					      phy_interface_t interface)
-{
-	struct net_device *ndev = to_net_dev(config->dev);
-	struct altera_tse_private *priv = netdev_priv(ndev);
-
-	if (interface == PHY_INTERFACE_MODE_SGMII ||
-	    interface == PHY_INTERFACE_MODE_1000BASEX)
-		return priv->pcs;
-	else
-		return NULL;
-}
-
-static const struct phylink_mac_ops alt_tse_phylink_ops = {
-	.validate = phylink_generic_validate,
-	.mac_an_restart = alt_tse_mac_an_restart,
-	.mac_config = alt_tse_mac_config,
-	.mac_link_down = alt_tse_mac_link_down,
-	.mac_link_up = alt_tse_mac_link_up,
-	.mac_select_pcs = alt_tse_select_pcs,
-};
-
-static int request_and_map(struct platform_device *pdev, const char *name,
-			   struct resource **res, void __iomem **ptr)
-{
-	struct device *device = &pdev->dev;
-	struct resource *region;
-
-	*res = platform_get_resource_byname(pdev, IORESOURCE_MEM, name);
-	if (*res == NULL) {
-		dev_err(device, "resource %s not defined\n", name);
-		return -ENODEV;
-	}
-
-	region = devm_request_mem_region(device, (*res)->start,
-					 resource_size(*res), dev_name(device));
-	if (region == NULL) {
-		dev_err(device, "unable to request %s\n", name);
-		return -EBUSY;
-	}
-
-	*ptr = devm_ioremap(device, region->start,
-				    resource_size(region));
-	if (*ptr == NULL) {
-		dev_err(device, "ioremap of %s failed!", name);
-		return -ENOMEM;
-	}
-
-	return 0;
-}
 
 /* Probe Altera TSE MAC device
  */
