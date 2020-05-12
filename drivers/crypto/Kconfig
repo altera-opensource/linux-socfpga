@@ -318,6 +318,17 @@ config CRYPTO_DEV_TALITOS2
 	  Say 'Y' here to use the Freescale Security Engine (SEC)
 	  version 2 and following as found on MPC83xx, MPC85xx, etc ...
 
+config CRYPTO_DEV_INTEL_FCS
+	tristate "Intel FPGA Crypto Service support"
+	depends on INTEL_STRATIX10_SERVICE
+	help
+	 Support crypto services on Intel SoCFPGA platforms. The crypto
+	 services include security certificate, image boot validation,
+	 security key cancellation, get provision data, random number
+	 generation and secure data object storage services.
+
+	 Say Y here if you want Intel FCS support
+
 config CRYPTO_DEV_IXP4XX
 	tristate "Driver for IXP4xx crypto hardware acceleration"
 	depends on ARCH_IXP4XX && IXP4XX_QMGR && IXP4XX_NPE
