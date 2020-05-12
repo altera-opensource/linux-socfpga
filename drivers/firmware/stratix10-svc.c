@@ -34,7 +34,7 @@
  * timeout is set to 30 seconds (30 * 1000) at Intel Stratix10 SoC.
  */
 #define SVC_NUM_DATA_IN_FIFO			32
-#define SVC_NUM_CHANNEL				3
+#define SVC_NUM_CHANNEL				4
 #define FPGA_CONFIG_DATA_CLAIM_TIMEOUT_MS	200
 #define FPGA_CONFIG_STATUS_TIMEOUT_SEC		30
 
@@ -259,7 +259,15 @@ static void svc_thread_cmd_config_status(struct stratix10_svc_controller *ctrl,
 	cb_data->kaddr3 = NULL;
 	cb_data->status = BIT(SVC_STATUS_ERROR);
 
-	pr_debug("%s: polling config status\n", __func__);
+	/* for debug purpose only */
+	pr_debug("%s: polling completed status\n", __func__);
+
+	a0 = INTEL_SIP_SMC_FPGA_CONFIG_ISDONE;
+	a1 = (unsigned long)p_data->paddr;
+	a2 = 0;
+
+	if (p_data->command == COMMAND_POLL_SERVICE_STATUS)
+		a0 = INTEL_SIP_SMC_SERVICE_COMPLETED;
 
 	a0 = INTEL_SIP_SMC_FPGA_CONFIG_ISDONE;
 	a1 = (unsigned long)p_data->paddr;
@@ -289,15 +297,12 @@ static void svc_thread_cmd_config_status(struct stratix10_svc_controller *ctrl,
 		cb_data->status = BIT(SVC_STATUS_BUSY);
 	} else if (res.a0 == INTEL_SIP_SMC_STATUS_OK) {
 		cb_data->status = BIT(SVC_STATUS_COMPLETED);
-		cb_data->kaddr2 = (res.a2) ?
-				  svc_pa_to_va(res.a2) : NULL;
-		cb_data->kaddr3 = (res.a3) ? &res.a3 : NULL;
+		cb_data->kaddr1 = (res.a1) ?
+				  svc_pa_to_va(res.a1) : NULL;
+		cb_data->kaddr2 = &res.a2;
 	} else {
 		pr_err("%s: poll status error\n", __func__);
 		cb_data->kaddr1 = &res.a1;
-		cb_data->kaddr2 = (res.a2) ?
-				  svc_pa_to_va(res.a2) : NULL;
-		cb_data->kaddr3 = (res.a3) ? &res.a3 : NULL;
 		cb_data->status = BIT(SVC_STATUS_ERROR);
 	}
 
@@ -326,8 +331,7 @@ static void svc_thread_recv_status_ok(struct stratix10_svc_data *p_data,
 	case COMMAND_RSU_NOTIFY:
 	case COMMAND_FCS_REQUEST_SERVICE:
 	case COMMAND_FCS_SEND_CERTIFICATE:
-	case COMMAND_FCS_DATA_ENCRYPTION:
-	case COMMAND_FCS_DATA_DECRYPTION:
+	case COMMAND_POLL_SERVICE_STATUS:
 		cb_data->status = BIT(SVC_STATUS_OK);
 		break;
 	case COMMAND_RECONFIG_DATA_SUBMIT:
@@ -354,8 +358,9 @@ static void svc_thread_recv_status_ok(struct stratix10_svc_data *p_data,
 		cb_data->kaddr2 = &res.a2;
 		break;
 	case COMMAND_FCS_RANDOM_NUMBER_GEN:
+	case COMMAND_FCS_DATA_ENCRYPTION:
+	case COMMAND_FCS_DATA_DECRYPTION:
 	case COMMAND_FCS_GET_PROVISION_DATA:
-	case COMMAND_POLL_SERVICE_STATUS:
 		cb_data->status = BIT(SVC_STATUS_OK);
 		cb_data->kaddr1 = &res.a1;
 		cb_data->kaddr2 = svc_pa_to_va(res.a2);
@@ -387,7 +392,7 @@ static int svc_normal_to_secure_thread(void *data)
 	struct stratix10_svc_data *pdata;
 	struct stratix10_svc_cb_data *cbdata;
 	struct arm_smccc_res res;
-	unsigned long a0, a1, a2, a3, a4, a5, a6, a7;
+	unsigned long a0, a1, a2, a3, a4, a5;
 	int ret_fifo = 0;
 
 	pdata =  kmalloc(sizeof(*pdata), GFP_KERNEL);
@@ -407,8 +412,6 @@ static int svc_normal_to_secure_thread(void *data)
 	a3 = 0;
 	a4 = 0;
 	a5 = 0;
-	a6 = 0;
-	a7 = 0;
 
 	pr_debug("smc_hvc_shm_thread is running\n");
 
@@ -474,11 +477,6 @@ static int svc_normal_to_secure_thread(void *data)
 			a1 = 0;
 			a2 = 0;
 			break;
-		case COMMAND_FIRMWARE_VERSION:
-			a0 = INTEL_SIP_SMC_FIRMWARE_VERSION;
-			a1 = 0;
-			a2 = 0;
-			break;
 
 		/* for FCS */
 		case COMMAND_FCS_DATA_ENCRYPTION:
@@ -500,7 +498,7 @@ static int svc_normal_to_secure_thread(void *data)
 		case COMMAND_FCS_RANDOM_NUMBER_GEN:
 			a0 = INTEL_SIP_SMC_FCS_RANDOM_NUMBER;
 			a1 = (unsigned long)pdata->paddr;
-			a2 = 0;
+			a2 = (unsigned long)pdata->size;
 			break;
 		case COMMAND_FCS_REQUEST_SERVICE:
 			a0 = INTEL_SIP_SMC_FCS_SERVICE_REQUEST;
@@ -515,25 +513,16 @@ static int svc_normal_to_secure_thread(void *data)
 		case COMMAND_FCS_GET_PROVISION_DATA:
 			a0 = INTEL_SIP_SMC_FCS_GET_PROVISION_DATA;
 			a1 = (unsigned long)pdata->paddr;
-			a2 = 0;
+			a2 = (unsigned long)pdata->size;
 			break;
 
 		/* for polling */
 		case COMMAND_POLL_SERVICE_STATUS:
 			a0 = INTEL_SIP_SMC_SERVICE_COMPLETED;
 			a1 = (unsigned long)pdata->paddr;
-			a2 = (unsigned long)pdata->size;
-			break;
-		case COMMAND_RSU_DCMF_STATUS:
-			a0 = INTEL_SIP_SMC_RSU_DCMF_STATUS;
-			a1 = 0;
 			a2 = 0;
 			break;
-		case COMMAND_SMC_SVC_VERSION:
-			a0 = INTEL_SIP_SMC_SVC_VERSION;
-			a1 = 0;
-			a2 = 0;
-			break;
+
 		default:
 			pr_warn("it shouldn't happen\n");
 			break;
@@ -997,7 +986,6 @@ int stratix10_svc_send(struct stratix10_svc_chan *chan, void *msg)
 	p_data->arg[0] = p_msg->arg[0];
 	p_data->arg[1] = p_msg->arg[1];
 	p_data->arg[2] = p_msg->arg[2];
-	p_data->size = p_msg->payload_length;
 	p_data->chan = chan;
 	pr_debug("%s: put to FIFO pa=0x%016x, cmd=%x, size=%u\n", __func__,
 	       (unsigned int)p_data->paddr, p_data->command,

@@ -15,8 +15,7 @@
 #define SVC_CLIENT_FPGA			"fpga"
 #define SVC_CLIENT_RSU			"rsu"
 #define SVC_CLIENT_FCS			"fcs"
-
-/*
+/**
  * Status of the sent command, in bit number
  *
  * SVC_STATUS_OK:
@@ -51,8 +50,7 @@
 #define SVC_STATUS_ERROR		5
 #define SVC_STATUS_NO_SUPPORT		6
 #define SVC_STATUS_INVALID_PARAM	7
-
-/*
+/**
  * Flag bit for COMMAND_RECONFIG
  *
  * COMMAND_RECONFIG_FLAG_PARTIAL:
@@ -109,18 +107,6 @@ struct stratix10_svc_chan;
  * @COMMAND_RSU_DCMF_VERSION: query firmware for the DCMF version, return status
  * is SVC_STATUS_OK or SVC_STATUS_ERROR
  *
- * @COMMAND_POLL_SERVICE_STATUS: poll if the service request is complete,
- * return statis is SVC_STATUS_OK, SVC_STATUS_ERROR or SVC_STATUS_BUSY
- *
- * @COMMAND_FIRMWARE_VERSION: query running firmware version, return status
- * is SVC_STATUS_OK or SVC_STATUS_ERROR
- *
- * @COMMAND_SMC_SVC_VERSION: Non-mailbox SMC SVC API Version,
- * return status is SVC_STATUS_OK
- *
- * @COMMAND_RSU_DCMF_STATUS: query firmware for the DCMF status
- * return status is SVC_STATUS_OK or SVC_STATUS_ERROR
- *
  * @COMMAND_FCS_REQUEST_SERVICE: request validation of image from firmware,
  * return status is SVC_STATUS_OK, SVC_STATUS_INVALID_PARAM
  *
@@ -138,6 +124,9 @@ struct stratix10_svc_chan;
  *
  * @COMMAND_FCS_RANDOM_NUMBER_GEN: generate a random number, return status
  * is SVC_STATUS_OK, SVC_STATUS_ERROR
+ *
+ * @COMMAND_POLL_SERVICE_STATUS: poll if the service request is complete,
+ * return statis is SVC_STATUS_OK, SVC_STATUS_ERROR or SVC_STATUS_BUSY
  */
 enum stratix10_svc_command_code {
 	/* for FPGA */
