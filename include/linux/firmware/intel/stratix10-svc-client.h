@@ -105,6 +105,9 @@ struct stratix10_svc_chan;
  * return status is SVC_STATUS_OK or SVC_STATUS_ERROR
  *
  * @COMMAND_RSU_DCMF_VERSION: query firmware for the DCMF version, return status
+ * return status is SVC_STATUS_OK or SVC_STATUS_ERROR
+ *
+ * @COMMAND_RSU_DCMF_VERSION: query firmware for the DCMF version, return status
  * is SVC_STATUS_OK or SVC_STATUS_ERROR
  *
  * @COMMAND_FCS_REQUEST_SERVICE: request validation of image from firmware,
