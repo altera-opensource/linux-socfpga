@@ -27,8 +27,8 @@
 
 #define RSU_TIMEOUT	(msecs_to_jiffies(SVC_RSU_REQUEST_TIMEOUT_MS))
 
-#define INVALID_RETRY_COUNTER		0xFFFFFFFF
-#define INVALID_DCMF_VERSION		0xff
+#define INVALID_RETRY_COUNTER		0xFF
+#define INVALID_DCMF_VERSION		0xFF
 
 
 typedef void (*rsu_callback)(struct stratix10_svc_client *client,
@@ -45,11 +45,12 @@ typedef void (*rsu_callback)(struct stratix10_svc_client *client,
  * @status.state: the state of RSU system
  * @status.error_details: error code
  * @status.error_location: the error offset inside the image that failed
- * @retry_counter: the current image's retry counter
  * @dcmf_version.dcmf0: Quartus dcmf0 version
  * @dcmf_version.dcmf1: Quartus dcmf1 version
  * @dcmf_version.dcmf2: Quartus dcmf2 version
  * @dcmf_version.dcmf3: Quartus dcmf3 version
+ * @retry_counter: the current image's retry counter
+ * @max_retry: the preset max retry value
  */
 struct stratix10_rsu_priv {
 	struct stratix10_svc_chan *chan;
@@ -73,6 +74,7 @@ struct stratix10_rsu_priv {
 	} dcmf_version;
 
 	unsigned int retry_counter;
+	unsigned int max_retry;
 };
 
 /**
@@ -157,6 +159,32 @@ static void rsu_retry_callback(struct stratix10_svc_client *client,
 		dev_warn(client->dev, "Secure FW doesn't support retry\n");
 	else
 		dev_err(client->dev, "Failed to get retry counter %lu\n",
+			BIT(data->status));
+
+	complete(&priv->completion);
+}
+
+/**
+ * rsu_max_retry_callback() - Callback from Intel service layer for getting
+ * the max retry value from the firmware
+ * @client: pointer to client
+ * @data: pointer to callback data structure
+ *
+ * Callback from Intel service layer for max retry.
+ */
+static void rsu_max_retry_callback(struct stratix10_svc_client *client,
+				   struct stratix10_svc_cb_data *data)
+{
+	struct stratix10_rsu_priv *priv = client->priv;
+	unsigned int *max_retry = (unsigned int *)data->kaddr1;
+
+	if (data->status == BIT(SVC_STATUS_OK))
+		 priv->max_retry = *max_retry;
+	else if (data->status == BIT(SVC_STATUS_NO_SUPPORT))
+		dev_warn(client->dev,
+			 "Secure FW doesn't support max retry\n");
+	else
+		dev_err(client->dev, "Failed to get max retry %lu\n",
 			BIT(data->status));
 
 	complete(&priv->completion);
@@ -326,6 +354,18 @@ static ssize_t retry_counter_show(struct device *dev,
 	return sprintf(buf, "0x%08x\n", priv->retry_counter);
 }
 
+static ssize_t max_retry_show(struct device *dev,
+			      struct device_attribute *attr, char *buf)
+{
+	struct stratix10_rsu_priv *priv = dev_get_drvdata(dev);
+
+	if (!priv)
+		return -ENODEV;
+
+	return scnprintf(buf, sizeof(priv->max_retry),
+			 "0x%08x\n", priv->max_retry);
+}
+
 static ssize_t dcmf0_show(struct device *dev,
 			  struct device_attribute *attr, char *buf)
 {
@@ -441,6 +481,7 @@ static DEVICE_ATTR_RO(version);
 static DEVICE_ATTR_RO(error_location);
 static DEVICE_ATTR_RO(error_details);
 static DEVICE_ATTR_RO(retry_counter);
+static DEVICE_ATTR_RO(max_retry);
 static DEVICE_ATTR_RO(dcmf0);
 static DEVICE_ATTR_RO(dcmf1);
 static DEVICE_ATTR_RO(dcmf2);
@@ -456,6 +497,7 @@ static struct attribute *rsu_attrs[] = {
 	&dev_attr_error_location.attr,
 	&dev_attr_error_details.attr,
 	&dev_attr_retry_counter.attr,
+	&dev_attr_max_retry.attr,
 	&dev_attr_dcmf0.attr,
 	&dev_attr_dcmf1.attr,
 	&dev_attr_dcmf2.attr,
@@ -516,13 +558,20 @@ static int stratix10_rsu_probe(struct platform_device *pdev)
 	ret = rsu_send_msg(priv, COMMAND_RSU_DCMF_VERSION,
 			   0, rsu_dcmf_version_callback);
 	if (ret) {
-		dev_err(dev, "Error, getting dcmf version %i\n", ret);
+		dev_err(dev, "Error, getting DCMF version %i\n", ret);
 		stratix10_svc_free_channel(priv->chan);
 	}
 
 	ret = rsu_send_msg(priv, COMMAND_RSU_RETRY, 0, rsu_retry_callback);
 	if (ret) {
 		dev_err(dev, "Error, getting RSU retry %i\n", ret);
+		stratix10_svc_free_channel(priv->chan);
+	}
+
+	ret = rsu_send_msg(priv, COMMAND_RSU_MAX_RETRY, 0,
+			   rsu_max_retry_callback);
+	if (ret) {
+		dev_err(dev, "Error, getting RSU max retry %i\n", ret);
 		stratix10_svc_free_channel(priv->chan);
 	}
 
