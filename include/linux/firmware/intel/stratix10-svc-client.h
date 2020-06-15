@@ -54,10 +54,9 @@
  * Flag bit for COMMAND_RECONFIG
  *
  * COMMAND_RECONFIG_FLAG_PARTIAL:
- * Set to FPGA configuration type (full or partial), the default
- * is full reconfig.
+ * Set to FPGA configuration type (full or partial).
  */
-#define COMMAND_RECONFIG_FLAG_PARTIAL	0
+#define COMMAND_RECONFIG_FLAG_PARTIAL	1
 
 /**
  * Timeout settings for service clients:
