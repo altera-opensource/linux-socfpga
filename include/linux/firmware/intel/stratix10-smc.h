@@ -363,7 +363,8 @@ INTEL_SIP_SMC_FAST_CALL_VAL(INTEL_SIP_SMC_FUNCID_FPGA_CONFIG_COMPLETED_WRITE)
 /**
  * Request INTEL_SIP_SMC_RSU_DCMF_VERSION
  *
- * Sync call used by service driver at EL1 to query DCMF version from FW
+ * Sync call used by service driver at EL1 to query DCMF (Decision
+ * Configuration Management Firmware) version from FW
  *
  * Call register usage:
  * a0 INTEL_SIP_SMC_RSU_DCMF_VERSION
@@ -385,7 +386,7 @@ INTEL_SIP_SMC_FAST_CALL_VAL(INTEL_SIP_SMC_FUNCID_FPGA_CONFIG_COMPLETED_WRITE)
 /**
  * Request INTEL_SIP_SMC_RSU_MAX_RETRY
  *
- * Sync call used by service driver at EL1 to query max retry value from FM
+ * Sync call used by service driver at EL1 to query max retry value from FW
  *
  * Call register usage:
  * a0 INTEL_SIP_SMC_RSU_MAX_RETRY
