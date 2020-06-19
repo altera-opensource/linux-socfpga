@@ -48,15 +48,19 @@ static void fcs_data_callback(struct stratix10_svc_client *client,
 			     struct stratix10_svc_cb_data *data)
 {
 	struct intel_fcs_priv *priv = client->priv;
-	unsigned int *status = (unsigned int *)data->kaddr1;
 
 	if (data->status == BIT(SVC_STATUS_OK)) {
 		priv->status = 0;
 		priv->kbuf = data->kaddr2;
 		priv->size = *((unsigned int *)data->kaddr3);
+	} else if (data->status == BIT(SVC_STATUS_ERROR)) {
+		priv->status = *((unsigned int *)data->kaddr1);
+		dev_err(client->dev, "error, mbox_error=0x%x\n", priv->status);
+		priv->kbuf = NULL;
+		priv->size = 0;
 	} else {
-		dev_err(client->dev, "failed, mbox_error=0x%x\n", *status);
-		priv->status = *status;
+		dev_err(client->dev, "rejected\n");
+		priv->status = -EINVAL;
 		priv->kbuf = NULL;
 		priv->size = 0;
 	}
