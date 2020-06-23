@@ -264,7 +264,7 @@ static void svc_thread_cmd_config_status(struct stratix10_svc_controller *ctrl,
 
 	a0 = INTEL_SIP_SMC_FPGA_CONFIG_ISDONE;
 	a1 = (unsigned long)p_data->paddr;
-	a2 = 0;
+	a2 = (unsigned long)p_data->size;
 
 	if (p_data->command == COMMAND_POLL_SERVICE_STATUS)
 		a0 = INTEL_SIP_SMC_SERVICE_COMPLETED;
@@ -297,12 +297,15 @@ static void svc_thread_cmd_config_status(struct stratix10_svc_controller *ctrl,
 		cb_data->status = BIT(SVC_STATUS_BUSY);
 	} else if (res.a0 == INTEL_SIP_SMC_STATUS_OK) {
 		cb_data->status = BIT(SVC_STATUS_COMPLETED);
-		cb_data->kaddr1 = (res.a1) ?
-				  svc_pa_to_va(res.a1) : NULL;
-		cb_data->kaddr2 = &res.a2;
+		cb_data->kaddr2 = (res.a2) ?
+				  svc_pa_to_va(res.a2) : NULL;
+		cb_data->kaddr3 = (res.a3) ? &res.a3 : NULL;
 	} else {
 		pr_err("%s: poll status error\n", __func__);
 		cb_data->kaddr1 = &res.a1;
+		cb_data->kaddr2 = (res.a2) ?
+				  svc_pa_to_va(res.a2) : NULL;
+		cb_data->kaddr3 = (res.a3) ? &res.a3 : NULL;
 		cb_data->status = BIT(SVC_STATUS_ERROR);
 	}
 
@@ -331,7 +334,8 @@ static void svc_thread_recv_status_ok(struct stratix10_svc_data *p_data,
 	case COMMAND_RSU_NOTIFY:
 	case COMMAND_FCS_REQUEST_SERVICE:
 	case COMMAND_FCS_SEND_CERTIFICATE:
-	case COMMAND_POLL_SERVICE_STATUS:
+	case COMMAND_FCS_DATA_ENCRYPTION:
+	case COMMAND_FCS_DATA_DECRYPTION:
 		cb_data->status = BIT(SVC_STATUS_OK);
 		break;
 	case COMMAND_RECONFIG_DATA_SUBMIT:
@@ -358,9 +362,8 @@ static void svc_thread_recv_status_ok(struct stratix10_svc_data *p_data,
 		cb_data->kaddr2 = &res.a2;
 		break;
 	case COMMAND_FCS_RANDOM_NUMBER_GEN:
-	case COMMAND_FCS_DATA_ENCRYPTION:
-	case COMMAND_FCS_DATA_DECRYPTION:
 	case COMMAND_FCS_GET_PROVISION_DATA:
+	case COMMAND_POLL_SERVICE_STATUS:
 		cb_data->status = BIT(SVC_STATUS_OK);
 		cb_data->kaddr1 = &res.a1;
 		cb_data->kaddr2 = svc_pa_to_va(res.a2);
@@ -498,7 +501,7 @@ static int svc_normal_to_secure_thread(void *data)
 		case COMMAND_FCS_RANDOM_NUMBER_GEN:
 			a0 = INTEL_SIP_SMC_FCS_RANDOM_NUMBER;
 			a1 = (unsigned long)pdata->paddr;
-			a2 = (unsigned long)pdata->size;
+			a2 = 0;
 			break;
 		case COMMAND_FCS_REQUEST_SERVICE:
 			a0 = INTEL_SIP_SMC_FCS_SERVICE_REQUEST;
@@ -513,14 +516,14 @@ static int svc_normal_to_secure_thread(void *data)
 		case COMMAND_FCS_GET_PROVISION_DATA:
 			a0 = INTEL_SIP_SMC_FCS_GET_PROVISION_DATA;
 			a1 = (unsigned long)pdata->paddr;
-			a2 = (unsigned long)pdata->size;
+			a2 = 0;
 			break;
 
 		/* for polling */
 		case COMMAND_POLL_SERVICE_STATUS:
 			a0 = INTEL_SIP_SMC_SERVICE_COMPLETED;
 			a1 = (unsigned long)pdata->paddr;
-			a2 = 0;
+			a2 = (unsigned long)pdata->size;
 			break;
 
 		default:
@@ -532,10 +535,15 @@ static int svc_normal_to_secure_thread(void *data)
 			 (unsigned int)a0,
 			 (unsigned int)a1);
 		pr_debug(" a2=0x%016x\n", (unsigned int)a2);
-		pr_debug(" a3=0x%016x\n", (unsigned int)a3);
-		pr_debug(" a4=0x%016x\n", (unsigned int)a4);
-		pr_debug(" a5=0x%016x\n", (unsigned int)a5);
-		ctrl->invoke_fn(a0, a1, a2, a3, a4, a5, a6, a7, &res);
+
+		if (a0 == INTEL_SIP_SMC_FCS_CRYPTION) {
+			pr_debug(" a3=0x%016x\n", (unsigned int)a3);
+			pr_debug(" a4=0x%016x\n", (unsigned int)a4);
+			pr_debug(" a5=0x%016x\n", (unsigned int)a5);
+			ctrl->invoke_fn(a0, a1, a2, a3, a4, a5, 0, 0, &res);
+		} else {
+			ctrl->invoke_fn(a0, a1, a2, 0, 0, 0, 0, 0, &res);
+		}
 
 		pr_debug("%s: after SMC call -- res.a0=0x%016x",
 			 __func__, (unsigned int)res.a0);
