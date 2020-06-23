@@ -409,15 +409,19 @@ INTEL_SIP_SMC_FAST_CALL_VAL(INTEL_SIP_SMC_FUNCID_FPGA_CONFIG_COMPLETED_WRITE)
  *
  * Call register usage:
  * a0: INTEL_SIP_SMC_SERVICE_COMPLETED
- * a1: the physical address for secure firmware to put output data
- * a2: size
+ * a1: this register is optional. If used, it is the physical address for
+ *     secure firmware to put output data
+ * a2: this register is optional. If used, it is the size of output data
  * a3-a7: not used
  *
  * Return status:
  * a0: INTEL_SIP_SMC_STATUS_OK, INTEL_SIP_SMC_STATUS_ERROR,
  *     INTEL_SIP_SMC_REJECTED or INTEL_SIP_SMC_STATUS_BUSY
- * a1: physical address for the output daat
- * a2: output data size
+ * a1: mailbox error if a0 is INTEL_SIP_SMC_STATUS_ERROR
+ * a2: physical address containing the process info
+ *     for FCS certificate -- the data contains the certificate status
+ *     for FCS cryption -- the data contains the actual data size FW processes
+ * a3: output data size
  */
 #define INTEL_SIP_SMC_FUNCID_SERVICE_COMPLETED 30
 #define INTEL_SIP_SMC_SERVICE_COMPLETED \
@@ -448,9 +452,9 @@ INTEL_SIP_SMC_FAST_CALL_VAL(INTEL_SIP_SMC_FUNCID_FPGA_CONFIG_COMPLETED_WRITE)
  * Return status:
  * a0 INTEL_SIP_SMC_STATUS_OK, INTEL_SIP_SMC_FCS_ERROR or
  *      INTEL_SIP_SMC_FCS_REJECTED
- * a1 the physical address of generated random number
- * a2 the size
- * a3 not used
+ * a1 mailbox error
+ * a2 the physical address of generated random number
+ * a3 size
  */
 #define INTEL_SIP_SMC_FUNCID_FCS_RANDOM_NUMBER 90
 #define INTEL_SIP_SMC_FCS_RANDOM_NUMBER \
@@ -460,6 +464,9 @@ INTEL_SIP_SMC_FAST_CALL_VAL(INTEL_SIP_SMC_FUNCID_FPGA_CONFIG_COMPLETED_WRITE)
  * Request INTEL_SIP_SMC_FCS_CRYPTION
  * Async call for data encryption and HMAC signature generation, or for
  * data decryption and HMAC verification.
+ *
+ * Call INTEL_SIP_SMC_SERVICE_COMPLETED to get the output encrypted or
+ * decrypted data
  *
  * Call register usage:
  * a0 INTEL_SIP_SMC_FCS_CRYPTION
@@ -473,9 +480,7 @@ INTEL_SIP_SMC_FAST_CALL_VAL(INTEL_SIP_SMC_FUNCID_FPGA_CONFIG_COMPLETED_WRITE)
  * Return status:
  * a0 INTEL_SIP_SMC_STATUS_OK, INTEL_SIP_SMC_STATUS_ERROR or
  *      INTEL_SIP_SMC_STATUS_REJECTED
- * a1 mbox return code
- * a2 physical address of output data which stores encrypted or decrypted data
- * a3 output data size
+ * a1-3 not used
  */
 #define INTEL_SIP_SMC_FUNCID_FCS_CRYPTION 91
 #define INTEL_SIP_SMC_FCS_CRYPTION \
@@ -513,8 +518,7 @@ INTEL_SIP_SMC_FAST_CALL_VAL(INTEL_SIP_SMC_FUNCID_FPGA_CONFIG_COMPLETED_WRITE)
  * a3-a7 not used
  *
  * Return status:
- * a0 INTEL_SIP_SMC_STATUS_OK, INTEL_SIP_SMC_FCS_ERROR or
- *      INTEL_SIP_SMC_FCS_REJECTED
+ * a0 INTEL_SIP_SMC_STATUS_OK or INTEL_SIP_SMC_FCS_REJECTED
  * a1-a3 not used
  */
 #define INTEL_SIP_SMC_FUNCID_FCS_SEND_CERTIFICATE 93
@@ -534,9 +538,9 @@ INTEL_SIP_SMC_FAST_CALL_VAL(INTEL_SIP_SMC_FUNCID_FPGA_CONFIG_COMPLETED_WRITE)
  * Return status:
  * a0 INTEL_SIP_SMC_STATUS_OK, INTEL_SIP_SMC_FCS_ERROR or
  *      INTEL_SIP_SMC_FCS_REJECTED
- * a1 physical address for the structure of fuse and key hashes
- * a2 the size of structure
- * a3 not used
+ * a1 mailbox error
+ * a2 physical address for the structure of fuse and key hashes
+ * a3 the size of structure
  *
  */
 #define INTEL_SIP_SMC_FUNCID_RSU_DCMF_VERSION 16
