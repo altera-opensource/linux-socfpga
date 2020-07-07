@@ -13,6 +13,11 @@ config ARCH_AGILEX
 	help
 	  This enables support for Intel's Agilex SoCFPGA Family.
 
+config ARCH_DM
+	bool "Intel's Diamond Mesa SoCFPGA Family"
+	help
+	  This enables support for Intel's Diamond Mesa SoCFPGA Family.
+
 config ARCH_SUNXI
 	bool "Allwinner sunxi 64-bit SoC Family"
 	select ARCH_HAS_RESET_CONTROLLER
