@@ -1,0 +1,28 @@
+// SPDX-License-Identifier:     GPL-2.0
+/*
+ * Copyright (C) 2020 Intel Corporation
+ */
+#include "socfpga_dm.dtsi"
+
+/ {
+	model = "SoCFPGA Diamond Mesa Simics";
+
+	aliases {
+		serial0 = &uart0;
+	};
+
+	chosen {
+		bootargs = "mem=64M earlycon";
+		stdout-path = "serial0:4800n8";
+	};
+
+	memory {
+		device_type = "memory";
+		/* We expect the bootloader to fill in the reg */
+		reg = <0 0 0 0x4000000>;
+	};
+};
+
+&uart0 {
+	status = "okay";
+};
