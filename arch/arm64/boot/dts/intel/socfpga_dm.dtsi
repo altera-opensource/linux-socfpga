@@ -96,6 +96,13 @@
 		ranges = <0 0 0 0xffffffff>;
 
 /* Use fixed frequency clocks in Simics - remove clk manager for initial DT */
+		clocks {
+			wdt_clk: wdt-clk {
+				#clock-cells = <0>;
+				compatible = "fixed-clock";
+				clock-frequency = <100000000>;
+			};
+		};
 
 		gmac0: ethernet@ff800000 {
 			compatible = "altr,socfpga-stmmac-a10-s10", "snps,dwmac-3.74a", "snps,dwmac";
@@ -417,7 +424,7 @@
 			reg = <0xffd00200 0x100>;
 			interrupts = <0 117 4>;
 			resets = <&rst WATCHDOG0_RESET>;
-			clock-frequency = <100000000>;
+			clock-frequency = <&wdt_clk>;
 			status = "disabled";
 		};
 
@@ -426,7 +433,7 @@
 			reg = <0xffd00300 0x100>;
 			interrupts = <0 118 4>;
 			resets = <&rst WATCHDOG1_RESET>;
-			clock-frequency = <100000000>;
+			clock-frequency = <&wdt_clk>;
 			status = "disabled";
 		};
 
@@ -435,7 +442,7 @@
 			reg = <0xffd00400 0x100>;
 			interrupts = <0 125 4>;
 			resets = <&rst WATCHDOG2_RESET>;
-			clock-frequency = <100000000>;
+			clock-frequency = <&wdt_clk>;
 			status = "disabled";
 		};
 
@@ -444,7 +451,7 @@
 			reg = <0xffd00500 0x100>;
 			interrupts = <0 126 4>;
 			resets = <&rst WATCHDOG3_RESET>;
-			clock-frequency = <100000000>;
+			clock-frequency = <&wdt_clk>;
 			status = "disabled";
 		};
 
