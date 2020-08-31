@@ -148,8 +148,8 @@
 			rx-fifo-depth = <16384>;
 			snps,multicast-filter-bins = <256>;
 			iommus = <&smmu 1>;
-			clocks = <&clkmgr AGILEX_EMAC0_CLK>;
-			clock-names = "stmmaceth";
+			clocks = <&clkmgr AGILEX_EMAC0_CLK>, <&clkmgr AGILEX_EMAC_PTP_CLK>;
+			clock-names = "stmmaceth", "ptp_ref";
 			altr,sysmgr-syscon = <&sysmgr 0x44 0>;
 			status = "disabled";
 		};
@@ -166,8 +166,8 @@
 			rx-fifo-depth = <16384>;
 			snps,multicast-filter-bins = <256>;
 			iommus = <&smmu 2>;
-			clocks = <&clkmgr AGILEX_EMAC1_CLK>;
-			clock-names = "stmmaceth";
+			clocks = <&clkmgr AGILEX_EMAC1_CLK>, <&clkmgr AGILEX_EMAC_PTP_CLK>;
+			clock-names = "stmmaceth", "ptp_ref";
 			altr,sysmgr-syscon = <&sysmgr 0x48 8>;
 			status = "disabled";
 		};
@@ -184,8 +184,8 @@
 			rx-fifo-depth = <16384>;
 			snps,multicast-filter-bins = <256>;
 			iommus = <&smmu 3>;
-			clocks = <&clkmgr AGILEX_EMAC2_CLK>;
-			clock-names = "stmmaceth";
+			clocks = <&clkmgr AGILEX_EMAC2_CLK>, <&clkmgr AGILEX_EMAC_PTP_CLK>;
+			clock-names = "stmmaceth", "ptp_ref";
 			altr,sysmgr-syscon = <&sysmgr 0x4c 16>;
 			status = "disabled";
 		};
