@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-2.0
 /*
- * Copyright (C) 2019, Intel Corporation
+ * Copyright (C) 2019-2020, Intel Corporation
  */
 #include <linux/slab.h>
 #include <linux/clk-provider.h>
@@ -264,6 +264,7 @@ static struct stratix10_clock_data *__socfpga_agilex_clk_init(struct platform_de
 	struct clk **clk_table;
 	struct resource *res;
 	void __iomem *base;
+	int ret;
 
 	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
 	base = devm_ioremap_resource(dev, res);
@@ -283,7 +284,10 @@ static struct stratix10_clock_data *__socfpga_agilex_clk_init(struct platform_de
 
 	clk_data->clk_data.clks = clk_table;
 	clk_data->clk_data.clk_num = nr_clks;
-	of_clk_add_provider(np, of_clk_src_onecell_get, &clk_data->clk_data);
+	ret = of_clk_add_provider(np, of_clk_src_onecell_get, &clk_data->clk_data);
+	if (ret)
+		return ERR_PTR(ret);
+
 	return clk_data;
 }
 
