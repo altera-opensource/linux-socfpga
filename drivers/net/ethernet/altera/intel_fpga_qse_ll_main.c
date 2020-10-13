@@ -1052,12 +1052,6 @@ static int qse_open(struct net_device *dev)
 
 	spin_unlock_irqrestore(&priv->rxdma_irq_lock, flags);
 
-	ret = intel_fpga_tod_init(&priv->ptp_priv);
-	if (ret) {
-		netdev_warn(dev, "Failed PTP initialization\n");
-		goto init_error;
-	}
-
 	napi_enable(&priv->napi);
 	netif_start_queue(dev);
 
