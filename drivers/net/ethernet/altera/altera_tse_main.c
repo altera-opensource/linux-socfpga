@@ -988,10 +988,6 @@ static int tse_open(struct net_device *dev)
 	}
 	phylink_start(priv->phylink);
 
-	ret = intel_fpga_tod_init(&priv->ptp_priv);
-	if (ret)
-		netdev_warn(dev, "Failed PTP initialization\n");
-
 	priv->dma_priv.hwts_tx_en = 0;
 	priv->dma_priv.hwts_rx_en = 0;
 

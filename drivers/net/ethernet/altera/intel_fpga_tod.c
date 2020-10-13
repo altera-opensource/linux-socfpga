@@ -275,31 +275,12 @@ static struct ptp_clock_info intel_fpga_tod_clock_ops = {
 	.enable = intel_fpga_tod_enable_feature,
 };
 
-/* Initialize PTP control block registers */
-int intel_fpga_tod_init(struct intel_fpga_tod_private *priv)
-{
-	struct timespec64 now;
-	int ret = 0;
-
-	ret = intel_fpga_tod_adjust_fine(&priv->ptp_clock_ops, 0l);
-	if (ret != 0)
-		goto out;
-
-	/* Initialize the hardware clock to the system time */
-	ktime_get_real_ts64(&now);
-	intel_fpga_tod_set_time(&priv->ptp_clock_ops, &now);
-
-	spin_lock_init(&priv->tod_lock);
-
-out:
-	return ret;
-}
-
 /* Register the PTP clock driver to kernel */
 int intel_fpga_tod_register(struct intel_fpga_tod_private *priv,
 			    struct device *device)
 {
 	int ret = 0;
+	struct timespec64 ts = { 0, 0 };
 
 	priv->ptp_clock_ops = intel_fpga_tod_clock_ops;
 
@@ -311,6 +292,9 @@ int intel_fpga_tod_register(struct intel_fpga_tod_private *priv,
 
 	if (priv->tod_clk)
 		ret = clk_prepare_enable(priv->tod_clk);
+
+	/* Initialize the hardware clock to zero */
+	intel_fpga_tod_set_time(&priv->ptp_clock_ops, &ts);
 
 	return ret;
 }
@@ -352,6 +336,8 @@ int intel_fpga_tod_probe(struct platform_device *pdev,
 		ret = -ENXIO;
 		goto err;
 	}
+
+	spin_lock_init(&priv->tod_lock);
 err:
 	return ret;
 }
