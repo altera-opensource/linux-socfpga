@@ -218,15 +218,25 @@ static struct fpga_image_info *of_fpga_region_parse_ov(
 
 	info->overlay = overlay;
 
-	/* Read FPGA region properties from the overlay */
-	if (of_property_read_bool(overlay, "partial-fpga-config"))
-		info->flags |= FPGA_MGR_PARTIAL_RECONFIG;
+	/*
+	 * Read FPGA region properties from the overlay.
+	 *
+	 * First check the integrity of the bitstream. If the
+	 * authentication is passed, the user can perform other
+	 * operations.
+	 */
+	if (of_property_read_bool(overlay, "authenticate-fpga-config")) {
+		info->flags |= FPGA_MGR_BITSTREAM_AUTHENTICATE;
+	} else {
+		if (of_property_read_bool(overlay, "partial-fpga-config"))
+			info->flags |= FPGA_MGR_PARTIAL_RECONFIG;
 
-	if (of_property_read_bool(overlay, "external-fpga-config"))
-		info->flags |= FPGA_MGR_EXTERNAL_CONFIG;
+		if (of_property_read_bool(overlay, "external-fpga-config"))
+			info->flags |= FPGA_MGR_EXTERNAL_CONFIG;
 
-	if (of_property_read_bool(overlay, "encrypted-fpga-config"))
-		info->flags |= FPGA_MGR_ENCRYPTED_BITSTREAM;
+		if (of_property_read_bool(overlay, "encrypted-fpga-config"))
+			info->flags |= FPGA_MGR_ENCRYPTED_BITSTREAM;
+	}
 
 	if (!of_property_read_string(overlay, "firmware-name",
 				     &firmware_name)) {
