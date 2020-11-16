@@ -182,6 +182,16 @@ Optional properties:
 	This property is optional if the FPGA Manager handles the bridges.
         If the fpga-region is  the child of a fpga-bridge, the list should not
         contain the parent bridge.
+- authenticate-fpga-config : boolean, set if do bitstream authentication only.
+	If 'authenticate-fpga-config' is added then adding a new node or another
+	operation is not allowed.
+	Flag authenticate-fpga-config is used to check the integrity of the
+	bitstream.
+	Except for the actual configuration of the device, the authentication
+	works in the same way as FPGA configuration. If the authentication passes,
+	other operations such as full or partial reconfiguration can be performed.
+	When the bitstream into QSPI flash memory at device is programmed, it is
+	expected that there will be no issue when starting the device.
 - partial-fpga-config : boolean, set if partial reconfiguration is to be done,
 	otherwise full reconfiguration is done.
 - external-fpga-config : boolean, set if the FPGA has already been configured
