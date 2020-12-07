@@ -30,6 +30,17 @@ struct stratix10_perip_c_clock {
 	unsigned long		offset;
 };
 
+struct n5x_perip_c_clock {
+	unsigned int		id;
+	const char		*name;
+	const char		*parent_name;
+	const char		*const *parent_names;
+	u8			num_parents;
+	unsigned long		flags;
+	unsigned long		offset;
+	unsigned long		shift;
+};
+
 struct stratix10_perip_cnt_clock {
 	unsigned int		id;
 	const char		*name;
@@ -66,9 +77,15 @@ struct clk *s10_register_pll(const char *, const char *const *, u8,
 struct clk *agilex_register_pll(const char *, const char *const *, u8,
 				unsigned long, void __iomem *, unsigned long);
 
+struct clk *n5x_register_pll(const char *, const char *const *, u8,
+				unsigned long, void __iomem *, unsigned long);
+
 struct clk *s10_register_periph(const char *, const char *,
 				const char * const *, u8, unsigned long,
 				void __iomem *, unsigned long);
+struct clk *n5x_register_periph(const char *, const char *,
+				const char * const *, u8, unsigned long,
+				void __iomem *, unsigned long, unsigned long);
 struct clk *s10_register_cnt_periph(const char *, const char *,
 				    const char * const *, u8,
 				    unsigned long, void __iomem *,
