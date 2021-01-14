@@ -18,7 +18,7 @@
 #define SVC_CLIENT_FCS			"fcs"
 #define SVC_CLIENT_HWMON		"hwmon"
 
-/**
+/*
  * Status of the sent command, in bit number
  *
  * SVC_STATUS_OK:
@@ -53,7 +53,8 @@
 #define SVC_STATUS_ERROR		5
 #define SVC_STATUS_NO_SUPPORT		6
 #define SVC_STATUS_INVALID_PARAM	7
-/**
+
+/*
  * Flag bit for COMMAND_RECONFIG
  *
  * COMMAND_RECONFIG_FLAG_PARTIAL:
