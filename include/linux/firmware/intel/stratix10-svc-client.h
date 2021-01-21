@@ -132,6 +132,9 @@ struct stratix10_svc_chan;
  *
  * @COMMAND_POLL_SERVICE_STATUS: poll if the service request is complete,
  * return statis is SVC_STATUS_OK, SVC_STATUS_ERROR or SVC_STATUS_BUSY
+ *
+ * @COMMAND_FIRMWARE_VERSION: query running firmware version, return status
+ * is SVC_STATUS_OK or SVC_STATUS_ERROR
  */
 enum stratix10_svc_command_code {
 	/* for FPGA */
@@ -157,8 +160,7 @@ enum stratix10_svc_command_code {
 	COMMAND_FCS_RANDOM_NUMBER_GEN,
 	/* for general status poll */
 	COMMAND_POLL_SERVICE_STATUS = 40,
-	/* Non-mailbox SMC Call */
-	COMMAND_SMC_SVC_VERSION = 200,
+	COMMAND_FIRMWARE_VERSION,
 };
 
 /**
