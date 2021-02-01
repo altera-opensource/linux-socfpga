@@ -875,8 +875,11 @@ static __poll_t vsock_poll(struct file *file, struct socket *sock,
 			mask |= EPOLLOUT | EPOLLWRNORM | EPOLLWRBAND;
 
 	} else if (sock->type == SOCK_STREAM) {
-		const struct vsock_transport *transport = vsk->transport;
+		const struct vsock_transport *transport;
+
 		lock_sock(sk);
+
+		transport = vsk->transport;
 
 		/* Listening sockets that have connections in their accept
 		 * queue can be read.
@@ -963,6 +966,8 @@ static int vsock_dgram_sendmsg(struct socket *sock, struct msghdr *msg,
 	transport = vsk->transport;
 
 	lock_sock(sk);
+
+	transport = vsk->transport;
 
 	err = vsock_auto_bind(vsk);
 	if (err)
@@ -1402,6 +1407,8 @@ static int vsock_stream_setsockopt(struct socket *sock,
 
 	lock_sock(sk);
 
+	transport = vsk->transport;
+
 	switch (optname) {
 	case SO_VM_SOCKETS_BUFFER_SIZE:
 		COPY_IN(val);
@@ -1543,6 +1550,8 @@ static int vsock_stream_sendmsg(struct socket *sock, struct msghdr *msg,
 
 	lock_sock(sk);
 
+	transport = vsk->transport;
+
 	/* Callers should not provide a destination with stream sockets. */
 	if (msg->msg_namelen) {
 		err = sk->sk_state == TCP_ESTABLISHED ? -EISCONN : -EOPNOTSUPP;
@@ -1682,7 +1691,9 @@ vsock_stream_recvmsg(struct socket *sock, struct msghdr *msg, size_t len,
 
 	lock_sock(sk);
 
-	if (sk->sk_state != TCP_ESTABLISHED) {
+	transport = vsk->transport;
+
+	if (!transport || sk->sk_state != TCP_ESTABLISHED) {
 		/* Recvmsg is supposed to return 0 if a peer performs an
 		 * orderly shutdown. Differentiate between that case and when a
 		 * peer has not connected or a local shutdown occured with the
