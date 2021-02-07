@@ -1778,7 +1778,7 @@ void dwxgmac3_est_irq_status(void __iomem *ioaddr, struct net_device *dev,
 }
 
 static void dwxgmac3_fpe_configure(void __iomem *ioaddr, u32 num_txq,
-				   u32 num_rxq, bool enable)
+				   u32 num_rxq, u32 txqpec, bool enable)
 {
 	u32 value;
 
