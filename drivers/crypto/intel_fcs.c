@@ -28,11 +28,12 @@
 #define PS_BUF_SIZE		64
 #define INVALID_STATUS		0xff
 
+#define MIN_SDOS_BUF_SZ		16
+#define MAX_SDOS_BUF_SZ		32768
 #define DEC_MIN_SZ		72
 #define DEC_MAX_SZ		32712
-#define ENC_MIN_SZ		128
-#define ENC_MAX_SZ		32768
-
+#define ENC_MIN_SZ		120
+#define ENC_MAX_SZ		32760
 
 #define FCS_REQUEST_TIMEOUT (msecs_to_jiffies(SVC_FCS_REQUEST_TIMEOUT_MS))
 #define FCS_COMPLETED_TIMEOUT (msecs_to_jiffies(SVC_COMPLETED_TIMEOUT_MS))
