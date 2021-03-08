@@ -51,17 +51,12 @@
 #define SVC_STATUS_NO_SUPPORT		6
 #define SVC_STATUS_INVALID_PARAM	7
 /**
- * Flag bit for COMMAND_RECONFIG, in bit number
+ * Flag bit for COMMAND_RECONFIG
  *
  * COMMAND_RECONFIG_FLAG_PARTIAL:
- * Set for partial FPGA configuration.
- *
- * COMMAND_AUTHENTICATE_BITSTREAM:
- * Set for bitstream authentication, which makes sure a signed bitstream
- * has valid signatures before committing it to QSPI flash memory.
+ * Set to FPGA configuration type (full or partial).
  */
-#define COMMAND_RECONFIG_FLAG_PARTIAL	0
-#define COMMAND_AUTHENTICATE_BITSTREAM	1
+#define COMMAND_RECONFIG_FLAG_PARTIAL	1
 
 /**
  * Timeout settings for service clients:
