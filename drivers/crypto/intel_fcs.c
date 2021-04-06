@@ -68,7 +68,7 @@ static void fcs_data_callback(struct stratix10_svc_client *client,
 		priv->size = (data->kaddr3) ?
 			*((unsigned int *)data->kaddr3) : 0;
 	} else {
-		dev_err(client->dev, "rejected\n");
+		dev_warn(client->dev, "rejected, invalid param\n");
 		priv->status = -EINVAL;
 		priv->kbuf = NULL;
 		priv->size = 0;
