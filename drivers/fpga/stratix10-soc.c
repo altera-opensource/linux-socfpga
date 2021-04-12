@@ -486,12 +486,10 @@ static int s10_probe(struct platform_device *pdev)
 			       NULL, 0, s10_fw_version_callback);
 	if (ret) {
 		dev_err(dev, "couldn't get firmware version\n");
-		stratix10_svc_done(priv->chan);
 		fpga_mgr_free(mgr);
 		goto probe_err;
 	}
 
-	stratix10_svc_done(priv->chan);
 	platform_set_drvdata(pdev, mgr);
 	return ret;
 
