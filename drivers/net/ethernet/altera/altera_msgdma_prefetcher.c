@@ -204,6 +204,12 @@ netdev_tx_t msgdma_pref_tx_buffer(struct altera_dma_private *priv,
 	tx_descs[desc_entry].read_addr_lo = lower_32_bits(buffer->dma_addr);
 	tx_descs[desc_entry].read_addr_hi = upper_32_bits(buffer->dma_addr);
 
+	/*
+	 * Ensure that the high and low address bits of the descriptor are
+	 * written prior to the go bit being set.
+	 */
+	dma_wmb();
+
 	/* set the control bits and set owned by hw */
 	tx_descs[desc_entry].desc_control = (MSGDMA_DESC_CTL_TX_SINGLE
 			| MSGDMA_PREF_DESC_CTL_OWNED_BY_HW);
