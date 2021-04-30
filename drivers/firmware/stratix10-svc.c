@@ -383,7 +383,7 @@ static int svc_normal_to_secure_thread(void *data)
 	struct stratix10_svc_data *pdata;
 	struct stratix10_svc_cb_data *cbdata;
 	struct arm_smccc_res res;
-	unsigned long a0, a1, a2, a3, a4, a5;
+	unsigned long a0, a1, a2, a3, a4, a5, a6, a7;
 	int ret_fifo = 0;
 
 	pdata =  kmalloc(sizeof(*pdata), GFP_KERNEL);
@@ -403,6 +403,8 @@ static int svc_normal_to_secure_thread(void *data)
 	a3 = 0;
 	a4 = 0;
 	a5 = 0;
+	a6 = 0;
+	a7 = 0;
 
 	pr_debug("smc_hvc_shm_thread is running\n");
 
@@ -530,15 +532,10 @@ static int svc_normal_to_secure_thread(void *data)
 		pr_debug("%s: before SMC call -- a0=0x%016x a1=0x%016x",
 			 __func__, (unsigned int)a0, (unsigned int)a1);
 		pr_debug(" a2=0x%016x\n", (unsigned int)a2);
-
-		if (a0 == INTEL_SIP_SMC_FCS_CRYPTION) {
-			pr_debug(" a3=0x%016x\n", (unsigned int)a3);
-			pr_debug(" a4=0x%016x\n", (unsigned int)a4);
-			pr_debug(" a5=0x%016x\n", (unsigned int)a5);
-			ctrl->invoke_fn(a0, a1, a2, a3, a4, a5, 0, 0, &res);
-		} else {
-			ctrl->invoke_fn(a0, a1, a2, 0, 0, 0, 0, 0, &res);
-		}
+		pr_debug(" a3=0x%016x\n", (unsigned int)a3);
+		pr_debug(" a4=0x%016x\n", (unsigned int)a4);
+		pr_debug(" a5=0x%016x\n", (unsigned int)a5);
+		ctrl->invoke_fn(a0, a1, a2, a3, a4, a5, a6, a7, &res);
 
 		pr_debug("%s: after SMC call -- res.a0=0x%016x",
 			 __func__, (unsigned int)res.a0);
