@@ -42,40 +42,11 @@ static const char * const mpu_free_mux[] = {"main_mpu_base_clk",
 					    "osc1", "cb-intosc-hs-div2-clk",
 					    "f2s-free-clk"};
 
-static const struct clk_parent_data sdmmc_mux[] = {
-	{ .fw_name = "sdmmc_free_clk",
-	  .name = "sdmmc_free_clk", },
-	{ .fw_name = "boot_clk",
-	  .name = "boot_clk", },
-};
-
-static const struct clk_parent_data s2f_user1_mux[] = {
-	{ .fw_name = "s2f_user1_free_clk",
-	  .name = "s2f_user1_free_clk", },
-	{ .fw_name = "boot_clk",
-	  .name = "boot_clk", },
-};
-
-static const struct clk_parent_data psi_mux[] = {
-	{ .fw_name = "psi_ref_free_clk",
-	  .name = "psi_ref_free_clk", },
-	{ .fw_name = "boot_clk",
-	  .name = "boot_clk", },
-};
-
-static const struct clk_parent_data gpio_db_mux[] = {
-	{ .fw_name = "gpio_db_free_clk",
-	  .name = "gpio_db_free_clk", },
-	{ .fw_name = "boot_clk",
-	  .name = "boot_clk", },
-};
-
-static const struct clk_parent_data emac_ptp_mux[] = {
-	{ .fw_name = "emac_ptp_free_clk",
-	  .name = "emac_ptp_free_clk", },
-	{ .fw_name = "boot_clk",
-	  .name = "boot_clk", },
-};
+static const char * const sdmmc_mux[] = {"sdmmc_free_clk", "boot_clk"};
+static const char * const s2f_user1_mux[] = {"s2f_user1_free_clk", "boot_clk"};
+static const char * const psi_mux[] = {"psi_ref_free_clk", "boot_clk"};
+static const char * const gpio_db_mux[] = {"gpio_db_free_clk", "boot_clk"};
+static const char * const emac_ptp_mux[] = {"emac_ptp_free_clk", "boot_clk"};
 
 /* clocks in AO (always on) controller */
 static const struct stratix10_pll_clock s10_pll_clks[] = {

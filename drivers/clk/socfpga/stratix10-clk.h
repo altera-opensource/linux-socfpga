@@ -97,4 +97,10 @@ struct clk *s10_register_gate(const char *, const char *,
 			      unsigned long, unsigned long,
 			      unsigned long, unsigned long, u8,
 			      unsigned long, u8, u8);
+struct clk *agilex_register_gate(const char *, const char *,
+			      const char * const *, u8,
+			      unsigned long, void __iomem *,
+			      unsigned long, unsigned long,
+			      unsigned long, unsigned long, u8,
+			      unsigned long, u8, u8);
 #endif	/* __STRATIX10_CLK_H */
