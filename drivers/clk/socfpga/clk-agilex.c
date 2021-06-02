@@ -54,43 +54,14 @@ static const char * const s2f_usr1_free_mux[] = {"main_pll_c2", "peri_pll_c2",
 static const char * const mpu_mux[] = { "mpu_free_clk", "boot_clk",};
 
 static const char * const s2f_usr0_mux[] = {"f2s-free-clk", "boot_clk"};
-static const char * const emac_mux[] = {"emaca_free_clk", "emacb_free_clk"};
+static const char * const emac_mux[] = {"emaca_free_clk", "emacb_free_clk",
+					"boot_clk"};
 static const char * const noc_mux[] = {"noc_free_clk", "boot_clk"};
-
-static const struct clk_parent_data sdmmc_mux[] = {
-	{ .fw_name = "sdmmc_free_clk",
-	  .name = "sdmmc_free_clk", },
-	{ .fw_name = "boot_clk",
-	  .name = "boot_clk", },
-};
-
-static const struct clk_parent_data s2f_user1_mux[] = {
-	{ .fw_name = "s2f_user1_free_clk",
-	  .name = "s2f_user1_free_clk", },
-	{ .fw_name = "boot_clk",
-	  .name = "boot_clk", },
-};
-
-static const struct clk_parent_data psi_mux[] = {
-	{ .fw_name = "psi_ref_free_clk",
-	  .name = "psi_ref_free_clk", },
-	{ .fw_name = "boot_clk",
-	  .name = "boot_clk", },
-};
-
-static const struct clk_parent_data gpio_db_mux[] = {
-	{ .fw_name = "gpio_db_free_clk",
-	  .name = "gpio_db_free_clk", },
-	{ .fw_name = "boot_clk",
-	  .name = "boot_clk", },
-};
-
-static const struct clk_parent_data emac_ptp_mux[] = {
-	{ .fw_name = "emac_ptp_free_clk",
-	  .name = "emac_ptp_free_clk", },
-	{ .fw_name = "boot_clk",
-	  .name = "boot_clk", },
-};
+static const char * const sdmmc_mux[] = {"sdmmc_free_clk", "boot_clk"};
+static const char * const s2f_user1_mux[] = {"s2f_user1_free_clk", "boot_clk"};
+static const char * const psi_mux[] = {"psi_ref_free_clk", "boot_clk"};
+static const char * const gpio_db_mux[] = {"gpio_db_free_clk", "boot_clk"};
+static const char * const emac_ptp_mux[] = {"emac_ptp_free_clk", "boot_clk"};
 
 /* clocks in AO (always on) controller */
 static const struct stratix10_pll_clock agilex_pll_clks[] = {
@@ -281,7 +252,7 @@ static int agilex_clk_register_gate(const struct stratix10_gate_clock *clks,				
 	int i;
 
 	for (i = 0; i < nums; i++) {
-		clk = s10_register_gate(clks[i].name, clks[i].parent_name,
+		clk = agilex_register_gate(clks[i].name, clks[i].parent_name,
 					clks[i].parent_names,
 					clks[i].num_parents,
 					clks[i].flags, base,
