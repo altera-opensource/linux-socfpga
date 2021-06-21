@@ -173,6 +173,9 @@ struct stratix10_svc_chan;
  *
  * @COMMAND_FCS_CRYPTO_IMPORT_KEY: import the crypto service key object,
  * return status is SVC_STATUS_OK or SVC_STATUS_ERROR
+ *
+ * @COMMAND_FCS_CRYPTO_EXPORT_KEY: export the crypto service key object,
+ * return status is SVC_STATUS_OK or SVC_STATUS_ERROR
  */
 enum stratix10_svc_command_code {
 	/* for FPGA */
@@ -212,6 +215,7 @@ enum stratix10_svc_command_code {
 	COMMAND_FCS_CRYPTO_OPEN_SESSION = 50,
 	COMMAND_FCS_CRYPTO_CLOSE_SESSION,
 	COMMAND_FCS_CRYPTO_IMPORT_KEY,
+	COMMAND_FCS_CRYPTO_EXPORT_KEY,
 };
 
 /**
