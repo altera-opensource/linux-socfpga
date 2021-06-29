@@ -189,6 +189,9 @@ struct stratix10_svc_chan;
  *
  * @COMMAND_FCS_CRYPTO_GET_KEY_INFO: get the crypto service key object
  * info, return status is SVC_STATUS_OK or SVC_STATUS_ERROR
+ *
+ * @COMMAND_FCS_CRYPTO_AES_CRYPT: sends request to encrypt or decrypt a
+ * data block, return status is SVC_STATUS_OK or SVC_STATUS_ERROR
  */
 enum stratix10_svc_command_code {
 	/* for FPGA */
@@ -234,6 +237,8 @@ enum stratix10_svc_command_code {
 	COMMAND_FCS_CRYPTO_EXPORT_KEY,
 	COMMAND_FCS_CRYPTO_REMOVE_KEY,
 	COMMAND_FCS_CRYPTO_GET_KEY_INFO,
+	COMMAND_FCS_CRYPTO_AES_CRYPT_INIT,
+	COMMAND_FCS_CRYPTO_AES_CRYPT_FINALIZE,
 };
 
 /**
