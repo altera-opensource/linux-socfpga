@@ -212,7 +212,11 @@ struct stratix10_svc_chan;
  * @COMMAND_FCS_CRYPTO_ECDSA_HASH_VERIFY (INIT and FINALIZE): send
  * digital signature verify request with precalculated hash, return status is
  * SVC_STATUS_OK or SVC_STATUS_ERROR
- */
+ *
+ * @COMMAND_FCS_CRYPTO_ECDSA_SHA2_VERIFY (INIT and FINALIZE): send digital
+ * signature verify request, return status is SVC_STATUS_OK or
+ * SVC_STATUS_ERROR
+*/
 enum stratix10_svc_command_code {
 	/* for FPGA */
 	COMMAND_NOOP = 0,
@@ -269,6 +273,8 @@ enum stratix10_svc_command_code {
 	COMMAND_FCS_CRYPTO_ECDSA_SHA2_DATA_SIGNING_FINALIZE,
 	COMMAND_FCS_CRYPTO_ECDSA_HASH_VERIFY_INIT,
 	COMMAND_FCS_CRYPTO_ECDSA_HASH_VERIFY_FINALIZE,
+	COMMAND_FCS_CRYPTO_ECDSA_SHA2_VERIFY_INIT,
+	COMMAND_FCS_CRYPTO_ECDSA_SHA2_VERIFY_FINALIZE,
 };
 
 /**
