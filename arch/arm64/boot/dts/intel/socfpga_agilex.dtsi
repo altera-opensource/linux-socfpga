@@ -73,6 +73,10 @@
 			fcs: fcs {
 				compatible = "intel,agilex-soc-fcs";
 			};
+
+			temp_volt: hwmon {
+				compatible = "intel,soc64-hwmon";
+			};
 		};
 	};
 
