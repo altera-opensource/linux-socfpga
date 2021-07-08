@@ -19,7 +19,7 @@
 #define SVC_CLIENT_FCS			"fcs"
 #define SVC_CLIENT_HWMON		"hwmon"
 
-/*
+/**
  * Status of the sent command, in bit number
  *
  * SVC_STATUS_OK:
