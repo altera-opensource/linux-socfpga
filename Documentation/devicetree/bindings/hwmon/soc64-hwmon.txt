@@ -1,0 +1,57 @@
+Bindings for SoC64-hwmon temperature and voltage sensors
+--------------------------------------------------------
+
+The SoC64-hwmon driver supports reading of temperature and voltage sensors on
+64-bit SoCFPGA and eASIC n5x devices.
+
+Required node properties:
+- compatible: must be
+		"intel,soc64-hwmon"
+
+
+Sensor subnode format:
+----------------------
+
+Under the hwmon node, there are child nodes to define each class of sensor.
+
+Compatible nodes:
+
+-voltage     : A node containing all voltage sensor configuration data
+-temperature : A node containing all temperature sensor configuration data
+
+Required properties for each child node:
+
+- label : Specify the human-readable name for the sensor channel
+- reg   : Specify the SDM channel of the sensor
+	  integer value in the range 0 to 15, that represents the channel used.
+
+There is a limit of 16 sensor entries for each child.
+
+Example:
+
+temp_volt: hwmon {
+	compatible = "intel,soc64-hwmon";
+	voltage {
+		#address-cells = <1>;
+		#size-cells = <0>;
+		input@2 {
+			label = "0.8V VDD";
+			reg = <2>;
+		};
+
+		input@3 {
+			label = "0.8V VDD_SDM";
+			reg = <3>;
+		};
+	};
+
+	temperature {
+		#address-cells = <1>;
+		#size-cells = <0>;
+
+		input@1 {
+			label = "Main Die";
+			reg = <1>;
+		};
+	};
+};
