@@ -23,6 +23,15 @@
 		/* We expect the bootloader to fill in the reg */
 		reg = <0 0 0 0>;
 	};
+
+	soc {
+		sdr_edac {
+			compatible = "snps,ddrc-3.80a";
+			reg = <0xf87f8000 0x400>;
+			interrupts = <0 175 4>;
+			intel,sysmgr-syscon = <&sysmgr 0xb8>;
+		};
+	};
 };
 
 &clkmgr {
