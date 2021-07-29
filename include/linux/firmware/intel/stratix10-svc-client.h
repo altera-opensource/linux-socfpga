@@ -160,11 +160,17 @@ struct stratix10_svc_chan;
  * @COMMAND_POLL_SERVICE_STATUS: poll if the service request is complete,
  * return statis is SVC_STATUS_OK, SVC_STATUS_ERROR or SVC_STATUS_BUSY
  *
+ * @COMMAND_FIRMWARE_VERSION: query running firmware version, return status
+ * is SVC_STATUS_OK or SVC_STATUS_ERROR
+ *
  * @COMMAND_FCS_ATTESTATION_CERTIFICATE: get FPGA attestation certificate,
  * return status is SVC_STATUS_OK or SVC_STATUS_ERROR
  *
  * @COMMAND_FCS_ATTESTATION_CERTIFICATE_RELOAD: reload FPGA attestation
  * certificate, return status is SVC_STATUS_OK or SVC_STATUS_ERROR
+ *
+ * @COMMAND_FCS_GET_ROM_PATCH_SHA384: read the ROM patch SHA384 value,
+ * return status is SVC_STATUS_OK, or SVC_STATUS_ERROR
  */
 enum stratix10_svc_command_code {
 	/* for FPGA */
@@ -189,6 +195,7 @@ enum stratix10_svc_command_code {
 	COMMAND_FCS_DATA_DECRYPTION,
 	COMMAND_FCS_RANDOM_NUMBER_GEN,
 	COMMAND_FCS_COUNTER_SET_PREAUTHORIZED,
+	COMMAND_FCS_GET_ROM_PATCH_SHA384,
 	/* for Attestation */
 	COMMAND_FCS_PSGSIGMA_TEARDOWN = 30,
 	COMMAND_FCS_GET_CHIP_ID,
