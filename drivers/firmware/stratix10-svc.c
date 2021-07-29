@@ -359,6 +359,7 @@ static void svc_thread_recv_status_ok(struct stratix10_svc_data *p_data,
 	case COMMAND_FCS_RANDOM_NUMBER_GEN:
 	case COMMAND_FCS_GET_PROVISION_DATA:
 	case COMMAND_POLL_SERVICE_STATUS:
+	case COMMAND_FCS_GET_ROM_PATCH_SHA384:
 		cb_data->status = BIT(SVC_STATUS_OK);
 		cb_data->kaddr1 = &res.a1;
 		cb_data->kaddr2 = svc_pa_to_va(res.a2);
@@ -579,14 +580,9 @@ static int svc_normal_to_secure_thread(void *data)
 			a1 = (unsigned long)pdata->paddr;
 			a2 = (unsigned long)pdata->size;
 			break;
-		case COMMAND_RSU_DCMF_STATUS:
-			a0 = INTEL_SIP_SMC_RSU_DCMF_STATUS;
-			a1 = 0;
-			a2 = 0;
-			break;
-		case COMMAND_SMC_SVC_VERSION:
-			a0 = INTEL_SIP_SMC_SVC_VERSION;
-			a1 = 0;
+		case COMMAND_FCS_GET_ROM_PATCH_SHA384:
+			a0 = INTEL_SIP_SMC_FCS_GET_ROM_PATCH_SHA384;
+			a1 = (unsigned long)pdata->paddr;
 			a2 = 0;
 			break;
 		default:
@@ -659,6 +655,7 @@ static int svc_normal_to_secure_thread(void *data)
 			case COMMAND_FCS_COUNTER_SET_PREAUTHORIZED:
 			case COMMAND_FCS_ATTESTATION_CERTIFICATE:
 			case COMMAND_FCS_ATTESTATION_CERTIFICATE_RELOAD:
+			case COMMAND_FCS_GET_ROM_PATCH_SHA384:
 				cbdata->status = BIT(SVC_STATUS_INVALID_PARAM);
 				cbdata->kaddr1 = NULL;
 				cbdata->kaddr2 = NULL;
