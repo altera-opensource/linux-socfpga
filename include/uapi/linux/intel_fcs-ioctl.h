@@ -187,14 +187,6 @@ struct fcs_attestation_measuerments {
 };
 
 /**
- * struct fcs_rom_patch_sha384
- * @checksum: 12 words of checksum calculated from rom patch area
- */
-struct fcs_rom_patch_sha384 {
-	uint32_t checksum[12];
-};
-
-/**
  * struct intel_fcs_dev_ioct: common structure passed to Linux
  *	kernel driver for all commands.
  * @status: Used for the return code.
@@ -227,7 +219,6 @@ struct intel_fcs_dev_ioctl {
 		struct fcs_attestation_chipid	c_id;
 		struct fcs_attestation_subkey	subkey;
 		struct fcs_attestation_measuerments	measurement;
-		struct fcs_rom_patch_sha384 sha384;
 	} com_paras;
 };
 
@@ -253,8 +244,6 @@ struct intel_fcs_dev_ioctl {
  * @INTEL_FCS_DEV_DATA_DECRYPTION_CMD:
  *
  * @INTEL_FCS_DEV_RANDOM_NUMBER_GEN_CMD:
- *
- * @INTEL_FCS_DEV_GET_ROM_PATCH_SHA384_CMD:
  */
 enum intel_fcs_command_code {
 	INTEL_FCS_DEV_COMMAND_NONE = 0,
@@ -271,7 +260,6 @@ enum intel_fcs_command_code {
 	INTEL_FCS_DEV_CHIP_ID_CMD,
 	INTEL_FCS_DEV_ATTESTATION_SUBKEY_CMD,
 	INTEL_FCS_DEV_ATTESTATION_MEASUREMENT_CMD,
-	INTEL_FCS_DEV_GET_ROM_PATCH_SHA384_CMD
 };
 
 #define INTEL_FCS_DEV_VERSION_REQUEST \
@@ -321,9 +309,5 @@ enum intel_fcs_command_code {
 #define INTEL_FCS_DEV_ATTESTATION_MEASUREMENT \
 	_IOWR(INTEL_FCS_IOCTL, \
 	      INTEL_FCS_DEV_ATTESTATION_MEASUREMENT_CMD, struct intel_fcs_dev_ioctl)
-
-#define INTEL_FCS_DEV_GET_ROM_PATCH_SHA384 \
-	_IOWR(INTEL_FCS_IOCTL, \
-	      INTEL_FCS_DEV_GET_ROM_PATCH_SHA384_CMD, struct intel_fcs_dev_ioctl)
 #endif
 
