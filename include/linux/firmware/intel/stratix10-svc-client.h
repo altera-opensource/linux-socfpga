@@ -172,6 +172,12 @@ struct stratix10_svc_chan;
  *
  * @COMMAND_FCS_GET_ROM_PATCH_SHA384: read the ROM patch SHA384 value,
  * return status is SVC_STATUS_OK, or SVC_STATUS_ERROR
+ *
+ * @COMMAND_FCS_CRYPTO_OPEN_SESSION: open the crypto service session(s),
+ * return status is SVC_STATUS_OK or SVC_STATUS_ERROR
+ *
+ * @COMMAND_FCS_CRYPTO_CLOSE_SESSION: close the crypto service session(s),
+ * return status is SVC_STATUS_OK or SVC_STATUS_ERROR
  */
 enum stratix10_svc_command_code {
 	/* for FPGA */
@@ -207,8 +213,9 @@ enum stratix10_svc_command_code {
 	COMMAND_FCS_ATTESTATION_CERTIFICATE_RELOAD,
 	/* for general status poll */
 	COMMAND_POLL_SERVICE_STATUS = 40,
-	/* Non-mailbox SMC Call */
-	COMMAND_SMC_SVC_VERSION = 200,
+	/* for crypto service */
+	COMMAND_FCS_CRYPTO_OPEN_SESSION = 50,
+	COMMAND_FCS_CRYPTO_CLOSE_SESSION,
 };
 
 /**
