@@ -39,7 +39,7 @@ static const char * const emac_ptp_free_mux[] = {"main_pll_c3", "peri_pll_c3",
 static const char * const gpio_db_free_mux[] = {"main_pll_c3", "peri_pll_c3",
 					      "osc1", "cb-intosc-hs-div2-clk",
 					      "f2s-free-clk"};
-static const char * const psi_ref_free_mux[] = {"main_pll_c3", "peri_pll_c3",
+static const char * const psi_ref_free_mux[] = {"main_pll_c2", "peri_pll_c2",
 					      "osc1", "cb-intosc-hs-div2-clk",
 					      "f2s-free-clk"};
 static const char * const sdmmc_free_mux[] = {"main_pll_c3", "peri_pll_c3",
