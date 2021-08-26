@@ -58,6 +58,7 @@ static const char * const emac_mux[] = {"emaca_free_clk", "emacb_free_clk",
 					"boot_clk"};
 static const char * const noc_mux[] = {"noc_free_clk", "boot_clk"};
 static const char * const sdmmc_mux[] = {"sdmmc_free_clk", "boot_clk"};
+static const char * const s2f_user0_mux[] = {"s2f_user0_free_clk", "boot_clk"};
 static const char * const s2f_user1_mux[] = {"s2f_user1_free_clk", "boot_clk"};
 static const char * const psi_mux[] = {"psi_ref_free_clk", "boot_clk"};
 static const char * const gpio_db_mux[] = {"gpio_db_free_clk", "boot_clk"};
@@ -159,6 +160,8 @@ static const struct stratix10_gate_clock agilex_gate_clks[] = {
 	  4, 0x98, 0, 16, 0x88, 3, 0},
 	{ AGILEX_SDMMC_CLK, "sdmmc_clk", NULL, sdmmc_mux, ARRAY_SIZE(sdmmc_mux), 0, 0x7C,
 	  5, 0, 0, 0, 0x88, 4, 4},
+	{ AGILEX_S2F_USER0_CLK, "s2f_user1_clk", NULL, s2f_user0_mux, ARRAY_SIZE(s2f_user0_mux), 0, 0x24,
+	  6, 0, 0, 0, 0x30, 2, 0},
 	{ AGILEX_S2F_USER1_CLK, "s2f_user1_clk", NULL, s2f_user1_mux, ARRAY_SIZE(s2f_user1_mux), 0, 0x7C,
 	  6, 0, 0, 0, 0x88, 5, 0},
 	{ AGILEX_PSI_REF_CLK, "psi_ref_clk", NULL, psi_mux, ARRAY_SIZE(psi_mux), 0, 0x7C,
