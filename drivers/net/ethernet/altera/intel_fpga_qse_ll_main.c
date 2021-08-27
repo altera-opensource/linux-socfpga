@@ -1284,7 +1284,7 @@ static void intel_fpga_qse_validate(struct phylink_config *config,
 		   __ETHTOOL_LINK_MODE_MASK_NBITS);
 }
 
-static int intel_fpga_qse_mac_link_state(struct phylink_config *config,
+static void intel_fpga_qse_mac_pcs_get_state(struct phylink_config *config,
 					    struct phylink_link_state *state)
 {
 	struct intel_fpga_qse_private *priv =
@@ -1300,7 +1300,6 @@ static int intel_fpga_qse_mac_link_state(struct phylink_config *config,
 
 	state->link = 1;
 
-	return 0;
 }
 
 static void intel_fpga_qse_mac_an_restart(struct phylink_config *config)
@@ -1366,7 +1365,7 @@ static void intel_fpga_qse_mac_link_up(struct phylink_config *config,
 
 static const struct phylink_mac_ops intel_fpga_qse_phylink_ops = {
 	.validate = intel_fpga_qse_validate,
-	.mac_link_state = intel_fpga_qse_mac_link_state,
+	.mac_pcs_get_state = intel_fpga_qse_mac_pcs_get_state,
 	.mac_an_restart = intel_fpga_qse_mac_an_restart,
 	.mac_config = intel_fpga_qse_mac_config,
 	.mac_link_down = intel_fpga_qse_mac_link_down,
@@ -1606,10 +1605,9 @@ static int intel_fpga_qse_ll_probe(struct platform_device *pdev)
 	spin_lock_init(&priv->ptp_priv.tod_lock);
 
 	/* check if phy-mode is present */
-	priv->phy_iface = of_get_phy_mode(np);
-	if (priv->phy_iface < 0) {
+	ret = of_get_phy_mode(np, &priv->phy_iface);
+	if (ret) {
 		dev_err(&pdev->dev, "incorrect phy-mode\n");
-		ret = -EINVAL;
 		goto err_free_netdev;
 	}
 
