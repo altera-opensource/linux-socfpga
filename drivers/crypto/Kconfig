@@ -345,7 +345,7 @@ config CRYPTO_DEV_TALITOS2
 
 config CRYPTO_DEV_INTEL_FCS
 	tristate "Intel FPGA Crypto Service support"
-	depends on INTEL_STRATIX10_SERVICE
+	depends on INTEL_STRATIX10_SERVICE && HW_RANDOM
 	help
 	 Support crypto services on Intel SoCFPGA platforms. The crypto
 	 services include security certificate, image boot validation,
