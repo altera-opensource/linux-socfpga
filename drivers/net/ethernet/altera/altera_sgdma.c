@@ -99,6 +99,7 @@ int sgdma_initialize(struct altera_dma_private *priv)
 
 	return 0;
 }
+EXPORT_SYMBOL(sgdma_initialize);
 
 void sgdma_uninitialize(struct altera_dma_private *priv)
 {
@@ -110,6 +111,7 @@ void sgdma_uninitialize(struct altera_dma_private *priv)
 		dma_unmap_single(priv->device, priv->txdescphys,
 				 priv->txdescmem, DMA_TO_DEVICE);
 }
+EXPORT_SYMBOL(sgdma_uninitialize);
 
 /* This function resets the SGDMA controller and clears the
  * descriptor memory used for transmits and receives.
@@ -126,6 +128,7 @@ void sgdma_reset(struct altera_dma_private *priv)
 	csrwr32(SGDMA_CTRLREG_RESET, priv->rx_dma_csr, sgdma_csroffs(control));
 	csrwr32(0, priv->rx_dma_csr, sgdma_csroffs(control));
 }
+EXPORT_SYMBOL(sgdma_reset);
 
 /* For SGDMA, interrupts remain enabled after initially enabling,
  * so no need to provide implementations for abstract enable
@@ -135,30 +138,36 @@ void sgdma_reset(struct altera_dma_private *priv)
 void sgdma_enable_rxirq(struct altera_dma_private *priv)
 {
 }
+EXPORT_SYMBOL(sgdma_enable_rxirq);
 
 void sgdma_enable_txirq(struct altera_dma_private *priv)
 {
 }
+EXPORT_SYMBOL(sgdma_enable_txirq);
 
 void sgdma_disable_rxirq(struct altera_dma_private *priv)
 {
 }
+EXPORT_SYMBOL(sgdma_disable_rxirq);
 
 void sgdma_disable_txirq(struct altera_dma_private *priv)
 {
 }
+EXPORT_SYMBOL(sgdma_disable_txirq);
 
 void sgdma_clear_rxirq(struct altera_dma_private *priv)
 {
 	tse_set_bit(priv->rx_dma_csr, sgdma_csroffs(control),
 		    SGDMA_CTRLREG_CLRINT);
 }
+EXPORT_SYMBOL(sgdma_clear_rxirq);
 
 void sgdma_clear_txirq(struct altera_dma_private *priv)
 {
 	tse_set_bit(priv->tx_dma_csr, sgdma_csroffs(control),
 		    SGDMA_CTRLREG_CLRINT);
 }
+EXPORT_SYMBOL(sgdma_clear_txirq);
 
 /* transmits buffer through SGDMA.
  *   original behavior returned the number of transmitted packets (always 1) &
@@ -199,6 +208,7 @@ netdev_tx_t sgdma_tx_buffer(struct altera_dma_private *priv,
 
 	return NETDEV_TX_OK;
 }
+EXPORT_SYMBOL(sgdma_tx_buffer);
 
 
 /* tx_lock held to protect access to queued tx list
@@ -216,17 +226,20 @@ u32 sgdma_tx_completions(struct altera_dma_private *priv)
 
 	return ready;
 }
+EXPORT_SYMBOL(sgdma_tx_completions);
 
 void sgdma_start_rxdma(struct altera_dma_private *priv)
 {
 	sgdma_async_read(priv);
 }
+EXPORT_SYMBOL(sgdma_start_rxdma);
 
 void sgdma_add_rx_desc(struct altera_dma_private *priv,
 		       struct altera_dma_buffer *rxbuffer)
 {
 	queue_rx(priv, rxbuffer);
 }
+EXPORT_SYMBOL(sgdma_add_rx_desc);
 
 /* status is returned on upper 16 bits,
  * length is returned in lower 16 bits
@@ -293,7 +306,7 @@ u32 sgdma_rx_status(struct altera_dma_private *priv)
 
 	return rxstatus;
 }
-
+EXPORT_SYMBOL(sgdma_rx_status);
 
 /* Private functions */
 static void sgdma_setup_descrip(struct sgdma_descrip __iomem *desc,

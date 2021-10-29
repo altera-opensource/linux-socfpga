@@ -14,14 +14,17 @@ int msgdma_initialize(struct altera_dma_private *priv)
 {
 	return 0;
 }
+EXPORT_SYMBOL(msgdma_initialize);
 
 void msgdma_uninitialize(struct altera_dma_private *priv)
 {
 }
+EXPORT_SYMBOL(msgdma_uninitialize);
 
 void msgdma_start_rxdma(struct altera_dma_private *priv)
 {
 }
+EXPORT_SYMBOL(msgdma_start_rxdma);
 
 void msgdma_reset(struct altera_dma_private *priv)
 {
@@ -70,40 +73,47 @@ void msgdma_reset(struct altera_dma_private *priv)
 	/* clear all status bits */
 	csrwr32(MSGDMA_CSR_STAT_MASK, priv->tx_dma_csr, msgdma_csroffs(status));
 }
+EXPORT_SYMBOL(msgdma_reset);
 
 void msgdma_disable_rxirq(struct altera_dma_private *priv)
 {
 	tse_clear_bit(priv->rx_dma_csr, msgdma_csroffs(control),
 		      MSGDMA_CSR_CTL_GLOBAL_INTR);
 }
+EXPORT_SYMBOL(msgdma_disable_rxirq);
 
 void msgdma_enable_rxirq(struct altera_dma_private *priv)
 {
 	tse_set_bit(priv->rx_dma_csr, msgdma_csroffs(control),
 		    MSGDMA_CSR_CTL_GLOBAL_INTR);
 }
+EXPORT_SYMBOL(msgdma_enable_rxirq);
 
 void msgdma_disable_txirq(struct altera_dma_private *priv)
 {
 	tse_clear_bit(priv->tx_dma_csr, msgdma_csroffs(control),
 		      MSGDMA_CSR_CTL_GLOBAL_INTR);
 }
+EXPORT_SYMBOL(msgdma_disable_txirq);
 
 void msgdma_enable_txirq(struct altera_dma_private *priv)
 {
 	tse_set_bit(priv->tx_dma_csr, msgdma_csroffs(control),
 		    MSGDMA_CSR_CTL_GLOBAL_INTR);
 }
+EXPORT_SYMBOL(msgdma_enable_txirq);
 
 void msgdma_clear_rxirq(struct altera_dma_private *priv)
 {
 	csrwr32(MSGDMA_CSR_STAT_IRQ, priv->rx_dma_csr, msgdma_csroffs(status));
 }
+EXPORT_SYMBOL(msgdma_clear_rxirq);
 
 void msgdma_clear_txirq(struct altera_dma_private *priv)
 {
 	csrwr32(MSGDMA_CSR_STAT_IRQ, priv->tx_dma_csr, msgdma_csroffs(status));
 }
+EXPORT_SYMBOL(msgdma_clear_txirq);
 
 /* return 0 to indicate transmit is pending */
 netdev_tx_t msgdma_tx_buffer(struct altera_dma_private *priv,
@@ -123,6 +133,7 @@ netdev_tx_t msgdma_tx_buffer(struct altera_dma_private *priv,
 		msgdma_descroffs(control));
 	return NETDEV_TX_OK;
 }
+EXPORT_SYMBOL(msgdma_tx_buffer);
 
 u32 msgdma_tx_completions(struct altera_dma_private *priv)
 {
@@ -147,6 +158,7 @@ u32 msgdma_tx_completions(struct altera_dma_private *priv)
 	}
 	return ready;
 }
+EXPORT_SYMBOL(msgdma_tx_completions);
 
 /* Put buffer to the mSGDMA RX FIFO
  */
@@ -173,6 +185,7 @@ void msgdma_add_rx_desc(struct altera_dma_private *priv,
 	csrwr32(0x00010001, priv->rx_dma_desc, msgdma_descroffs(stride));
 	csrwr32(control, priv->rx_dma_desc, msgdma_descroffs(control));
 }
+EXPORT_SYMBOL(msgdma_add_rx_desc);
 
 /* status is returned on upper 16 bits,
  * length is returned in lower 16 bits
@@ -195,3 +208,4 @@ u32 msgdma_rx_status(struct altera_dma_private *priv)
 	}
 	return rxstatus;
 }
+EXPORT_SYMBOL(msgdma_rx_status);

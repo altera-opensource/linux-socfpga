@@ -13,6 +13,7 @@ void tse_set_bit(void __iomem *ioaddr, size_t offs, u32 bit_mask)
 	value |= bit_mask;
 	csrwr32(value, ioaddr, offs);
 }
+EXPORT_SYMBOL(tse_set_bit);
 
 void tse_clear_bit(void __iomem *ioaddr, size_t offs, u32 bit_mask)
 {
@@ -20,18 +21,21 @@ void tse_clear_bit(void __iomem *ioaddr, size_t offs, u32 bit_mask)
 	value &= ~bit_mask;
 	csrwr32(value, ioaddr, offs);
 }
+EXPORT_SYMBOL(tse_clear_bit);
 
 int tse_bit_is_set(void __iomem *ioaddr, size_t offs, u32 bit_mask)
 {
 	u32 value = csrrd32(ioaddr, offs);
 	return (value & bit_mask) ? 1 : 0;
 }
+EXPORT_SYMBOL(tse_bit_is_set);
 
 int tse_bit_is_clear(void __iomem *ioaddr, size_t offs, u32 bit_mask)
 {
 	u32 value = csrrd32(ioaddr, offs);
 	return (value & bit_mask) ? 0 : 1;
 }
+EXPORT_SYMBOL(tse_bit_is_clear);
 
 int request_and_map(struct platform_device *pdev, const char *name,
 		    struct resource **res, void __iomem **ptr)
@@ -61,3 +65,4 @@ int request_and_map(struct platform_device *pdev, const char *name,
 
 	return 0;
 }
+EXPORT_SYMBOL(request_and_map);
