@@ -18,7 +18,7 @@ config ALTERA_TSE
 	  This driver supports the Altera Triple-Speed (TSE) Ethernet MAC.
 
 	  To compile this driver as a module, choose M here. The module
-	  will be called alteratse.
+	  will be called altera_tse.
 
 config INTEL_FPGA_QSE_LL
 	tristate "Intel FPGA Quad-Speed Low Latency Ethernet MAC support"
