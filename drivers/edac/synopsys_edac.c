@@ -485,7 +485,7 @@ out:
 	clearval = readl(base + ECC_CLR_OFST) |
 		   ECC_CTRL_CLR_CE_ERR | ECC_CTRL_CLR_CE_ERRCNT |
 		   ECC_CTRL_CLR_UE_ERR | ECC_CTRL_CLR_UE_ERRCNT;
-	writel(clearval, base + ECC_CLR_OFST);
+	writel(0x00, base + ECC_CLR_OFST);
 
 	spin_unlock_irqrestore(&priv->reglock, flags);
 
