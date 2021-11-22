@@ -413,7 +413,8 @@ static void svc_thread_recv_status_ok(struct stratix10_svc_data *p_data,
 	}
 
 	pr_debug("%s: call receive_cb\n", __func__);
-	p_data->chan->scl->receive_cb(p_data->chan->scl, cb_data);
+	if (p_data->chan->scl->receive_cb)
+		p_data->chan->scl->receive_cb(p_data->chan->scl, cb_data);
 }
 
 /**
@@ -639,7 +640,7 @@ static int svc_normal_to_secure_thread(void *data)
 			a1 = pdata->arg[0];
 			a2 = pdata->arg[1];
 			a3 = (unsigned long)pdata->paddr_output;
-                        a4 = (unsigned long)pdata->size_output;
+			a4 = (unsigned long)pdata->size_output;
 			break;
 		case COMMAND_FCS_CRYPTO_AES_CRYPT_INIT:
 			a0 = INTEL_SIP_SMC_FCS_AES_CRYPTO_INIT;
@@ -818,6 +819,11 @@ static int svc_normal_to_secure_thread(void *data)
 			a2 = (unsigned long)pdata->size;
 			a3 = pdata->arg[0];
 			break;
+		case COMMAND_SMC_SVC_VERSION:
+			a0 = INTEL_SIP_SMC_SVC_VERSION;
+			a1 = 0;
+			a2 = 0;
+			break;
 		case COMMAND_FCS_GET_ROM_PATCH_SHA384:
 			a0 = INTEL_SIP_SMC_FCS_GET_ROM_PATCH_SHA384;
 			a1 = (unsigned long)pdata->paddr;
@@ -969,7 +975,8 @@ static int svc_normal_to_secure_thread(void *data)
 			cbdata->kaddr1 = NULL;
 			cbdata->kaddr2 = NULL;
 			cbdata->kaddr3 = NULL;
-			pdata->chan->scl->receive_cb(pdata->chan->scl, cbdata);
+			if (pdata->chan->scl->receive_cb)
+				pdata->chan->scl->receive_cb(pdata->chan->scl, cbdata);
 			break;
 
 		}
