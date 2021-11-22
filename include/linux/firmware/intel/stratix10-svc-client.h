@@ -233,12 +233,14 @@ struct stratix10_svc_command_config_type {
  * @kaddr1: address of 1st completed data block
  * @kaddr2: address of 2nd completed data block
  * @kaddr3: address of 3rd completed data block
+ * @kaddr4: address of 4th completed data block
  */
 struct stratix10_svc_cb_data {
 	u32 status;
 	void *kaddr1;
 	void *kaddr2;
 	void *kaddr3;
+	void *kaddr4;
 };
 
 /**
