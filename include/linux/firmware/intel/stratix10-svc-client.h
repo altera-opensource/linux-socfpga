@@ -67,17 +67,17 @@
 #define COMMAND_RECONFIG_FLAG_PARTIAL	0
 #define COMMAND_AUTHENTICATE_BITSTREAM	1
 
-/**
+/*
  * Timeout settings for service clients:
  * timeout value used in Stratix10 FPGA manager driver.
  * timeout value used in RSU driver
  */
 #define SVC_RECONFIG_REQUEST_TIMEOUT_MS         5000
 #define SVC_RECONFIG_BUFFER_TIMEOUT_MS          5000
-#define SVC_RSU_REQUEST_TIMEOUT_MS              300
+#define SVC_RSU_REQUEST_TIMEOUT_MS              2000
 #define SVC_FCS_REQUEST_TIMEOUT_MS		2000
 #define SVC_COMPLETED_TIMEOUT_MS		30000
-#define SVC_HWMON_REQUEST_TIMEOUT_MS		300
+#define SVC_HWMON_REQUEST_TIMEOUT_MS		2000
 
 struct stratix10_svc_chan;
 
