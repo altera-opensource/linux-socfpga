@@ -301,6 +301,7 @@ int intel_fpga_tod_register(struct intel_fpga_tod_private *priv,
 
 	return ret;
 }
+EXPORT_SYMBOL(intel_fpga_tod_register);
 
 /* Remove/unregister the ptp clock driver from the kernel */
 void intel_fpga_tod_unregister(struct intel_fpga_tod_private *priv)
@@ -313,6 +314,7 @@ void intel_fpga_tod_unregister(struct intel_fpga_tod_private *priv)
 	if (priv->tod_clk)
 		clk_disable_unprepare(priv->tod_clk);
 }
+EXPORT_SYMBOL(intel_fpga_tod_unregister);
 
 /* Common PTP probe function */
 int intel_fpga_tod_probe(struct platform_device *pdev,
@@ -344,5 +346,6 @@ int intel_fpga_tod_probe(struct platform_device *pdev,
 err:
 	return ret;
 }
+EXPORT_SYMBOL(intel_fpga_tod_probe);
 
 MODULE_LICENSE("GPL");

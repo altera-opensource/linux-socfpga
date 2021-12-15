@@ -111,6 +111,7 @@ err_tx:
 err_rx:
 	return -ENOMEM;
 }
+EXPORT_SYMBOL(msgdma_pref_initialize);
 
 void msgdma_pref_uninitialize(struct altera_dma_private *priv)
 {
@@ -126,42 +127,49 @@ void msgdma_pref_uninitialize(struct altera_dma_private *priv)
 				  * priv->tx_ring_size * 2,
 				  priv->pref_txdesc, priv->pref_txdescphys);
 }
+EXPORT_SYMBOL(msgdma_pref_uninitialize);
 
 void msgdma_pref_enable_txirq(struct altera_dma_private *priv)
 {
 	tse_set_bit(priv->tx_pref_csr, msgdma_pref_csroffs(control),
 		    MSGDMA_PREF_CTL_GLOBAL_INTR);
 }
+EXPORT_SYMBOL(msgdma_pref_enable_txirq);
 
 void msgdma_pref_disable_txirq(struct altera_dma_private *priv)
 {
 	tse_clear_bit(priv->tx_pref_csr, msgdma_pref_csroffs(control),
 		      MSGDMA_PREF_CTL_GLOBAL_INTR);
 }
+EXPORT_SYMBOL(msgdma_pref_disable_txirq);
 
 void msgdma_pref_clear_txirq(struct altera_dma_private *priv)
 {
 	csrwr32(MSGDMA_PREF_STAT_IRQ, priv->tx_pref_csr,
 		msgdma_pref_csroffs(status));
 }
+EXPORT_SYMBOL(msgdma_pref_clear_txirq);
 
 void msgdma_pref_enable_rxirq(struct altera_dma_private *priv)
 {
 	tse_set_bit(priv->rx_pref_csr, msgdma_pref_csroffs(control),
 		    MSGDMA_PREF_CTL_GLOBAL_INTR);
 }
+EXPORT_SYMBOL(msgdma_pref_enable_rxirq);
 
 void msgdma_pref_disable_rxirq(struct altera_dma_private *priv)
 {
 	tse_clear_bit(priv->rx_pref_csr, msgdma_pref_csroffs(control),
 		      MSGDMA_PREF_CTL_GLOBAL_INTR);
 }
+EXPORT_SYMBOL(msgdma_pref_disable_rxirq);
 
 void msgdma_pref_clear_rxirq(struct altera_dma_private *priv)
 {
 	csrwr32(MSGDMA_PREF_STAT_IRQ, priv->rx_pref_csr,
 		msgdma_pref_csroffs(status));
 }
+EXPORT_SYMBOL(msgdma_pref_clear_rxirq);
 
 static u64 timestamp_to_ns(struct msgdma_pref_extended_desc *desc)
 {
@@ -220,6 +228,7 @@ netdev_tx_t msgdma_pref_tx_buffer(struct altera_dma_private *priv,
 
 	return NETDEV_TX_OK;
 }
+EXPORT_SYMBOL(msgdma_pref_tx_buffer);
 
 u32 msgdma_pref_tx_completions(struct altera_dma_private *priv)
 {
@@ -274,6 +283,7 @@ u32 msgdma_pref_tx_completions(struct altera_dma_private *priv)
 
 	return ready;
 }
+EXPORT_SYMBOL(msgdma_pref_tx_completions);
 
 void msgdma_pref_reset(struct altera_dma_private *priv)
 {
@@ -330,6 +340,7 @@ void msgdma_pref_reset(struct altera_dma_private *priv)
 	/* Reset mSGDMA dispatchers*/
 	msgdma_reset(priv);
 }
+EXPORT_SYMBOL(msgdma_pref_reset);
 
 /* Setup the RX and TX prefetchers to poll the descriptor chain */
 void msgdma_pref_start_rxdma(struct altera_dma_private *priv)
@@ -343,6 +354,7 @@ void msgdma_pref_start_rxdma(struct altera_dma_private *priv)
 	tse_set_bit(priv->rx_pref_csr, msgdma_pref_csroffs(control),
 		    MSGDMA_PREF_CTL_DESC_POLL_EN | MSGDMA_PREF_CTL_RUN);
 }
+EXPORT_SYMBOL(msgdma_pref_start_rxdma);
 
 void msgdma_pref_start_txdma(struct altera_dma_private *priv)
 {
@@ -355,6 +367,7 @@ void msgdma_pref_start_txdma(struct altera_dma_private *priv)
 	tse_set_bit(priv->tx_pref_csr, msgdma_pref_csroffs(control),
 		    MSGDMA_PREF_CTL_DESC_POLL_EN | MSGDMA_PREF_CTL_RUN);
 }
+EXPORT_SYMBOL(msgdma_pref_start_txdma);
 
 /* Add MSGDMA Prefetcher Descriptor to descriptor list
  *   -> This should never be called when a descriptor isn't available
@@ -391,6 +404,7 @@ void msgdma_pref_add_rx_desc(struct altera_dma_private *priv,
 			    priv->pref_rxdesc[desc_entry].desc_control);
 	}
 }
+EXPORT_SYMBOL(msgdma_pref_add_rx_desc);
 
 u32 msgdma_pref_rx_status(struct altera_dma_private *priv)
 {
@@ -435,3 +449,4 @@ u32 msgdma_pref_rx_status(struct altera_dma_private *priv)
 	}
 	return rxstatus;
 }
+EXPORT_SYMBOL(msgdma_pref_rx_status);
