@@ -1,0 +1,2445 @@
+/* SPDX-License-Identifier: GPL-2.0 */
+/* Intel FPGA E-tile Ethernet MAC driver
+ * Copyright (C) 2020-2022 Intel Corporation. All rights reserved.
+ *
+ * Contributors:
+ *   Roman Bulgakov
+ *   Yu Ying Choo
+ *   Joyce Ooi
+ *   Arzu Ozdogan-tackin
+ *   Alexis Rodriguez
+ *
+ * Original driver contributed by GlobalLogic.
+ */
+
+#ifndef __INTEL_FPGA_ETILE_ETH_H__
+#define __INTEL_FPGA_ETILE_ETH_H__
+
+#define INTEL_FPGA_ETILE_ETH_RESOURCE_NAME "intel_fpga_etile"
+
+#include <linux/bitops.h>
+#include <linux/if_vlan.h>
+#include <linux/list.h>
+#include <linux/netdevice.h>
+#include <linux/phy.h>
+#include <linux/ptp_clock_kernel.h>
+#include <linux/timer.h>
+#include "intel_fpga_tod.h"
+
+#define INTEL_FPGA_ETILE_SW_RESET_WATCHDOG_CNTR		1000000
+#define INTEL_FPGA_ETILE_UI_VALUE_10G			0x0018D302
+#define INTEL_FPGA_ETILE_UI_VALUE_25G			0x0009EE01
+#define INTEL_FPGA_TX_PMA_DELAY_25G			105
+#define INTEL_FPGA_RX_PMA_DELAY_25G			89
+#define INTEL_FPGA_PMA_OFFSET_207_TIMEOUT		300	// in miliseconds
+
+/* Flow Control defines */
+#define FLOW_OFF	0
+#define FLOW_RX		1
+#define FLOW_TX		2
+#define FLOW_ON		(FLOW_TX | FLOW_RX)
+
+/* Ethernet Reconfiguration Interface
+ * Auto Negotiation and Link Training
+ *Bit Definitions
+ */
+/* 0xB0: ANLT Sequencer Config */
+#define ETH_ANLT_SEQ_CONF_RESET_SEQ				BIT(0)
+#define ETH_ANLT_SEQ_CONF_DISABLE_AN_TIMER			BIT(1)
+#define ETH_ANLT_SEQ_CONF_DISABLE_LF_TIMER			BIT(2)
+#define ETH_ANLT_SEQ_CONF_SEQ_FORCE_MODE_NONE			(0b000 << 4)
+#define ETH_ANLT_SEQ_CONF_SEQ_FORCE_MODE_25G_R1			(0b001 << 4)
+#define ETH_ANLT_SEQ_CONF_SEQ_FORCE_MODE_100G_R4		(0b011 << 4)
+#define ETH_ANLT_SEQ_CONF_SEQ_FORCE_MODE_10G_R1			(0b101 << 4)
+#define ETH_ANLT_SEQ_CONF_SEQ_FORCE_MODE_100G_P2		(0x7 << 4)
+#define ETH_ANLT_SEQ_CONF_SEQ_FORCE_MODE_RS_FEC_ON		BIT(7)
+
+#define ETH_ANLT_SEQ_CONF_LINK_FAILURE_RESP			BIT(12)
+#define ETH_ANLT_SEQ_CONF_LINK_FAIL_IF_HIBER			BIT(13)
+#define ETH_ANLT_SEQ_CONF_SKIP_LINK_ON_TO			BIT(14)
+#define ETH_ANLT_SEQ_CONF_ILPBK_LN_0				BIT(16)
+#define ETH_ANLT_SEQ_CONF_ILPBK_LN_1				BIT(17)
+#define ETH_ANLT_SEQ_CONF_ILPBK_LN_2				BIT(18)
+#define ETH_ANLT_SEQ_CONF_ILPBK_LN_3				BIT(19)
+#define ETH_ANLT_SEQ_CONF_RS_FEC_NEG_EN				BIT(20)
+#define ETH_ANLT_SEQ_CONF_RS_FEC_REQ				BIT(21)
+#define ETH_ANLT_SEQ_CONF_TX_POL_INV_LN_0			BIT(22)
+#define ETH_ANLT_SEQ_CONF_TX_POL_INV_LN_1			BIT(23)
+#define ETH_ANLT_SEQ_CONF_TX_POL_INV_LN_2			BIT(24)
+#define ETH_ANLT_SEQ_CONF_TX_POL_INV_LN_3			BIT(25)
+#define ETH_ANLT_SEQ_CONF_RX_POL_INV_LN_0			BIT(26)
+#define ETH_ANLT_SEQ_CONF_RX_POL_INV_LN_1			BIT(27)
+#define ETH_ANLT_SEQ_CONF_RX_POL_INV_LN_2			BIT(28)
+#define ETH_ANLT_SEQ_CONF_RX_POL_INV_LN_3			BIT(29)
+#define ETH_ANLT_SEQ_CONF_KR_PAUSE				BIT(31)
+
+/* 0xB1: ANLT Sequencer Status */
+#define ETH_ANLT_SEQ_STAT_LINK_READY				BIT(0)
+#define ETH_ANLT_SEQ_STAT_AUTO_NEG_TIMEOUT			BIT(1)
+#define ETH_ANLT_SEQ_STAT_LINK_TR_TIMEOUT			BIT(2)
+#define ETH_ANLT_SEQ_STAT_RECONF_MODE_AN			BIT(8)
+#define ETH_ANLT_SEQ_STAT_RECONF_MODE_LT			BIT(9)
+#define ETH_ANLT_SEQ_STAT_RECONF_MODE_10G_DATA			BIT(10)
+#define ETH_ANLT_SEQ_STAT_RECONF_MODE_25G_DATA			BIT(11)
+#define ETH_ANLT_SEQ_STAT_RECONF_MODE_100G_R4_DATA		BIT(13)
+#define ETH_ANLT_SEQ_STAT_RECONF_MODE_100G_P2			BIT(15)
+#define ETH_ANLT_SEQ_STAT_RS_FEC_SUPPORT			BIT(18)
+#define ETH_ANLT_SEQ_STAT_KR_PAUSED				BIT(31)
+
+/* 0xC0: Auto Negotiation Config Register 1 */
+#define ETH_AUTO_NEG_CONF_1_EN					BIT(0)
+#define ETH_AUTO_NEG_CONF_1_EN_AN_BASE_PAGE			BIT(1)
+#define ETH_AUTO_NEG_CONF_1_EN_AN_NEXT_PAGE			BIT(2)
+#define ETH_AUTO_NEG_CONF_1_FORCE_LOCAL_DEV_REM_FAULT		BIT(3)
+#define ETH_AUTO_NEG_CONF_1_OVERRIDE_AN_PARAMS			BIT(5)
+#define ETH_AUTO_NEG_CONF_1_OVERRIDE_AN_MASTER_CH		BIT(6)
+#define ETH_AUTO_NEG_CONF_1_IGNORE_NONCE_FIELD			BIT(7)
+#define ETH_AUTO_NEG_CONF_1_EN_CONSORT_NEXT_PAGE_SENT		BIT(8)
+#define ETH_AUTO_NEG_CONF_1_EN_CONSORT_NEXT_PAGE_RECV		BIT(9)
+#define ETH_AUTO_NEG_CONF_1_EN_CONSORT_NEXT_PAGE_OVERRIDE	BIT(10)
+#define ETH_AUTO_NEG_CONF_1_IGNORE_CONSORT_NEXT_PAGE_CODE	BIT(11)
+#define ETH_AUTO_NEG_CONF_1_CONSORT_OUI				(0xFFFF << 16)
+
+/* 0xC1: Auto Negotiation Config Register 2 */
+#define ETH_AUTO_NEG_CONF_2_RESET_AN				BIT(0)
+#define ETH_AUTO_NEG_CONF_2_AN_NEXT_PAGE			BIT(8)
+#define ETH_AUTO_NEG_CONF_2_CONST_OUI_UPPER			(0xFF << 16)
+
+/* 0xC2: Auto Negotiation Status Register */
+#define ETH_AUTO_NEG_STATUS_AN_PAGE_RECEIVED			BIT(1)
+#define ETH_AUTO_NEG_STATUS_AN_COMPLETE				BIT(2)
+#define ETH_AUTO_NEG_STATUS_AN_ADV_REM_FAULT			BIT(3)
+#define ETH_AUTO_NEG_STATUS_PHY_AN_ABILITY			BIT(5)
+#define ETH_AUTO_NEG_STATUS_AN_STATUS				BIT(7)
+#define ETH_AUTO_NEG_STATUS_AN_LP_ABILITY			BIT(7)
+#define ETH_AUTO_NEG_STATUS_CONSORT_NEXT_PAGE_RECV		BIT(10)
+#define ETH_AUTO_NEG_STATUS_AN_FAILURE				BIT(11)
+#define ETH_AUTO_NEG_STATUS_IEEE_1000BASE_KX			BIT(12)
+#define ETH_AUTO_NEG_STATUS_IEEE_10GBASE_KX4			BIT(13)
+#define ETH_AUTO_NEG_STATUS_IEEE_10GBASE_KR			BIT(14)
+#define ETH_AUTO_NEG_STATUS_IEEE_40GBASE_KR4			BIT(15)
+#define ETH_AUTO_NEG_STATUS_IEEE_40GBASE_CR4			BIT(16)
+#define ETH_AUTO_NEG_STATUS_IEEE_100GBASE_CR10			BIT(17)
+#define ETH_AUTO_NEG_STATUS_IEEE_100GBASE_KP4			BIT(18)
+#define ETH_AUTO_NEG_STATUS_IEEE_100GBASE_KR4			BIT(19)
+#define ETH_AUTO_NEG_STATUS_IEEE_100GBASE_CR4			BIT(20)
+#define ETH_AUTO_NEG_STATUS_IEEE_25GBASE_KRS_CRS		BIT(21)
+#define ETH_AUTO_NEG_STATUS_IEEE_25GBASE_KR_CR			BIT(22)
+#define ETH_AUTO_NEG_STATUS_IEEE_25GBASE_KR2_CR2		BIT(23)
+#define ETH_AUTO_NEG_STATUS_CONST_25GBASE_KR1			BIT(24)
+#define ETH_AUTO_NEG_STATUS_CONST_25GBASE_CR1			BIT(25)
+#define ETH_AUTO_NEG_STATUS_CONST_50GBASE_KR2			BIT(26)
+#define ETH_AUTO_NEG_STATUS_CONST_50GBASE_CR2			BIT(27)
+#define ETH_AUTO_NEG_STATUS_RS_FEC_NEGOTIATED			BIT(30)
+
+/* 0xC3: Auto Negotiation Config Register 3 */
+#define ETH_AUTO_NEG_CONF_3_USER_BASE_PAGE_LOW_SELECTOR			0x1F
+#define ETH_AUTO_NEG_CONF_3_USER_BASE_PAGE_LOW_ECHOED_NONE		(0x1F << 5)
+#define ETH_AUTO_NEG_CONF_3_USER_BASE_PAGE_LOW_REMOTE_FAULT		BIT(13)
+#define ETH_AUTO_NEG_CONF_3_USER_BASE_PAGE_LOW_ACK			BIT(14)
+#define ETH_AUTO_NEG_CONF_3_USER_BASE_PAGE_LOW_NEXT_PG			BIT(15)
+#define ETH_AUTO_NEG_CONF_3_OVERRIDE_AN_TECH_10GBASE_KX4		BIT(17)
+#define ETH_AUTO_NEG_CONF_3_OVERRIDE_AN_TECH_10GBASE_KR			BIT(18)
+#define ETH_AUTO_NEG_CONF_3_OVERRIDE_AN_TECH_100GBASE_KP4		BIT(22)
+#define ETH_AUTO_NEG_CONF_3_OVERRIDE_AN_TECH_100GBASE_KR4		BIT(23)
+#define ETH_AUTO_NEG_CONF_3_OVERRIDE_AN_FEC_10GBASE_RSFEC_CAP		BIT(24)
+#define ETH_AUTO_NEG_CONF_3_OVERRIDE_AN_FEC_10GBASE_RSFEC_REQ		BIT(25)
+#define ETH_AUTO_NEG_CONF_3_OVERRIDE_AN_FEC_25G_IEEE_RSFEC_REQ		BIT(26)
+#define ETH_AUTO_NEG_CONF_3_OVERRIDE_AN_FEC_25G_IEEE_BASE_RSFEC_REQ	BIT(27)
+#define ETH_AUTO_NEG_CONF_3_OVERRIDE_AN_PAUSE_AB			BIT(28)
+#define ETH_AUTO_NEG_CONF_3_OVERRIDE_AN_AYSSYM_DIR			BIT(29)
+
+/* 0xC4: Auto Negotiation Config Register 4 */
+#define ETH_AUTO_NEG_CONF_4_TX_NONCE				0x1F
+#define ETH_AUTO_NEG_CONF_4_TECH_AB				0x3FFFFFE0
+#define ETH_AUTO_NEG_CONF_4_FEC					(0x3 << 30)
+
+/* 0xC5: Auto Negotiation Config Register 5 */
+#define ETH_AUTO_NEG_CONF_5_MSG_CODE				0x7FF
+#define ETH_AUTO_NEG_CONF_5_TOGGLE				BIT(11)
+#define ETH_AUTO_NEG_CONF_5_ACK2				BIT(12)
+#define ETH_AUTO_NEG_CONF_5_MP					BIT(13)
+#define ETH_AUTO_NEG_CONF_5_ACK					BIT(14)
+#define ETH_AUTO_NEG_CONF_5_NEXT_PAGE				BIT(15)
+#define ETH_AUTO_NEG_CONF_5_100GBASE_CR4			BIT(16)
+#define ETH_AUTO_NEG_CONF_5_25GBASE_KRS_CRS			BIT(17)
+#define ETH_AUTO_NEG_CONF_5_25GBASE_KR_CR			BIT(18)
+#define ETH_AUTO_NEG_CONF_5_2_5GBASE_KX				BIT(19)
+#define ETH_AUTO_NEG_CONF_5_5GBASE_KR				BIT(20)
+#define ETH_AUTO_NEG_CONF_5_50GBASE_KR_CR			BIT(21)
+#define ETH_AUTO_NEG_CONF_5_100GBASE_KR2_CR2			BIT(22)
+#define ETH_AUTO_NEG_CONF_5_200GBASE_KR4_CR4			BIT(23)
+
+/* 0xC6: Auto Negotiation Config Register 6 */
+#define ETH_AUTO_NEG_CONF_6_USER_NEXT_PAGE_HIGH			0xFFFFFFFF
+
+/* 0xC7: Auto Negotiation Status Register 1 */
+#define ETH_AUTO_NEG_STAT_1_LP_BASE_PG_LO_SEL			0x1F
+#define ETH_AUTO_NEG_STAT_1_LP_BASE_PG_LO_ECHO			(0x1F << 5)
+#define ETH_AUTO_NEG_STAT_1_LP_BASE_PG_LO_PAUSE			(0x7 << 10)
+#define ETH_AUTO_NEG_STAT_1_LP_BASE_PG_LO_RF			BIT(13)
+#define ETH_AUTO_NEG_STAT_1_LP_BASE_PG_LO_ACK			BIT(14)
+#define ETH_AUTO_NEG_STAT_1_LP_BASE_PG_LO_NP			BIT(15)
+
+/* 0xC8: Auto Negotiation Status Register 2 */
+
+#define ETH_AUTO_NEG_STAT_2_LP_BASE_PG_HI_TX_NONCE		0x1F
+#define ETH_AUTO_NEG_STAT_2_LP_BASE_PG_HI_TECH_AB		0x3FFFFFE0
+#define ETH_AUTO_NEG_STAT_2_LP_BASE_PG_HI_FEC			(0x3 << 30)
+
+/* 0xC9: Auto Negotiation Status Register 3 */
+
+#define ETH_AUTO_NEG_STAT_3_LP_NEXT_PG_LO_MSG			0x7FF
+#define ETH_AUTO_NEG_STAT_3_LP_NEXT_PG_LO_TOGGLE		BIT(11)
+#define ETH_AUTO_NEG_STAT_3_LP_NEXT_PG_LO_ACK2			BIT(12)
+#define ETH_AUTO_NEG_STAT_3_LP_NEXT_PG_LO_MP			BIT(13)
+#define ETH_AUTO_NEG_STAT_3_LP_NEXT_PG_LO_ACK			BIT(14)
+#define ETH_AUTO_NEG_STAT_3_LP_NEXT_PG_LO_NEXT_PAGE		BIT(15)
+
+/* 0xCA: Auto Negotiation Status Register 4 */
+
+#define ETH_AUTO_NEG_STAT_4_LP_NEXT_PG_HI			0xFFFFFFFF
+
+/* 0xCB: Auto Negotiation Status Register 5 */
+#define ETH_AUTO_NEG_STAT_5_1000BASE_KX				BIT(0)
+#define ETH_AUTO_NEG_STAT_5_10GBASE_KX4				BIT(1)
+#define ETH_AUTO_NEG_STAT_5_10GBASE_KR				BIT(2)
+#define ETH_AUTO_NEG_STAT_5_40GBASE_KR4				BIT(3)
+#define ETH_AUTO_NEG_STAT_5_40GBASE_CR4				BIT(4)
+#define ETH_AUTO_NEG_STAT_5_100GBASE_CR10			BIT(5)
+#define ETH_AUTO_NEG_STAT_5_100GBASE_KP4			BIT(6)
+#define ETH_AUTO_NEG_STAT_5_100GBASE_KR4			BIT(7)
+#define ETH_AUTO_NEG_STAT_5_100GBASE_CR4			BIT(8)
+#define ETH_AUTO_NEG_STAT_5_25GBASE_KRS_CRS			BIT(9)
+#define ETH_AUTO_NEG_STAT_5_25GBASE_KR_CR			BIT(10)
+#define ETH_AUTO_NEG_STAT_5_2_5GBASE_KX				BIT(11)
+#define ETH_AUTO_NEG_STAT_5_5GBASE_KR				BIT(12)
+#define ETH_AUTO_NEG_STAT_5_50GBASE_KR_CR			BIT(13)
+#define ETH_AUTO_NEG_STAT_5_100GBASE_KR2_CR2			BIT(14)
+#define ETH_AUTO_NEG_STAT_5_200GBASE_KR4_CR4			BIT(15)
+#define ETH_AUTO_NEG_STAT_5_25G_RSFEC_REQ			BIT(23)
+#define ETH_AUTO_NEG_STAT_5_25GBASE_R_FEC_REQ			BIT(24)
+#define ETH_AUTO_NEG_STAT_5_FEC_AB				BIT(25)
+#define ETH_AUTO_NEG_STAT_5_FEC_REQ				BIT(26)
+#define ETH_AUTO_NEG_STAT_5_REMOTE_FAULT			BIT(27)
+#define ETH_AUTO_NEG_STAT_5_PAUSE				BIT(28)
+#define ETH_AUTO_NEG_STAT_5_ASM_DIR				BIT(29)
+
+/* 0xCC: AN Channel Override */
+#define ETH_OR_AN_CH		0x3
+
+/* 0xCD: Consortium Next Page Override*/
+#define ETH_OR_CONSORT_NEXT_PG_TECH_25GBASE_KR1_AB		BIT(13)
+#define ETH_OR_CONSORT_NEXT_PG_TECH_25GBASE_CR1_AB		BIT(14)
+#define ETH_OR_CONSORT_NEXT_PG_TECH_50GBASE_KR2_AB		BIT(17)
+#define ETH_OR_CONSORT_NEXT_PG_TECH_50GBASE_CR2_AB		BIT(18)
+#define ETH_OR_CONSORT_NEXT_PG_FEC_CTRL_F1_CL91_RSFEC_AB	BIT(24)
+#define ETH_OR_CONSORT_NEXT_PG_FEC_CTRL_F2_CL74_RSFEC_AB	BIT(25)
+#define ETH_OR_CONSORT_NEXT_PG_FEC_CTRL_F3_CL91_RSFEC_REQ	BIT(26)
+#define ETH_OR_CONSORT_NEXT_PG_FEC_CTRL_F4_CL74_RSFEC_REQ	BIT(27)
+
+/* 0xCE: Consortium Next Page Link Partner Status */
+#define ETH_LP_CONSORT_NEXT_PG_TECH_25GBASE_KR1_AB		BIT(13)
+#define ETH_LP_CONSORT_NEXT_PG_TECH_25GBASE_CR1_AB		BIT(14)
+#define ETH_LP_CONSORT_NEXT_PG_TECH_50GBASE_KR2_AB		BIT(17)
+#define ETH_LP_CONSORT_NEXT_PG_TECH_50GBASE_CR2_AB		BIT(18)
+#define ETH_LP_CONSORT_NEXT_PG_FEC_F1_CL91_RSFEC_AB		BIT(24)
+#define ETH_LP_CONSORT_NEXT_PG_FEC_F2_CL74_RSFEC_AB		BIT(25)
+#define ETH_LP_CONSORT_NEXT_PG_FEC_F3_CL91_RSFEC_REQ		BIT(26)
+#define ETH_LP_CONSORT_NEXT_PG_FEC_F4_CL74_RSFEC_REQ		BIT(27)
+
+/* 0xD0: Link training Config 1 */
+#define ETH_LNK_CONF_LNK_TRN_EN					BIT(0)
+#define ETH_LNK_CONF_MAX_WAIT_TMR_DIS				BIT(1)
+#define ETH_LNK_CONF_HIGH_EFFORT				BIT(2)
+#define ETH_LNK_CONF_SERDES_EN					BIT(3)
+#define ETH_LNK_CONF_LT_MAX_WAIT_TIME				(0xFFF << 4)
+#define ETH_LNK_CONF_RX_ADAPT_DIS				BIT(16)
+#define ETH_LNK_CONF_PER_RX_ADAPT_DIS				BIT(17)
+#define ETH_LNK_CONF_PRE_LT_DIS					BIT(18)
+#define ETH_LNK_CONF_POST_LT_DIS				BIT(19)
+#define ETH_LNK_CONF_LF_OR					(0xF << 20)
+#define ETH_LNK_CONF_HF_OR					(0xF << 24)
+#define ETH_LNK_CONF_BW_OR					(0xF << 28)
+
+/* 0xD2: Link training Status 1 */
+#define ETH_LNK_TR_STAT_LN0					BIT(0)
+#define ETH_LNK_TR_STAT_FRM_LN0					BIT(1)
+#define ETH_LNK_TR_STAT_STARTUP_LN0				BIT(2)
+#define ETH_LNK_TR_STAT_FAIL_LN0				BIT(3)
+#define ETH_LNK_TR_STAT_LN1					BIT(8)
+#define ETH_LNK_TR_STAT_FRM_LN1					BIT(9)
+#define ETH_LNK_TR_STAT_STARTUP_LN1				BIT(10)
+#define ETH_LNK_TR_STAT_FAIL_LN1				BIT(11)
+#define ETH_LNK_TR_STAT_LN2					BIT(16)
+#define ETH_LNK_TR_STAT_FRM_LN2					BIT(17)
+#define ETH_LNK_TR_STAT_STARTUP_LN2				BIT(18)
+#define ETH_LNK_TR_STAT_FAIL_LN2				BIT(19)
+#define ETH_LNK_TR_STAT_LN3					BIT(24)
+#define ETH_LNK_TR_STAT_FRM_LN3					BIT(25)
+#define ETH_LNK_TR_STAT_STARTUP_LN3				BIT(26)
+#define ETH_LNK_TR_STAT_FAIL_LN3				BIT(27)
+
+/* 0xD3: Link training Config Lane 0 */
+#define ETH_LNK_TR_CONF_PRSB_SELECT_LN0				0x7
+#define ETH_LNK_TR_CONF_PRSB_SEED_LN0				(0x7FF << 16)
+
+/* 0x:E0 Link training Config Lane 1 */
+#define ETH_LNK_TR_CONF_PRSB_SELECT_LN1				0x7
+#define ETH_LNK_TR_CONF_PRSB_SEED_LN1				(0x7FF << 16)
+
+/* 0xE4: Link training Config Lane 2 */
+#define ETH_LNK_TR_CONF_PRSB_SELECT_LN2				0x7
+#define ETH_LNK_TR_CONF_PRSB_SEED_LN2				(0x7FF << 16)
+
+/* 0xE8: Link training Config Lane 3 */
+#define ETH_LNK_TR_CONF_PRSB_SELECT_LN3				0x7
+#define ETH_LNK_TR_CONF_PRSB_SEED_LN3				(0x7FF << 16)
+
+/* 0x300: PHY ID  */
+#define ETH_PHY_ID		0xffffffff
+
+/* 0x301: PHY scratch  */
+#define ETH_PHY_SCRATCH		0xffffffff
+
+/* 0x30D: PHY link loopback  */
+#define ETH_PHY_LOOPBACK_TX_PCS					(0x7 << 3)
+#define ETH_PHY_LOOPBACK_RX_PCS					(0x7 << 15)
+#define ETH_PHY_LOOPBACK_RX_MAC					(0x7 << 18)
+#define ETH_PHY_LOOPBACK_RX_PLD					(0x7 << 21)
+
+/* 0x310: PHY configuration */
+/* **** RESET REGISTERS FOR THE MAC ****/
+#define ETH_PHY_CONF_IO_SYS_RESET				BIT(0)
+#define ETH_PHY_CONF_SOFT_TXP_RESET				BIT(1)
+#define ETH_PHY_CONF_SOFT_RXP_RESET				BIT(2)
+#define ETH_PHY_CONF_SET_REF_CLOCK				BIT(4)
+#define ETH_PHY_CONF_SET_DSATA_CLOCK				BIT(5)
+
+/* 0x321: PHY CDR locked */
+#define ETH_PHY_CD_PLL_LOCKED					0xF
+
+/* 0x322: PHY tx datapath ready */
+#define ETH_PHY_TX_PCS_READY					BIT(0)
+
+/* 0x323 PHY frame erors detected */
+#define ETH_PHY_FRM_ERROR					0xFFFFF
+
+/* 0x324 PHY clear frame error */
+#define ETH_PHY_CLR_FRM_ERROR					BIT(0)
+
+/* 0x326: PHY RX PCS status */
+#define ETH_PHY_RX_PCS_ALIGNED					BIT(0)
+#define ETH_PHY_HI_BER		BIT(1)
+
+/* 0x327: PHY pcs error injection */
+#define ETH_PHY_INJ_ERROR					0x000FFFFF
+
+/* 0x328: PHY alignment marker lock */
+#define ETH_PHY_AM_LOCK		BIT(0)
+
+/* 0x329: PHY PCS deskew status */
+#define ETH_PHY_RX_PCS_DSKW_STAT				BIT(0)
+#define ETH_PHY_RX_PCS_DSKW_CHNG				BIT(1)
+
+/* 0x32A: PHY BER count */
+#define ETH_PHY_BER_CNT		0xffffffff
+
+/* 0x32B: PHY transfer ready */
+#define ETH_PHY_AIB_RESETEHIP_TX_TRANSFER			0xF
+#define ETH_PHY_AIB_RESET_PTP_TX_TRANSFER			(0x3 << 4)
+#define ETH_PHY_AIB_RESET_EHIP_RX_TRANSFER			(0xF << 16)
+#define ETH_PHY_AIB_RESET_PTP_RX_TRANSFER			(0x3 << 20)
+
+/* 0x3C: PHY soft rc reset status */
+#define ETH_PHY_EHIP_RESET					BIT(0)
+#define ETH_PHY_EHIP_TX_RESET					BIT(1)
+#define ETH_PHY_EHIP_RX_RESET					BIT(2)
+#define ETH_PHY_EHIP_RSFEC_RESET				BIT(3)
+#define ETH_PHY_EHIP_RSFEC_TX_RESET				BIT(4)
+#define ETH_PHY_EHIP_RSFEC_RX_RESET				BIT(5)
+
+/* 0x330: PHY virtual lane 0 */
+#define ETH_PHY_VLANE_0_vlan0					0x1F
+#define ETH_PHY_VLANE_0_vlan1					(0x1F << 5)
+#define ETH_PHY_VLANE_0_vlan2					(0x1F << 10)
+#define ETH_PHY_VLANE_0_vlan3					(0x1F << 15)
+#define ETH_PHY_VLANE_0_vlan4					(0x1F << 20)
+#define ETH_PHY_VLANE_0_vlan5					(0x1F << 25)
+
+/* 0x331: PHY virtual lane 1 */
+#define ETH_PHY_VLANE_1_vlan6					0x1F
+#define ETH_PHY_VLANE_1_vlan7					(0x1F << 5)
+#define ETH_PHY_VLANE_1_vlan8					(0x1F << 10)
+#define ETH_PHY_VLANE_1_vlan9					(0x1F << 15)
+#define ETH_PHY_VLANE_1_vlan10					(0x1F << 20)
+#define ETH_PHY_VLANE_1_vlan11					(0x1F << 25)
+
+/* 0x332: PHY virtual lane 2 */
+#define ETH_PHY_VLANE_2_vlan12					0x1F
+#define ETH_PHY_VLANE_2_vlan13					(0x1F << 5)
+#define ETH_PHY_VLANE_2_vlan14					(0x1F << 10)
+#define ETH_PHY_VLANE_2_vlan15					(0x1F << 15)
+#define ETH_PHY_VLANE_2_vlan16					(0x1F << 20)
+#define ETH_PHY_VLANE_2_vlan17					(0x1F << 25)
+
+/* 0x333: PHY virtual lane 3 */
+#define ETH_PHY_VLANE_3_vlan18					0x1F
+#define ETH_PHY_VLANE_3_vlan19					(0X1F << 5)
+
+/* 0x341: PHY recovered clock  */
+#define ETH_PHY_KHZ_RX		0xffffffff
+
+/* 0x342: PHY TX clock */
+#define ETH_PHY_KHZ_TX		0xffffffff
+
+/* 0x350: PHY TX PLD Configuration */
+#define ETH_PHY_TX_PLD_EHIP_MODE				0x7
+#define ETH_PHY_TX_PLD_FIFO_FULL				(0x1F << 8)
+#define ETH_PHY_TX_PLD_DESKEW_CHAN_SEL				(0x3F << 16)
+#define ETH_PHY_TX_PLD_TX_DESKEW_CLEAR				BIT(22)
+#define ETH_PHY_TX_PLD_SEL_50GX2				BIT(23)
+
+/* 0x351: PHY TX PLD status */
+#define ETH_PHY_TX_PLD_STAT_EVAL_DONE				BIT(0)
+#define ETH_PHY_TX_PLD_STAT_DESKW				(0x7 << 1)
+#define ETH_PHY_TX_PLD_STAT_MONITOR_ERR				(0x3F << 8)
+#define ETH_PHY_TX_PLD_STAT_DSK_ACT_CHAN			(0x3F << 16)
+#define ETH_PHY_TX_PLD_STAT_FIFO_UNDERFLOW			BIT(22)
+#define ETH_PHY_TX_PLD_STAT_FIFO_EMPTY				BIT(23)
+#define ETH_PHY_TX_PLD_STAT_FIFO_OVERFLOW			BIT(24)
+
+/* 0x354 PHY dynamic deskew buffer */
+#define ETH_PHY_DYNAMIC_DESKEW_BUFF_ALMOST_FULL			(0xF << 8)
+#define ETH_PHY_DYNAMIC_DESKEW_BUFF_OVERFLOW_IND		(0xF << 12)
+#define ETH_PHY_DYNAMIC_DESKEW_BUFF_OVERFLOW			BIT(16)
+
+/* 0x355 PHY RX PLD block */
+#define ETH_PHY_RX_PLD_RX_EHIP_MODE				0x7
+#define ETH_PHY_RX_PLD_USER_LANE_PTP				BIT(3)
+#define ETH_PHY_RX_PLD_SEL_50GX2				BIT(4)
+
+/* 0x360 PHY RX PCS */
+#define ETH_PHY_RX_PCS_AM_INTVL					0x3FFF
+#define ETH_PHY_RX_PCS_RX_PCS_MAX_SKEW				(0x3F << 14)
+#define ETH_PHY_RX_PCS_USE_HIBER_MON				BIT(20)
+
+/* 0x361 PHY BIP counter 0 */
+#define ETH_PHY_BIP_CNT_0					0x0000FFFF
+
+/* 0x362 PHY BIP counter 1 */
+#define ETH_PHY_BIP_CNT_1					0x0000FFFF
+
+/* 0x363 PHY BIP counter 2 */
+#define ETH_PHY_BIP_CNT_2					0x0000FFFF
+
+/* 0x364 PHY BIP counter 3 */
+#define ETH_PHY_BIP_CNT_3					0x0000FFFF
+
+/* 0x365 PHY BIP counter 4 */
+#define ETH_PHY_BIP_CNT_4					0x0000FFFF
+
+/* 0x366 PHY BIP counter 5 */
+#define ETH_PHY_BIP_CNT_5					0x0000FFFF
+
+/* 0x367 PHY BIP counter 6 */
+#define ETH_PHY_BIP_CNT_6					0x0000FFFF
+
+/* 0x368 PHY BIP counter 7 */
+#define ETH_PHY_BIP_CNT_7					0x0000FFFF
+
+/* 0x369 PHY BIP counter 8 */
+#define ETH_PHY_BIP_CNT_8					0x0000FFFF
+
+/* 0x36A PHY BIP counter 9 */
+#define ETH_PHY_BIP_CNT_9					0x0000FFFF
+
+/* 0x36B PHY BIP counter 10 */
+#define ETH_PHY_BIP_CNT_10					0x0000FFFF
+
+/* 0x36C PHY BIP counter 11 */
+#define ETH_PHY_BIP_CNT_11					0x0000FFFF
+
+/* 0x36D PHY BIP counter 12 */
+#define ETH_PHY_BIP_CNT_12					0x0000FFFF
+
+/* 0x36E PHY BIP counter 13 */
+#define ETH_PHY_BIP_CNT_13					0x0000FFFF
+
+/* 0x36F PHY BIP counter 14 */
+#define ETH_PHY_BIP_CNT_14					0x0000FFFF
+
+/* 0x370 PHY BIP counter 15 */
+#define ETH_PHY_BIP_CNT_15					0x0000FFFF
+
+/* 0x371 PHY BIP counter 16 */
+#define ETH_PHY_BIP_CNT_16					0x0000FFFF
+
+/* 0x372 PHY BIP counter 17 */
+#define ETH_PHY_BIP_CNT_17					0x0000FFFF
+
+/* 0x373 PHY BIP counter 18 */
+#define ETH_PHY_BIP_CNT_18					0x0000FFFF
+
+/* 0x374 PHY BIP counter 19 */
+#define ETH_PHY_BIP_CNT_19					0x0000FFFF
+
+/* 0x37A PHY hiber chekcs */
+#define ETH_PHY_HIBER_CHECKS					0x001FFFFF
+/* 0x37B PHY hiber frame error */
+#define ETH_PHY_HIBER_FRM_ERR					0x7F
+
+/* 0x37C PHY error block count */
+#define ETH_PHY_ERR_BLOCK_COUNT					0xffffffff
+
+/* 0x37F PHY BIP deskew dept 0 */
+#define ETH_PHY_DES_DEPT0_DEPT_0				0x3F
+#define ETH_PHY_DES_DEPT0_DEPT_1				(0x3F << 6)
+#define ETH_PHY_DES_DEPT0_DEPT_2				(0x3F << 12)
+#define ETH_PHY_DES_DEPT0_DEPT_3				(0x3F << 18)
+#define ETH_PHY_DES_DEPT0_DEPT_4				(0x3F << 24)
+
+/* 0x380 PHY BIP deskew dept 1 */
+#define ETH_PHY_DES_DEPT1_DEPT_0				0x3F
+#define ETH_PHY_DES_DEPT1_DEPT_1				(0x3F << 6)
+#define ETH_PHY_DES_DEPT1_DEPT_2				(0x3F << 12)
+#define ETH_PHY_DES_DEPT1_DEPT_3				(0x3F << 18)
+#define ETH_PHY_DES_DEPT1_DEPT_4				(0x3F << 24)
+
+/* 0x381 PHY BIP deskew dept 2 */
+#define ETH_PHY_DES_DEPT2_DEPT_0				0x3F
+#define ETH_PHY_DES_DEPT2_DEPT_1				(0x3F << 6)
+#define ETH_PHY_DES_DEPT2_DEPT_2				(0x3F << 12)
+#define ETH_PHY_DES_DEPT2_DEPT_3				(0x3F << 18)
+#define ETH_PHY_DES_DEPT2_DEPT_4				(0x3F << 24)
+
+/* 0x382 PHY BIP deskew dept 3 */
+#define ETH_PHY_DES_DEPT3_DEPT_0				0x3F
+#define ETH_PHY_DES_DEPT3_DEPT_1				(0x3F << 6)
+#define ETH_PHY_DES_DEPT3_DEPT_2				(0x3F << 12)
+#define ETH_PHY_DES_DEPT3_DEPT_3				(0x3F << 18)
+#define ETH_PHY_DES_DEPT3_DEPT_4				(0x3F << 24)
+#define ETH_PHY_DES_DEPT3					0xffff
+
+/* 0x383 PHY RX PCS test  error count */
+#define ETH_PHY_RX_PCS_TEST_ERR_CNT				0xFFFFFFFF
+
+/* 0x400: TX MAC ID  */
+#define ETH_TX_ETH_ID		0xffffffff
+
+/* 0x401: TX MAC scratch  */
+#define ETH_TX_MAC_SCRATCH					0xffffffff
+
+/* 0x405: TX MAC link fault configuiration  */
+#define ETH_TX_MAC_LF_EN					BIT(0)
+#define ETH_TX_MAC_UNIDIR_EN					BIT(1)
+#define ETH_TX_MAC_DISABLE_RF					BIT(2)
+#define ETH_TX_MAC_FORCE_RF					BIT(3)
+
+/* 0x406: TX MAC IPG col rem  */
+#define ETH_TX_MAC_IPG_COL_REM					0x0000ffff
+
+/* 0x407: TX MAC frame size  */
+#define ETH_TX_MAC_MAX_TX					0x0000ffff
+
+/* 0x40A: TX MAC configuration  */
+#define ETH_TX_MAC_DISABLE_S_ADDR_EN				BIT(3)
+#define ETH_TX_MAC_DISABLE_TXVMAC				BIT(2)
+#define ETH_TX_MAC_DISABLE_TXVLAN				BIT(1)
+
+/* 0x40B: TX MAC EHIP configuration  */
+#define ETH_TX_MAC_EHIP_CONF_EN_PP				BIT(0)
+#define ETH_TX_MAC_EHIP_CONF_IPG				(0x3 << 1)
+#define ETH_TX_MAC_EHIP_CONF_AM_WIDTH				(0x7 << 3)
+#define ETH_TX_MAC_EHIP_CONF_FLOWREG				(0x7 << 6)
+#define ETH_TX_MAC_EHIP_CONF_CRC_EN				BIT(9)
+#define ETH_TX_MAC_EHIP_CONF_AM_PERIOD				(0x1FFF << 15)
+
+/* 0x40C: TX MAC source address lower bytes  */
+#define ETH_TX_MAC_LOW_BYTES					0xffffffff
+
+/* 0x40D: TX MAC source address higher bytes  */
+#define ETH_TX_MAC_HIGH_BYTES					0x0000ffff
+
+/* 0x500  RX MAC ID confuguration */
+#define ETH_RX_MAC_ID		0xffffffff
+
+/* 0x501  RX MAC scratch confuguration */
+#define ETH_RX_MAC_SCRATCH					0xffffffff
+
+/* 0x506  RX MAC frame size  */
+#define ETH_RX_MAC_FRAME_SIZE					0x0000ffff
+
+/* 0x507  RX MAC CRC forwarding */
+#define ETH_RX_MAC_CRC_FORWARD					BIT(0)
+
+/* 0x508  RX MAC link status */
+#define ETH_RX_MAC_LOCAL_FAULT					BIT(0)
+#define ETH_RX_MAC_REMOTE_FAULT					BIT(1)
+
+/* 0x50A  RX MAC confuguration */
+#define ETH_RX_MAC_EN_PLEN					BIT(0)
+#define ETH_RX_MAC_RXVLAN_DISABLE				BIT(1)
+#define ETH_RX_MAC_EN_CHECK_SFD					BIT(3)
+#define ETH_RX_MAC_EN_STR_PREAMBLE				BIT(4)
+#define ETH_RX_MAC_ENFORCE_MAX_RX				BIT(7)
+#define ETH_RX_MAC_REMOVE_RX_PAD				BIT(8)
+
+/* 0x50B  RX MAC feature confuguration */
+#define ETH_RX_MAC_EN_PP					BIT(0)
+#define ETH_RX_MAC_RXCRC_PREAMBLE				BIT(1)
+
+/* Ethernet Reconfiguration Interface
+ * Pause and Priority - Based Flow Control
+ * Bit Definitions
+ */
+/* 0x605 Enable TX Pause Ports */
+#define ETH_EN_PFC_PORT_FOR_PFC					0xFF
+#define ETH_EN_PFC_PORT_FOR_PAUSE				BIT(8)
+
+/* 0x606 TX Pause Request */
+#define ETH_TX_PAUSE_REQ_FOR_PFC				0xFF
+#define ETH_TX_PAUSE_REQ_FOR_PAUSE				BIT(8)
+
+/* 0x607 Enable Automatic TX Pause Retransmission */
+#define ETH_TX_EN_HOLDOFF_FOR_PFC				0xFF
+#define ETH_TX_EN_HOLDOFF_FOR_PAUSE				BIT(8)
+
+/* 0x608 Retransmit Holdoff Quanta Fields */
+#define ETH_TX_RETRANSMIT_HOLDOFF_QUANTA			0xFFFF
+
+/* 0x609 Retransmit Pause Quanta */
+#define ETH_RETRANSMIT_PAUSE_QUANTA				0xFFFF
+
+/* 0x60A Enable TX XOFF */
+#define ETH_TX_XOFF		0x3
+
+/* 0x60B Enable Uniform Holdoff */
+#define ETH_EN_UNIFORM_HOLDOFF					BIT(0)
+
+/* 0x60C Set Uniform Holdoff */
+#define ETH_SET_UNIFORM_HOLDOFF					0xFFFF
+
+/* 0x60D Lower 4 Bytes of the Dest Addr for Flow Control Fields */
+#define ETH_TX_DEST_ADDR_FLOW_CTRL_LO				0xFFFFFFFF
+
+/* 0x60E Higher 2 Bytes of the Dest Addr for Flow Control Fields */
+#define ETH_TX_DEST_ADDR_FLOW_CTRL_HI				0xFFFF
+
+/* 0x60F Lower 4 Bytes of the Src Addr for Flow Control Fields */
+#define ETH_TX_SRC_ADDR_FLOW_CTRL_LO				0xFFFFFFFF
+
+/* 0x610 Higher 2 Bytes of the Src Addr for Flow Control Fields */
+#define ETH_TX_SRC_ADDR_FLOW_CTRL_HI				0xFFFF
+
+/* 0x611 TX Flow Control Feature Configuration */
+#define ETH_TX_EN_STD_FLOW_CTRL					BIT(0)
+#define ETH_TX_EN_PRIORITY_FLOW_CTRL				BIT(1)
+#define MAC_PAUSEFRAME_QUANTA					0xFFFF
+
+/* 0x620 Pause Quanta 0 */
+#define ETH_PAUSE_QUANTA_0					0xFFFF
+
+/* 0x621 Pause Quanta 1 */
+#define ETH_PAUSE_QUANTA_1					0xFFFF
+
+/* 0x622 Pause Quanta 2 */
+#define ETH_PAUSE_QUANTA_2					0xFFFF
+
+/* 0x623 Pause Quanta 3 */
+#define ETH_PAUSE_QUANTA_3					0xFFFF
+
+/* 0x624 Pause Quanta 4 */
+#define ETH_PAUSE_QUANTA_4					0xFFFF
+
+/* 0x625 Pause Quanta 5 */
+#define ETH_PAUSE_QUANTA_5					0xFFFF
+
+/* 0x626 Pause Quanta 6 */
+#define ETH_PAUSE_QUANTA_6					0xFFFF
+
+/* 0x627 Pause Quanta 7 */
+#define ETH_PAUSE_QUANTA_7					0xFFFF
+
+/* 0x628 PFC Holdoff Quanta 0 */
+#define ETH_PFC_HOLDOFF_QUANTA_0				0xFFFF
+
+/* 0x629 PFC Holdoff Quanta 1 */
+#define ETH_PFC_HOLDOFF_QUANTA_1				0xFFFF
+
+/* 0x62A PFC Holdoff Quanta 2 */
+#define ETH_PFC_HOLDOFF_QUANTA_2				0xFFFF
+
+/* 0x62B PFC Holdoff Quanta 3 */
+#define ETH_PFC_HOLDOFF_QUANTA_3				0xFFFF
+
+/* 0x62C PFC Holdoff Quanta 4 */
+#define ETH_PFC_HOLDOFF_QUANTA_4				0xFFFF
+
+/* 0x62D PFC Holdoff Quanta 5 */
+#define ETH_PFC_HOLDOFF_QUANTA_5				0xFFFF
+
+/* 0x62E PFC Holdoff Quanta 6 */
+#define ETH_PFC_HOLDOFF_QUANTA_6				0xFFFF
+
+/* 0x62F PFC Holdoff Quanta 7 */
+#define ETH_PFC_HOLDOFF_QUANTA_7				0xFFFF
+
+/* 0x705 Enable RX Pause Frame Processing Fields */
+#define ETH_EN_RX_PAUSE		BIT(0)
+
+/* 0x706 RX Forward Flow Control Frames */
+#define ETH_RX_PAUSE_FWD					BIT(0)
+
+/* 0x707 Lower 4 bytes of Dest. Addr. for RX Pause Frames */
+#define ETH_RX_DEST_ADDR_FLOW_CTRL_LO				0xFFFFFFFF
+
+/* 0x708 Higher 2 bytes of the Dest Addr for RX Pause Frames */
+#define ETH_RX_DEST_ADDR_FLOW_CTRL_HI				0xFFFF
+
+/* 0x709 RX Flow Control Feature Configuration */
+#define ETH_RX_EN_STD_FLOW_CTRL					BIT(0)
+#define ETH_RX_EN_PRIORITY_FLOW_CTRL				BIT(1)
+
+/* Ethernet Reconfiguration Interface
+ * TX Statistics Counter
+ * Bit Definitions
+ */
+/* 0x845: Configuration of TX Statistics Counters */
+#define ETH_TX_CNTR_CFG_RST_ALL					BIT(0)
+#define ETH_TX_CNTR_CFG_RST_PARITY_ERR				BIT(1)
+#define ETH_TX_CNTR_CFG_FREEZE_STATS				BIT(2)
+
+/* 0x846: Status of TX Statistics Counters */
+#define ETH_TX_CNTR_STAT_PARITY_ERR				BIT(0)
+#define ETH_TX_CNTR_STAT_CSR					BIT(1)
+
+/* Ethernet Reconfiguration Interface
+ * RX Statistics Counter
+ * Bit Definitions
+ */
+/* 0x945: Configuration of RX Statistics Counters */
+#define ETH_RX_CNTR_CFG_RST_ALL					BIT(0)
+#define ETH_RX_CNTR_CFG_RST_PARITY_ERR				BIT(1)
+#define ETH_RX_CNTR_CFG_FREEZE_STATS				BIT(2)
+
+/* 0x946: Status of RX Statistics Counters */
+#define ETH_RX_CNTR_STAT_PARITY_ERR				BIT(0)
+#define ETH_RX_CNTR_STAT_CSR					BIT(1)
+
+/* Ethernet Reconfiguration Interface
+ * TX 1588 PTP
+ * Bit Definitions
+ */
+/* 0xA05: TX 1588 PTP Clock Period */
+#define ETH_PTP_CLK_PERIOD_FRAC_NS				0xFFFF
+#define ETH_PTP_CLK_PERIOD_NS					(0xF << 16)
+
+/* 0xA0A: TX 1588 PTP Extra Latency */
+#define ETH_TX_PTP_EXTRA_LATENCY_FRAC_NS			0xFFFF
+#define ETH_TX_PTP_EXTRA_LATENCY_NS				(0x7FFF << 16)
+#define ETH_TX_PTP_EXTRA_LATENCY_SIGN				BIT(31)
+
+/* 0xA0D: TX 1588 PTP Debug */
+#define ETH_TX_PTP_DEBUG					BIT(0)
+
+/* Ethernet Reconfiguration Interface
+ * RX 1588 PTP
+ * Bit Definitions
+ */
+/* 0xB06: RX 1588 PTP Extra Latency */
+#define ETH_RX_PTP_EXTRA_LATENCY_FRAC_NS			0xFFFF
+#define ETH_RX_PTP_EXTRA_LATENCY_NS				(0x7FFF << 16)
+#define ETH_RX_PTP_EXTRA_LATENCY_SIGN				BIT(31)
+
+/* Ethernet Reconfiguration Interface
+ * 10G/25G PTP PPM UI Adjustment
+ * Bit Definitions
+ */
+/* 0xB10: TX 1588 PTP UI */
+#define ETH_TX_UI_FRAC_NS					0xFFFFFF
+#define ETH_TX_UI_NS		(0xFF << 24)
+
+/* 0xB11: RX 1588 PTP UI */
+#define ETH_RX_UI_FRAC_NS					0xFFFFFF
+#define ETH_RX_UI_NS		(0xFF << 24)
+
+/* 0xB19: Time Value Control*/
+#define ETH_TAM_SNAPSHOT					BIT(0)
+
+/* 0xB1A: TX TAM Lower */
+#define ETH_TX_TAM_LO_FRAC_NS					0xFFFF
+#define ETH_TX_TAM_LO_NS					(0xFFFF << 16)
+
+/* 0xB1B: TX TAM Upper */
+#define ETH_TX_TAM_HI_NS					0xFFFF
+
+/* 0xB1C: TX Count */
+#define ETH_TX_CNT		0xFFFF
+
+/* 0xB1D: RX TAM Lower */
+#define ETH_RX_TAM_LO_FRAC_NS					0xFFFF
+#define ETH_RX_TAM_LO_NS					(0xFFFF << 16)
+
+/* 0xB1E: RX TAM Upper */
+#define ETH_RX_TAM_HI_NS					0xFFFF
+
+/* 0xB1F: RX Count */
+#define ETH_TX_CNT		0xFFFF
+
+/* RSFEC Reconfiguration Interface
+ * TX & RX RSFEC
+ * Bit Definitions
+ */
+/* 0x010: RS-FEC TX Configuration */
+#define RSFEC_TX_SEL_LANE_0_EHIP_CORE_TX_DATA			0x0
+#define RSFEC_TX_SEL_LANE_0_EHIP_LANE_TX_DATA			0x1
+#define RSFEC_TX_SEL_LANE_0_EMIB_LANE_TX_DATA_DESKEW		0x2
+#define RSFEC_TX_SEL_LANE_0_EMIB_LANE_TX_DATA_NO_DESKEW		0x3
+#define RSFEC_TX_SEL_LANE_0_FEC_LANE_DISABLED			0x6
+#define RSFEC_TX_SEL_LANE_0_DEBUG				0x7
+#define RSFEC_TX_SEL_LANE_1_EHIP_CORE_TX_DATA			(0x0 << 4)
+#define RSFEC_TX_SEL_LANE_1_EHIP_LANE_TX_DATA			(0x1 << 4)
+#define RSFEC_TX_SEL_LANE_1_EMIB_LANE_TX_DATA_DESKEW		(0x2 << 4)
+#define RSFEC_TX_SEL_LANE_1_EMIB_LANE_TX_DATA_NO_DESKEW		(0x3 << 4)
+#define RSFEC_TX_SEL_LANE_1_FEC_LANE_DISABLED			(0x6 << 4)
+#define RSFEC_TX_SEL_LANE_1_DEBUG				(0x7 << 4)
+#define RSFEC_TX_SEL_LANE_2_EHIP_CORE_TX_DATA			(0x0 << 8)
+#define RSFEC_TX_SEL_LANE_2_EHIP_LANE_TX_DATA			(0x1 << 8)
+#define RSFEC_TX_SEL_LANE_2_EMIB_LANE_TX_DATA_DESKEW		(0x2 << 8)
+#define RSFEC_TX_SEL_LANE_2_EMIB_LANE_TX_DATA_NO_DESKEW		(0x3 << 8)
+#define RSFEC_TX_SEL_LANE_2_FEC_LANE_DISABLED			(0x6 << 8)
+#define RSFEC_TX_SEL_LANE_2_DEBUG				(0x7 << 8)
+#define RSFEC_TX_SEL_LANE_3_EHIP_CORE_TX_DATA			(0x0 << 12)
+#define RSFEC_TX_SEL_LANE_3_EHIP_LANE_TX_DATA			(0x1 << 12)
+#define RSFEC_TX_SEL_LANE_3_EMIB_LANE_TX_DATA_DESKEW		(0x2 << 12)
+#define RSFEC_TX_SEL_LANE_3_EMIB_LANE_TX_DATA_NO_DESKEW		(0x3 << 12)
+#define RSFEC_TX_SEL_LANE_3_FEC_LANE_DISABLED			(0x6 << 12)
+#define RSFEC_TX_SEL_LANE_3_DEBUG				(0x7 << 12)
+#define RSFEC_FEC_TX_BYPASS_LANE_0				BIT(28)
+#define RSFEC_FEC_TX_BYPASS_LANE_1				BIT(29)
+#define RSFEC_FEC_TX_BYPASS_LANE_2				BIT(30)
+#define RSFEC_FEC_TX_BYPASS_LANE_3				BIT(31)
+
+/* 0x014: RS-FEC RX Configuration */
+#define RSFEC_RX_SEL_LANE_0_BYPASS_RSFEC_RX_PATH_NORMAL		0x0
+#define RSFEC_RX_SEL_LANE_0_SEL_OUTPUT_OF_RX			0x1
+#define RSFEC_RX_SEL_LANE_0_BYPASS_RSFEC_RX_PATH_EHIP_ELANE	0x2
+#define RSFEC_RX_SEL_LANE_0_DEBUG				0x3
+#define RSFEC_RX_SEL_LANE_1_BYPASS_RSFEC_RX_PATH_NORMAL		(0x0 << 4)
+#define RSFEC_RX_SEL_LANE_1_SEL_OUTPUT_OF_RX			(0x1 << 4)
+#define RSFEC_RX_SEL_LANE_1_BYPASS_RSFEC_RX_PATH_EHIP_ELANE	(0x2 << 4)
+#define RSFEC_RX_SEL_LANE_1_DEBUG				(0x3 << 4)
+#define RSFEC_RX_SEL_LANE_2_BYPASS_RSFEC_RX_PATH_NORMAL		(0x0 << 8)
+#define RSFEC_RX_SEL_LANE_2_SEL_OUTPUT_OF_RX			(0x1 << 8)
+#define RSFEC_RX_SEL_LANE_2_BYPASS_RSFEC_RX_PATH_EHIP_ELANE	(0x2 << 8)
+#define RSFEC_RX_SEL_LANE_2_DEBUG				(0x3 << 8)
+#define RSFEC_RX_SEL_LANE_3_BYPASS_RSFEC_RX_PATH_NORMAL		(0x0 << 12)
+#define RSFEC_RX_SEL_LANE_3_SEL_OUTPUT_OF_RX			(0x1 << 12)
+#define RSFEC_RX_SEL_LANE_3_BYPASS_RSFEC_RX_PATH_EHIP_ELANE	(0x2 << 12)
+#define RSFEC_RX_SEL_LANE_3_DEBUG				(0x3 << 12)
+#define RSFEC_FEC_RX_BYPASS_LANE_0				BIT(28)
+#define RSFEC_FEC_RX_BYPASS_LANE_1				BIT(29)
+#define RSFEC_FEC_RX_BYPASS_LANE_2				BIT(30)
+#define RSFEC_FEC_RX_BYPASS_LANE_3				BIT(31)
+
+/* 0x020: TX Deskew Configuration */
+#define RSFEC_TX_DESKEW_CHAN_SEL_LANE_0				BIT(0)
+#define RSFEC_TX_DESKEW_CHAN_SEL_LANE_1				BIT(1)
+#define RSFEC_TX_DESKEW_CHAN_SEL_LANE_2				BIT(2)
+#define RSFEC_TX_DESKEW_CHAN_SEL_LANE_3				BIT(3)
+#define RSFEC_TX_DESKEW_CLEAR					BIT(7)
+
+/* 0x030: RS-FEC Core Configuration */
+#define RSFEC_CORE_FRAC_NONE					0x0
+#define RSFEC_CORE_FRAC_FRAC4					0x3
+
+/* 0x040: RS-FEC Lane 0 Configuration */
+#define RSFEC_LANE0_FIBER_CHAN_MODE				BIT(0)
+#define RSFEC_LANE0_EN_PN5280_SCRAMBLE				BIT(1)
+#define RSFEC_LANE0_BYPASS_ERROR_INDICATION			BIT(2)
+#define RSFEC_LANE0_RS_ENCODER_DECODER_MODE			BIT(3)
+
+/* 0x044: RS-FEC Lane 1 Configuration */
+#define RSFEC_LANE1_FIBER_CHAN_MODE				BIT(0)
+#define RSFEC_LANE1_EN_PN5280_SCRAMBLE				BIT(1)
+#define RSFEC_LANE1_BYPASS_ERROR_INDICATION			BIT(2)
+#define RSFEC_LANE1_RS_ENCODER_DECODER_MODE			BIT(3)
+
+/* 0x048: RS-FEC Lane 2 Configuration */
+#define RSFEC_LANE2_FIBER_CHAN_MODE				BIT(0)
+#define RSFEC_LANE2_EN_PN5280_SCRAMBLE				BIT(1)
+#define RSFEC_LANE2_BYPASS_ERROR_INDICATION			BIT(2)
+#define RSFEC_LANE2_RS_ENCODER_DECODER_MODE			BIT(3)
+
+/* 0x04C: RS-FEC Lane 3 Configuration */
+#define RSFEC_LANE3_FIBER_CHAN_MODE				BIT(0)
+#define RSFEC_LANE3_EN_PN5280_SCRAMBLE				BIT(1)
+#define RSFEC_LANE3_BYPASS_ERROR_INDICATION			BIT(2)
+#define RSFEC_LANE3_RS_ENCODER_DECODER_MODE			BIT(3)
+
+/* 0x104: TX Deskew Status */
+#define RSFEC_TX_DESKEW_COMPLETE				BIT(0)
+#define RSFEC_TX_DESKEW_STATUS					(0x7 << 1)
+#define RSFEC_TX_DESKEW_MONITOR_ERR				(0xF << 4)
+#define RSFEC_TX_DESKEW_ACTIVE_CHANNELS				(0xF << 8)
+
+/* 0x108: RSFEC Debug Configuration */
+#define RSFEC_DEBUG_SHADOW_REQ					0xF
+#define RSFEC_DEBUG_SHADOW_CLR					BIT(4)
+#define RSFEC_DEBUG_TX_RST					BIT(28)
+#define RSFEC_DEBUG_RX_RST					BIT(29)
+#define RSFEC_DEBUG_MAIN_RST					BIT(31)
+
+/* 0x120: RSFEC TX Status Lane 0 */
+#define RSFEC_TX_STATUS_LANE_0_INVALID_SYNC_HEADER		BIT(0)
+#define RSFEC_TX_STATUS_LANE_0_INVALID_BLOCK_TYPE		BIT(1)
+#define RSFEC_TX_STATUS_LANE_0_MARKER_RESYNC			BIT(2)
+#define RSFEC_TX_STATUS_LANE_0_PACING_VIOLATION			BIT(3)
+
+/* 0x124: RSFEC TX Status Lane 1 */
+#define RSFEC_TX_STATUS_LANE_1_INVALID_SYNC_HEADER		BIT(0)
+#define RSFEC_TX_STATUS_LANE_1_INVALID_BLOCK_TYPE		BIT(1)
+#define RSFEC_TX_STATUS_LANE_1_MARKER_RESYNC			BIT(2)
+#define RSFEC_TX_STATUS_LANE_1_PACING_VIOLATION			BIT(3)
+
+/* 0x128: RSFEC TX Status Lane 2 */
+#define RSFEC_TX_STATUS_LANE_2_INVALID_SYNC_HEADER		BIT(0)
+#define RSFEC_TX_STATUS_LANE_2_INVALID_BLOCK_TYPE		BIT(1)
+#define RSFEC_TX_STATUS_LANE_2_MARKER_RESYNC			BIT(2)
+#define RSFEC_TX_STATUS_LANE_2_PACING_VIOLATION			BIT(3)
+
+/* 0x12C: RSFEC TX Status Lane 3 */
+#define RSFEC_TX_STATUS_LANE_3_INVALID_SYNC_HEADER		BIT(0)
+#define RSFEC_TX_STATUS_LANE_3_INVALID_BLOCK_TYPE		BIT(1)
+#define RSFEC_TX_STATUS_LANE_3_MARKER_RESYNC			BIT(2)
+#define RSFEC_TX_STATUS_LANE_3_PACING_VIOLATION			BIT(3)
+
+/* 0x130 RSFEC TX Hold Status Lane 0 */
+#define RSFEC_TX_HOLD_STATUS_LANE_0_INVALID_SYNC_HEADER		BIT(0)
+#define RSFEC_TX_HOLD_STATUS_LANE_0_INVALID_BLOCK_TYPE		BIT(1)
+#define RSFEC_TX_HOLD_STATUS_LANE_0_MARKER_RESYNC		BIT(2)
+#define RSFEC_TX_HOLD_STATUS_LANE_0_PACING_VIOLATION		BIT(3)
+
+/* 0x134 RSFEC TX Hold Status Lane 1 */
+#define RSFEC_TX_HOLD_STATUS_LANE_1_INVALID_SYNC_HEADER		BIT(0)
+#define RSFEC_TX_HOLD_STATUS_LANE_1_INVALID_BLOCK_TYPE		BIT(1)
+#define RSFEC_TX_HOLD_STATUS_LANE_1_MARKER_RESYNC		BIT(2)
+#define RSFEC_TX_HOLD_STATUS_LANE_1_PACING_VIOLATION		BIT(3)
+
+/* 0x138 RSFEC TX Hold Status Lane 2 */
+#define RSFEC_TX_HOLD_STATUS_LANE_2_INVALID_SYNC_HEADER		BIT(0)
+#define RSFEC_TX_HOLD_STATUS_LANE_2_INVALID_BLOCK_TYPE		BIT(1)
+#define RSFEC_TX_HOLD_STATUS_LANE_2_MARKER_RESYNC		BIT(2)
+#define RSFEC_TX_HOLD_STATUS_LANE_2_PACING_VIOLATION		BIT(3)
+
+/* 0x13C RSFEC TX Hold Status Lane 3 */
+#define RSFEC_TX_HOLD_STATUS_LANE_3_INVALID_SYNC_HEADER		BIT(0)
+#define RSFEC_TX_HOLD_STATUS_LANE_3_INVALID_BLOCK_TYPE		BIT(1)
+#define RSFEC_TX_HOLD_STATUS_LANE_3_MARKER_RESYNC		BIT(2)
+#define RSFEC_TX_HOLD_STATUS_LANE_3_PACING_VIOLATION		BIT(3)
+
+/* 0x140 RSFEC TX Hold Status Interrupt Lane 0 */
+#define RSFEC_TX_HOLD_STATUS_INT_LANE_0_INVALID_SYNC_HEADER	BIT(0)
+#define RSFEC_TX_HOLD_STATUS_INT_LANE_0_INVALID_BLOCK_TYPE	BIT(1)
+#define RSFEC_TX_HOLD_STATUS_INT_LANE_0_MARKER_RESYNC		BIT(2)
+#define RSFEC_TX_HOLD_STATUS_INT_LANE_0_PACING_VIOLATION	BIT(3)
+
+/* 0x144 RSFEC TX Hold Status Interrupt Lane 1 */
+#define RSFEC_TX_HOLD_STATUS_INT_LANE_1_INVALID_SYNC_HEADER	BIT(0)
+#define RSFEC_TX_HOLD_STATUS_INT_LANE_1_INVALID_BLOCK_TYPE	BIT(1)
+#define RSFEC_TX_HOLD_STATUS_INT_LANE_1_MARKER_RESYNC		BIT(2)
+#define RSFEC_TX_HOLD_STATUS_INT_LANE_1_PACING_VIOLATION	BIT(3)
+
+/* 0x148 RSFEC TX Hold Status Interrupt Lane 2 */
+#define RSFEC_TX_HOLD_STATUS_INT_LANE_2_INVALID_SYNC_HEADER	BIT(0)
+#define RSFEC_TX_HOLD_STATUS_INT_LANE_2_INVALID_BLOCK_TYPE	BIT(1)
+#define RSFEC_TX_HOLD_STATUS_INT_LANE_2_MARKER_RESYNC		BIT(2)
+#define RSFEC_TX_HOLD_STATUS_INT_LANE_2_PACING_VIOLATION	BIT(3)
+
+/* 0x14C RSFEC TX Hold Status Interrupt Lane 3 */
+#define RSFEC_TX_HOLD_STATUS_INT_LANE_3_INVALID_SYNC_HEADER	BIT(0)
+#define RSFEC_TX_HOLD_STATUS_INT_LANE_3_INVALID_BLOCK_TYPE	BIT(1)
+#define RSFEC_TX_HOLD_STATUS_INT_LANE_3_MARKER_RESYNC		BIT(2)
+#define RSFEC_TX_HOLD_STATUS_INT_LANE_3_PACING_VIOLATION	BIT(3)
+
+/* 0x150 RSFEC RX Status Lane 0 */
+#define RSFEC_RX_STATUS_LANE_0_SIG_FAIL				BIT(0)
+#define RSFEC_RX_STATUS_LANE_0_NOT_LOCKED			BIT(1)
+#define RSFEC_RX_STATUS_LANE_0_FEC_3BAD				BIT(2)
+#define RSFEC_RX_STATUS_LANE_0_AM_5BAD				BIT(3)
+#define RSFEC_RX_STATUS_LANE_0_HI_SER				BIT(4)
+#define RSFEC_RX_STATUS_LANE_0_CORR_CW				BIT(5)
+#define RSFEC_RX_STATUS_LANE_0_UNCORR_CW			BIT(6)
+
+/* 0x154 RSFEC RX Status Lane 1 */
+#define RSFEC_RX_STATUS_LANE_1_SIG_FAIL				BIT(0)
+#define RSFEC_RX_STATUS_LANE_1_NOT_LOCKED			BIT(1)
+#define RSFEC_RX_STATUS_LANE_1_FEC_3BAD				BIT(2)
+#define RSFEC_RX_STATUS_LANE_1_AM_5BAD				BIT(3)
+#define RSFEC_RX_STATUS_LANE_1_HI_SER				BIT(4)
+#define RSFEC_RX_STATUS_LANE_1_CORR_CW				BIT(5)
+#define RSFEC_RX_STATUS_LANE_1_UNCORR_CW			BIT(6)
+
+/* 0x158 RSFEC RX Status Lane 2 */
+#define RSFEC_RX_STATUS_LANE_2_SIG_FAIL				BIT(0)
+#define RSFEC_RX_STATUS_LANE_2_NOT_LOCKED			BIT(1)
+#define RSFEC_RX_STATUS_LANE_2_FEC_3BAD				BIT(2)
+#define RSFEC_RX_STATUS_LANE_2_AM_5BAD				BIT(3)
+#define RSFEC_RX_STATUS_LANE_2_HI_SER				BIT(4)
+#define RSFEC_RX_STATUS_LANE_2_CORR_CW				BIT(5)
+#define RSFEC_RX_STATUS_LANE_2_UNCORR_CW			BIT(6)
+
+/* 0x15C RSFEC RX Status Lane 3 */
+#define RSFEC_RX_STATUS_LANE_3_SIG_FAIL				BIT(0)
+#define RSFEC_RX_STATUS_LANE_3_NOT_LOCKED			BIT(1)
+#define RSFEC_RX_STATUS_LANE_3_FEC_3BAD				BIT(2)
+#define RSFEC_RX_STATUS_LANE_3_AM_5BAD				BIT(3)
+#define RSFEC_RX_STATUS_LANE_3_HI_SER				BIT(4)
+#define RSFEC_RX_STATUS_LANE_3_CORR_CW				BIT(5)
+#define RSFEC_RX_STATUS_LANE_3_UNCORR_CW			BIT(6)
+
+/* 0x160 RSFEC RX Hold Status Lane 0 */
+#define RSFEC_RX_HOLD_STATUS_LANE_0_SIG_FAIL			BIT(0)
+#define RSFEC_RX_HOLD_STATUS_LANE_0_NOT_LOCKED			BIT(1)
+#define RSFEC_RX_HOLD_STATUS_LANE_0_FEC_3BAD			BIT(2)
+#define RSFEC_RX_HOLD_STATUS_LANE_0_AM_5BAD			BIT(3)
+#define RSFEC_RX_HOLD_STATUS_LANE_0_HI_SER			BIT(4)
+#define RSFEC_RX_HOLD_STATUS_LANE_0_CORR_CW			BIT(5)
+#define RSFEC_RX_HOLD_STATUS_LANE_0_UNCORR_CW			BIT(6)
+
+/* 0x164 RSFEC RX Hold Status Lane 1 */
+#define RSFEC_RX_HOLD_STATUS_LANE_1_SIG_FAIL			BIT(0)
+#define RSFEC_RX_HOLD_STATUS_LANE_1_NOT_LOCKED			BIT(1)
+#define RSFEC_RX_HOLD_STATUS_LANE_1_FEC_3BAD			BIT(2)
+#define RSFEC_RX_HOLD_STATUS_LANE_1_AM_5BAD			BIT(3)
+#define RSFEC_RX_HOLD_STATUS_LANE_1_HI_SER			BIT(4)
+#define RSFEC_RX_HOLD_STATUS_LANE_1_CORR_CW			BIT(5)
+#define RSFEC_RX_HOLD_STATUS_LANE_1_UNCORR_CW			BIT(6)
+
+/* 0x168 RSFEC RX Hold Status Lane 2 */
+#define RSFEC_RX_HOLD_STATUS_LANE_2_SIG_FAIL			BIT(0)
+#define RSFEC_RX_HOLD_STATUS_LANE_2_NOT_LOCKED			BIT(1)
+#define RSFEC_RX_HOLD_STATUS_LANE_2_FEC_3BAD			BIT(2)
+#define RSFEC_RX_HOLD_STATUS_LANE_2_AM_5BAD			BIT(3)
+#define RSFEC_RX_HOLD_STATUS_LANE_2_HI_SER			BIT(4)
+#define RSFEC_RX_HOLD_STATUS_LANE_2_CORR_CW			BIT(5)
+#define RSFEC_RX_HOLD_STATUS_LANE_2_UNCORR_CW			BIT(6)
+
+/* 0x16C RSFEC RX Hold Status Lane 3 */
+#define RSFEC_RX_HOLD_STATUS_LANE_3_SIG_FAIL			BIT(0)
+#define RSFEC_RX_HOLD_STATUS_LANE_3_NOT_LOCKED			BIT(1)
+#define RSFEC_RX_HOLD_STATUS_LANE_3_FEC_3BAD			BIT(2)
+#define RSFEC_RX_HOLD_STATUS_LANE_3_AM_5BAD			BIT(3)
+#define RSFEC_RX_HOLD_STATUS_LANE_3_HI_SER			BIT(4)
+#define RSFEC_RX_HOLD_STATUS_LANE_3_CORR_CW			BIT(5)
+#define RSFEC_RX_HOLD_STATUS_LANE_3_UNCORR_CW			BIT(6)
+
+/* 0x170 RSFEC RX Hold Interrupt Status Lane 0 */
+#define RSFEC_RX_HOLD_INT_STATUS_LANE_0_SIG_FAIL		BIT(0)
+#define RSFEC_RX_HOLD_INT_STATUS_LANE_0_NOT_LOCKED		BIT(1)
+#define RSFEC_RX_HOLD_INT_STATUS_LANE_0_FEC_3BAD		BIT(2)
+#define RSFEC_RX_HOLD_INT_STATUS_LANE_0_AM_5BAD			BIT(3)
+#define RSFEC_RX_HOLD_INT_STATUS_LANE_0_HI_SER			BIT(4)
+#define RSFEC_RX_HOLD_INT_STATUS_LANE_0_CORR_CW			BIT(5)
+#define RSFEC_RX_HOLD_INT_STATUS_LANE_0_UNCORR_CW		BIT(6)
+
+/* 0x174 RSFEC RX Hold Interrupt Status Lane 1 */
+#define RSFEC_RX_HOLD_INT_STATUS_LANE_1_SIG_FAIL		BIT(0)
+#define RSFEC_RX_HOLD_INT_STATUS_LANE_1_NOT_LOCKED		BIT(1)
+#define RSFEC_RX_HOLD_INT_STATUS_LANE_1_FEC_3BAD		BIT(2)
+#define RSFEC_RX_HOLD_INT_STATUS_LANE_1_AM_5BAD			BIT(3)
+#define RSFEC_RX_HOLD_INT_STATUS_LANE_1_HI_SER			BIT(4)
+#define RSFEC_RX_HOLD_INT_STATUS_LANE_1_CORR_CW			BIT(5)
+#define RSFEC_RX_HOLD_INT_STATUS_LANE_1_UNCORR_CW		BIT(6)
+
+/* 0x178 RSFEC RX Hold Interrupt Status Lane 2 */
+#define RSFEC_RX_HOLD_INT_STATUS_LANE_2_SIG_FAIL		BIT(0)
+#define RSFEC_RX_HOLD_INT_STATUS_LANE_2_NOT_LOCKED		BIT(1)
+#define RSFEC_RX_HOLD_INT_STATUS_LANE_2_FEC_3BAD		BIT(2)
+#define RSFEC_RX_HOLD_INT_STATUS_LANE_2_AM_5BAD			BIT(3)
+#define RSFEC_RX_HOLD_INT_STATUS_LANE_2_HI_SER			BIT(4)
+#define RSFEC_RX_HOLD_INT_STATUS_LANE_2_CORR_CW			BIT(5)
+#define RSFEC_RX_HOLD_INT_STATUS_LANE_2_UNCORR_CW		BIT(6)
+
+/* 0x17C RSFEC RX Hold Interrupt Status Lane 3 */
+#define RSFEC_RX_HOLD_INT_STATUS_LANE_3_SIG_FAIL		BIT(0)
+#define RSFEC_RX_HOLD_INT_STATUS_LANE_3_NOT_LOCKED		BIT(1)
+#define RSFEC_RX_HOLD_INT_STATUS_LANE_3_FEC_3BAD		BIT(2)
+#define RSFEC_RX_HOLD_INT_STATUS_LANE_3_AM_5BAD			BIT(3)
+#define RSFEC_RX_HOLD_INT_STATUS_LANE_3_HI_SER			BIT(4)
+#define RSFEC_RX_HOLD_INT_STATUS_LANE_3_CORR_CW			BIT(5)
+#define RSFEC_RX_HOLD_INT_STATUS_LANE_3_UNCORR_CW		BIT(6)
+
+/* 0x180: RSFEC RX Lanes Status */
+#define RSFEC_RX_LANES_STATUS_NOT_ALIGN				BIT(0)
+#define RSFEC_RX_LANES_STATUS_NOT_DESKEW			BIT(1)
+
+/* 0x188: RSFEC RX Lanes Hold Status */
+#define RSFEC_RX_LANES_HOLD_STATUS_NOT_ALIGN			BIT(0)
+#define RSFEC_RX_LANES_HOLD_STATUS_NOT_DESKEW			BIT(1)
+
+/* 0x18C: RSFEC RX Lanes Hold Interrupt Status */
+#define RSFEC_RX_LANES_HOLD_INT_STATUS_NOT_ALIGN		BIT(0)
+#define RSFEC_RX_LANES_HOLD_INT_STATUS_NOT_DESKEW		BIT(1)
+
+/* 0x1A0: RSFEC RX Lane 0 Mapping */
+#define RSFEC_RX_LANE_0_MAPPING_FEC_LANE			0x3
+
+/* 0x1A4: RSFEC RX Lane 1 Mapping */
+#define RSFEC_RX_LANE_1_MAPPING_FEC_LANE			0x3
+
+/* 0x1A8: RSFEC RX Lane 2 Mapping */
+#define RSFEC_RX_LANE_2_MAPPING_FEC_LANE			0x3
+
+/* 0x1AC: RSFEC RX Lane 3 Mapping */
+#define RSFEC_RX_LANE_3_MAPPING_FEC_LANE			0x3
+
+/* 0x1B0: RSFEC RX FEC Lane 0 Skew */
+#define RSFEC_RX_FEC_LANE_0_SKEW_VAL				0x7F
+
+/* 0x1B4: RSFEC RX FEC Lane 1 Skew */
+#define RSFEC_RX_FEC_LANE_1_SKEW_VAL				0x7F
+
+/* 0x1B8: RSFEC RX FEC Lane 2 Skew */
+#define RSFEC_RX_FEC_LANE_2_SKEW_VAL				0x7F
+
+/* 0x1BC: RSFEC RX FEC Lane 3 Skew */
+#define RSFEC_RX_FEC_LANE_3_SKEW_VAL				0x7F
+
+/* 0x1C0: RSFEC RX Lane 0 Codeword Position */
+#define RSFEC_RX_LANE_0_CW_POS					0x1FFF
+
+/* 0x1C4: RSFEC RX Lane 1 Codeword Position */
+#define RSFEC_RX_LANE_1_CW_POS					0x1FFF
+
+/* 0x1C8: RSFEC RX Lane 2 Codeword Position */
+#define RSFEC_RX_LANE_2_CW_POS					0x1FFF
+
+/* 0x1CC: RSFEC RX Lane 3 Codeword Position */
+#define RSFEC_RX_LANE_3_CW_POS					0x1FFF
+
+/* 0x1D0 RSFEC SRAM ECC Hold Status */
+#define RSFEC_SRAM_ECC_HOLD_STATUS_SBE				0xFF
+#define RSFEC_SRAM_ECC_HOLD_STATUS_MBE				(0xFF << 8)
+
+/* 0x1E0 RSFEC TX Lane 0 Error Injection Mode */
+#define RSFEC_TX_LANE_0_ERR_INJ_MODE_RATE			0xFF
+#define RSFEC_TX_LANE_0_ERR_INJ_MODE_PAT			(0xFF << 8)
+
+/* 0x1E4 RSFEC TX Lane 1 Error Injection Mode */
+#define RSFEC_TX_LANE_1_ERR_INJ_MODE_RATE			0xFF
+#define RSFEC_TX_LANE_1_ERR_INJ_MODE_PAT			(0xFF << 8)
+
+/* 0x1E8 RSFEC TX Lane 2 Error Injection Mode */
+#define RSFEC_TX_LANE_2_ERR_INJ_MODE_RATE			0xFF
+#define RSFEC_TX_LANE_2_ERR_INJ_MODE_PAT			(0xFF << 8)
+
+/* 0x1EC RSFEC TX Lane 3 Error Injection Mode */
+#define RSFEC_TX_LANE_3_ERR_INJ_MODE_RATE			0xFF
+#define RSFEC_TX_LANE_3_ERR_INJ_MODE_PAT			(0xFF << 8)
+
+/* 0x1F0 RSFEC TX Lane 0 Error Injection Status */
+#define RSFEC_TX_LANE_0_ERR_INJ_STATUS_INJ0S			0xFF
+#define RSFEC_TX_LANE_0_ERR_INJ_STATUS_INJ1S			(0xFF << 8)
+
+/* 0x1F4 RSFEC TX Lane 1 Error Injection Status */
+#define RSFEC_TX_LANE_1_ERR_INJ_STATUS_INJ0S			0xFF
+#define RSFEC_TX_LANE_1_ERR_INJ_STATUS_INJ1S			(0xFF << 8)
+
+/* 0x1F8 RSFEC TX Lane 2 Error Injection Status */
+#define RSFEC_TX_LANE_2_ERR_INJ_STATUS_INJ0S			0xFF
+#define RSFEC_TX_LANE_2_ERR_INJ_STATUS_INJ1S			(0xFF << 8)
+
+/* 0x1FC RSFEC TX Lane 3 Error Injection Status */
+#define RSFEC_TX_LANE_3_ERR_INJ_STATUS_INJ0S			0xFF
+#define RSFEC_TX_LANE_3_ERR_INJ_STATUS_INJ1S			(0xFF << 8)
+
+/* 0x200 RSFEC Lane 0 Corrected Code Words Count (Low) */
+#define RSFEC_LANE_0_CORR_CW_CNT_LO				0xFFFFFFFF
+
+/* 0x208 RSFEC Lane 1 Corrected Code Words Count (Low) */
+#define RSFEC_LANE_1_CORR_CW_CNT_LO				0xFFFFFFFF
+
+/* 0x210 RSFEC Lane 2 Corrected Code Words Count (Low) */
+#define RSFEC_LANE_2_CORR_CW_CNT_LO				0xFFFFFFFF
+
+/* 0x218 RSFEC Lane 3 Corrected Code Words Count (Low) */
+#define RSFEC_LANE_3_CORR_CW_CNT_LO				0xFFFFFFFF
+
+/* 0x200 RSFEC Lane 0 Corrected Code Words Count (High) */
+#define RSFEC_LANE_0_CORR_CW_CNT_HI				0xFFFFFFFF
+
+/* 0x204 RSFEC Lane 1 Corrected Code Words Count (High) */
+#define RSFEC_LANE_1_CORR_CW_CNT_HI				0xFFFFFFFF
+
+/* 0x20C RSFEC Lane 2 Corrected Code Words Count (High) */
+#define RSFEC_LANE_2_CORR_CW_CNT_HI				0xFFFFFFFF
+
+/* 0x21C RSFEC Lane 3 Corrected Code Words Count (High) */
+#define RSFEC_LANE_3_CORR_CW_CNT_HI		0xFFFFFFFF
+
+/* 0x220 RSFEC Lane 0 Uncorrected Code Words Count (Low) */
+#define RSFEC_LANE_0_UNCORR_CW_CNT_LO				0xFFFFFFFF
+
+/* 0x228 RSFEC Lane 1 Uncorrected Code Words Count (Low) */
+#define RSFEC_LANE_1_UNCORR_CW_CNT_LO				0xFFFFFFFF
+
+/* 0x230 RSFEC Lane 2 Uncorrected Code Words Count (Low) */
+#define RSFEC_LANE_2_UNCORR_CW_CNT_LO				0xFFFFFFFF
+
+/* 0x238 RSFEC Lane 3 Uncorrected Code Words Count (Low) */
+#define RSFEC_LANE_3_UNCORR_CW_CNT_LO				0xFFFFFFFF
+
+/* 0x224 RSFEC Lane 0 Uncorrected Code Words Count (High) */
+#define RSFEC_LANE_0_UNCORR_CW_CNT_HI				0xFFFFFFFF
+
+/* 0x22C RSFEC Lane 1 Uncorrected Code Words Count (High) */
+#define RSFEC_LANE_1_UNCORR_CW_CNT_HI				0xFFFFFFFF
+
+/* 0x234 RSFEC Lane 2 Uncorrected Code Words Count (High) */
+#define RSFEC_LANE_2_UNCORR_CW_CNT_HI				0xFFFFFFFF
+
+/* 0x23C RSFEC Lane 3 Uncorrected Code Words Count (High) */
+#define RSFEC_LANE_3_UNCORR_CW_CNT_HI				0xFFFFFFFF
+
+/* 0x240: RSFEC Lane 0 Corrected Symbol Count (Low) */
+#define RSFEC_LANE_0_CORR_SYM_CNT_LO				0xFFFFFFFF
+
+/* 0x248: RSFEC Lane 1 Corrected Symbol Count (Low) */
+#define RSFEC_LANE_1_CORR_SYM_CNT_LO				0xFFFFFFFF
+
+/* 0x250: RSFEC Lane 2 Corrected Symbol Count (Low) */
+#define RSFEC_LANE_2_CORR_SYM_CNT_LO				0xFFFFFFFF
+
+/* 0x258: RSFEC Lane 3 Corrected Symbol Count (Low) */
+#define RSFEC_LANE_3_CORR_SYM_CNT_LO				0xFFFFFFFF
+
+/* 0x244: RSFEC Lane 0 Corrected Symbol Count (High) */
+#define RSFEC_LANE_0_CORR_SYM_CNT_HI				0xFFFFFFFF
+
+/* 0x24C: RSFEC Lane 1 Corrected Symbol Count (High) */
+#define RSFEC_LANE_1_CORR_SYM_CNT_HI				0xFFFFFFFF
+
+/* 0x254: RSFEC Lane 2 Corrected Symbol Count (High) */
+#define RSFEC_LANE_2_CORR_SYM_CNT_HI				0xFFFFFFFF
+
+/* 0x25C: RSFEC Lane 3 Corrected Symbol Count (High) */
+#define RSFEC_LANE_3_CORR_SYM_CNT_HI				0xFFFFFFFF
+
+/* 0x260: RSFEC Lane 0 Corrected 0s Count (Low) */
+#define RSFEC_LANE_0_CORR_0S_CNT_LO				0xFFFFFFFF
+
+/* 0x268: RSFEC Lane 1 Corrected 0s Count (Low) */
+#define RSFEC_LANE_1_CORR_0S_CNT_LO				0xFFFFFFFF
+
+/* 0x270: RSFEC Lane 2 Corrected 0s Count (Low) */
+#define RSFEC_LANE_2_CORR_0S_CNT_LO				0xFFFFFFFF
+
+/* 0x268: RSFEC Lane 3 Corrected 0s Count (Low) */
+#define RSFEC_LANE_3_CORR_0S_CNT_LO				0xFFFFFFFF
+
+/* 0x260: RSFEC Lane 0 Corrected 0s Count (High) */
+#define RSFEC_LANE_0_CORR_0S_CNT_HI				0xFFFFFFFF
+
+/* 0x268: RSFEC Lane 1 Corrected 0s Count (High) */
+#define RSFEC_LANE_1_CORR_0S_CNT_HI				0xFFFFFFFF
+
+/* 0x270: RSFEC Lane 2 Corrected 0s Count (High) */
+#define RSFEC_LANE_2_CORR_0S_CNT_HI				0xFFFFFFFF
+
+/* 0x268: RSFEC Lane 3 Corrected 0s Count (High) */
+#define RSFEC_LANE_3_CORR_0S_CNT_HI				0xFFFFFFFF
+
+/* 0x260: RSFEC Lane 0 Corrected 1s Count (Low) */
+#define RSFEC_LANE_0_CORR_1S_CNT_LO				0xFFFFFFFF
+
+/* 0x268: RSFEC Lane 1 Corrected 1s Count (Low) */
+#define RSFEC_LANE_1_CORR_1S_CNT_LO				0xFFFFFFFF
+
+/* 0x270: RSFEC Lane 2 Corrected 1s Count (Low) */
+#define RSFEC_LANE_2_CORR_1S_CNT_LO				0xFFFFFFFF
+
+/* 0x268: RSFEC Lane 3 Corrected 1s Count (Low) */
+#define RSFEC_LANE_3_CORR_1S_CNT_LO				0xFFFFFFFF
+
+/* 0x260: RSFEC Lane 0 Corrected 1s Count (High) */
+#define RSFEC_LANE_0_CORR_1S_CNT_HI				0xFFFFFFFF
+
+/* 0x268: RSFEC Lane 1 Corrected 1s Count (High) */
+#define RSFEC_LANE_1_CORR_1S_CNT_HI				0xFFFFFFFF
+
+/* 0x270: RSFEC Lane 2 Corrected 1s Count (High) */
+#define RSFEC_LANE_2_CORR_1S_CNT_HI				0xFFFFFFFF
+
+/* 0x268: RSFEC Lane 3 Corrected 1s Count (High) */
+#define RSFEC_LANE_3_CORR_1S_CNT_HI				0xFFFFFFFF
+
+/* Transceiver Reconfiguration Interface
+ * PMA AVMM
+ * Bit Definitions
+ */
+/* 0x004 */
+#define XCVR_PMA_AVMM_004_TX_DATAPATH_CLK_EN			BIT(0)
+#define XCVR_PMA_AVMM_004_TRANSMIT_FULL_CLK_OUT_EN		BIT(1)
+#define XCVR_PMA_AVMM_004_TRANSMIT_DATA_INPUT_SEL		(0x7 << 2)
+#define XCVR_PMA_AVMM_004_TRANSMIT_FULL_CLK_OUT_SEL		BIT(5)
+#define XCVR_PMA_AVMM_004_TRANSMIT_CLK_DATAPATH_SEL		BIT(6)
+#define XCVR_PMA_AVMM_004_TRANSMIT_ADAPTATION_ORD_SEL		BIT(7)
+
+/* 0x005 */
+#define XCVR_PMA_AVMM_005_TRANSMIT_MULTI_LANE_DATA_SEL		0x3
+#define XCVR_PMA_AVMM_005_TX_GBOX_CLK_EN			BIT(2)
+#define XCVR_PMA_AVMM_005_TX_DATAPATH_CLK_EN			BIT(3)
+#define XCVR_PMA_AVMM_005_TX_PCS_DIV2_CLK_INPUT_EN		BIT(4)
+#define XCVR_PMA_AVMM_005_TX_FEC_DIV2_CLK_INPUT_EN		BIT(5)
+#define XCVR_PMA_AVMM_005_TX_EHIP_DIV2_CLK_INPUT_EN		BIT(6)
+#define XCVR_PMA_AVMM_005_TX_DIRECT_CLK_INPUT_EN		BIT(7)
+
+/* 0x006 */
+#define XCVR_PMA_AVMM_006_RX_DATAPATH_CLK_EN			BIT(0)
+#define XCVR_PMA_AVMM_006_RECV_FULL_CLK_OUT_EN			BIT(1)
+#define XCVR_PMA_AVMM_006_RECV_HALF_CLK_OUT_EN			BIT(2)
+#define XCVR_PMA_AVMM_006_RECV_DIV66_CLK_OUT_EN			BIT(3)
+#define XCVR_PMA_AVMM_006_RECV_ADAPTATION_ORD_SEL		BIT(4)
+#define XCVR_PMA_AVMM_006_RECV_ADAPTER_DATA_SEL			(0x3 << 5)
+#define XCVR_PMA_AVMM_006_RECV_REVERSE_BIT_ORDER_IN_GBOX	BIT(7)
+
+/* 0x007 */
+#define XCVR_PMA_AVMM_007_RECV_REVERSE_64_66_SYNC_HEADER	BIT(0)
+#define XCVR_PMA_AVMM_007_RX_FIFO_READ_CLK_EN			BIT(1)
+#define XCVR_PMA_AVMM_007_RECV_GBOX_FIFO_WR_CLK_EN		BIT(2)
+#define XCVR_PMA_AVMM_007_RECV_DIRECT_DATA_MODE_MULTI_LANE	(0x3 << 3)
+#define XCVR_PMA_AVMM_007_SEL_RX_FIFO_RD_CLK			(0x3 << 5)
+#define XCVR_PMA_AVMM_007_RX_ADAPTER_CLK_EN			BIT(7)
+
+/* 0x008 TX Gearbox*/
+#define XCVR_PMA_AVMM_008_REVERSE_DATA_BIT_TRANS_ORDER		BIT(0)
+#define XCVR_PMA_AVMM_008_REVERSE_64_66_SYNC_HEADER_BIT		BIT(1)
+#define XCVR_PMA_AVMM_008_DYNAMIC_BITSLIP_EN			BIT(3)
+#define XCVR_PMA_AVMM_008_64_66_SYNC_HEADER_LOC			BIT(5)
+
+/* 0x009 TX Deskew */
+#define XCVR_PMA_AVMM_009_TX_DESKEW_MULTI_LANE_MODE		0x3
+#define XCVR_PMA_AVMM_009_TX_DESKEW_STATUS			(0x3 << 2)
+#define XCVR_PMA_AVMM_009_TX_DESKEW_ALIGN_STATUS		BIT(4)
+#define XCVR_PMA_AVMM_009_RX_FIFO_BIT_67_SEL			BIT(5)
+
+/* 0x00A */
+#define XCVR_PMA_AVMM_00A_TRANSMIT_DESKEW_EN			0x7
+#define XCVR_PMA_AVMM_00A_DYNAMIC_RX_BITSLIP_EN			BIT(5)
+
+/* 0x010 */
+#define XCVR_PMA_AVMM_010_XCVR_RX_FIFO_EMPTY_THRESHOLD		0x1F
+#define XCVR_PMA_AVMM_010_XCVR_RX_FIFO_ALMOST_EMPTY_THRESHOLD	(0x3 << 6)
+
+/* 0x011 */
+#define XCVR_PMA_AVMM_011_XCVR_RX_FIFO_ALMOST_EMPTY_THRESHOLD	0x7
+#define XCVR_PMA_AVMM_011_XCVR_RX_FIFO_FULL_THRESHOLD		0xF0
+
+/* 0x012 */
+#define XCVR_PMA_AVMM_012_XCVR_RX_FIFO_FULL_THRESHOLD		BIT(0)
+#define XCVR_PMA_AVMM_012_XCVR_RX_FIFO_ALMOST_FULL_THRESHOLD	(0x1F << 2)
+
+/* 0x013 */
+#define XCVR_PMA_AVMM_013_RX_FIFO_RD_WHEN_EMPTY			BIT(6)
+#define XCVR_PMA_AVMM_013_RX_FIFO_RD_WHEN_FULL			BIT(7)
+
+/* 0x014 */
+#define XCVR_PMA_AVMM_014_XCVR_TX_FIFO_EMPTY_THRESHOLD		0x1F
+#define XCVR_PMA_AVMM_014_XCVR_TX_FIFO_ALMOST_EMPTY_THRESHOLD	(0x3 << 6)
+
+/* 0x015 */
+#define XCVR_PMA_AVMM_015_XCVR_TX_FIFO_ALMOST_EMPTY_THRESHOLD	0x7
+#define XCVR_PMA_AVMM_015_XCVR_TX_FIFO_FULL_THRESHOLD		0xF0
+
+/* 0x016 */
+#define XCVR_PMA_AVMM_016_XCVR_TX_FIFO_FULL_THRESHOLD		BIT(0)
+#define XCVR_PMA_AVMM_016_XCVR_TX_FIFO_ALMOST_FULL_THRESHOLD	(0x1F << 2)
+
+/* 0x017 */
+#define XCVR_PMA_AVMM_017_TX_FIFO_PHASE_COMP_MODE		(0x3 << 4)
+#define XCVR_PMA_AVMM_017_TX_FIFO_WR_WHEN_FULL			BIT(6)
+#define XCVR_PMA_AVMM_017_TX_FIFO_RD_WHEN_EMPTY			BIT(7)
+
+/* 0x01C */
+#define XCVR_PMA_AVMM_01C_TRANSMIT_OUTPUT_VAL			0xFF
+#define XCVR_PMA_AVMM_01D_TRANSMIT_OUTPUT_VAL			0xFF
+#define XCVR_PMA_AVMM_01E_TRANSMIT_OUTPUT_VAL			0xFF
+#define XCVR_PMA_AVMM_01F_TRANSMIT_OUTPUT_VAL			0xFF
+#define XCVR_PMA_AVMM_020_TRANSMIT_OUTPUT_VAL			0xFF
+#define XCVR_PMA_AVMM_021_TRANSMIT_OUTPUT_VAL			0xFF
+#define XCVR_PMA_AVMM_022_TRANSMIT_OUTPUT_VAL			0xFF
+#define XCVR_PMA_AVMM_023_TRANSMIT_OUTPUT_VAL			0xFF
+#define XCVR_PMA_AVMM_024_TRANSMIT_OUTPUT_VAL			0x7
+
+/* 0x034 */
+#define XCVR_PMA_AVMM_034_SERIALIZATION_FACTOR_RX_BIT_CNT	0x3
+#define XCVR_PMA_AVMM_034_RX_BIT_CNT_RESET_VAL			0xF0
+
+/* 0x035 */
+#define XCVR_PMA_AVMM_035_RX_BIT_CNT_RESET_VAL			0xFF
+
+/* 0x036 */
+#define XCVR_PMA_AVMM_036_RX_BIT_CNT_RESET_VAL			BIT(0)
+#define XCVR_PMA_AVMM_036_RDWR_SELF_CLR				BIT(3)
+#define XCVR_PMA_AVMM_036_TRANSMIT_DIV66_CLK_OUT		BIT(4)
+
+/* 0x037 */
+#define XCVR_PMA_AVMM_037_TRANSMIT_SCLK_EN			BIT(0)
+#define XCVR_PMA_AVMM_037_INC_TX_FIFO_LATENCY_SEL		0x30
+#define XCVR_PMA_AVMM_037_RECV_SCLK_EN				BIT(4)
+#define XCVR_PMA_AVMM_037_INC_RX_FIFO_LATENCY_SEL		(0x3 << 5)
+#define XCVR_PMA_AVMM_037_ASYNC_LATENCY_PULSE_SEL		BIT(7)
+
+/* 0x038 */
+#define XCVR_PMA_AVMM_038_DCC_BYPASS_DISABLE			BIT(0)
+#define XCVR_PMA_AVMM_038_DCC_MASTER_EN				BIT(1)
+#define XCVR_PMA_AVMM_038_DCC_SEL_CONT_CAL			BIT(2)
+
+/* 0x03C */
+#define XCVR_PMA_AVMM_03C_DCC_EN_FOR_FSM			BIT(1)
+
+/* 0x080 */
+#define XCVR_PMA_AVMM_080_CORE_PMA_ATTR_CTRL			0xF
+#define XCVR_PMA_AVMM_081_CORE_PMA_ATTR_CTRL			0xF
+#define XCVR_PMA_AVMM_084_CORE_PMA_ATTR_DATA			0xF
+#define XCVR_PMA_AVMM_085_CORE_PMA_ATTR_DATA			0xF
+#define XCVR_PMA_AVMM_086_CORE_PMA_ATTR_DATA			0xF
+#define XCVR_PMA_AVMM_087_CORE_PMA_ATTR_CODE			0xF
+#define XCVR_PMA_AVMM_088_CORE_PMA_ATTR_CODE_RET_VAL_LO		0xF
+#define XCVR_PMA_AVMM_089_CORE_PMA_ATTR_CODE_RET_VAL_HI		0xF
+#define XCVR_PMA_AVMM_088_PMA_INTERNAL_LOOPBACK			BIT(3)
+#define XCVR_PMA_AVMM_089_PMA_INTERNAL_LOOPBACK			BIT(0)
+#define XCVR_PMA_AVMM_088_PMA_RECEIVER_TUNING_CTRL		GENMASK(3, 1)
+#define XCVR_PMA_AVMM_089_PMA_RECEIVER_TUNING_CTRL		BIT(0)
+#define XCVR_PMA_AVMM_088_PMA_READ_RECEIVER_TUNING		BIT(0)
+#define XCVR_PMA_AVMM_08A_PMA_ATTR_SENT_SUCCESS			BIT(7)
+#define XCVR_PMA_AVMM_08B_PMA_FINISH_ATTR			BIT(0)
+#define XCVR_PMA_AVMM_08B_PMA_RELOAD_SUCCESS			GENMASK(3, 2)
+#define XCVR_PMA_AVMM_090_LD_084_087_PMA			BIT(0)
+#define XCVR_PMA_AVMM_091_LD_INIT_PMA_OR_LAST_SEL		BIT(0)
+#define XCVR_PMA_AVMM_095_PMA_CALIBRATE				BIT(5)
+#define XCVR_PMA_AVMM_0EC_REF_CLK_SEL_IN_A_0			0x0
+#define XCVR_PMA_AVMM_0EC_REF_CLK_SEL_IN_A_1			0x1
+#define XCVR_PMA_AVMM_0EC_REF_CLK_SEL_IN_A_2			0x2
+#define XCVR_PMA_AVMM_0EC_REF_CLK_SEL_IN_A_3			0x3
+#define XCVR_PMA_AVMM_0EC_REF_CLK_SEL_IN_A_4			0x4
+#define XCVR_PMA_AVMM_0EC_REF_CLK_SEL_IN_A_5			0x5
+#define XCVR_PMA_AVMM_0EC_REF_CLK_SEL_IN_A_6			0x6
+#define XCVR_PMA_AVMM_0EC_REF_CLK_SEL_IN_A_7			0x7
+#define XCVR_PMA_AVMM_0EC_REF_CLK_SEL_IN_A_8			0x8
+#define XCVR_PMA_AVMM_0EC_REF_CLK_SEL_IN_REFCLK4_0		0x00
+#define XCVR_PMA_AVMM_0EC_REF_CLK_SEL_IN_REFCLK4_1		0x10
+#define XCVR_PMA_AVMM_0EC_REF_CLK_SEL_IN_REFCLK4_2		0x20
+#define XCVR_PMA_AVMM_0EC_REF_CLK_SEL_IN_REFCLK4_3		0x30
+#define XCVR_PMA_AVMM_0EC_REF_CLK_SEL_IN_REFCLK4_4		0x40
+#define XCVR_PMA_AVMM_0EC_REF_CLK_SEL_IN_REFCLK4_5		0x50
+#define XCVR_PMA_AVMM_0EC_REF_CLK_SEL_IN_REFCLK4_6		0x60
+#define XCVR_PMA_AVMM_0EC_REF_CLK_SEL_IN_REFCLK4_7		0x70
+#define XCVR_PMA_AVMM_0EC_REF_CLK_SEL_IN_REFCLK4_8		0x80
+#define XCVR_PMA_AVMM_0EE_REF_CLK_SEL_IN_REFCLK0_0		0x0
+#define XCVR_PMA_AVMM_0EE_REF_CLK_SEL_IN_REFCLK0_1		0x1
+#define XCVR_PMA_AVMM_0EE_REF_CLK_SEL_IN_REFCLK0_2		0x2
+#define XCVR_PMA_AVMM_0EE_REF_CLK_SEL_IN_REFCLK0_3		0x3
+#define XCVR_PMA_AVMM_0EE_REF_CLK_SEL_IN_REFCLK0_4		0x4
+#define XCVR_PMA_AVMM_0EE_REF_CLK_SEL_IN_REFCLK0_5		0x5
+#define XCVR_PMA_AVMM_0EE_REF_CLK_SEL_IN_REFCLK0_6		0x6
+#define XCVR_PMA_AVMM_0EE_REF_CLK_SEL_IN_REFCLK0_7		0x7
+#define XCVR_PMA_AVMM_0EE_REF_CLK_SEL_IN_REFCLK0_8		0x8
+#define XCVR_PMA_AVMM_0EE_REF_CLK_SEL_IN_REFCLK1_0		0x00
+#define XCVR_PMA_AVMM_0EE_REF_CLK_SEL_IN_REFCLK1_1		0x10
+#define XCVR_PMA_AVMM_0EE_REF_CLK_SEL_IN_REFCLK1_2		0x20
+#define XCVR_PMA_AVMM_0EE_REF_CLK_SEL_IN_REFCLK1_3		0x30
+#define XCVR_PMA_AVMM_0EE_REF_CLK_SEL_IN_REFCLK1_4		0x40
+#define XCVR_PMA_AVMM_0EE_REF_CLK_SEL_IN_REFCLK1_5		0x50
+#define XCVR_PMA_AVMM_0EE_REF_CLK_SEL_IN_REFCLK1_6		0x60
+#define XCVR_PMA_AVMM_0EE_REF_CLK_SEL_IN_REFCLK1_7		0x70
+#define XCVR_PMA_AVMM_0EE_REF_CLK_SEL_IN_REFCLK1_8		0x80
+#define XCVR_PMA_AVMM_0EF_REF_CLK_SEL_IN_REFCLK2_0		0x0
+#define XCVR_PMA_AVMM_0EF_REF_CLK_SEL_IN_REFCLK2_1		0x1
+#define XCVR_PMA_AVMM_0EF_REF_CLK_SEL_IN_REFCLK2_2		0x2
+#define XCVR_PMA_AVMM_0EF_REF_CLK_SEL_IN_REFCLK2_3		0x3
+#define XCVR_PMA_AVMM_0EF_REF_CLK_SEL_IN_REFCLK2_4		0x4
+#define XCVR_PMA_AVMM_0EF_REF_CLK_SEL_IN_REFCLK2_5		0x5
+#define XCVR_PMA_AVMM_0EF_REF_CLK_SEL_IN_REFCLK2_6		0x6
+#define XCVR_PMA_AVMM_0EF_REF_CLK_SEL_IN_REFCLK2_7		0x7
+#define XCVR_PMA_AVMM_0EF_REF_CLK_SEL_IN_REFCLK2_8		0x8
+#define XCVR_PMA_AVMM_0EF_REF_CLK_SEL_IN_REFCLK3_0		0x00
+#define XCVR_PMA_AVMM_0EF_REF_CLK_SEL_IN_REFCLK3_1		0x10
+#define XCVR_PMA_AVMM_0EF_REF_CLK_SEL_IN_REFCLK3_2		0x20
+#define XCVR_PMA_AVMM_0EF_REF_CLK_SEL_IN_REFCLK3_3		0x30
+#define XCVR_PMA_AVMM_0EF_REF_CLK_SEL_IN_REFCLK3_4		0x40
+#define XCVR_PMA_AVMM_0EF_REF_CLK_SEL_IN_REFCLK3_5		0x50
+#define XCVR_PMA_AVMM_0EF_REF_CLK_SEL_IN_REFCLK3_6		0x60
+#define XCVR_PMA_AVMM_0EF_REF_CLK_SEL_IN_REFCLK3_7		0x70
+#define XCVR_PMA_AVMM_0EF_REF_CLK_SEL_IN_REFCLK3_8		0x80
+
+/* PMA Analog Reset or PMA Operating Mode - SEE ETILE PHY USER GUIDE */
+#define XCVR_PMA_AVMM_200_FIELD			0xFF
+#define XCVR_PMA_AVMM_201_FIELD			0xFF
+#define XCVR_PMA_AVMM_202_FIELD			0xFF
+#define XCVR_PMA_AVMM_203_FIELD			0xFF
+
+/* PMA Others */
+#define XCVR_PMA_AVMM_204_RET_PHYS_CHANNEL_NUMBER		0xFF
+#define XCVR_PMA_AVMM_207_OP_ON_200_203_SUCCESS			BIT(0)
+#define XCVR_PMA_AVMM_207_LAST_OP_ON_200_203_SUCCESS		BIT(7)
+
+/* Transceiver Reconfiguration Interface
+ * PMA Capability
+ * Bit Definitions
+ */
+/* 0x40000: IP Identifier 0 */
+#define XCVR_PMA_CAP_IP_ID_0					0xFF
+
+/* 0x40001: IP Identifier 1 */
+#define XCVR_PMA_CAP_IP_ID_1					0xFF
+
+/* 0x40002: IP Identifier 2 */
+#define XCVR_PMA_CAP_IP_ID_2					0xFF
+
+/* 0x40003: IP Identifier 3 */
+#define XCVR_PMA_CAP_IP_ID_3					0xFF
+
+/* 0x40004: Status Register Enabled */
+#define XCVR_PMA_CAP_STATUS_REG_EN				BIT(0)
+
+/* 0x40005: Control Register Enabled */
+#define XCVR_PMA_CAP_CTRL_REG_EN				BIT(0)
+
+/* 0x40010: Number of Channels */
+#define XCVR_PMA_CAP_NUMBER_OF_CHANNELS				0xFF
+
+/* 0x40011: Channel Number */
+#define XCVR_PMA_CAP_CHANNEL_NUMBER				0xFF
+
+/* 0x40012: Transceiver Mode */
+#define XCVR_PMA_CAP_MODE					0x3
+
+/* Transceiver Reconfiguration Interface
+ * PMA Control and Status
+ * Bit Definitions
+ */
+/* 0x40080: RX Locked to Data Status */
+#define XCVR_PMA_CTRL_STAT_RX_LOCKED_TO_DATA_STATUS		BIT(0)
+
+/* 0x40081: TXRX Ready Status */
+#define XCVR_PMA_CTRL_STAT_TX_READY_STATUS			BIT(0)
+#define XCVR_PMA_CTRL_STAT_RX_READY_STATUS			BIT(1)
+
+/* 0x40082: TXRX Transfer Status */
+#define XCVR_PMA_CTRL_STAT_TX_TRANSFER_STATUS			BIT(0)
+#define XCVR_PMA_CTRL_STAT_RX_TRANSFER_STATUS			BIT(1)
+
+/* 0x400E2: TXRX Reset Configuration */
+#define XCVR_PMA_CTRL_STAT_RX_PMA_INT_RESET			BIT(0)
+#define XCVR_PMA_CTRL_STAT_RX_EMIB_RESET			BIT(1)
+#define XCVR_PMA_CTRL_STAT_TX_PMA_INT_RESET			BIT(2)
+#define XCVR_PMA_CTRL_STAT_TX_EMIB_RESET			BIT(3)
+#define XCVR_PMA_CTRL_STAT_RX_PMA_INT_RESET_OVERRIDE		BIT(4)
+#define XCVR_PMA_CTRL_STAT_RX_EMIB_RESET_OVERRIDE		BIT(5)
+#define XCVR_PMA_CTRL_STAT_TX_PMA_INT_RESET_OVERRIDE		BIT(6)
+#define XCVR_PMA_CTRL_STAT_TX_EMIB_RESET_OVERRIDE		BIT(7)
+
+/* 0x40140: Configuration Profile Select */
+#define XCVR_PMA_CTRL_STAT_SET_CFG_PROFILE			0x7
+#define XCVR_PMA_CTRL_STAT_START_STREAM				BIT(7)
+
+/* 0x40141: Busy Status */
+#define XCVR_PMA_CTRL_STAT_BUSY_STATUS				BIT(0)
+
+/* 0x40143: PMA Configuration */
+#define XCVR_PMA_CTRL_STAT_PMA_CFG_SELECT			0x7
+#define XCVR_PMA_CTRL_STAT_REQ_PMA_CFG_LOAD			BIT(7)
+
+/* 0x40144: PMA Configuration Loading Status */
+#define XCVR_PMA_CTRL_STAT_RCP_LOAD_FINISH			BIT(0)
+#define XCVR_PMA_CTRL_STAT_RCP_LOAD_TIMEOUT			BIT(1)
+#define XCVR_PMA_CTRL_STAT_RCP_LOAD_BUSY			BIT(2)
+
+/* Ethernet Reconfiguration Interface Register Base Addresses
+ * Word Offset	Register Type
+ * 0x0B0-0x0E8	Auto Negotiation and Link Training registers
+ * 0x300-0x3FF	PHY registers
+ * 0x310-0x310	Reset Controller registers
+ * 0x400-0x4FF	TX MAC registers
+ * 0x500-0x5FF	RX MAC registers
+ * 0x600-0x7FF	Pause and Priority- Based Flow Control registers
+ * 0x800-0x8FF	TX Statistics Counter registers
+ * 0x900-0x9FF	RX Statistics Counter registers
+ * 0xA00-0xAFF	TX 1588 PTP registers
+ * 0xB00-0xBFF	RX 1588 PTP registers
+ * struct Definitions
+ */
+/* 0x0B0-0x0E8	Auto Negotiation and Link Training registers
+ * Note: Belongs within intel_fpga_etile_eth struct
+ */
+struct intel_fpga_etile_eth_auto_neg_link {
+	u32 anlt_sequencer_config;			//0x0B0
+	u32 anlt_sequencer_status;			//0x0B1
+	u32 reserved_0b2[14];				//0x0B2-0xBF
+	u32 auto_neg_conf_1;				//0x0C0
+	u32 auto_neg_conf_2;				//0x0C1
+	u32 auto_neg_stat;				//0x0C2
+	u32 auto_neg_conf_3;				//0x0C3
+	u32 auto_neg_conf_4;				//0x0C4
+	u32 auto_neg_conf_5;				//0x0C5
+	u32 auto_neg_conf_6;				//0x0C6
+	u32 auto_neg_stat_1;				//0x0C7
+	u32 auto_neg_stat_2;				//0x0C8
+	u32 auto_neg_stat_3;				//0x0C9
+	u32 auto_neg_stat_4;				//0x0CA
+	u32 auto_neg_stat_5;				//0x0CB
+	u32 auto_neg_an_channel_override;		//0x0CC
+	u32 auto_neg_const_next_page_override;		//0x0CD
+	u32 auto_neg_const_next_page_lp_stat;		//0x0CE
+	u32 reserved_0cf;				//0x0CF
+	u32 link_train_conf_1;				//0x0D0
+	u32 reserved_0d1;				//0x0D1
+	u32 link_train_stat_1;				//0x0D2
+	u32 link_train_conf_lane_0;			//0x0D3
+	u32 reserved_0d4[12];				//0x0D4-0x0DF
+	u32 link_train_conf_lane_1;			//0x0E0
+	u32 reserved_0e1[3];				//0x0E1-0x0E3
+	u32 link_train_conf_lane_2;			//0x0E4
+	u32 reserved_0e5[3];				//0x0E5-0x0E7
+	u32 link_train_conf_lane_3;			//0x0E8
+};
+
+/* 0x300-0x3FF	PHY registers
+ * Note: Belongs within intel_fpga_etile_eth struct
+ */
+struct intel_fpga_etile_eth_phy {
+	u32 phy_rev_id;					//0x300
+	u32 phy_scratch;				//0x301
+	u32 reserved_302[11];				//0x302-0x30C
+	u32 phy_loopback;				//0x30D
+	u32 reserved_30e[2];				//0x30E-0x30F
+	u32 phy_config;					//0x310
+	u32 reserved_311[16];				//0x311-0x320
+	u32 phy_cdr_pll_locked;				//0x321
+	u32 phy_tx_datapath_ready;			//0x322
+	u32 phy_frm_err_detect;				//0x323
+	u32 phy_clr_frm_err;				//0x324
+	u32 reserved_325;				//0x325
+	u32 phy_pcs_stat_anlt;				//0x326
+	u32 phy_pcs_err_inject;				//0x327
+	u32 phy_am_lock;				//0x328
+	u32 phy_dskew_chng;				//0x329
+	u32 phy_ber_cnt;				//0x32A
+	u32 phy_aib_transfer_ready_stat;		//0x32B
+	u32 phy_soft_rc_reset_stat;			//0x32C
+	u32 reserved_32d[3];				//0x32D-0x32F
+	u32 phy_pcs_virtual_ln_0;			//0x330
+	u32 phy_pcs_virtual_ln_1;			//0x331
+	u32 phy_pcs_virtual_ln_2;			//0x332
+	u32 phy_pcs_virtual_ln_3;			//0x333
+	u32 reserved_334[13];				//0x334-0x340
+	u32 phy_recovered_clk_freq;			//0x341
+	u32 phy_tx_clk_freq;				//0x342
+	u32 reserved_343[13];				//0x343-0x34F
+	u32 phy_tx_pld_conf;				//0x350
+	u32 phy_tx_pld_stat;				//0x351
+	u32 reserved_352[2];				//0x352-0x353
+	u32 phy_dynamic_deskew_buf_stat;		//0x354
+	u32 phy_rx_pld_conf;				//0x355
+	u32 reserved_356[10];				//0x356-0x35F
+	u32 phy_rx_pcs_conf;				//0x360
+	u32 phy_bip_cnt_0;				//0x361
+	u32 phy_bip_cnt_1;				//0x362
+	u32 phy_bip_cnt_2;				//0x363
+	u32 phy_bip_cnt_3;				//0x364
+	u32 phy_bip_cnt_4;				//0x365
+	u32 phy_bip_cnt_5;				//0x366
+	u32 phy_bip_cnt_6;				//0x367
+	u32 phy_bip_cnt_7;				//0x368
+	u32 phy_bip_cnt_8;				//0x369
+	u32 phy_bip_cnt_9;				//0x36A
+	u32 phy_bip_cnt_10;				//0x36B
+	u32 phy_bip_cnt_11;				//0x36C
+	u32 phy_bip_cnt_12;				//0x36D
+	u32 phy_bip_cnt_13;				//0x36E
+	u32 phy_bip_cnt_14;				//0x36F
+	u32 phy_bip_cnt_15;				//0x370
+	u32 phy_bip_cnt_16;				//0x371
+	u32 phy_bip_cnt_17;				//0x372
+	u32 phy_bip_cnt_18;				//0x373
+	u32 phy_bip_cnt_19;				//0x374
+	u32 reserved_375[5];				//0x375-0x379
+	u32 phy_timer_window_hiber_check;		//0x37A
+	u32 phy_hiber_frm_err;				//0x37B
+	u32 phy_err_block_cnt;				//0x37C
+	u32 reserved_37d[2];				//0x37D-0x37E
+	u32 phy_deskew_dept_0;				//0x37F
+	u32 phy_deskew_dept_1;				//0x380
+	u32 phy_deskew_dept_2;				//0x381
+	u32 phy_deskew_dept_3;				//0x382
+	u32 phy_rx_pcs_test_err_cnt;			//0x383
+	u32 reserved_384[124];				//0x384-0x3FF
+};
+
+/* 0x400-0x4FF	TX MAC registers
+ * Note: Belongs within intel_fpga_etile_eth struct
+ */
+
+struct intel_fpga_etile_eth_tx_mac_10_25G {
+	u32 tx_mac_rev_id;				//0x400
+	u32 tx_mac_scratch;				//0x401
+	u32 reserved_402[3];				//0x402-0x404
+	u32 tx_mac_link_fault;				//0x405
+	u32 tx_mac_ipg_col_rem;				//0x406
+	u32 tx_mac_max_frm_size;			//0x407
+	u32 reserved_408[2];				//0x408-0x409
+	u32 tx_mac_conf;				//0x40A
+	u32 tx_mac_ehip_conf;				//0x40B
+	u32 tx_mac_source_addr_lower_bytes;		//0x40C
+	u32 tx_mac_source_addr_higher_bytes;		//0x40D
+	u32 reserved_40e[242];				//0x40E-0x4FF
+};
+
+/* 0x500-0x5FF	RX MAC registers
+ * Note: Belongs within intel_fpga_etile_eth struct
+ */
+
+struct intel_fpga_etile_eth_rx_mac_10_25G {
+	u32 rx_mac_rev_id;				//0x500
+	u32 rx_mac_scratch;				//0x501
+	u32 reserved_502[4];				//0x502-0x505
+	u32 rx_mac_max_frm_size;			//0x506
+	u32 rx_mac_frwd_rx_crc;				//0x507
+	u32 rx_max_link_fault;				//0x508
+	u32 reserved_509;				//0x509
+	u32 rx_mac_conf;				//0x50A
+	u32 rx_mac_ehip_conf;				//0x50B
+	u32 reserved_50C[244];				//0x50C-0x5FF
+};
+
+/* 0x600-0x7FF	Pause and Priority - Based Flow Control Registers
+ * Note: Belongs within intel_fpga_etile_eth struct
+ */
+struct intel_fpga_etile_eth_pause_priority {
+	u32 txsfc_module_revision_id;			// 0x600
+	u32 txsfc_scratch_register;			// 0x601
+	u32 reserved_602[3];				// 0x602-0x604
+	u32 enable_tx_pause_ports;			// 0x605
+	u32 tx_pause_request;				// 0x606
+	u32 enable_automatic_tx_pause_retransmission;	// 0x607
+	u32 retransmit_holdoff_quanta;			// 0x608
+	u32 retransmit_pause_quanta;			// 0x609
+	u32 enable_tx_xoff;				// 0x60A
+	u32 enable_uniform_holdoff;			// 0x60B
+	u32 set_uniform_holdoff;			// 0x60C
+	u32 flow_control_fields_lsb;			// 0x60D
+	u32 flow_control_fields_msb;			// 0x60E
+	u32 flow_control_frames_lsb;			// 0x60F
+	u32 flow_control_frames_msb;			// 0x610
+	u32 tx_flow_control_feature_cfg;		// 0x611
+	u32 reserved_612[14];				// 0x612-0x61F
+	u32 pause_quanta_0;				// 0x620
+	u32 pause_quanta_1;				// 0x621
+	u32 pause_quanta_2;				// 0x622
+	u32 pause_quanta_3;				// 0x623
+	u32 pause_quanta_4;				// 0x624
+	u32 pause_quanta_5;				// 0x625
+	u32 pause_quanta_6;				// 0x626
+	u32 pause_quanta_7;				// 0x627
+	u32 pfc_holdoff_quanta_0;			// 0x628
+	u32 pfc_holdoff_quanta_1;			// 0x629
+	u32 pfc_holdoff_quanta_2;			// 0x62A
+	u32 pfc_holdoff_quanta_3;			// 0x62B
+	u32 pfc_holdoff_quanta_4;			// 0x62C
+	u32 pfc_holdoff_quanta_5;			// 0x62D
+	u32 pfc_holdoff_quanta_6;			// 0x62E
+	u32 pfc_holdoff_quanta_7;			// 0x62F
+	u32 reserved_630[208];				// 0x630-0x6FF
+	u32 rxsfc_module_revision_id;			// 0x700
+	u32 rxsfc_scratch_register;			// 0x701
+	u32 reserved_702[3];				// 0x702-0x704
+	u32 enable_rx_pause_frame_processing_fields;	// 0x705
+	u32 forward_flow_control_frames;		// 0x706
+	u32 rx_pause_frames_lsb;			// 0x707
+	u32 rx_pause_frames_msb;			// 0x708
+	u32 rx_flow_control_feature_cfg;		// 0x709
+	u32 reserved_70A[246];				// 0x70A-0x7FF
+};
+
+/* 0x800-0x8FF	TX Statistics Counter registers
+ * Note: Belongs within intel_fpga_etile_eth struct
+ */
+struct intel_fpga_etile_eth_tx_stats {
+	u32 tx_fragments_lsb;				// 0x800
+	u32 tx_fragments_msb;				// 0x801
+	u32 tx_jabbers_lsb;				// 0x802
+	u32 tx_jabbers_msb;				// 0x803
+	u32 tx_fcserr_lsb;				// 0x804
+	u32 tx_fcserr_msb;				// 0x805
+	u32 tx_crcerr_okpkt_lsb;			// 0x806
+	u32 tx_crcerr_okpkt_msb;			// 0x807
+	u32 tx_mcast_data_err_lsb;			// 0x808
+	u32 tx_mcast_data_err_msb;			// 0x809
+	u32 tx_bcast_data_err_lsb;			// 0x80A
+	u32 tx_bcast_data_err_msb;			// 0x80B
+	u32 tx_ucast_data_err_lsb;			// 0x80C
+	u32 tx_ucast_data_err_msb;			// 0x80D
+	u32 tx_mcast_ctrl_err_lsb;			// 0x80E
+	u32 tx_mcast_ctrl_err_msb;			// 0x80F
+	u32 tx_bcast_ctrl_err_lsb;			// 0x810
+	u32 tx_bcast_ctrl_err_msb;			// 0x811
+	u32 tx_ucast_ctrl_err_lsb;			// 0x812
+	u32 tx_ucast_ctrl_err_msb;			// 0x813
+	u32 tx_pause_err_lsb;				// 0x814
+	u32 tx_pause_err_msb;				// 0x815
+	u32 tx_64b_lsb;					// 0x816
+	u32 tx_64b_msb;					// 0x817
+	u32 tx_65to127b_lsb;				// 0x818
+	u32 tx_65to127b_msb;				// 0x819
+	u32 tx_128to255b_lsb;				// 0x81A
+	u32 tx_128to255b_msb;				// 0x81B
+	u32 tx_256to511b_lsb;				// 0x81C
+	u32 tx_256to511b_msb;				// 0x81D
+	u32 tx_512to1023b_lsb;				// 0x81E
+	u32 tx_512to1023b_msb;				// 0x81F
+	u32 tx_1024to1518b_lsb;				// 0x820
+	u32 tx_1024to1518b_msb;				// 0x821
+	u32 tx_1519tomaxb_lsb;				// 0x822
+	u32 tx_1519tomaxb_msb;				// 0x823
+	u32 tx_oversize_lsb;				// 0x824
+	u32 tx_oversize_msb;				// 0x825
+	u32 tx_mcast_data_ok_lsb;			// 0x826
+	u32 tx_mcast_data_ok_msb;			// 0x827
+	u32 tx_bcast_data_ok_lsb;			// 0x828
+	u32 tx_bcast_data_ok_msb;			// 0x829
+	u32 tx_ucast_data_ok_lsb;			// 0x82A
+	u32 tx_ucast_data_ok_msb;			// 0x82B
+	u32 tx_mcast_ctrl_ok_lsb;			// 0x82C
+	u32 tx_mcast_ctrl_ok_msb;			// 0x82D
+	u32 tx_bcast_ctrl_ok_lsb;			// 0x82E
+	u32 tx_bcast_ctrl_ok_msb;			// 0x82F
+	u32 tx_ucast_ctrl_ok_lsb;			// 0x830
+	u32 tx_ucast_ctrl_ok_msb;			// 0x831
+	u32 tx_pause_lsb;				// 0x832
+	u32 tx_pause_msb;				// 0x833
+	u32 tx_rnt_lsb;					// 0x834
+	u32 tx_rnt_msb;					// 0x835
+	u32 tx_st_lsb;					// 0x836
+	u32 tx_st_msb;					// 0x837
+	u32 tx_lenerr_lsb;				// 0x838
+	u32 tx_lenerr_msb;				// 0x839
+	u32 tx_pfc_err_lsb;				// 0x83A
+	u32 tx_pfc_err_msb;				// 0x83B
+	u32 tx_pfc_lsb;					// 0x83C
+	u32 tx_pfc_msb;					// 0x83D
+	u32 reserved_83E[2];				// 0x83E-0x83F
+	u32 tx_stat_revid;				// 0x840
+	u32 tx_stat_scratch;				// 0x841
+	u32 reserved_842[3];				// 0x842-0x844
+	u32 tx_cntr_config;				// 0x845
+	u32 tx_cntr_status;				// 0x846
+	u32 reserved_847[25];				// 0x847-0x85F
+	u32 tx_payload_octetsok_lsb;			// 0x860
+	u32 tx_payload_octetsok_msb;			// 0x861
+	u32 tx_frame_octetsok_lsb;			// 0x862
+	u32 tx_frame_octetsok_msb;			// 0x863
+	u32 tx_malformed_ctrl_lsb;			// 0x864
+	u32 tx_malformed_ctrl_msb;			// 0x865
+	u32 tx_dropped_ctrl_lsb;			// 0x866
+	u32 tx_dropped_ctrl_msb;			// 0x867
+	u32 tx_badlt_ctrl_lsb;				// 0x868
+	u32 tx_badlt_ctrl_msb;				// 0x869
+	u32 reserved_86A[150];				// 0x86A-0x8FF
+};
+
+/* 0x900-0x9FF	RX Statistics Counter registers
+ * Note: Belongs within intel_fpga_etile_eth struct
+ */
+struct intel_fpga_etile_eth_rx_stats {
+	u32 rx_fragments_lsb;				// 0x900
+	u32 rx_fragments_msb;				// 0x901
+	u32 rx_jabbers_lsb;				// 0x902
+	u32 rx_jabbers_msb;				// 0x903
+	u32 rx_fcserr_lsb;				// 0x904
+	u32 rx_fcserr_msb;				// 0x905
+	u32 rx_crcerr_okpkt_lsb;			// 0x906
+	u32 rx_crcerr_okpkt_msb;			// 0x907
+	u32 rx_mcast_data_err_lsb;			// 0x908
+	u32 rx_mcast_data_err_msb;			// 0x909
+	u32 rx_bcast_data_err_lsb;			// 0x90A
+	u32 rx_bcast_data_err_msb;			// 0x90B
+	u32 rx_ucast_data_err_lsb;			// 0x90C
+	u32 rx_ucast_data_err_msb;			// 0x90D
+	u32 rx_mcast_ctrl_err_lsb;			// 0x90E
+	u32 rx_mcast_ctrl_err_msb;			// 0x90F
+	u32 rx_bcast_ctrl_err_lsb;			// 0x910
+	u32 rx_bcast_ctrl_err_msb;			// 0x911
+	u32 rx_ucast_ctrl_err_lsb;			// 0x912
+	u32 rx_ucast_ctrl_err_msb;			// 0x913
+	u32 rx_pause_err_lsb;				// 0x914
+	u32 rx_pause_err_msb;				// 0x915
+	u32 rx_64b_lsb;					// 0x916
+	u32 rx_64b_msb;					// 0x917
+	u32 rx_65to127b_lsb;				// 0x918
+	u32 rx_65to127b_msb;				// 0x919
+	u32 rx_128to255b_lsb;				// 0x91A
+	u32 rx_128to255b_msb;				// 0x91B
+	u32 rx_256to511b_lsb;				// 0x91C
+	u32 rx_256to511b_msb;				// 0x91D
+	u32 rx_512to1023b_lsb;				// 0x91E
+	u32 rx_512to1023b_msb;				// 0x91F
+	u32 rx_1024to1518b_lsb;				// 0x920
+	u32 rx_1024to1518b_msb;				// 0x921
+	u32 rx_1519tomaxb_lsb;				// 0x922
+	u32 rx_1519tomaxb_msb;				// 0x923
+	u32 rx_oversize_lsb;				// 0x924
+	u32 rx_oversize_msb;				// 0x925
+	u32 rx_mcast_data_ok_lsb;			// 0x926
+	u32 rx_mcast_data_ok_msb;			// 0x927
+	u32 rx_bcast_data_ok_lsb;			// 0x928
+	u32 rx_bcast_data_ok_msb;			// 0x929
+	u32 rx_ucast_data_ok_lsb;			// 0x92A
+	u32 rx_ucast_data_ok_msb;			// 0x92B
+	u32 rx_mcast_ctrl_ok_lsb;			// 0x92C
+	u32 rx_mcast_ctrl_ok_msb;			// 0x92D
+	u32 rx_bcast_ctrl_ok_lsb;			// 0x92E
+	u32 rx_bcast_ctrl_ok_msb;			// 0x92F
+	u32 rx_ucast_ctrl_ok_lsb;			// 0x930
+	u32 rx_ucast_ctrl_ok_msb;			// 0x931
+	u32 rx_pause_lsb;				// 0x932
+	u32 rx_pause_msb;				// 0x933
+	u32 rx_rnt_lsb;					// 0x934
+	u32 rx_rnt_msb;					// 0x935
+	u32 rx_st_lsb;					// 0x936
+	u32 rx_st_msb;					// 0x937
+	u32 rx_lenerr_lsb;				// 0x938
+	u32 rx_lenerr_msb;				// 0x939
+	u32 rx_pfc_err_lsb;				// 0x93A
+	u32 rx_pfc_err_msb;				// 0x93B
+	u32 rx_pfc_lsb;					// 0x93C
+	u32 rx_pfc_msb;					// 0x93D
+	u32 reserved_93E[2];				// 0x93E-0x93F
+	u32 rx_stat_revid;				// 0x940
+	u32 rx_stat_scratch;				// 0x941
+	u32 reserved_942[3];				// 0x942-0x944
+	u32 rx_cntr_config;				// 0x945
+	u32 rx_cntr_status;				// 0x946
+	u32 reserved_947[25];				// 0x947-0x95F
+	u32 rx_payload_octetsok_lsb;			// 0x960
+	u32 rx_payload_octetsok_msb;			// 0x961
+	u32 rx_frame_octetsok_lsb;			// 0x962
+	u32 rx_frame_octetsok_msb;			// 0x963
+	u32 reserved_964[156];				// 0x964-0x9FF
+};
+
+/* 0xA00-0xAFF	TX 1588 PTP registers
+ * 0xB00-0xBFF	RX 1588 PTP registers
+ * Note: Belongs within intel_fpga_etile_eth struct
+ */
+struct intel_fpga_etile_eth_1588_ptp {
+	/* TX 1588 PTP Registers */
+	u32 txptp_revid;				// 0xA00
+	u32 txptp_scratch;				// 0xA01
+	u32 reserved_a02[3];				// 0xA02-0xA04
+	u32 tx_ptp_clk_period;				// 0xA05
+	u32 reserved_a06[4];				// 0xA06-0xA09
+	u32 tx_ptp_extra_latency;			// 0xA0A
+	u32 reserved_a0b[2];				// 0xA0B-0xA0C
+	u32 ptp_debug;					// 0xA0D
+	u32 reserved_a0e[242];				// 0xA0E-0xAFF
+	/* RX 1588 PTP Registers */
+	u32 rxptp_revid;				// 0xB00
+	u32 rxptp_scratch;				// 0xB01
+	u32 reserved_b02[4];				// 0xB02-0xB05
+	u32 rx_ptp_extra_latency;			// 0xB06
+	u32 reserved_b07[9];				// 0xB07-0xB0F
+	/* 10G/25G PTP PPM UI Adjustment Registers */
+	u32 tx_ui_reg;					// 0xB10
+	u32 rx_ui_reg;					// 0xB11
+	u32 reserved_b12[7];				// 0xB12-0xB18
+	u32 tam_snapshot;				// 0xB19
+	u32 tx_tam_l;					// 0xB1A
+	u32 tx_tam_h;					// 0xB1B
+	u32 tx_count;					// 0xB1C
+	u32 rx_tam_l;					// 0xB1D
+	u32 rx_tam_h;					// 0xB1E
+	u32 rx_count;					// 0xB1F
+	u32 reserved_b20[224];				// 0xB20-0xBFF
+};
+
+/* E-Tile RS-FEC Reconfiguration Interface Register Base Addresses
+ * Word Offset		Register Type
+ * 0x000-0x2FF		TX and RX RS-FEC
+ */
+struct intel_fpga_etile_rsfec {
+	u32 reserved_0[4];				//0x000-0x003
+	u32 rsfec_top_clk_cfg;				//0x004
+	u32 reserved_5[11];				//0x005-0x00F
+	u32 rsfec_top_tx_cfg;				//0x010
+	u32 reserved_11[3];				//0x011-0x013
+	u32 rsfec_top_rx_cfg;				//0x014
+	u32 reserved_15[11];				//0x015-0x01F
+	u32 tx_aib_dsk_conf;				//0x020
+	u32 reserved_21[15];				//0x021-0x02F
+	u32 rsfec_core_cfg;				//0x030
+	u32 reserved_31[15];				//0x031-0x03F
+	u32 rsfec_lane_cfg_0;				//0x040
+	u32 reserved_41[3];				//0x041-0x043
+	u32 rsfec_lane_cfg_1;				//0x044
+	u32 reserved_45[3];				//0x45-0x047
+	u32 rsfec_lane_cfg_2;				//0x048
+	u32 reserved_49[3];				//0x049-0x04B
+	u32 rsfec_lane_cfg_3;				//0x04C
+	u32 reserved_4d[183];				//0x04D-0x103
+	u32 tx_aib_dsk_status;				//0x104
+	u32 reserved_105[3];				//0x105-0x107
+	u32 rsfec_debug_cfg;				//0x108
+	u32 reserved_109[23];				//0x109-0x11F
+	u32 rsfec_lane_tx_stat_0;			//0x120
+	u32 reserved_121[3];				//0x121-0x123
+	u32 rsfec_lane_tx_stat_1;			//0x124
+	u32 reserved_125[3];				//0x125-0x127
+	u32 rsfec_lane_tx_stat_2;			//0x128
+	u32 reserved_129[3];				//0x129-0x12B
+	u32 rsfec_lane_tx_stat_3;			//0x12C
+	u32 reserved_12d[3];				//0x12D-0x12F
+	u32 rsfec_lane_tx_hold_0;			//0x130
+	u32 reserved_131[3];				//0x131-0x133
+	u32 rsfec_lane_tx_hold_1;			//0x134
+	u32 reserved_135[3];				//0x135-0x137
+	u32 rsfec_lane_tx_hold_2;			//0x138
+	u32 reserved_139[3];				//0x139-0x13B
+	u32 rsfec_lane_tx_hold_3;			//0x13C
+	u32 reserved_13d[3];				//0x13D-0x13F
+	u32 rsfec_lane_tx_inten_0;			//0x140
+	u32 reserved_141[3];				//0x141-0x143
+	u32 rsfec_lane_tx_inten_1;			//0x144
+	u32 reserved_145[3];				//0x145-0x147
+	u32 rsfec_lane_tx_inten_2;			//0x148
+	u32 reserved_149[3];				//0x149-0x14B
+	u32 rsfec_lane_tx_inten_3;			//0x14C
+	u32 reserved_14d[3];				//0x14D-0x14F
+	u32 rsfec_lane_rx_stat_0;			//0x150
+	u32 reserved_151[3];				//0x151-0x153
+	u32 rsfec_lane_rx_stat_1;			//0x154
+	u32 reserved_155[3];				//0x155-0x157
+	u32 rsfec_lane_rx_stat_2;			//0x158
+	u32 reserved_159[3];				//0x159-0x15B
+	u32 rsfec_lane_rx_stat_3;			//0x15C
+	u32 reserved_15d[3];				//0x15D-0x15F
+	u32 rsfec_lane_rx_hold_0;			//0x160
+	u32 reserved_161[3];				//0x161-0x163
+	u32 rsfec_lane_rx_hold_1;			//0x164
+	u32 reserved_165[3];				//0x165-0x167
+	u32 rsfec_lane_rx_hold_2;			//0x168
+	u32 reserved_169[3];				//0x169-0x16B
+	u32 rsfec_lane_rx_hold_3;			//0x16C
+	u32 reserved_16d[3];				//0x16D-0x16F
+	u32 rsfec_lane_rx_inten_0;			//0x170
+	u32 reserved_171[3];				//0x171-0x173
+	u32 rsfec_lane_rx_inten_1;			//0x174
+	u32 reserved_175[3];				//0x175-0x177
+	u32 rsfec_lane_rx_inten_2;			//0x178
+	u32 reserved_179[3];				//0x179-0x17B
+	u32 rsfec_lane_rx_inten_3;			//0x17C
+	u32 reserved_17d[3];				//0x17D-0x17F
+	u32 rsfec_lanes_rx_stat;			//0x180
+	u32 reserved_181[7];				//0x181-0x187
+	u32 rsfec_lanes_rx_hold;			//0x188
+	u32 reserved_189[3];				//0x189-0x18B
+	u32 rsfec_lanes_rx_inten;			//0x18C
+	u32 reserved_18d[19];				//0x18D-0x19F
+	u32 rsfec_ln_mapping_rx_0;			//0x1A0
+	u32 reserved_1a1[3];				//0x1A1-0x1A3
+	u32 rsfec_ln_mapping_rx_1;			//0x1A4
+	u32 reserved_1a5[3];				//0x1A5-0x1A7
+	u32 rsfec_ln_mapping_rx_2;			//0x1A8
+	u32 reserved_1a9[3];				//0x1A9-0x1AB
+	u32 rsfec_ln_mapping_rx_3;			//0x1AC
+	u32 reserved_1ad[3];				//0x1AD-0x1AF
+	u32 rsfec_ln_skew_rx_0;				//0x1B0
+	u32 reserved_1b1[3];				//0x1B1-0x1B3
+	u32 rsfec_ln_skew_rx_1;				//0x1B4
+	u32 reserved_1b5[3];				//0x1B5-0x1B7
+	u32 rsfec_ln_skew_rx_2;				//0x1B8
+	u32 reserved_1b9[3];				//0x1B9-0x1BB
+	u32 rsfec_ln_skew_rx_3;				//0x1BC
+	u32 reserved_1bd[3];				//0x1BD-0x1BF
+	u32 rsfec_cw_pos_rx_0;				//0x1C0
+	u32 reserved_1c1[3];				//0x1C1-0x1C3
+	u32 rsfec_cw_pos_rx_1;				//0x1C4
+	u32 reserved_1c5[3];				//0x1C5-0x1C7
+	u32 rsfec_cw_pos_rx_2;				//0x1C8
+	u32 reserved_1c9[3];				//0x1C9-0x1CB
+	u32 rsfec_cw_pos_rx_3;				//0x1CC
+	u32 reserved_1cd[3];				//0x1CD-0x1CF
+	u32 rsfec_core_ecc_hold;			//0x1D0
+	u32 reserved_1d1[15];				//0x1D1-0x1DF
+	u32 rsfec_err_inj_tx_0;				//0x1E0
+	u32 reserved_1e1[3];				//0x1E1-0x1E3
+	u32 rsfec_err_inj_tx_1;				//0x1E4
+	u32 reserved_1e5[3];				//0x1E5-0x1E7
+	u32 rsfec_err_inj_tx_2;				//0x1E8
+	u32 reserved_1e9[3];				//0x1E9-0x1EB
+	u32 rsfec_err_inj_tx_3;				//0x1EC
+	u32 reserved_1ed[3];				//0x1ED-0x1EF
+	u32 rsfec_err_val_tx_0;				//0x1F0
+	u32 reserved_1f1[3];				//0x1F1-0x1F3
+	u32 rsfec_err_val_tx_1;				//0x1F4
+	u32 reserved_1f5[3];				//0x1F5-0x1F7
+	u32 rsfec_err_val_tx_2;				//0x1F8
+	u32 reserved_1f9[3];				//0x1F9-0x1FB
+	u32 rsfec_err_val_tx_3;				//0x1FC
+	u32 reserved_1fd[3];				//0x1FD-0x1FF
+	u32 rsfec_corr_cw_cnt_0_lo;			//0x200
+	u32 reserved_201[3];				//0x201-0x203
+	u32 rsfec_corr_cw_cnt_0_hi;			//0x204
+	u32 reserved_205[3];				//0x205-0x207
+	u32 rsfec_corr_cw_cnt_1_lo;			//0x208
+	u32 reserved_209[3];				//0x209-0x20B
+	u32 rsfec_corr_cw_cnt_1_hi;			//0x20C
+	u32 reserved_20d[3];				//0x20D-0x20F
+	u32 rsfec_corr_cw_cnt_2_lo;			//0x210
+	u32 reserved_211[3];				//0x211-0x213
+	u32 rsfec_corr_cw_cnt_2_hi;			//0x214
+	u32 reserved_215[3];				//0x215-0x217
+	u32 rsfec_corr_cw_cnt_3_lo;			//0x218
+	u32 reserved_219[3];				//0x219-0x21B
+	u32 rsfec_corr_cw_cnt_3_hi;			//0x21C
+	u32 reserved_21d[3];				//0x21D-0x21F
+	u32 rsfec_uncorr_cw_cnt_0_lo;			//0x220
+	u32 reserved_221[3];				//0x221-0x223
+	u32 rsfec_uncorr_cw_cnt_0_hi;			//0x224
+	u32 reserved_225[3];				//0x225-0x227
+	u32 rsfec_uncorr_cw_cnt_1_lo;			//0x228
+	u32 reserved_229[3];				//0x229-0x22B
+	u32 rsfec_uncorr_cw_cnt_1_hi;			//0x22C
+	u32 reserved_22d[3];				//0x22D-0x22F
+	u32 rsfec_uncorr_cw_cnt_2_lo;			//0x230
+	u32 reserved_231[3];				//0x231-0x233
+	u32 rsfec_uncorr_cw_cnt_2_hi;			//0x234
+	u32 reserved_235[3];				//0x235-0x237
+	u32 rsfec_uncorr_cw_cnt_3_lo;			//0x238
+	u32 reserved_239[3];				//0x239-0x23B
+	u32 rsfec_uncorr_cw_cnt_3_hi;			//0x23C
+	u32 reserved_23d[3];				//0x23D-0x23F
+	u32 rsfec_corr_syms_cnt_0_lo;			//0x240
+	u32 reserved_241[3];				//0x241-0x243
+	u32 rsfec_corr_syms_cnt_0_hi;			//0x244
+	u32 reserved_245[3];				//0x245-0x247
+	u32 rsfec_corr_syms_cnt_1_lo;			//0x248
+	u32 reserved_249[3];				//0x249-0x24B
+	u32 rsfec_corr_syms_cnt_1_hi;			//0x24C
+	u32 reserved_24d[3];				//0x24D-0x24F
+	u32 rsfec_corr_syms_cnt_2_lo;			//0x250
+	u32 reserved_251[3];				//0x251-0x253
+	u32 rsfec_corr_syms_cnt_2_hi;			//0x254
+	u32 reserved_255[3];				//0x255-0x257
+	u32 rsfec_corr_syms_cnt_3_lo;			//0x258
+	u32 reserved_259[3];				//0x259-0x25B
+	u32 rsfec_corr_syms_cnt_3_hi;			//0x25C
+	u32 reserved_25d[3];				//0x25D-0x25F
+	u32 rsfec_corr_0s_cnt_0_lo;			//0x260
+	u32 reserved_261[3];				//0x261-0x263
+	u32 rsfec_corr_0s_cnt_0_hi;			//0x264
+	u32 reserved_265[3];				//0x265-0x267
+	u32 rsfec_corr_0s_cnt_1_lo;			//0x268
+	u32 reserved_269[3];				//0x269-0x26B
+	u32 rsfec_corr_0s_cnt_1_hi;			//0x26C
+	u32 reserved_26d[3];				//0x26D-0x26F
+	u32 rsfec_corr_0s_cnt_2_lo;			//0x270
+	u32 reserved_271[3];				//0x271-0x273
+	u32 rsfec_corr_0s_cnt_2_hi;			//0x274
+	u32 reserved_275[3];				//0x275-0x277
+	u32 rsfec_corr_0s_cnt_3_lo;			//0x278
+	u32 reserved_279[3];				//0x279-0x27B
+	u32 rsfec_corr_0s_cnt_3_hi;			//0x27C
+	u32 reserved_27d[3];				//0x27D-0x27F
+	u32 rsfec_corr_1s_cnt_0_lo;			//0x280
+	u32 reserved_281[3];				//0x281-0x283
+	u32 rsfec_corr_1s_cnt_0_hi;			//0x284
+	u32 reserved_285[3];				//0x285-0x287
+	u32 rsfec_corr_1s_cnt_1_lo;			//0x288
+	u32 reserved_289[3];				//0x289-0x28B
+	u32 rsfec_corr_1s_cnt_1_hi;			//0x28C
+	u32 reserved_28d[3];				//0x28D-0x28F
+	u32 rsfec_corr_1s_cnt_2_lo;			//0x290
+	u32 reserved_291[3];				//0x291-0x293
+	u32 rsfec_corr_1s_cnt_2_hi;			//0x294
+	u32 reserved_295[3];				//0x295-0x297
+	u32 rsfec_corr_1s_cnt_3_lo;			//0x298
+	u32 reserved_299[3];				//0x299-0x29B
+	u32 rsfec_corr_1s_cnt_3_hi;			//0x29C
+	u32 reserved_29d[99];				//0x29D-0x2FF
+};
+
+#define eth_rsfec_csroffs(a) \
+	(offsetof(struct intel_fpga_etile_rsfec, a))
+
+/* E-Tile Transceiver Reconfiguration Interface Register Base Addresses
+ * Word Offset		Register Type
+ * 0x00000-0x00207	PMA AVMM
+ * 0x40000-0x40012	PMA Capability
+ * 0x40080-0x40144	PMA Control and Status
+ */
+/* 0x00000-0x00207	PMA AVMM
+ * Note: Names not used for registers since they are not named in E-Tile PHY User Guide
+ */
+struct intel_fpga_etile_xcvr_pma_avmm {
+	u8 reserved_0[4];				// 0x000-0x003
+	u8 reg_004;					// 0x004
+	u8 reg_005;					// 0x005
+	u8 reg_006;					// 0x006
+	u8 reg_007;					// 0x007
+	u8 reg_008;					// 0x008
+	u8 reg_009;					// 0x009
+	u8 reg_00a;					// 0x00A
+	u8 reserved_00b[5];				// 0x00B-0x00F
+	u8 reg_010;					// 0x010
+	u8 reg_011;					// 0x011
+	u8 reg_012;					// 0x012
+	u8 reg_013;					// 0x013
+	u8 reg_014;					// 0x014
+	u8 reg_015;					// 0x015
+	u8 reg_016;					// 0x016
+	u8 reg_017;					// 0x017
+	u8 reserved_018[4];				// 0x018-0x01B
+	u8 reg_01c;					// 0x01C
+	u8 reg_01d;					// 0x01D
+	u8 reg_01e;					// 0x01E
+	u8 reg_01f;					// 0x01F
+	u8 reg_020;					// 0x020
+	u8 reg_021;					// 0x021
+	u8 reg_022;					// 0x022
+	u8 reg_023;					// 0x023
+	u8 reg_024;					// 0x024
+	u8 reserved_025[15];				// 0x025-0x033
+	u8 reg_034;					// 0x034
+	u8 reg_035;					// 0x035
+	u8 reg_036;					// 0x036
+	u8 reg_037;					// 0x037
+	u8 reg_038;					// 0x038
+	u8 reserved_039[3];				// 0x039-0x03B
+	u8 reg_03c;					// 0x03C
+	u8 reserved_03d[67];				//0x03D-0x07F
+	u8 reg_080;					// 0x080
+	u8 reg_081;					// 0x081
+	u8 reserved_082[2];				//0x082-0x083
+	u8 reg_084;					// 0x084
+	u8 reg_085;					// 0x085
+	u8 reg_086;					// 0x086
+	u8 reg_087;					// 0x087
+	u8 reg_088;					// 0x088
+	u8 reg_089;					// 0x089
+	u8 reg_08A;					// 0x08A
+	u8 reg_08B;					// 0x08B
+	u8 reserved_08C[4];				//0x08C-0x08F
+	u8 reg_090;					// 0x090
+	u8 reg_091;					// 0x091
+	u8 reserved_092[3];				//0x092-0x094
+	u8 reg_095;					// 0x095
+	u8 reserved_096[86];				//0x096-0x0EB
+	u8 reg_0ec;					// 0x0EC
+	u8 reserved_0ed;				// 0x0ED
+	u8 reg_0ee;					// 0x0EE
+	u8 reg_0ef;					// 0x0EF
+	u8 reserved_0f0[272];				//0x0F0-0x1FF
+	u8 reg_200;					// 0x200
+	u8 reg_201;					// 0x201
+	u8 reg_202;					// 0x202
+	u8 reg_203;					// 0x203
+	u8 reg_204;					// 0x204
+	u8 reserved_205[2];				//0x205-0x206
+	u8 reg_207;					// 0x207
+} __packed;
+
+/* 0x40000-0x40012	PMA Capability */
+struct intel_fpga_etile_xcvr_pma_capability {
+	u8 ip_identifier_0;				// 0x40000
+	u8 ip_identifier_1;				// 0x40001
+	u8 ip_identifier_2;				// 0x40002
+	u8 ip_identifier_3;				// 0x40003
+	u8 status_register_en;				// 0x40004
+	u8 ctrl_reg_en;					// 0x40005
+	u8 reserved_40006[10];				// 0x40006-0x4000F
+	u8 number_of_channels;				// 0x40010
+	u8 channel_number;				// 0x40011
+	u8 duplex;					// 0x40012
+};
+
+/* 0x40080-0x40144	PMA Control and Status */
+struct intel_fpga_etile_xcvr_pma_ctrl_status {
+	u8 rx_locked_to_data_status;			// 0x40080
+	u8 txrx_ready_status;				// 0x40081
+	u8 txrx_transfer_ready_status;			// 0x40082
+	u8 reserved_40083[95];				// 0x40083-0x400E1
+	u8 txrx_pmaemib_reset;				// 0x400E2
+	u8 reserved_400e3[93];				// 0x400E3-0x4013F
+	u8 cfg_prof_select_and_start_streaming;		// 0x40140
+	u8 busy_status_bit;				// 0x40141
+	u8 reserved_400142;				// 0x40142
+	u8 pma_cfg;					// 0x40143
+};
+
+struct intel_fpga_etile_xcvr {
+	struct intel_fpga_etile_xcvr_pma_avmm pma_avmm;			// 0x00000-0x00207
+	u8 reserved_208[261624];					// 0x00208-0x3FFFF
+	struct intel_fpga_etile_xcvr_pma_capability pma_capability;	// 0x40000-0x40012
+	struct intel_fpga_etile_xcvr_pma_ctrl_status pma_ctrl_status;	// 0x40080-0x40144
+};
+
+#define eth_pma_avmm_csroffs(a) \
+	(offsetof(struct intel_fpga_etile_xcvr, pma_avmm.a))
+#define eth_pma_capability_csroffs(a) \
+	(offsetof(struct intel_fpga_etile_xcvr, pma_capability.a))
+#define eth_pma_ctrl_status_csroffs(a) \
+	(offsetof(struct intel_fpga_etile_xcvr, pma_ctrl_status.a))
+
+struct intel_fpga_etile_ethernet {
+	u32 reserved_0[176];						//0x000-0x0AF
+	struct intel_fpga_etile_eth_auto_neg_link auto_neg_link;	//0x0B0-0x0E8
+	u32 reserved_e9[535];						//0x0E9-0x2FF
+	struct intel_fpga_etile_eth_phy phy;				//0x300-0x3FF
+	struct intel_fpga_etile_eth_tx_mac_10_25G tx_mac;		//0x400-0x4FF
+	struct intel_fpga_etile_eth_rx_mac_10_25G rx_mac;		//0x500-0x5ff
+	struct intel_fpga_etile_eth_pause_priority pause_priority;	//0x600-0x7FF
+	struct intel_fpga_etile_eth_tx_stats tx_stats;			//0x800-0x8FF
+	struct intel_fpga_etile_eth_rx_stats rx_stats;			//0x900-0x9FF
+	struct intel_fpga_etile_eth_1588_ptp ptp;			//0xA00-0xBFF
+};
+
+#define eth_csroffs(a)	(offsetof(struct intel_fpga_etile_ethernet, a))
+#define eth_auto_neg_link_csroffs(a) \
+	(offsetof(struct intel_fpga_etile_ethernet, auto_neg_link.a))
+#define eth_phy_csroffs(a) \
+	(offsetof(struct intel_fpga_etile_ethernet, phy.a))
+#define eth_tx_mac_csroffs(a) \
+	(offsetof(struct intel_fpga_etile_ethernet, tx_mac.a))
+#define eth_rx_mac_csroffs(a) \
+	(offsetof(struct intel_fpga_etile_ethernet, rx_mac.a))
+#define eth_pause_and_priority_csroffs(a) \
+	(offsetof(struct intel_fpga_etile_ethernet, pause_priority.a))
+#define eth_tx_stats_csroffs(a) \
+	(offsetof(struct intel_fpga_etile_ethernet, tx_stats.a))
+#define eth_rx_stats_csroffs(a) \
+	(offsetof(struct intel_fpga_etile_ethernet, rx_stats.a))
+#define eth_ptp_csroffs(a) \
+	(offsetof(struct intel_fpga_etile_ethernet, ptp.a))
+
+/* RX FIFO Address Space
+ */
+struct intel_fpga_rx_fifo {
+	u32 fill_level;					//0x00
+	u32 reserved;					//0x04
+	u32 almost_full_threshold;			//0x08
+	u32 almost_empty_threshold;			//0x0C
+	u32 cut_through_threshold;			//0x10
+	u32 drop_on_error;				//0x14
+};
+
+#define rx_fifo_csroffs(a)	(offsetof(struct intel_fpga_rx_fifo, a))
+
+struct intel_fpga_etile_eth_private {
+	struct net_device *dev;
+	struct device *device;
+	struct napi_struct napi;
+	struct timer_list fec_timer;
+
+	/* Phylink */
+	struct phylink *phylink;
+	struct phylink_config phylink_config;
+
+	/* MAC address space */
+	struct intel_fpga_etile_ethernet __iomem *mac_dev;
+	/* Shared DMA structure */
+	struct altera_dma_private dma_priv;
+
+	/* Shared PTP structure */
+	struct intel_fpga_tod_private ptp_priv;
+	u32 ptp_enable;
+
+	/* FIFO address space */
+	struct intel_fpga_rx_fifo __iomem *rx_fifo;
+
+	/* Etile xcvr address space */
+	struct intel_fpga_etile_xcvr __iomem *xcvr;
+
+	/* RS-FEC address space */
+	struct intel_fpga_etile_rsfec __iomem *rsfec;
+
+	/* Interrupts */
+	u32 tx_irq;
+	u32 rx_irq;
+
+	/* RX/TX MAC FIFO configs */
+	u32 tx_fifo_depth;
+	u32 rx_fifo_depth;
+	u32 rx_fifo_almost_full;
+	u32 rx_fifo_almost_empty;
+	u32 max_mtu;
+
+	/* Hash filter settings */
+	u32 hash_filter;
+	u32 added_unicast;
+
+	/* MAC command_config register protection */
+	spinlock_t mac_cfg_lock;
+
+	/* Tx path protection */
+	spinlock_t tx_lock;
+
+	/* Rx DMA & interrupt control protection */
+	spinlock_t rxdma_irq_lock;
+
+	/* Rx DMA Buffer Size */
+	u32 rxdma_buffer_size;
+
+	/* MAC flow control */
+	unsigned int flow_ctrl;
+	unsigned int pause;
+
+	/* PMA digital delay */
+	u32 tx_pma_delay_ns;
+	u32 rx_pma_delay_ns;
+	u32 tx_pma_delay_fns;
+	u32 rx_pma_delay_fns;
+
+	/* External PHY delay */
+	u32 tx_external_phy_delay_ns;
+	u32 rx_external_phy_delay_ns;
+
+	/* PHY */
+	void __iomem *mac_extra_control;
+	int phy_addr;		/* PHY's MDIO address, -1 for autodetection */
+	phy_interface_t phy_iface;
+	struct mii_bus *mdio;
+	int oldspeed;
+	int oldduplex;
+	int oldlink;
+
+	/* FEC */
+	const char *fec_type;
+	u32 fec_channel;
+
+	/* ethtool msglvl option */
+	u32 msg_enable;
+	struct altera_dmaops *dmaops;
+};
+
+/* Function prototypes
+ */
+void intel_fpga_etile_set_ethtool_ops(struct net_device *dev);
+int fec_init(struct platform_device *pdev, struct intel_fpga_etile_eth_private *priv);
+void ui_adjustments(struct timer_list *t);
+
+#ifdef CONFIG_INTEL_FPGA_ETILE_DEBUG_FS
+int intel_fpga_etile_init_fs(struct net_device *dev);
+void intel_fpga_etile_exit_fs(struct net_device *dev);
+#else
+static inline int intel_fpga_etile_init_fs(struct net_device *dev)
+{
+	return 0;
+}
+
+static inline void intel_fpga_etile_exit_fs(struct net_device *dev) {}
+#endif /* CONFIG_INTEL_FPGA_ETILE_DEBUG_FS */
+
+#endif /* __INTEL_FPGA_ETILE_ETH_H__ */
