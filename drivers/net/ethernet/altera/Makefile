@@ -15,4 +15,8 @@ ifeq ($(CONFIG_INTEL_FPGA_QSE_LL),y)
 	obj-$(CONFIG_INTEL_FPGA_QSE_LL) += intel_fpga_qse_ll.o
 	intel_fpga_qse_ll-objs := intel_fpga_qse_ll_main.o intel_fpga_qse_ll_ethtool.o
 endif
-
+ifeq ($(CONFIG_INTEL_FPGA_ETILE),y)
+	obj-$(CONFIG_INTEL_FPGA_ETILE) += intel_fpga_etile.o
+	intel_fpga_etile-objs := intel_fpga_etile_main.o intel_fpga_etile_fec.o \
+				 intel_fpga_etile_ethtool.o
+endif
