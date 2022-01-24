@@ -150,6 +150,7 @@ static struct ucounts *get_ucounts(struct user_namespace *ns, kuid_t uid)
 		} else {
 			hlist_add_head(&new->node, hashent);
 			ucounts = new;
+			get_user_ns(new->ns);
 		}
 	}
 	if (ucounts->count == INT_MAX)
@@ -173,6 +174,7 @@ static void put_ucounts(struct ucounts *ucounts)
 	spin_unlock_irqrestore(&ucounts_lock, flags);
 
 	kfree(ucounts);
+	put_user_ns(ucounts->ns);
 }
 
 static inline bool atomic_inc_below(atomic_t *v, int u)
