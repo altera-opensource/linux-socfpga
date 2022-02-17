@@ -153,7 +153,7 @@ static void qse_free_tx_buffer(struct intel_fpga_qse_private *priv,
 	}
 }
 
-int alloc_init_skbufs(struct intel_fpga_qse_private *priv)
+int qse_alloc_init_skbufs(struct intel_fpga_qse_private *priv)
 {
 	unsigned int rx_descs = priv->dma_priv.rx_ring_size;
 	unsigned int tx_descs = priv->dma_priv.tx_ring_size;
@@ -205,7 +205,7 @@ err_rx_ring:
 	return ret;
 }
 
-void free_skbufs(struct net_device *dev)
+void qse_free_skbufs(struct net_device *dev)
 {
 	struct intel_fpga_qse_private *priv = netdev_priv(dev);
 	unsigned int rx_descs = priv->dma_priv.rx_ring_size;
@@ -1016,7 +1016,7 @@ static int qse_open(struct net_device *dev)
 
 	priv->dmaops->reset_dma(&priv->dma_priv);
 
-	ret = alloc_init_skbufs(priv);
+	ret = qse_alloc_init_skbufs(priv);
 	if (ret) {
 		netdev_err(dev, "DMA descriptors initialization failed\n");
 		goto alloc_skbuf_error;
@@ -1072,7 +1072,7 @@ static int qse_open(struct net_device *dev)
 	return 0;
 
 init_error:
-	free_skbufs(dev);
+	qse_free_skbufs(dev);
 alloc_skbuf_error:
 phy_error:
 	return ret;
@@ -1111,7 +1111,7 @@ static int qse_shutdown(struct net_device *dev)
 	 */
 	if (ret)
 		netdev_dbg(dev, "Cannot reset MAC core (error: %d)\n", ret);
-	free_skbufs(dev);
+	qse_free_skbufs(dev);
 
 	spin_unlock(&priv->tx_lock);
 	spin_unlock(&priv->mac_cfg_lock);
