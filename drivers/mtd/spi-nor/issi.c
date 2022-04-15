@@ -9,26 +9,30 @@
 #include "core.h"
 
 static int
-is25lp256_post_bfpt_fixups(struct spi_nor *nor,
+is25_post_bfpt_fixups(struct spi_nor *nor,
 			   const struct sfdp_parameter_header *bfpt_header,
 			   const struct sfdp_bfpt *bfpt,
 			   struct spi_nor_flash_parameter *params)
 {
 	/*
-	 * IS25LP256 supports 4B opcodes, but the BFPT advertises a
-	 * BFPT_DWORD1_ADDRESS_BYTES_3_ONLY address width.
+	 * IS25XX256 & IS25XX512 supports 4B opcodes,
+	 * but the BFPT advertises BFPT_DWORD1_ADDRESS_BYTES_3_ONLY and
+	 * BFPT_DWORD1_ADDRESS_BYTES_3_OR_4 address width repectively.
 	 * Overwrite the address width advertised by the BFPT.
 	 */
-	if ((bfpt->dwords[BFPT_DWORD(1)] & BFPT_DWORD1_ADDRESS_BYTES_MASK) ==
-		BFPT_DWORD1_ADDRESS_BYTES_3_ONLY)
+	if (((bfpt->dwords[BFPT_DWORD(1)] & BFPT_DWORD1_ADDRESS_BYTES_MASK) ==
+		BFPT_DWORD1_ADDRESS_BYTES_3_ONLY) ||
+		((bfpt->dwords[BFPT_DWORD(1)] & BFPT_DWORD1_ADDRESS_BYTES_MASK) ==
+		BFPT_DWORD1_ADDRESS_BYTES_3_OR_4))
 		nor->addr_width = 4;
 
 	return 0;
 }
 
-static struct spi_nor_fixups is25lp256_fixups = {
-	.post_bfpt = is25lp256_post_bfpt_fixups,
+static struct spi_nor_fixups is25_fixups = {
+	.post_bfpt = is25_post_bfpt_fixups,
 };
+
 
 static const struct flash_info issi_parts[] = {
 	/* ISSI */
@@ -48,7 +52,7 @@ static const struct flash_info issi_parts[] = {
 	{ "is25lp256",  INFO(0x9d6019, 0, 64 * 1024, 512,
 			     SECT_4K | SPI_NOR_DUAL_READ | SPI_NOR_QUAD_READ |
 			     SPI_NOR_4B_OPCODES)
-		.fixups = &is25lp256_fixups },
+		.fixups = &is25_fixups },
 	{ "is25wp032",  INFO(0x9d7016, 0, 64 * 1024,  64,
 			     SECT_4K | SPI_NOR_DUAL_READ | SPI_NOR_QUAD_READ) },
 	{ "is25wp064",  INFO(0x9d7017, 0, 64 * 1024, 128,
@@ -58,7 +62,12 @@ static const struct flash_info issi_parts[] = {
 	{ "is25wp256", INFO(0x9d7019, 0, 64 * 1024, 512,
 			    SECT_4K | SPI_NOR_DUAL_READ | SPI_NOR_QUAD_READ |
 			    SPI_NOR_4B_OPCODES)
-		.fixups = &is25lp256_fixups },
+		.fixups = &is25_fixups },
+	{ "is25wp512", INFO(0x9d701a, 0, 64 * 1024, 1024,
+			    SECT_4K | SPI_NOR_DUAL_READ | SPI_NOR_QUAD_READ |
+			    SPI_NOR_4B_OPCODES) 
+		.fixups = &is25_fixups },
+
 
 	/* PMC */
 	{ "pm25lv512",   INFO(0,        0, 32 * 1024,    2, SECT_4K_PMC) },
