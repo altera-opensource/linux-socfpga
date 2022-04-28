@@ -1,7 +1,7 @@
 # SPDX-License-Identifier: GPL-2.0
 # Makefile for Linux PHY drivers
 
-libphy-y			:= phy.o phy-c45.o phy-core.o phy_device.o \
+libphy-y			:= phy.o phy-c45.o phy-core.o phy_device.o\
 				   linkmode.o
 mdio-bus-y			+= mdio_bus.o mdio_device.o
 
@@ -29,6 +29,15 @@ obj-$(CONFIG_NETWORK_PHY_TIMESTAMPING) += mii_timestamper.o
 obj-$(CONFIG_SFP)		+= sfp.o
 sfp-obj-$(CONFIG_SFP)		+= sfp-bus.o
 obj-y				+= $(sfp-obj-y) $(sfp-obj-m)
+
+#obj-$(CONFIG_QSFP)		+= qsfp.o
+#qsfp-obj-$(CONFIG_SFP)		+= qsfp_bus.o
+#obj-y				+= $(qsfp-obj-y) $(qsfp-obj-m)
+
+obj-y					+=qsfp.o
+obj-y					+=qsfp_bus.o
+
+
 
 obj-$(CONFIG_ADIN_PHY)		+= adin.o
 obj-$(CONFIG_AMD_PHY)		+= amd.o
