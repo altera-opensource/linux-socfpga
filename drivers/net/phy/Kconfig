@@ -63,6 +63,14 @@ config SFP
 
 comment "MII PHY device drivers"
 
+config QSFP
+	tristate "QSFP cage support"
+	depends on I2C && PHYLINK
+	depends on HWMON || HWMON=n
+	select MDIO_I2C
+
+comment "MII PHY device drivers"
+
 config AMD_PHY
 	tristate "AMD PHYs"
 	help
