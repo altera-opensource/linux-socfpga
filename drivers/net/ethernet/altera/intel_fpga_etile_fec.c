@@ -40,12 +40,13 @@ int fec_init(struct platform_device *pdev, struct intel_fpga_etile_eth_private *
 	dev_info(&pdev->dev, "\tFEC type is %s\n", priv->fec_type);
 
 	/* get FEC channel from device tree */
-	if (of_property_read_u32(pdev->dev.of_node, "fec-channel",
-				 &priv->fec_channel)) {
-		dev_err(&pdev->dev, "cannot obtain fec-channel\n");
+	if (of_property_read_u32(pdev->dev.of_node, "fec-cw-pos-rx",
+				 &priv->rsfec_cw_pos_rx)) {
+		dev_err(&pdev->dev, "cannot obtain fec codeword bit position!\n");
 		return -ENXIO;
 	}
-	dev_info(&pdev->dev, "\tfec-channel is 0x%x\n", priv->fec_channel);
+	dev_info(&pdev->dev, "\trsfec rx codeword bit position is 0x%x\n",
+		 priv->rsfec_cw_pos_rx);
 
 	return 0;
 }
@@ -64,6 +65,7 @@ void ui_adjustments(struct timer_list *t)
 	u64 tx_tam_delta, rx_tam_delta;
 	u64 tx_ui, rx_ui;
 	u64 start_jiffies;
+	u32 ui_value_16bit_fns;
 
 	start_jiffies = get_jiffies_64();
 	/* Set tam_snapshot to 1 to take the first snapshot of the Time of
@@ -89,7 +91,7 @@ void ui_adjustments(struct timer_list *t)
 		      ETH_TAM_SNAPSHOT);
 
 	/* Wait for a few TAM interval */
-	udelay(210);
+	udelay(5300);
 
 	/* Request snapshot of Nth TX TAM and RX TAM */
 	tse_set_bit(priv->mac_dev, eth_ptp_csroffs(tam_snapshot),
@@ -111,8 +113,9 @@ void ui_adjustments(struct timer_list *t)
 	tse_clear_bit(priv->mac_dev, eth_ptp_csroffs(tam_snapshot),
 		      ETH_TAM_SNAPSHOT);
 	if ((get_jiffies_64() - start_jiffies) > HZ) {
-		printk(KERN_ALERT "%s: 1st to Nth snapshot takes more than 1 second\n"
-		, __func__);
+		netdev_warn(priv->dev,
+			    "%s:1st to Nth snapshot takes more than 1 second\n",
+			    __func__);
 		goto ui_restart;
 	}
 
@@ -145,9 +148,11 @@ void ui_adjustments(struct timer_list *t)
 	case PHY_INTERFACE_MODE_10GKR:
 	case PHY_INTERFACE_MODE_10GBASER:
 		ui_value = INTEL_FPGA_ETILE_UI_VALUE_10G;
+		ui_value_16bit_fns = ui_value >> 8;
 		break;
 	case PHY_INTERFACE_MODE_25GKR:
 		ui_value = INTEL_FPGA_ETILE_UI_VALUE_25G;
+		ui_value_16bit_fns = ui_value >> 8;
 		break;
 	default:
 		ui_value = 0; //invalid value
@@ -156,20 +161,36 @@ void ui_adjustments(struct timer_list *t)
 	/* Calculate estimated count value */
 	if (ui_value > 0) {
 		if (tx_tam_interval > 0)
-			tx_tam_count_est = tx_tam_delta / (tx_tam_interval * ui_value);
+			tx_tam_count_est = tx_tam_delta /
+			(tx_tam_interval * ui_value_16bit_fns);
 
 		if (rx_tam_interval > 0)
-			rx_tam_count_est = rx_tam_delta / (rx_tam_interval * ui_value);
+			rx_tam_count_est = rx_tam_delta /
+			(rx_tam_interval * ui_value_16bit_fns);
 	}
 
 	/* if estimated count value is more than 64000 (max count value with
 	 * offset), discard the snapshot and repeat steps
 	 */
-	if (tx_tam_count_est > MAX_COUNT_OFFSET ||
-	    rx_tam_count_est > MAX_COUNT_OFFSET) {
-		printk(KERN_ALERT "%s: estimated count value (tx: %d, rx: %d)"
-			"is more than %d\n", __func__, tx_tam_count_est,
-			rx_tam_count_est, MAX_COUNT_OFFSET);
+	if (tx_tam_count_est > MAX_COUNT_OFFSET) {
+		netdev_warn(priv->dev,
+			    "Est count exceeded:tx_tam_count_est: %u = tx_tam_delta:%llu / "
+			    "(tx_tam_interval:%u * ui_value_16bit_fns:0x%x)\n",
+			    tx_tam_count_est, tx_tam_delta, tx_tam_interval,
+			    ui_value_16bit_fns);
+		netdev_warn(priv->dev, "tx_tam_nth: %llu, tx_tam_initial: %llu\n",
+			    tx_tam_nth, tx_tam_initial);
+		goto ui_restart;
+	}
+
+	if (rx_tam_count_est > MAX_COUNT_OFFSET) {
+		netdev_warn(priv->dev,
+			    "Est count exceeded:rx_tam_count_est: %u = rx_tam_delta:%llu / "
+			    "(rx_tam_interval:%u * ui_value_16bit_fns:0x%x)\n",
+			    rx_tam_count_est, rx_tam_delta, rx_tam_interval,
+			    ui_value_16bit_fns);
+		netdev_warn(priv->dev, "rx_tam_nth: %llu, rx_tam_initial: %llu\n",
+			    rx_tam_nth, rx_tam_initial);
 		goto ui_restart;
 	}
 
@@ -191,15 +212,33 @@ void ui_adjustments(struct timer_list *t)
 	if (rx_tam_count > 0 && rx_tam_interval > 0)
 		rx_ui = (rx_tam_delta * int_pow(2, 8)) / (rx_tam_count * rx_tam_interval);
 
-	if (tx_ui > 0x9EE42 || tx_ui < 0x9EDC0) {
-		printk(KERN_ALERT "%s: TX UI value (0x%llx) is not within "
-		"0x9EDC0 to 0x9EE42 range\n", __func__, tx_ui);
-		goto ui_restart;
-	}
-	if (rx_ui > 0x9EE42 || rx_ui < 0x9EDC0) {
-		printk(KERN_ALERT "%s: RX UI value (0x%llx) is not within "
-		"0x9EDC0 to 0x9EE42 range\n", __func__, rx_ui);
-		goto ui_restart;
+	/* UI Adjustment for 25G kr-fec */
+	if (priv->link_speed == SPEED_25000) {
+		if (tx_ui > 0x9EE42 || tx_ui < 0x9EDC0) {
+			netdev_warn(priv->dev,
+				    "%s: TX UI value(0x%llx) is not within "
+				    "0x9EDC0 to 0x9EE42 range\n", __func__, tx_ui);
+			goto ui_restart;
+		}
+		if (rx_ui > 0x9EE42 || rx_ui < 0x9EDC0) {
+			netdev_warn(priv->dev,
+				    "%s: RX UI value(0x%llx) is not within "
+				    "0x9EDC0 to 0x9EE42 range\n", __func__, rx_ui);
+			goto ui_restart;
+		}
+	} else {
+		if (tx_ui > 0x18D3A4 || tx_ui < 0x18D25F) {
+			netdev_warn(priv->dev,
+				    "%s: TX UI value (0x%llx) is not within "
+				    "0x18D25F to 0x18D3A4 range\n", __func__, tx_ui);
+			goto ui_restart;
+		}
+		if (rx_ui > 0x18D3A4 || rx_ui < 0x18D25F) {
+			netdev_warn(priv->dev,
+				    "%s: RX UI value (0x%llx) is not within "
+				    "0x18D25F to 0x18D3A4 range\n", __func__, rx_ui);
+			goto ui_restart;
+		}
 	}
 
 	csrwr32(tx_ui, priv->mac_dev, eth_ptp_csroffs(tx_ui_reg));
