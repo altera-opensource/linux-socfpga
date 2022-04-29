@@ -550,10 +550,14 @@
 /* 0x40B: TX MAC EHIP configuration  */
 #define ETH_TX_MAC_EHIP_CONF_EN_PP				BIT(0)
 #define ETH_TX_MAC_EHIP_CONF_IPG				(0x3 << 1)
-#define ETH_TX_MAC_EHIP_CONF_AM_WIDTH				(0x7 << 3)
-#define ETH_TX_MAC_EHIP_CONF_FLOWREG				(0x7 << 6)
+#define ETH_TX_MAC_EHIP_CONF_AM_WIDTH_25G			(0x4 << 3)
+#define ETH_TX_MAC_EHIP_CONF_AM_WIDTH_10G			(0x1 << 3)
+#define ETH_TX_MAC_EHIP_CONF_FLOWREG_25G			(0x3 << 6)
+#define ETH_TX_MAC_EHIP_CONF_FLOWREG_10G			(0x4 << 6)
 #define ETH_TX_MAC_EHIP_CONF_CRC_EN				BIT(9)
 #define ETH_TX_MAC_EHIP_CONF_AM_PERIOD				(0x1FFF << 15)
+#define ETH_TX_MAC_EHIP_CONF_AM_25G_FEC				(0x13FFF << 15)
+#define ETH_TX_MAC_EHIP_CONF_AM_25G				(0x13FFC << 15)
 
 /* 0x40C: TX MAC source address lower bytes  */
 #define ETH_TX_MAC_LOW_BYTES					0xffffffff
@@ -1558,6 +1562,9 @@
 #define XCVR_PMA_CTRL_STAT_RCP_LOAD_TIMEOUT			BIT(1)
 #define XCVR_PMA_CTRL_STAT_RCP_LOAD_BUSY			BIT(2)
 
+#define INTEL_FPGA_BYTE_ALIGN	8
+#define INTEL_FPGA_WORD_ALIGN	32
+
 /* Ethernet Reconfiguration Interface Register Base Addresses
  * Word Offset	Register Type
  * 0x0B0-0x0E8	Auto Negotiation and Link Training registers
@@ -1615,7 +1622,8 @@ struct intel_fpga_etile_eth_phy {
 	u32 phy_scratch;				//0x301
 	u32 reserved_302[11];				//0x302-0x30C
 	u32 phy_loopback;				//0x30D
-	u32 reserved_30e[2];				//0x30E-0x30F
+	u32 phy_rx_pcs_align;				//0x30E
+	u32 reserved_30f;				//0x30F
 	u32 phy_config;					//0x310
 	u32 reserved_311[16];				//0x311-0x320
 	u32 phy_cdr_pll_locked;				//0x321
@@ -1970,205 +1978,413 @@ struct intel_fpga_etile_eth_1588_ptp {
  * 0x000-0x2FF		TX and RX RS-FEC
  */
 struct intel_fpga_etile_rsfec {
-	u32 reserved_0[4];				//0x000-0x003
-	u32 rsfec_top_clk_cfg;				//0x004
-	u32 reserved_5[11];				//0x005-0x00F
-	u32 rsfec_top_tx_cfg;				//0x010
-	u32 reserved_11[3];				//0x011-0x013
-	u32 rsfec_top_rx_cfg;				//0x014
-	u32 reserved_15[11];				//0x015-0x01F
-	u32 tx_aib_dsk_conf;				//0x020
-	u32 reserved_21[15];				//0x021-0x02F
-	u32 rsfec_core_cfg;				//0x030
-	u32 reserved_31[15];				//0x031-0x03F
-	u32 rsfec_lane_cfg_0;				//0x040
-	u32 reserved_41[3];				//0x041-0x043
-	u32 rsfec_lane_cfg_1;				//0x044
-	u32 reserved_45[3];				//0x45-0x047
-	u32 rsfec_lane_cfg_2;				//0x048
-	u32 reserved_49[3];				//0x049-0x04B
-	u32 rsfec_lane_cfg_3;				//0x04C
-	u32 reserved_4d[183];				//0x04D-0x103
-	u32 tx_aib_dsk_status;				//0x104
-	u32 reserved_105[3];				//0x105-0x107
-	u32 rsfec_debug_cfg;				//0x108
-	u32 reserved_109[23];				//0x109-0x11F
-	u32 rsfec_lane_tx_stat_0;			//0x120
-	u32 reserved_121[3];				//0x121-0x123
-	u32 rsfec_lane_tx_stat_1;			//0x124
-	u32 reserved_125[3];				//0x125-0x127
-	u32 rsfec_lane_tx_stat_2;			//0x128
-	u32 reserved_129[3];				//0x129-0x12B
-	u32 rsfec_lane_tx_stat_3;			//0x12C
-	u32 reserved_12d[3];				//0x12D-0x12F
-	u32 rsfec_lane_tx_hold_0;			//0x130
-	u32 reserved_131[3];				//0x131-0x133
-	u32 rsfec_lane_tx_hold_1;			//0x134
-	u32 reserved_135[3];				//0x135-0x137
-	u32 rsfec_lane_tx_hold_2;			//0x138
-	u32 reserved_139[3];				//0x139-0x13B
-	u32 rsfec_lane_tx_hold_3;			//0x13C
-	u32 reserved_13d[3];				//0x13D-0x13F
-	u32 rsfec_lane_tx_inten_0;			//0x140
-	u32 reserved_141[3];				//0x141-0x143
-	u32 rsfec_lane_tx_inten_1;			//0x144
-	u32 reserved_145[3];				//0x145-0x147
-	u32 rsfec_lane_tx_inten_2;			//0x148
-	u32 reserved_149[3];				//0x149-0x14B
-	u32 rsfec_lane_tx_inten_3;			//0x14C
-	u32 reserved_14d[3];				//0x14D-0x14F
-	u32 rsfec_lane_rx_stat_0;			//0x150
-	u32 reserved_151[3];				//0x151-0x153
-	u32 rsfec_lane_rx_stat_1;			//0x154
-	u32 reserved_155[3];				//0x155-0x157
-	u32 rsfec_lane_rx_stat_2;			//0x158
-	u32 reserved_159[3];				//0x159-0x15B
-	u32 rsfec_lane_rx_stat_3;			//0x15C
-	u32 reserved_15d[3];				//0x15D-0x15F
-	u32 rsfec_lane_rx_hold_0;			//0x160
-	u32 reserved_161[3];				//0x161-0x163
-	u32 rsfec_lane_rx_hold_1;			//0x164
-	u32 reserved_165[3];				//0x165-0x167
-	u32 rsfec_lane_rx_hold_2;			//0x168
-	u32 reserved_169[3];				//0x169-0x16B
-	u32 rsfec_lane_rx_hold_3;			//0x16C
-	u32 reserved_16d[3];				//0x16D-0x16F
-	u32 rsfec_lane_rx_inten_0;			//0x170
-	u32 reserved_171[3];				//0x171-0x173
-	u32 rsfec_lane_rx_inten_1;			//0x174
-	u32 reserved_175[3];				//0x175-0x177
-	u32 rsfec_lane_rx_inten_2;			//0x178
-	u32 reserved_179[3];				//0x179-0x17B
-	u32 rsfec_lane_rx_inten_3;			//0x17C
-	u32 reserved_17d[3];				//0x17D-0x17F
-	u32 rsfec_lanes_rx_stat;			//0x180
-	u32 reserved_181[7];				//0x181-0x187
-	u32 rsfec_lanes_rx_hold;			//0x188
-	u32 reserved_189[3];				//0x189-0x18B
-	u32 rsfec_lanes_rx_inten;			//0x18C
-	u32 reserved_18d[19];				//0x18D-0x19F
-	u32 rsfec_ln_mapping_rx_0;			//0x1A0
-	u32 reserved_1a1[3];				//0x1A1-0x1A3
-	u32 rsfec_ln_mapping_rx_1;			//0x1A4
-	u32 reserved_1a5[3];				//0x1A5-0x1A7
-	u32 rsfec_ln_mapping_rx_2;			//0x1A8
-	u32 reserved_1a9[3];				//0x1A9-0x1AB
-	u32 rsfec_ln_mapping_rx_3;			//0x1AC
-	u32 reserved_1ad[3];				//0x1AD-0x1AF
-	u32 rsfec_ln_skew_rx_0;				//0x1B0
-	u32 reserved_1b1[3];				//0x1B1-0x1B3
-	u32 rsfec_ln_skew_rx_1;				//0x1B4
-	u32 reserved_1b5[3];				//0x1B5-0x1B7
-	u32 rsfec_ln_skew_rx_2;				//0x1B8
-	u32 reserved_1b9[3];				//0x1B9-0x1BB
-	u32 rsfec_ln_skew_rx_3;				//0x1BC
-	u32 reserved_1bd[3];				//0x1BD-0x1BF
-	u32 rsfec_cw_pos_rx_0;				//0x1C0
-	u32 reserved_1c1[3];				//0x1C1-0x1C3
-	u32 rsfec_cw_pos_rx_1;				//0x1C4
-	u32 reserved_1c5[3];				//0x1C5-0x1C7
-	u32 rsfec_cw_pos_rx_2;				//0x1C8
-	u32 reserved_1c9[3];				//0x1C9-0x1CB
-	u32 rsfec_cw_pos_rx_3;				//0x1CC
-	u32 reserved_1cd[3];				//0x1CD-0x1CF
-	u32 rsfec_core_ecc_hold;			//0x1D0
-	u32 reserved_1d1[15];				//0x1D1-0x1DF
-	u32 rsfec_err_inj_tx_0;				//0x1E0
-	u32 reserved_1e1[3];				//0x1E1-0x1E3
-	u32 rsfec_err_inj_tx_1;				//0x1E4
-	u32 reserved_1e5[3];				//0x1E5-0x1E7
-	u32 rsfec_err_inj_tx_2;				//0x1E8
-	u32 reserved_1e9[3];				//0x1E9-0x1EB
-	u32 rsfec_err_inj_tx_3;				//0x1EC
-	u32 reserved_1ed[3];				//0x1ED-0x1EF
-	u32 rsfec_err_val_tx_0;				//0x1F0
-	u32 reserved_1f1[3];				//0x1F1-0x1F3
-	u32 rsfec_err_val_tx_1;				//0x1F4
-	u32 reserved_1f5[3];				//0x1F5-0x1F7
-	u32 rsfec_err_val_tx_2;				//0x1F8
-	u32 reserved_1f9[3];				//0x1F9-0x1FB
-	u32 rsfec_err_val_tx_3;				//0x1FC
-	u32 reserved_1fd[3];				//0x1FD-0x1FF
-	u32 rsfec_corr_cw_cnt_0_lo;			//0x200
-	u32 reserved_201[3];				//0x201-0x203
-	u32 rsfec_corr_cw_cnt_0_hi;			//0x204
-	u32 reserved_205[3];				//0x205-0x207
-	u32 rsfec_corr_cw_cnt_1_lo;			//0x208
-	u32 reserved_209[3];				//0x209-0x20B
-	u32 rsfec_corr_cw_cnt_1_hi;			//0x20C
-	u32 reserved_20d[3];				//0x20D-0x20F
-	u32 rsfec_corr_cw_cnt_2_lo;			//0x210
-	u32 reserved_211[3];				//0x211-0x213
-	u32 rsfec_corr_cw_cnt_2_hi;			//0x214
-	u32 reserved_215[3];				//0x215-0x217
-	u32 rsfec_corr_cw_cnt_3_lo;			//0x218
-	u32 reserved_219[3];				//0x219-0x21B
-	u32 rsfec_corr_cw_cnt_3_hi;			//0x21C
-	u32 reserved_21d[3];				//0x21D-0x21F
-	u32 rsfec_uncorr_cw_cnt_0_lo;			//0x220
-	u32 reserved_221[3];				//0x221-0x223
-	u32 rsfec_uncorr_cw_cnt_0_hi;			//0x224
-	u32 reserved_225[3];				//0x225-0x227
-	u32 rsfec_uncorr_cw_cnt_1_lo;			//0x228
-	u32 reserved_229[3];				//0x229-0x22B
-	u32 rsfec_uncorr_cw_cnt_1_hi;			//0x22C
-	u32 reserved_22d[3];				//0x22D-0x22F
-	u32 rsfec_uncorr_cw_cnt_2_lo;			//0x230
-	u32 reserved_231[3];				//0x231-0x233
-	u32 rsfec_uncorr_cw_cnt_2_hi;			//0x234
-	u32 reserved_235[3];				//0x235-0x237
-	u32 rsfec_uncorr_cw_cnt_3_lo;			//0x238
-	u32 reserved_239[3];				//0x239-0x23B
-	u32 rsfec_uncorr_cw_cnt_3_hi;			//0x23C
-	u32 reserved_23d[3];				//0x23D-0x23F
-	u32 rsfec_corr_syms_cnt_0_lo;			//0x240
-	u32 reserved_241[3];				//0x241-0x243
-	u32 rsfec_corr_syms_cnt_0_hi;			//0x244
-	u32 reserved_245[3];				//0x245-0x247
-	u32 rsfec_corr_syms_cnt_1_lo;			//0x248
-	u32 reserved_249[3];				//0x249-0x24B
-	u32 rsfec_corr_syms_cnt_1_hi;			//0x24C
-	u32 reserved_24d[3];				//0x24D-0x24F
-	u32 rsfec_corr_syms_cnt_2_lo;			//0x250
-	u32 reserved_251[3];				//0x251-0x253
-	u32 rsfec_corr_syms_cnt_2_hi;			//0x254
-	u32 reserved_255[3];				//0x255-0x257
-	u32 rsfec_corr_syms_cnt_3_lo;			//0x258
-	u32 reserved_259[3];				//0x259-0x25B
-	u32 rsfec_corr_syms_cnt_3_hi;			//0x25C
-	u32 reserved_25d[3];				//0x25D-0x25F
-	u32 rsfec_corr_0s_cnt_0_lo;			//0x260
-	u32 reserved_261[3];				//0x261-0x263
-	u32 rsfec_corr_0s_cnt_0_hi;			//0x264
-	u32 reserved_265[3];				//0x265-0x267
-	u32 rsfec_corr_0s_cnt_1_lo;			//0x268
-	u32 reserved_269[3];				//0x269-0x26B
-	u32 rsfec_corr_0s_cnt_1_hi;			//0x26C
-	u32 reserved_26d[3];				//0x26D-0x26F
-	u32 rsfec_corr_0s_cnt_2_lo;			//0x270
-	u32 reserved_271[3];				//0x271-0x273
-	u32 rsfec_corr_0s_cnt_2_hi;			//0x274
-	u32 reserved_275[3];				//0x275-0x277
-	u32 rsfec_corr_0s_cnt_3_lo;			//0x278
-	u32 reserved_279[3];				//0x279-0x27B
-	u32 rsfec_corr_0s_cnt_3_hi;			//0x27C
-	u32 reserved_27d[3];				//0x27D-0x27F
-	u32 rsfec_corr_1s_cnt_0_lo;			//0x280
-	u32 reserved_281[3];				//0x281-0x283
-	u32 rsfec_corr_1s_cnt_0_hi;			//0x284
-	u32 reserved_285[3];				//0x285-0x287
-	u32 rsfec_corr_1s_cnt_1_lo;			//0x288
-	u32 reserved_289[3];				//0x289-0x28B
-	u32 rsfec_corr_1s_cnt_1_hi;			//0x28C
-	u32 reserved_28d[3];				//0x28D-0x28F
-	u32 rsfec_corr_1s_cnt_2_lo;			//0x290
-	u32 reserved_291[3];				//0x291-0x293
-	u32 rsfec_corr_1s_cnt_2_hi;			//0x294
-	u32 reserved_295[3];				//0x295-0x297
-	u32 rsfec_corr_1s_cnt_3_lo;			//0x298
-	u32 reserved_299[3];				//0x299-0x29B
-	u32 rsfec_corr_1s_cnt_3_hi;			//0x29C
-	u32 reserved_29d[99];				//0x29D-0x2FF
+	u8 reserved_0[4];			//0x000-0x003
+	u8 rsfec_top_clk_cfg_b0;		//0x004
+	u8 rsfec_top_clk_cfg_b8;		//0x005
+	u8 rsfec_top_clk_cfg_b16;		//0x006
+	u8 rsfec_top_clk_cfg_b24;		//0x007
+	u8 reserved_8[8];			//0x008-0x00F
+	u8 rsfec_top_tx_cfg_b0;			//0x010
+	u8 rsfec_top_tx_cfg_b8;			//0x011
+	u8 rsfec_top_tx_cfg_b16;		//0x012
+	u8 rsfec_top_tx_cfg_b24;		//0x013
+	u8 rsfec_top_rx_cfg_b0;			//0x014
+	u8 rsfec_top_rx_cfg_b8;			//0x015
+	u8 rsfec_top_rx_cfg_b16;		//0x016
+	u8 rsfec_top_rx_cfg_b24;		//0x017
+	u8 reserved_18[8];			//0x018-0x01F
+	u8 tx_aib_dsk_conf_b0;			//0x020
+	u8 tx_aib_dsk_conf_b8;			//0x021
+	u8 tx_aib_dsk_conf_b16;			//0x022
+	u8 tx_aib_dsk_conf_b24;			//0x023
+	u8 reserved_24[12];			//0x024-0x02F
+	u8 rsfec_core_cfg_b0;			//0x030
+	u8 rsfec_core_cfg_b8;			//0x031
+	u8 rsfec_core_cfg_b16;			//0x032
+	u8 rsfec_core_cfg_b24;			//0x033
+	u8 reserved_34[12];			//0x034-0x03F
+	u8 rsfec_lane_cfg_0_b0;			//0x040
+	u8 rsfec_lane_cfg_0_b8;			//0x041
+	u8 rsfec_lane_cfg_0_b16;		//0x042
+	u8 rsfec_lane_cfg_0_b24;		//0x043
+	u8 rsfec_lane_cfg_1_b0;			//0x044
+	u8 rsfec_lane_cfg_1_b8;			//0x045
+	u8 rsfec_lane_cfg_1_b16;		//0x046
+	u8 rsfec_lane_cfg_1_b24;		//0x047
+	u8 rsfec_lane_cfg_2_b0;			//0x048
+	u8 rsfec_lane_cfg_2_b8;			//0x049
+	u8 rsfec_lane_cfg_2_b16;		//0x04A
+	u8 rsfec_lane_cfg_2_b24;		//0x04B
+	u8 rsfec_lane_cfg_3_b0;			//0x04C
+	u8 rsfec_lane_cfg_3_b8;			//0x04D
+	u8 rsfec_lane_cfg_3_b16;		//0x04E
+	u8 rsfec_lane_cfg_3_b24;		//0x04F
+	u8 reserved_50[180];			//0x050 - 0x103
+	u8 tx_aib_dsk_status_b0;		//0x104
+	u8 tx_aib_dsk_status_b8;		//0x105
+	u8 tx_aib_dsk_status_b16;		//0x106
+	u8 tx_aib_dsk_status_b24;		//0x107
+	u8 rsfec_debug_cfg_b0;			//0x108
+	u8 rsfec_debug_cfg_b8;			//0x109
+	u8 rsfec_debug_cfg_b16;			//0x10A
+	u8 rsfec_debug_cfg_b24;			//0x10B
+	u8 reserved_10C[20];			//0x10C-0x11F
+	u8 rsfec_lane_tx_stat_0_b0;		//0x120
+	u8 rsfec_lane_tx_stat_0_b8;		//0x121
+	u8 rsfec_lane_tx_stat_0_b16;		//0x122
+	u8 rsfec_lane_tx_stat_0_b24;		//0x123
+	u8 rsfec_lane_tx_stat_1_b0;		//0x124
+	u8 rsfec_lane_tx_stat_1_b8;		//0x125
+	u8 rsfec_lane_tx_stat_1_b16;		//0x126
+	u8 rsfec_lane_tx_stat_1_b24;		//0x127
+	u8 rsfec_lane_tx_stat_2_b0;		//0x128
+	u8 rsfec_lane_tx_stat_2_b8;		//0x129
+	u8 rsfec_lane_tx_stat_2_b16;		//0x12A
+	u8 rsfec_lane_tx_stat_2_b24;		//0x12B
+	u8 rsfec_lane_tx_stat_3_b0;		//0x12C
+	u8 rsfec_lane_tx_stat_3_b8;		//0x12D
+	u8 rsfec_lane_tx_stat_3_b16;		//0x12E
+	u8 rsfec_lane_tx_stat_3_b24;		//0x12F
+	u8 rsfec_lane_tx_hold_0_b0;		//0x130
+	u8 rsfec_lane_tx_hold_0_b8;		//0x131
+	u8 rsfec_lane_tx_hold_0_b16;		//0x132
+	u8 rsfec_lane_tx_hold_0_b24;		//0x133
+	u8 rsfec_lane_tx_hold_1_b0;		//0x134
+	u8 rsfec_lane_tx_hold_1_b8;		//0x135
+	u8 rsfec_lane_tx_hold_1_b16;		//0x136
+	u8 rsfec_lane_tx_hold_1_b24;		//0x137
+	u8 rsfec_lane_tx_hold_2_b0;		//0x138
+	u8 rsfec_lane_tx_hold_2_b8;		//0x139
+	u8 rsfec_lane_tx_hold_2_b16;		//0x13A
+	u8 rsfec_lane_tx_hold_2_b24;		//0x13B
+	u8 rsfec_lane_tx_hold_3_b0;		//0x13C
+	u8 rsfec_lane_tx_hold_3_b8;		//0x13D
+	u8 rsfec_lane_tx_hold_3_b16;		//0x13E
+	u8 rsfec_lane_tx_hold_3_b24;		//0x13F
+	u8 rsfec_lane_tx_inten_0_b0;		//0x140
+	u8 rsfec_lane_tx_inten_0_b8;		//0x141
+	u8 rsfec_lane_tx_inten_0_b16;		//0x142
+	u8 rsfec_lane_tx_inten_0_b24;		//0x143
+	u8 rsfec_lane_tx_inten_1_b0;		//0x144
+	u8 rsfec_lane_tx_inten_1_b8;		//0x145
+	u8 rsfec_lane_tx_inten_1_b16;		//0x146
+	u8 rsfec_lane_tx_inten_1_b24;		//0x147
+	u8 rsfec_lane_tx_inten_2_b0;		//0x148
+	u8 rsfec_lane_tx_inten_2_b8;		//0x149
+	u8 rsfec_lane_tx_inten_2_b16;		//0x14A
+	u8 rsfec_lane_tx_inten_2_b24;		//0x14B
+	u8 rsfec_lane_tx_inten_3_b0;		//0x14C
+	u8 rsfec_lane_tx_inten_3_b8;		//0x14D
+	u8 rsfec_lane_tx_inten_3_b16;		//0x14E
+	u8 rsfec_lane_tx_inten_3_b24;		//0x14F
+	u8 rsfec_lane_rx_stat_0_b0;		//0x150
+	u8 rsfec_lane_rx_stat_0_b8;		//0x151
+	u8 rsfec_lane_rx_stat_0_b16;		//0x152
+	u8 rsfec_lane_rx_stat_0_b24;		//0x153
+	u8 rsfec_lane_rx_stat_1_b0;		//0x154
+	u8 rsfec_lane_rx_stat_1_b8;		//0x155
+	u8 rsfec_lane_rx_stat_1_b16;		//0x156
+	u8 rsfec_lane_rx_stat_1_b24;		//0x157
+	u8 rsfec_lane_rx_stat_2_b0;		//0x158
+	u8 rsfec_lane_rx_stat_2_b8;		//0x159
+	u8 rsfec_lane_rx_stat_2_b16;		//0x15A
+	u8 rsfec_lane_rx_stat_2_b24;		//0x15B
+	u8 rsfec_lane_rx_stat_3_b0;		//0x15C
+	u8 rsfec_lane_rx_stat_3_b8;		//0x15D
+	u8 rsfec_lane_rx_stat_3_b16;		//0x15E
+	u8 rsfec_lane_rx_stat_3_b24;		//0x15F
+	u8 rsfec_lane_rx_hold_0_b0;		//0x160
+	u8 rsfec_lane_rx_hold_0_b8;		//0x161
+	u8 rsfec_lane_rx_hold_0_b16;		//0x162
+	u8 rsfec_lane_rx_hold_0_b24;		//0x163
+	u8 rsfec_lane_rx_hold_1_b0;		//0x164
+	u8 rsfec_lane_rx_hold_1_b8;		//0x165
+	u8 rsfec_lane_rx_hold_1_b16;		//0x166
+	u8 rsfec_lane_rx_hold_1_b24;		//0x167
+	u8 rsfec_lane_rx_hold_2_b0;		//0x168
+	u8 rsfec_lane_rx_hold_2_b8;		//0x169
+	u8 rsfec_lane_rx_hold_2_b16;		//0x16A
+	u8 rsfec_lane_rx_hold_2_b24;		//0x16B
+	u8 rsfec_lane_rx_hold_3_b0;		//0x16C
+	u8 rsfec_lane_rx_hold_3_b8;		//0x16D
+	u8 rsfec_lane_rx_hold_3_b16;		//0x16E
+	u8 rsfec_lane_rx_hold_3_b24;		//0x16F
+	u8 rsfec_lane_rx_inten_0_b0;		//0x170
+	u8 rsfec_lane_rx_inten_0_b8;		//0x171
+	u8 rsfec_lane_rx_inten_0_b16;		//0x172
+	u8 rsfec_lane_rx_inten_0_b24;		//0x173
+	u8 rsfec_lane_rx_inten_1_b0;		//0x174
+	u8 rsfec_lane_rx_inten_1_b8;		//0x175
+	u8 rsfec_lane_rx_inten_1_b16;		//0x176
+	u8 rsfec_lane_rx_inten_1_b24;		//0x177
+	u8 rsfec_lane_rx_inten_2_b0;		//0x178
+	u8 rsfec_lane_rx_inten_2_b8;		//0x179
+	u8 rsfec_lane_rx_inten_2_b16;		//0x17A
+	u8 rsfec_lane_rx_inten_2_b24;		//0x17B
+	u8 rsfec_lane_rx_inten_3_b0;		//0x17C
+	u8 rsfec_lane_rx_inten_3_b8;		//0x17D
+	u8 rsfec_lane_rx_inten_3_b16;		//0x17E
+	u8 rsfec_lane_rx_inten_3_b24;		//0x17F
+	u8 rsfec_lanes_rx_stat_b0;		//0x180
+	u8 rsfec_lanes_rx_stat_b8;		//0x181
+	u8 rsfec_lanes_rx_stat_b16;		//0x182
+	u8 rsfec_lanes_rx_stat_b24;		//0x183
+	u8 reserved_184[4];			//0x184-0x187
+	u8 rsfec_lanes_rx_hold_b0;		//0x188
+	u8 rsfec_lanes_rx_hold_b8;		//0x189
+	u8 rsfec_lanes_rx_hold_b16;		//0x18A
+	u8 rsfec_lanes_rx_hold_b24;		//0x18B
+	u8 rsfec_lanes_rx_inten_b0;		//0x18C
+	u8 rsfec_lanes_rx_inten_b8;		//0x18D
+	u8 rsfec_lanes_rx_inten_b16;		//0x18E
+	u8 rsfec_lanes_rx_inten_b24;		//0x18F
+	u8 reserved_190[16];			//0x190-0x19F
+	u8 rsfec_ln_mapping_rx_0_b0;		//0x1A0
+	u8 rsfec_ln_mapping_rx_0_b8;		//0x1A1
+	u8 rsfec_ln_mapping_rx_0_b16;		//0x1A2
+	u8 rsfec_ln_mapping_rx_0_b24;		//0x1A3
+	u8 rsfec_ln_mapping_rx_1_b0;		//0x1A4
+	u8 rsfec_ln_mapping_rx_1_b8;		//0x1A5
+	u8 rsfec_ln_mapping_rx_1_b16;		//0x1A6
+	u8 rsfec_ln_mapping_rx_1_b24;		//0x1A7
+	u8 rsfec_ln_mapping_rx_2_b0;		//0x1A8
+	u8 rsfec_ln_mapping_rx_2_b8;		//0x1A9
+	u8 rsfec_ln_mapping_rx_2_b16;		//0x1AA
+	u8 rsfec_ln_mapping_rx_2_b24;		//0x1AB
+	u8 rsfec_ln_mapping_rx_3_b0;		//0x1AC
+	u8 rsfec_ln_mapping_rx_3_b8;		//0x1AD
+	u8 rsfec_ln_mapping_rx_3_b16;		//0x1AE
+	u8 rsfec_ln_mapping_rx_3_b24;		//0x1AF
+	u8 rsfec_ln_skew_rx_0_b0;		//0x1B0
+	u8 rsfec_ln_skew_rx_0_b8;		//0x1B1
+	u8 rsfec_ln_skew_rx_0_b16;		//0x1B2
+	u8 rsfec_ln_skew_rx_0_b24;		//0x1B3
+	u8 rsfec_ln_skew_rx_1_b0;		//0x1B4
+	u8 rsfec_ln_skew_rx_1_b8;		//0x1B5
+	u8 rsfec_ln_skew_rx_1_b16;		//0x1B6
+	u8 rsfec_ln_skew_rx_1_b24;		//0x1B7
+	u8 rsfec_ln_skew_rx_2_b0;		//0x1B8
+	u8 rsfec_ln_skew_rx_2_b8;		//0x1B9
+	u8 rsfec_ln_skew_rx_2_b16;		//0x1BA
+	u8 rsfec_ln_skew_rx_2_b24;		//0x1BB
+	u8 rsfec_ln_skew_rx_3_b0;		//0x1BC
+	u8 rsfec_ln_skew_rx_3_b8;		//0x1BD
+	u8 rsfec_ln_skew_rx_3_b16;		//0x1BE
+	u8 rsfec_ln_skew_rx_3_b24;		//0x1BF
+	u8 rsfec_cw_pos_rx_0_b0;		//0x1C0
+	u8 rsfec_cw_pos_rx_0_b8;		//0x1C1
+	u8 rsfec_cw_pos_rx_0_b16;		//0x1C2
+	u8 rsfec_cw_pos_rx_0_b24;		//0x1C3
+	u8 rsfec_cw_pos_rx_1_b0;		//0x1C4
+	u8 rsfec_cw_pos_rx_1_b8;		//0x1C5
+	u8 rsfec_cw_pos_rx_1_b16;		//0x1C6
+	u8 rsfec_cw_pos_rx_1_b24;		//0x1C7
+	u8 rsfec_cw_pos_rx_2_b0;		//0x1C8
+	u8 rsfec_cw_pos_rx_2_b8;		//0x1C9
+	u8 rsfec_cw_pos_rx_2_b16;		//0x1CA
+	u8 rsfec_cw_pos_rx_2_b24;		//0x1CB
+	u8 rsfec_cw_pos_rx_3_b0;		//0x1CC
+	u8 rsfec_cw_pos_rx_3_b8;		//0x1CD
+	u8 rsfec_cw_pos_rx_3_b16;		//0x1CE
+	u8 rsfec_cw_pos_rx_3_b24;		//0x1CF
+	u8 rsfec_core_ecc_hold_b0;		//0x1D0
+	u8 rsfec_core_ecc_hold_b8;		//0x1D1
+	u8 rsfec_core_ecc_hold_b16;		//0x1D2
+	u8 rsfec_core_ecc_hold_b24;		//0x1D3
+	u8 reserved_1d4[12];			//0x1D4-0x1DF
+	u8 rsfec_err_inj_tx_0_b0;		//0x1E0
+	u8 rsfec_err_inj_tx_0_b8;		//0x1E1
+	u8 rsfec_err_inj_tx_0_b16;		//0x1E2
+	u8 rsfec_err_inj_tx_0_b24;		//0x1E3
+	u8 rsfec_err_inj_tx_1_b0;		//0x1E4
+	u8 rsfec_err_inj_tx_1_b8;		//0x1E5
+	u8 rsfec_err_inj_tx_1_b16;		//0x1E6
+	u8 rsfec_err_inj_tx_1_b24;		//0x1E7
+	u8 rsfec_err_inj_tx_2_b0;		//0x1E8
+	u8 rsfec_err_inj_tx_2_b8;		//0x1E9
+	u8 rsfec_err_inj_tx_2_b16;		//0x1EA
+	u8 rsfec_err_inj_tx_2_b24;		//0x1EB
+	u8 rsfec_err_inj_tx_3_b0;		//0x1EC
+	u8 rsfec_err_inj_tx_3_b8;		//0x1ED
+	u8 rsfec_err_inj_tx_3_b16;		//0x1EE
+	u8 rsfec_err_inj_tx_3_b24;		//0x1EF
+	u8 rsfec_err_val_tx_0_b0;		//0x1F0
+	u8 rsfec_err_val_tx_0_b8;		//0x1F1
+	u8 rsfec_err_val_tx_0_b16;		//0x1F2
+	u8 rsfec_err_val_tx_0_b24;		//0x1F3
+	u8 rsfec_err_val_tx_1_b0;		//0x1F4
+	u8 rsfec_err_val_tx_1_b8;		//0x1F5
+	u8 rsfec_err_val_tx_1_b16;		//0x1F6
+	u8 rsfec_err_val_tx_1_b24;		//0x1F7
+	u8 rsfec_err_val_tx_2_b0;		//0x1F8
+	u8 rsfec_err_val_tx_2_b8;		//0x1F9
+	u8 rsfec_err_val_tx_2_b16;		//0x1FA
+	u8 rsfec_err_val_tx_2_b24;		//0x1FB
+	u8 rsfec_err_val_tx_3_b0;		//0x1FC
+	u8 rsfec_err_val_tx_3_b8;		//0x1FD
+	u8 rsfec_err_val_tx_3_b16;		//0x1FE
+	u8 rsfec_err_val_tx_3_b24;		//0x1FF
+	u8 rsfec_corr_cw_cnt_0_lo_b0;		//0x200
+	u8 rsfec_corr_cw_cnt_0_lo_b8;		//0x201
+	u8 rsfec_corr_cw_cnt_0_lo_b16;		//0x202
+	u8 rsfec_corr_cw_cnt_0_lo_b24;		//0x203
+	u8 rsfec_corr_cw_cnt_0_hi_b0;		//0x204
+	u8 rsfec_corr_cw_cnt_0_hi_b8;		//0x205
+	u8 rsfec_corr_cw_cnt_0_hi_b16;		//0x206
+	u8 rsfec_corr_cw_cnt_0_hi_b24;		//0x207
+	u8 rsfec_corr_cw_cnt_1_lo_b0;		//0x208
+	u8 rsfec_corr_cw_cnt_1_lo_b8;		//0x209
+	u8 rsfec_corr_cw_cnt_1_lo_b16;		//0x20A
+	u8 rsfec_corr_cw_cnt_1_lo_b24;		//0x20B
+	u8 rsfec_corr_cw_cnt_1_hi_b0;		//0x20C
+	u8 rsfec_corr_cw_cnt_1_hi_b8;		//0x20D
+	u8 rsfec_corr_cw_cnt_1_hi_b16;		//0x20E
+	u8 rsfec_corr_cw_cnt_1_hi_b24;		//0x20F
+	u8 rsfec_corr_cw_cnt_2_lo_b0;		//0x210
+	u8 rsfec_corr_cw_cnt_2_lo_b8;		//0x211
+	u8 rsfec_corr_cw_cnt_2_lo_b16;		//0x212
+	u8 rsfec_corr_cw_cnt_2_lo_b24;		//0x213
+	u8 rsfec_corr_cw_cnt_2_hi_b0;		//0x214
+	u8 rsfec_corr_cw_cnt_2_hi_b8;		//0x215
+	u8 rsfec_corr_cw_cnt_2_hi_b16;		//0x216
+	u8 rsfec_corr_cw_cnt_2_hi_b24;		//0x217
+	u8 rsfec_corr_cw_cnt_3_lo_b0;		//0x218
+	u8 rsfec_corr_cw_cnt_3_lo_b8;		//0x219
+	u8 rsfec_corr_cw_cnt_3_lo_b16;		//0x21A
+	u8 rsfec_corr_cw_cnt_3_lo_b24;		//0x21B
+	u8 rsfec_corr_cw_cnt_3_hi_b0;		//0x21C
+	u8 rsfec_corr_cw_cnt_3_hi_b8;		//0x21D
+	u8 rsfec_corr_cw_cnt_3_hi_b16;		//0x21E
+	u8 rsfec_corr_cw_cnt_3_hi_b24;		//0x21F
+	u8 rsfec_uncorr_cw_cnt_0_lo_b0;		//0x220
+	u8 rsfec_uncorr_cw_cnt_0_lo_b8;		//0x221
+	u8 rsfec_uncorr_cw_cnt_0_lo_b16;	//0x222
+	u8 rsfec_uncorr_cw_cnt_0_lo_b24;	//0x223
+	u8 rsfec_uncorr_cw_cnt_0_hi_b0;		//0x224
+	u8 rsfec_uncorr_cw_cnt_0_hi_b8;		//0x225
+	u8 rsfec_uncorr_cw_cnt_0_hi_b16;	//0x226
+	u8 rsfec_uncorr_cw_cnt_0_hi_b24;	//0x227
+	u8 rsfec_uncorr_cw_cnt_1_lo_b0;		//0x228
+	u8 rsfec_uncorr_cw_cnt_1_lo_b8;		//0x229
+	u8 rsfec_uncorr_cw_cnt_1_lo_b16;	//0x22A
+	u8 rsfec_uncorr_cw_cnt_1_lo_b24;	//0x22B
+	u8 rsfec_uncorr_cw_cnt_1_hi_b0;		//0x22C
+	u8 rsfec_uncorr_cw_cnt_1_hi_b8;		//0x22D
+	u8 rsfec_uncorr_cw_cnt_1_hi_b16;	//0x22E
+	u8 rsfec_uncorr_cw_cnt_1_hi_b24;	//0x22F
+	u8 rsfec_uncorr_cw_cnt_2_lo_b0;		//0x230
+	u8 rsfec_uncorr_cw_cnt_2_lo_b8;		//0x231
+	u8 rsfec_uncorr_cw_cnt_2_lo_b16;	//0x232
+	u8 rsfec_uncorr_cw_cnt_2_lo_b24;	//0x233
+	u8 rsfec_uncorr_cw_cnt_2_hi_b0;		//0x234
+	u8 rsfec_uncorr_cw_cnt_2_hi_b8;		//0x235
+	u8 rsfec_uncorr_cw_cnt_2_hi_b16;	//0x236
+	u8 rsfec_uncorr_cw_cnt_2_hi_b24;	//0x237
+	u8 rsfec_uncorr_cw_cnt_3_lo_b0;		//0x238
+	u8 rsfec_uncorr_cw_cnt_3_lo_b8;		//0x239
+	u8 rsfec_uncorr_cw_cnt_3_lo_b16;	//0x23A
+	u8 rsfec_uncorr_cw_cnt_3_lo_b24;	//0x23B
+	u8 rsfec_uncorr_cw_cnt_3_hi_b0;		//0x23C
+	u8 rsfec_uncorr_cw_cnt_3_hi_b8;		//0x23D
+	u8 rsfec_uncorr_cw_cnt_3_hi_b16;	//0x23E
+	u8 rsfec_uncorr_cw_cnt_3_hi_b24;	//0x23F
+	u8 rsfec_corr_syms_cnt_0_lo_b0;		//0x240
+	u8 rsfec_corr_syms_cnt_0_lo_b8;		//0x241
+	u8 rsfec_corr_syms_cnt_0_lo_b16;	//0x242
+	u8 rsfec_corr_syms_cnt_0_lo_b24;	//0x243
+	u8 rsfec_corr_syms_cnt_0_hi_b0;		//0x244
+	u8 rsfec_corr_syms_cnt_0_hi_b8;		//0x245
+	u8 rsfec_corr_syms_cnt_0_hi_b16;	//0x246
+	u8 rsfec_corr_syms_cnt_0_hi_b24;	//0x247
+	u8 rsfec_corr_syms_cnt_1_lo_b0;		//0x248
+	u8 rsfec_corr_syms_cnt_1_lo_b8;		//0x249
+	u8 rsfec_corr_syms_cnt_1_lo_b16;	//0x24A
+	u8 rsfec_corr_syms_cnt_1_lo_b24;	//0x24B
+	u8 rsfec_corr_syms_cnt_1_hi_b0;		//0x24C
+	u8 rsfec_corr_syms_cnt_1_hi_b8;		//0x24D
+	u8 rsfec_corr_syms_cnt_1_hi_b16;	//0x24E
+	u8 rsfec_corr_syms_cnt_1_hi_b24;	//0x24F
+	u8 rsfec_corr_syms_cnt_2_lo_b0;		//0x250
+	u8 rsfec_corr_syms_cnt_2_lo_b8;		//0x251
+	u8 rsfec_corr_syms_cnt_2_lo_b16;	//0x252
+	u8 rsfec_corr_syms_cnt_2_lo_b24;	//0x253
+	u8 rsfec_corr_syms_cnt_2_hi_b0;		//0x254
+	u8 rsfec_corr_syms_cnt_2_hi_b8;		//0x255
+	u8 rsfec_corr_syms_cnt_2_hi_b16;	//0x256
+	u8 rsfec_corr_syms_cnt_2_hi_b24;	//0x257
+	u8 rsfec_corr_syms_cnt_3_lo_b0;		//0x258
+	u8 rsfec_corr_syms_cnt_3_lo_b8;		//0x259
+	u8 rsfec_corr_syms_cnt_3_lo_b16;	//0x25A
+	u8 rsfec_corr_syms_cnt_3_lo_b24;	//0x25B
+	u8 rsfec_corr_syms_cnt_3_hi_b0;		//0x25C
+	u8 rsfec_corr_syms_cnt_3_hi_b8;		//0x25D
+	u8 rsfec_corr_syms_cnt_3_hi_b16;	//0x25E
+	u8 rsfec_corr_syms_cnt_3_hi_b24;	//0x25F
+	u8 rsfec_corr_0s_cnt_0_lo_b0;		//0x260
+	u8 rsfec_corr_0s_cnt_0_lo_b8;		//0x261
+	u8 rsfec_corr_0s_cnt_0_lo_b16;		//0x262
+	u8 rsfec_corr_0s_cnt_0_lo_b24;		//0x263
+	u8 rsfec_corr_0s_cnt_0_hi_b0;		//0x264
+	u8 rsfec_corr_0s_cnt_0_hi_b8;		//0x265
+	u8 rsfec_corr_0s_cnt_0_hi_b16;		//0x266
+	u8 rsfec_corr_0s_cnt_0_hi_b24;		//0x267
+	u8 rsfec_corr_0s_cnt_1_lo_b0;		//0x268
+	u8 rsfec_corr_0s_cnt_1_lo_b8;		//0x269
+	u8 rsfec_corr_0s_cnt_1_lo_b16;		//0x26A
+	u8 rsfec_corr_0s_cnt_1_lo_b24;		//0x26B
+	u8 rsfec_corr_0s_cnt_1_hi_b0;		//0x26C
+	u8 rsfec_corr_0s_cnt_1_hi_b8;		//0x26D
+	u8 rsfec_corr_0s_cnt_1_hi_b16;		//0x26E
+	u8 rsfec_corr_0s_cnt_1_hi_b24;		//0x26F
+	u8 rsfec_corr_0s_cnt_2_lo_b0;		//0x270
+	u8 rsfec_corr_0s_cnt_2_lo_b8;		//0x271
+	u8 rsfec_corr_0s_cnt_2_lo_b16;		//0x272
+	u8 rsfec_corr_0s_cnt_2_lo_b24;		//0x273
+	u8 rsfec_corr_0s_cnt_2_hi_b0;		//0x274
+	u8 rsfec_corr_0s_cnt_2_hi_b8;		//0x275
+	u8 rsfec_corr_0s_cnt_2_hi_b16;		//0x276
+	u8 rsfec_corr_0s_cnt_2_hi_b24;		//0x277
+	u8 rsfec_corr_0s_cnt_3_lo_b0;		//0x278
+	u8 rsfec_corr_0s_cnt_3_lo_b8;		//0x279
+	u8 rsfec_corr_0s_cnt_3_lo_b16;		//0x27A
+	u8 rsfec_corr_0s_cnt_3_lo_b24;		//0x27B
+	u8 rsfec_corr_0s_cnt_3_hi_b0;		//0x27C
+	u8 rsfec_corr_0s_cnt_3_hi_b8;		//0x27D
+	u8 rsfec_corr_0s_cnt_3_hi_b16;		//0x27E
+	u8 rsfec_corr_0s_cnt_3_hi_b24;		//0x27F
+	u8 rsfec_corr_1s_cnt_0_lo_b0;		//0x280
+	u8 rsfec_corr_1s_cnt_0_lo_b8;		//0x281
+	u8 rsfec_corr_1s_cnt_0_lo_b16;		//0x282
+	u8 rsfec_corr_1s_cnt_0_lo_b24;		//0x283
+	u8 rsfec_corr_1s_cnt_0_hi_b0;		//0x284
+	u8 rsfec_corr_1s_cnt_0_hi_b8;		//0x285
+	u8 rsfec_corr_1s_cnt_0_hi_b16;		//0x286
+	u8 rsfec_corr_1s_cnt_0_hi_b24;		//0x287
+	u8 rsfec_corr_1s_cnt_1_lo_b0;		//0x288
+	u8 rsfec_corr_1s_cnt_1_lo_b8;		//0x289
+	u8 rsfec_corr_1s_cnt_1_lo_b16;		//0x28A
+	u8 rsfec_corr_1s_cnt_1_lo_b24;		//0x28B
+	u8 rsfec_corr_1s_cnt_1_hi_b0;		//0x28C
+	u8 rsfec_corr_1s_cnt_1_hi_b8;		//0x28D
+	u8 rsfec_corr_1s_cnt_1_hi_b16;		//0x28E
+	u8 rsfec_corr_1s_cnt_1_hi_b24;		//0x28F
+	u8 rsfec_corr_1s_cnt_2_lo_b0;		//0x290
+	u8 rsfec_corr_1s_cnt_2_lo_b8;		//0x291
+	u8 rsfec_corr_1s_cnt_2_lo_b16;		//0x292
+	u8 rsfec_corr_1s_cnt_2_lo_b24;		//0x293
+	u8 rsfec_corr_1s_cnt_2_hi_b0;		//0x294
+	u8 rsfec_corr_1s_cnt_2_hi_b8;		//0x295
+	u8 rsfec_corr_1s_cnt_2_hi_b16;		//0x296
+	u8 rsfec_corr_1s_cnt_2_hi_b24;		//0x297
+	u8 rsfec_corr_1s_cnt_3_lo_b0;		//0x298
+	u8 rsfec_corr_1s_cnt_3_lo_b8;		//0x299
+	u8 rsfec_corr_1s_cnt_3_lo_b16;		//0x29A
+	u8 rsfec_corr_1s_cnt_3_lo_b24;		//0x29B
+	u8 rsfec_corr_1s_cnt_3_hi_b0;		//0x29C
+	u8 rsfec_corr_1s_cnt_3_hi_b8;		//0x29D
+	u8 rsfec_corr_1s_cnt_3_hi_b16;		//0x29E
+	u8 rsfec_corr_1s_cnt_3_hi_b24;		//0x29F
+	u8 reserved_2A0[96];			//0x2A0-0x2FF
 };
 
 #define eth_rsfec_csroffs(a) \
@@ -2211,7 +2427,9 @@ struct intel_fpga_etile_xcvr_pma_avmm {
 	u8 reg_022;					// 0x022
 	u8 reg_023;					// 0x023
 	u8 reg_024;					// 0x024
-	u8 reserved_025[15];				// 0x025-0x033
+	u8 reserved_025[3];				// 0x025-0x027
+	u8 reg_028;					// 0x028
+	u8 reserved_029[11];				// 0x029-0x033
 	u8 reg_034;					// 0x034
 	u8 reg_035;					// 0x035
 	u8 reg_036;					// 0x036
@@ -2411,13 +2629,13 @@ struct intel_fpga_etile_eth_private {
 	int phy_addr;		/* PHY's MDIO address, -1 for autodetection */
 	phy_interface_t phy_iface;
 	struct mii_bus *mdio;
-	int oldspeed;
-	int oldduplex;
+	u32 link_speed;
+	u8 duplex;
 	int oldlink;
 
 	/* FEC */
 	const char *fec_type;
-	u32 fec_channel;
+	u32 rsfec_cw_pos_rx;
 
 	/* ethtool msglvl option */
 	u32 msg_enable;
@@ -2429,6 +2647,8 @@ struct intel_fpga_etile_eth_private {
 void intel_fpga_etile_set_ethtool_ops(struct net_device *dev);
 int fec_init(struct platform_device *pdev, struct intel_fpga_etile_eth_private *priv);
 void ui_adjustments(struct timer_list *t);
+int etile_check_counter_complete(void __iomem *ioaddr, size_t offs, u32 bit_mask,
+				 bool set_bit, int align);
 
 #ifdef CONFIG_INTEL_FPGA_ETILE_DEBUG_FS
 int intel_fpga_etile_init_fs(struct net_device *dev);
