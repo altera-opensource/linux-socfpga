@@ -72,9 +72,12 @@ static int pause = MAC_PAUSEFRAME_QUANTA;
 module_param(pause, int, 0644);
 MODULE_PARM_DESC(pause, "Flow Control Pause Time");
 
-#define INTEL_FPGA_BYTE_ALIGN	8
-#define INTEL_FPGA_WORD_ALIGN	32
-
+/* Make sure DMA buffer size is larger than the max frame size
+ * plus some alignment offset and a VLAN header. If the max frame size is
+ * 1518, a VLAN header would be additional 4 bytes and additional
+ * headroom for alignment is 2 bytes, 2048 is just fine.
+ */
+#define INTEL_FPGA_RXDMABUFFER_SIZE	2048
 #define INTEL_FPGA_COAL_TIMER(x)	(jiffies + usecs_to_jiffies(x))
 
 static const struct of_device_id intel_fpga_etile_ll_ids[];
@@ -530,9 +533,9 @@ out:
 	return ret;
 }
 
-static int check_counter_complete(void __iomem *ioaddr,
-				  size_t offs, u32 bit_mask, bool set_bit,
-				  int align)
+int etile_check_counter_complete(void __iomem *ioaddr,
+				 size_t offs, u32 bit_mask, bool set_bit,
+				 int align)
 {
 	int counter;
 
@@ -718,7 +721,12 @@ static int eth_etile_tx_rx_user_flow(struct intel_fpga_etile_eth_private *priv)
 	u32 rx_pma_delay_ns = 0;
 	u32 rx_extra_latency = 0;
 	u32 ui_value;
+	u8 rx_bitslip_cnt = 0;
+	u8 rx_fec_cw_pos_b0 = 0;
+	u8 rx_fec_cw_pos_b8 = 0;
+
 	int ret;
+	const char *kr_fec = "kr-fec";
 
 	switch (priv->phy_iface) {
 	case PHY_INTERFACE_MODE_10GKR:
@@ -734,10 +742,10 @@ static int eth_etile_tx_rx_user_flow(struct intel_fpga_etile_eth_private *priv)
 
 	/* TX User Flow */
 	/* Step 1 After power up or reset, wait until TX data path is up */
-	if (check_counter_complete(priv->mac_dev,
-				   eth_phy_csroffs(phy_tx_datapath_ready),
-				   ETH_PHY_TX_PCS_READY, true,
-				   INTEL_FPGA_WORD_ALIGN)) {
+	if (etile_check_counter_complete(priv->mac_dev,
+					 eth_phy_csroffs(phy_tx_datapath_ready),
+					 ETH_PHY_TX_PCS_READY, true,
+					 INTEL_FPGA_WORD_ALIGN)) {
 		netdev_err(priv->dev, "MAC Tx datapath not ready\n");
 		return -EINVAL;
 	}
@@ -759,24 +767,85 @@ static int eth_etile_tx_rx_user_flow(struct intel_fpga_etile_eth_private *priv)
 
 	/* RX User Flow */
 	/* Step 1 After power up or reset, wait until RX data path is up */
-	if (check_counter_complete(priv->mac_dev,
-				   eth_phy_csroffs(phy_pcs_stat_anlt),
-				   ETH_PHY_RX_PCS_ALIGNED, true,
-				   INTEL_FPGA_WORD_ALIGN)) {
+	if (etile_check_counter_complete(priv->mac_dev,
+					 eth_phy_csroffs(phy_pcs_stat_anlt),
+					 ETH_PHY_RX_PCS_ALIGNED, true,
+					 INTEL_FPGA_WORD_ALIGN)) {
 		netdev_err(priv->dev, "MAC Rx datapath not ready\n");
 		return -EINVAL;
 	}
 
-	/*  Step 2 Read RX FEC codeword position */
-	rx_fec_cw_pos = csrrd32(priv->rsfec, eth_rsfec_csroffs(rsfec_cw_pos_rx_0));
+	/* Check for 25G FEC variants */
+	if (priv->link_speed == SPEED_25000 &&
+	    (!strcasecmp(kr_fec, priv->fec_type))) {
+		/*  Step 2a Read RX FEC codeword position */
+		switch (priv->rsfec_cw_pos_rx) {
+		case 0:
+			rx_fec_cw_pos_b0 = csrrd8(priv->rsfec,
+						  eth_rsfec_csroffs(rsfec_cw_pos_rx_0_b0));
+			rx_fec_cw_pos_b8 = csrrd8(priv->rsfec,
+						  eth_rsfec_csroffs(rsfec_cw_pos_rx_0_b8));
+			break;
+		case 1:
+			rx_fec_cw_pos_b0 = csrrd8(priv->rsfec,
+						  eth_rsfec_csroffs(rsfec_cw_pos_rx_1_b0));
+			rx_fec_cw_pos_b8 = csrrd8(priv->rsfec,
+						  eth_rsfec_csroffs(rsfec_cw_pos_rx_1_b8));
+			break;
+		case 2:
+			rx_fec_cw_pos_b0 = csrrd8(priv->rsfec,
+						  eth_rsfec_csroffs(rsfec_cw_pos_rx_1_b0));
+			rx_fec_cw_pos_b8 = csrrd8(priv->rsfec,
+						  eth_rsfec_csroffs(rsfec_cw_pos_rx_1_b8));
+			break;
+		case 3:
+		default:
+			rx_fec_cw_pos_b0 = csrrd8(priv->rsfec,
+						  eth_rsfec_csroffs(rsfec_cw_pos_rx_3_b0));
+			rx_fec_cw_pos_b8 = csrrd8(priv->rsfec,
+						  eth_rsfec_csroffs(rsfec_cw_pos_rx_3_b8));
+			break;
+		}
 
-	/* Step 3 Determine sync pulse (Alignment Marker) offsets with reference to async pulse */
-	rx_spulse_offset = (rx_fec_cw_pos * ui_value);
+		rx_fec_cw_pos = (rx_fec_cw_pos_b8 << 8) | rx_fec_cw_pos_b0;
 
-	/* Step 4 Calculate RX Extra latency and total up extra latency together */
-	rx_pma_delay_ns = (INTEL_FPGA_RX_PMA_DELAY_25G * ui_value);
-	rx_extra_latency = ((rx_pma_delay_ns + rx_spulse_offset +
-			     priv->rx_external_phy_delay_ns) >> 8) | 0x80000000;
+		/* Step 3 Determine sync pulse (Alignment Marker)
+		 * offsets with reference to async pulse
+		 */
+		rx_spulse_offset = (rx_fec_cw_pos * ui_value);
+
+		netdev_info(priv->dev, "Rx FEC lane:%d codeword pos:%d ui value:0x%x\n",
+			    priv->rsfec_cw_pos_rx, rx_fec_cw_pos, ui_value);
+
+		/* Step 4 Calculate RX Extra latency and total up extra latency together */
+		rx_pma_delay_ns = (INTEL_FPGA_RX_PMA_DELAY_25G * ui_value);
+		rx_extra_latency = ((rx_pma_delay_ns + priv->rx_external_phy_delay_ns -
+				    rx_spulse_offset) >> 8) | 0x80000000;
+	} else {
+		/*  Step 2b Read bitslip count from IP */
+		rx_bitslip_cnt = csrrd8(priv->xcvr, eth_pma_avmm_csroffs(reg_028));
+
+		/* Step 3 Determine sync pulse (Alignment Marker)
+		 * offsets with reference to async pulse
+		 */
+		if (rx_bitslip_cnt > 62) {
+			rx_spulse_offset = (rx_bitslip_cnt - 66) * ui_value;
+			if (rx_bitslip_cnt > 62 && rx_bitslip_cnt <= 66) {
+				netdev_warn(priv->dev,
+					    "rx_blitslip_cnt value :%d is incorrect!\n",
+					    rx_bitslip_cnt);
+			}
+		}
+		rx_spulse_offset = (rx_bitslip_cnt * ui_value);
+
+		netdev_info(priv->dev, "Rx bitslip cnt:%d ui value:%x\n",
+			    rx_bitslip_cnt, ui_value);
+
+		/* Step 4 Calculate RX Extra latency and total up extra latency together */
+		rx_pma_delay_ns = (INTEL_FPGA_RX_PMA_DELAY_25G * ui_value);
+		rx_extra_latency = ((rx_pma_delay_ns + rx_spulse_offset +
+			priv->rx_external_phy_delay_ns) >> 8) | 0x80000000;
+	}
 
 	/* Step 5 Write RX extra Latency */
 	csrwr32(rx_extra_latency, priv->mac_dev, eth_ptp_csroffs(rx_ptp_extra_latency));
@@ -786,7 +855,7 @@ static int eth_etile_tx_rx_user_flow(struct intel_fpga_etile_eth_private *priv)
 
 	/* Adjust UI value */
 	timer_setup(&priv->fec_timer, ui_adjustments, 0);
-	ret = mod_timer(&priv->fec_timer, jiffies + msecs_to_jiffies(1000));
+	ret = mod_timer(&priv->fec_timer, jiffies + msecs_to_jiffies(5000));
 	if (ret)
 		netdev_err(priv->dev, "Timer failed to start UI adjustment\n");
 
@@ -819,16 +888,16 @@ static int init_rst_mac(struct intel_fpga_etile_eth_private *priv)
 	csrwr8(0x0, priv->xcvr, eth_pma_avmm_csroffs(reg_202));
 	csrwr8(0x81, priv->xcvr, eth_pma_avmm_csroffs(reg_203));
 
-	if (check_counter_complete(priv->xcvr, eth_pma_avmm_csroffs(reg_207),
-				   XCVR_PMA_AVMM_207_LAST_OP_ON_200_203_SUCCESS,
-				   true, INTEL_FPGA_BYTE_ALIGN)) {
+	if (etile_check_counter_complete(priv->xcvr, eth_pma_avmm_csroffs(reg_207),
+					 XCVR_PMA_AVMM_207_LAST_OP_ON_200_203_SUCCESS,
+					 true, INTEL_FPGA_BYTE_ALIGN)) {
 		netdev_err(priv->dev, "Analog PMA reset failed, abort\n");
 		return -EINVAL;
 	}
 
-	if (check_counter_complete(priv->xcvr, eth_pma_avmm_csroffs(reg_204),
-				   XCVR_PMA_AVMM_204_RET_PHYS_CHANNEL_NUMBER,
-				   false, INTEL_FPGA_BYTE_ALIGN))
+	if (etile_check_counter_complete(priv->xcvr, eth_pma_avmm_csroffs(reg_204),
+					 XCVR_PMA_AVMM_204_RET_PHYS_CHANNEL_NUMBER,
+					 false, INTEL_FPGA_BYTE_ALIGN))
 		netdev_warn(priv->dev, "Cannot read channel number\n");
 
 	/* Step 3 - Reload PMA settings
@@ -836,9 +905,9 @@ static int init_rst_mac(struct intel_fpga_etile_eth_private *priv)
 	 *	2.	PMA AVMM Read, Offset = 0x8B, expected values bit [2] and [3] = ‘11’
 	 */
 	csrwr8(0x1, priv->xcvr, eth_pma_avmm_csroffs(reg_091));
-	if (check_counter_complete(priv->xcvr, eth_pma_avmm_csroffs(reg_08B),
-				   XCVR_PMA_AVMM_08B_PMA_RELOAD_SUCCESS,
-				   true, INTEL_FPGA_BYTE_ALIGN))
+	if (etile_check_counter_complete(priv->xcvr, eth_pma_avmm_csroffs(reg_08B),
+					 XCVR_PMA_AVMM_08B_PMA_RELOAD_SUCCESS,
+					 true, INTEL_FPGA_BYTE_ALIGN))
 		netdev_warn(priv->dev, "Reload PMA settings failed\n");
 
 	/* Step 4 - De-assert TX digital reset
@@ -866,27 +935,27 @@ static int init_rst_mac(struct intel_fpga_etile_eth_private *priv)
 	csrwr8(0x0, priv->xcvr, eth_pma_avmm_csroffs(reg_087));
 	csrwr8(0x1, priv->xcvr, eth_pma_avmm_csroffs(reg_090));
 
-	if (check_counter_complete(priv->xcvr, eth_pma_avmm_csroffs(reg_08A),
-				   XCVR_PMA_AVMM_08A_PMA_ATTR_SENT_SUCCESS,
-				   true, INTEL_FPGA_BYTE_ALIGN))
+	if (etile_check_counter_complete(priv->xcvr, eth_pma_avmm_csroffs(reg_08A),
+					 XCVR_PMA_AVMM_08A_PMA_ATTR_SENT_SUCCESS,
+					 true, INTEL_FPGA_BYTE_ALIGN))
 		netdev_warn(priv->dev,
 			    "Internal loopback: PMA attribute sent failed\n");
 
-	if (check_counter_complete(priv->xcvr, eth_pma_avmm_csroffs(reg_08B),
-				   XCVR_PMA_AVMM_08B_PMA_FINISH_ATTR,
-				   false, INTEL_FPGA_BYTE_ALIGN))
+	if (etile_check_counter_complete(priv->xcvr, eth_pma_avmm_csroffs(reg_08B),
+					 XCVR_PMA_AVMM_08B_PMA_FINISH_ATTR,
+					 false, INTEL_FPGA_BYTE_ALIGN))
 		netdev_warn(priv->dev,
 			    "Internal loopback: PMA attribute not returned\n");
 
-	if (check_counter_complete(priv->xcvr, eth_pma_avmm_csroffs(reg_088),
-				   XCVR_PMA_AVMM_088_PMA_INTERNAL_LOOPBACK,
-				   true, INTEL_FPGA_BYTE_ALIGN))
+	if (etile_check_counter_complete(priv->xcvr, eth_pma_avmm_csroffs(reg_088),
+					 XCVR_PMA_AVMM_088_PMA_INTERNAL_LOOPBACK,
+					 true, INTEL_FPGA_BYTE_ALIGN))
 		netdev_warn(priv->dev,
 			    "Internal loopback: PMA low byte failed\n");
 
-	if (check_counter_complete(priv->xcvr, eth_pma_avmm_csroffs(reg_089),
-				   XCVR_PMA_AVMM_089_CORE_PMA_ATTR_CODE_RET_VAL_HI,
-				   false, INTEL_FPGA_BYTE_ALIGN))
+	if (etile_check_counter_complete(priv->xcvr, eth_pma_avmm_csroffs(reg_089),
+					 XCVR_PMA_AVMM_089_CORE_PMA_ATTR_CODE_RET_VAL_HI,
+					 false, INTEL_FPGA_BYTE_ALIGN))
 		netdev_warn(priv->dev,
 			    "Internal loopback: PMA high byte failed\n");
 
@@ -910,27 +979,27 @@ static int init_rst_mac(struct intel_fpga_etile_eth_private *priv)
 	csrwr8(0x0, priv->xcvr, eth_pma_avmm_csroffs(reg_087));
 	csrwr8(0x1, priv->xcvr, eth_pma_avmm_csroffs(reg_090));
 
-	if (check_counter_complete(priv->xcvr, eth_pma_avmm_csroffs(reg_08A),
-				   XCVR_PMA_AVMM_08A_PMA_ATTR_SENT_SUCCESS,
-				   true, INTEL_FPGA_BYTE_ALIGN))
+	if (etile_check_counter_complete(priv->xcvr, eth_pma_avmm_csroffs(reg_08A),
+					 XCVR_PMA_AVMM_08A_PMA_ATTR_SENT_SUCCESS,
+					 true, INTEL_FPGA_BYTE_ALIGN))
 		netdev_warn(priv->dev,
 			    "Initial Adaptation: PMA attribute sent failed\n");
 
-	if (check_counter_complete(priv->xcvr, eth_pma_avmm_csroffs(reg_08B),
-				   XCVR_PMA_AVMM_08B_PMA_FINISH_ATTR, false,
-				   INTEL_FPGA_BYTE_ALIGN))
+	if (etile_check_counter_complete(priv->xcvr, eth_pma_avmm_csroffs(reg_08B),
+					 XCVR_PMA_AVMM_08B_PMA_FINISH_ATTR, false,
+					 INTEL_FPGA_BYTE_ALIGN))
 		netdev_warn(priv->dev,
 			    "Initial Adaptation: PMA attribute not returned\n");
 
-	if (check_counter_complete(priv->xcvr, eth_pma_avmm_csroffs(reg_088),
-				   XCVR_PMA_AVMM_088_PMA_RECEIVER_TUNING_CTRL,
-				   true, INTEL_FPGA_BYTE_ALIGN))
+	if (etile_check_counter_complete(priv->xcvr, eth_pma_avmm_csroffs(reg_088),
+					 XCVR_PMA_AVMM_088_PMA_RECEIVER_TUNING_CTRL,
+					 true, INTEL_FPGA_BYTE_ALIGN))
 		netdev_warn(priv->dev,
 			    "Initial Adaptation: PMA low byte failed\n");
 
-	if (check_counter_complete(priv->xcvr, eth_pma_avmm_csroffs(reg_089),
-				   XCVR_PMA_AVMM_089_CORE_PMA_ATTR_CODE_RET_VAL_HI,
-				   false, INTEL_FPGA_BYTE_ALIGN))
+	if (etile_check_counter_complete(priv->xcvr, eth_pma_avmm_csroffs(reg_089),
+					 XCVR_PMA_AVMM_089_CORE_PMA_ATTR_CODE_RET_VAL_HI,
+					 false, INTEL_FPGA_BYTE_ALIGN))
 		netdev_warn(priv->dev,
 			    "Initial Adaptation: PMA high byte failed\n");
 
@@ -954,27 +1023,27 @@ static int init_rst_mac(struct intel_fpga_etile_eth_private *priv)
 	csrwr8(0x1, priv->xcvr, eth_pma_avmm_csroffs(reg_087));
 	csrwr8(0x1, priv->xcvr, eth_pma_avmm_csroffs(reg_090));
 
-	if (check_counter_complete(priv->xcvr, eth_pma_avmm_csroffs(reg_08A),
-				   XCVR_PMA_AVMM_08A_PMA_ATTR_SENT_SUCCESS,
-				   true, INTEL_FPGA_BYTE_ALIGN))
+	if (etile_check_counter_complete(priv->xcvr, eth_pma_avmm_csroffs(reg_08A),
+					 XCVR_PMA_AVMM_08A_PMA_ATTR_SENT_SUCCESS,
+					 true, INTEL_FPGA_BYTE_ALIGN))
 		netdev_warn(priv->dev,
 			    "Initial Adaptation Status: PMA sent failed\n");
 
-	if (check_counter_complete(priv->xcvr, eth_pma_avmm_csroffs(reg_08B),
-				   XCVR_PMA_AVMM_08B_PMA_FINISH_ATTR, false,
-				   INTEL_FPGA_BYTE_ALIGN))
+	if (etile_check_counter_complete(priv->xcvr, eth_pma_avmm_csroffs(reg_08B),
+					 XCVR_PMA_AVMM_08B_PMA_FINISH_ATTR, false,
+					 INTEL_FPGA_BYTE_ALIGN))
 		netdev_warn(priv->dev,
 			    "Initial Adaptation Status: PMA not returned\n");
 
-	if (check_counter_complete(priv->xcvr, eth_pma_avmm_csroffs(reg_088),
-				   XCVR_PMA_AVMM_088_PMA_READ_RECEIVER_TUNING,
-				   false, INTEL_FPGA_BYTE_ALIGN))
+	if (etile_check_counter_complete(priv->xcvr, eth_pma_avmm_csroffs(reg_088),
+					 XCVR_PMA_AVMM_088_PMA_READ_RECEIVER_TUNING,
+					 false, INTEL_FPGA_BYTE_ALIGN))
 		netdev_warn(priv->dev,
 			    "Initial Adaptation Status: PMA low byte failed");
 
-	if (check_counter_complete(priv->xcvr, eth_pma_avmm_csroffs(reg_089),
-				   XCVR_PMA_AVMM_089_CORE_PMA_ATTR_CODE_RET_VAL_HI,
-				   false, INTEL_FPGA_BYTE_ALIGN))
+	if (etile_check_counter_complete(priv->xcvr, eth_pma_avmm_csroffs(reg_089),
+					 XCVR_PMA_AVMM_089_CORE_PMA_ATTR_CODE_RET_VAL_HI,
+					 false, INTEL_FPGA_BYTE_ALIGN))
 		netdev_warn(priv->dev,
 			    "Initial Adaptation Status: PMA high byte failed\n");
 
@@ -998,27 +1067,27 @@ static int init_rst_mac(struct intel_fpga_etile_eth_private *priv)
 	csrwr8(0x0, priv->xcvr, eth_pma_avmm_csroffs(reg_087));
 	csrwr8(0x1, priv->xcvr, eth_pma_avmm_csroffs(reg_090));
 
-	if (check_counter_complete(priv->xcvr, eth_pma_avmm_csroffs(reg_08A),
-				   XCVR_PMA_AVMM_08A_PMA_ATTR_SENT_SUCCESS,
-				   true, INTEL_FPGA_BYTE_ALIGN))
+	if (etile_check_counter_complete(priv->xcvr, eth_pma_avmm_csroffs(reg_08A),
+					 XCVR_PMA_AVMM_08A_PMA_ATTR_SENT_SUCCESS,
+					 true, INTEL_FPGA_BYTE_ALIGN))
 		netdev_warn(priv->dev,
 			    "Disable loopback: PMA attribute sent failed\n");
 
-	if (check_counter_complete(priv->xcvr, eth_pma_avmm_csroffs(reg_08B),
-				   XCVR_PMA_AVMM_08B_PMA_FINISH_ATTR, false,
-				   INTEL_FPGA_BYTE_ALIGN))
+	if (etile_check_counter_complete(priv->xcvr, eth_pma_avmm_csroffs(reg_08B),
+					 XCVR_PMA_AVMM_08B_PMA_FINISH_ATTR, false,
+					 INTEL_FPGA_BYTE_ALIGN))
 		netdev_warn(priv->dev,
 			    "Disable loopback: PMA attribute not returned\n");
 
-	if (check_counter_complete(priv->xcvr, eth_pma_avmm_csroffs(reg_088),
-				   XCVR_PMA_AVMM_088_PMA_INTERNAL_LOOPBACK,
-				   true, INTEL_FPGA_BYTE_ALIGN))
+	if (etile_check_counter_complete(priv->xcvr, eth_pma_avmm_csroffs(reg_088),
+					 XCVR_PMA_AVMM_088_PMA_INTERNAL_LOOPBACK,
+					 true, INTEL_FPGA_BYTE_ALIGN))
 		netdev_warn(priv->dev,
 			    "Disable loopback: PMA low byte failed\n");
 
-	if (check_counter_complete(priv->xcvr, eth_pma_avmm_csroffs(reg_089),
-				   XCVR_PMA_AVMM_089_CORE_PMA_ATTR_CODE_RET_VAL_HI,
-				   false, INTEL_FPGA_BYTE_ALIGN))
+	if (etile_check_counter_complete(priv->xcvr, eth_pma_avmm_csroffs(reg_089),
+					 XCVR_PMA_AVMM_089_CORE_PMA_ATTR_CODE_RET_VAL_HI,
+					 false, INTEL_FPGA_BYTE_ALIGN))
 		netdev_warn(priv->dev,
 			    "Disable loopback: PMA high byte failed\n");
 
@@ -1049,27 +1118,27 @@ static int init_rst_mac(struct intel_fpga_etile_eth_private *priv)
 	csrwr8(0x0, priv->xcvr, eth_pma_avmm_csroffs(reg_087));
 	csrwr8(0x1, priv->xcvr, eth_pma_avmm_csroffs(reg_090));
 
-	if (check_counter_complete(priv->xcvr, eth_pma_avmm_csroffs(reg_08A),
-				   XCVR_PMA_AVMM_08A_PMA_ATTR_SENT_SUCCESS,
-				   true, INTEL_FPGA_BYTE_ALIGN))
+	if (etile_check_counter_complete(priv->xcvr, eth_pma_avmm_csroffs(reg_08A),
+					 XCVR_PMA_AVMM_08A_PMA_ATTR_SENT_SUCCESS,
+					 true, INTEL_FPGA_BYTE_ALIGN))
 		netdev_warn(priv->dev,
 			    "Initial Adaptation repeat: PMA sent failed\n");
 
-	if (check_counter_complete(priv->xcvr, eth_pma_avmm_csroffs(reg_08B),
-				   XCVR_PMA_AVMM_08B_PMA_FINISH_ATTR, false,
-				   INTEL_FPGA_BYTE_ALIGN))
+	if (etile_check_counter_complete(priv->xcvr, eth_pma_avmm_csroffs(reg_08B),
+					 XCVR_PMA_AVMM_08B_PMA_FINISH_ATTR, false,
+					 INTEL_FPGA_BYTE_ALIGN))
 		netdev_warn(priv->dev,
 			    "Initial Adaptation repeat: PMA not returned\n");
 
-	if (check_counter_complete(priv->xcvr, eth_pma_avmm_csroffs(reg_088),
-				   XCVR_PMA_AVMM_088_PMA_RECEIVER_TUNING_CTRL,
-				   true, INTEL_FPGA_BYTE_ALIGN))
+	if (etile_check_counter_complete(priv->xcvr, eth_pma_avmm_csroffs(reg_088),
+					 XCVR_PMA_AVMM_088_PMA_RECEIVER_TUNING_CTRL,
+					 true, INTEL_FPGA_BYTE_ALIGN))
 		netdev_warn(priv->dev,
 			    "Initial Adaptation repeat: PMA low byte failed\n");
 
-	if (check_counter_complete(priv->xcvr, eth_pma_avmm_csroffs(reg_089),
-				   XCVR_PMA_AVMM_089_CORE_PMA_ATTR_CODE_RET_VAL_HI,
-				   false, INTEL_FPGA_BYTE_ALIGN))
+	if (etile_check_counter_complete(priv->xcvr, eth_pma_avmm_csroffs(reg_089),
+					 XCVR_PMA_AVMM_089_CORE_PMA_ATTR_CODE_RET_VAL_HI,
+					 false, INTEL_FPGA_BYTE_ALIGN))
 		netdev_warn(priv->dev,
 			    "Initial Adaptation repeat: PMA high byte failed\n");
 
@@ -1093,27 +1162,27 @@ static int init_rst_mac(struct intel_fpga_etile_eth_private *priv)
 	csrwr8(0x1, priv->xcvr, eth_pma_avmm_csroffs(reg_087));
 	csrwr8(0x1, priv->xcvr, eth_pma_avmm_csroffs(reg_090));
 
-	if (check_counter_complete(priv->xcvr, eth_pma_avmm_csroffs(reg_08A),
-				   XCVR_PMA_AVMM_08A_PMA_ATTR_SENT_SUCCESS,
-				   true, INTEL_FPGA_BYTE_ALIGN))
+	if (etile_check_counter_complete(priv->xcvr, eth_pma_avmm_csroffs(reg_08A),
+					 XCVR_PMA_AVMM_08A_PMA_ATTR_SENT_SUCCESS,
+					 true, INTEL_FPGA_BYTE_ALIGN))
 		netdev_warn(priv->dev,
 			    "Initial Adaptation Status repeat: PMA sent failed\n");
 
-	if (check_counter_complete(priv->xcvr, eth_pma_avmm_csroffs(reg_08B),
-				   XCVR_PMA_AVMM_08B_PMA_FINISH_ATTR, false,
-				   INTEL_FPGA_BYTE_ALIGN))
+	if (etile_check_counter_complete(priv->xcvr, eth_pma_avmm_csroffs(reg_08B),
+					 XCVR_PMA_AVMM_08B_PMA_FINISH_ATTR, false,
+					 INTEL_FPGA_BYTE_ALIGN))
 		netdev_warn(priv->dev,
 			    "Initial Adaptation Status repeat: PMA not returned\n");
 
-	if (check_counter_complete(priv->xcvr, eth_pma_avmm_csroffs(reg_088),
-				   XCVR_PMA_AVMM_088_PMA_READ_RECEIVER_TUNING,
-				   false, INTEL_FPGA_BYTE_ALIGN))
+	if (etile_check_counter_complete(priv->xcvr, eth_pma_avmm_csroffs(reg_088),
+					 XCVR_PMA_AVMM_088_PMA_READ_RECEIVER_TUNING,
+					 false, INTEL_FPGA_BYTE_ALIGN))
 		netdev_warn(priv->dev,
 			    "Initial Adaptation Status repeat: PMA low byte failed");
 
-	if (check_counter_complete(priv->xcvr, eth_pma_avmm_csroffs(reg_089),
-				   XCVR_PMA_AVMM_089_CORE_PMA_ATTR_CODE_RET_VAL_HI,
-				   false, INTEL_FPGA_BYTE_ALIGN))
+	if (etile_check_counter_complete(priv->xcvr, eth_pma_avmm_csroffs(reg_089),
+					 XCVR_PMA_AVMM_089_CORE_PMA_ATTR_CODE_RET_VAL_HI,
+					 false, INTEL_FPGA_BYTE_ALIGN))
 		netdev_warn(priv->dev,
 			    "Initial Adaptation Status repeat: PMA high byte failed\n");
 
@@ -1139,27 +1208,27 @@ static int init_rst_mac(struct intel_fpga_etile_eth_private *priv)
 	csrwr8(0x0, priv->xcvr, eth_pma_avmm_csroffs(reg_087));
 	csrwr8(0x1, priv->xcvr, eth_pma_avmm_csroffs(reg_090));
 
-	if (check_counter_complete(priv->xcvr, eth_pma_avmm_csroffs(reg_08A),
-				   XCVR_PMA_AVMM_08A_PMA_ATTR_SENT_SUCCESS,
-				   true, INTEL_FPGA_BYTE_ALIGN))
+	if (etile_check_counter_complete(priv->xcvr, eth_pma_avmm_csroffs(reg_08A),
+					 XCVR_PMA_AVMM_08A_PMA_ATTR_SENT_SUCCESS,
+					 true, INTEL_FPGA_BYTE_ALIGN))
 		netdev_warn(priv->dev,
 			    "Continuous Adaption: PMA failed to send\n");
 
-	if (check_counter_complete(priv->xcvr, eth_pma_avmm_csroffs(reg_08B),
-				   XCVR_PMA_AVMM_08B_PMA_FINISH_ATTR, false,
-				   INTEL_FPGA_BYTE_ALIGN))
+	if (etile_check_counter_complete(priv->xcvr, eth_pma_avmm_csroffs(reg_08B),
+					 XCVR_PMA_AVMM_08B_PMA_FINISH_ATTR, false,
+					 INTEL_FPGA_BYTE_ALIGN))
 		netdev_warn(priv->dev,
 			    "Continuous Adaption: PMA not returned\n");
 
-	if (check_counter_complete(priv->xcvr, eth_pma_avmm_csroffs(reg_088),
-				   XCVR_PMA_AVMM_088_PMA_RECEIVER_TUNING_CTRL,
-				   true, INTEL_FPGA_BYTE_ALIGN))
+	if (etile_check_counter_complete(priv->xcvr, eth_pma_avmm_csroffs(reg_088),
+					 XCVR_PMA_AVMM_088_PMA_RECEIVER_TUNING_CTRL,
+					 true, INTEL_FPGA_BYTE_ALIGN))
 		netdev_warn(priv->dev,
 			    "Continuous Adaption: PMA low byte failed\n");
 
-	if (check_counter_complete(priv->xcvr, eth_pma_avmm_csroffs(reg_089),
-				   XCVR_PMA_AVMM_089_CORE_PMA_ATTR_CODE_RET_VAL_HI,
-				   false, INTEL_FPGA_BYTE_ALIGN))
+	if (etile_check_counter_complete(priv->xcvr, eth_pma_avmm_csroffs(reg_089),
+					 XCVR_PMA_AVMM_089_CORE_PMA_ATTR_CODE_RET_VAL_HI,
+					 false, INTEL_FPGA_BYTE_ALIGN))
 		netdev_warn(priv->dev,
 			    "Continuous Adaption: PMA high byte failed\n");
 
@@ -1173,10 +1242,10 @@ static int init_rst_mac(struct intel_fpga_etile_eth_private *priv)
 	/* Step 12 - Verify RX PCS Status
 	 *	EHIP CSR Read, Offset = 0x326, expected value = 0x1
 	 */
-	if (check_counter_complete(priv->mac_dev,
-				   eth_phy_csroffs(phy_pcs_stat_anlt),
-				   ETH_PHY_RX_PCS_ALIGNED, true,
-				   INTEL_FPGA_WORD_ALIGN)) {
+	if (etile_check_counter_complete(priv->mac_dev,
+					 eth_phy_csroffs(phy_pcs_stat_anlt),
+					 ETH_PHY_RX_PCS_ALIGNED, true,
+					 INTEL_FPGA_WORD_ALIGN)) {
 		netdev_err(priv->dev, "RX PCS is not aligned\n");
 		return -EINVAL;
 	}
@@ -1343,6 +1412,9 @@ static int etile_open(struct net_device *dev)
 	if (priv->dmaops->start_txdma)
 		priv->dmaops->start_txdma(&priv->dma_priv);
 
+	if (priv->phylink)
+		phylink_start(priv->phylink);
+
 	return 0;
 
 init_error:
@@ -1358,6 +1430,10 @@ static int etile_shutdown(struct net_device *dev)
 {
 	struct intel_fpga_etile_eth_private *priv = netdev_priv(dev);
 	unsigned long flags;
+
+	/* Stop the PHY */
+	if (priv->phylink)
+		phylink_stop(priv->phylink);
 
 	netif_stop_queue(dev);
 	napi_disable(&priv->napi);
@@ -1378,6 +1454,12 @@ static int etile_shutdown(struct net_device *dev)
 	spin_lock(&priv->mac_cfg_lock);
 	spin_lock(&priv->tx_lock);
 
+	/* Trigger RX digital reset
+	 * 1.	EHIP CSR Write, Offset = 0x310, value = 0x4
+	 */
+	csrwr32(0x4, priv->mac_dev, eth_phy_csroffs(phy_config));
+	udelay(1);
+
 	priv->dmaops->reset_dma(&priv->dma_priv);
 	etile_free_skbufs(dev);
 
@@ -1385,6 +1467,8 @@ static int etile_shutdown(struct net_device *dev)
 	spin_unlock(&priv->mac_cfg_lock);
 	priv->dmaops->uninit_dma(&priv->dma_priv);
 	del_timer_sync(&priv->fec_timer);
+
+	netdev_warn(dev, "shutdown completed\n");
 
 	return 0;
 }
@@ -1515,6 +1599,9 @@ static void intel_fpga_etile_validate(struct phylink_config *config,
 		state->speed = SPEED_10000;
 		break;
 	case PHY_INTERFACE_MODE_25GKR:
+		phylink_set(mask, 25000baseCR_Full);
+		phylink_set(mask, 25000baseKR_Full);
+		phylink_set(mask, 25000baseSR_Full);
 		phylink_set(mac_supported, 25000baseCR_Full);
 		phylink_set(mac_supported, 25000baseKR_Full);
 		phylink_set(mac_supported, 25000baseSR_Full);
@@ -1546,18 +1633,24 @@ static void intel_fpga_etile_mac_an_restart(struct phylink_config *config)
 	/* Not Supported */
 }
 
+static void intel_fpga_etile_get_pcs_fixed_state(struct phylink_config *config,
+						 struct phylink_link_state *state)
+{
+	struct intel_fpga_etile_eth_private *priv =
+		netdev_priv(to_net_dev(config->dev));
+
+	if (!priv)
+		return;
+
+	state->speed = priv->link_speed;
+	state->duplex = DUPLEX_FULL;
+}
+
 static void intel_fpga_etile_mac_config(struct phylink_config *config,
 					unsigned int mode,
 					const struct phylink_link_state *state)
 {
-	struct intel_fpga_etile_eth_private *priv =
-			netdev_priv(to_net_dev(config->dev));
-	int ret;
-
-	/* init mac */
-	ret = init_rst_mac(priv);
-	if (ret)
-		netdev_err(priv->dev, "Cannot reset MAC core (error: %d)\n", ret);
+	/* Not Supported */
 }
 
 static void intel_fpga_etile_mac_link_down(struct phylink_config *config,
@@ -1606,6 +1699,7 @@ static int intel_fpga_etile_probe(struct platform_device *pdev)
 	struct device_node *np = pdev->dev.of_node;
 	const unsigned char *macaddr;
 	const struct of_device_id *of_id = NULL;
+	struct fwnode_handle *fixed_node;
 
 	ndev = alloc_etherdev(sizeof(struct intel_fpga_etile_eth_private));
 	if (!ndev) {
@@ -1625,6 +1719,9 @@ static int intel_fpga_etile_probe(struct platform_device *pdev)
 	priv->dma_priv.msg_enable = netif_msg_init(debug, default_msg_level);
 	priv->pause = pause;
 	priv->flow_ctrl = flow_ctrl;
+	priv->phylink_config.dev = &priv->dev->dev;
+	priv->phylink_config.type = PHYLINK_NETDEV;
+	priv->phylink_config.get_fixed_state = intel_fpga_etile_get_pcs_fixed_state;
 
 	of_id = of_match_device(intel_fpga_etile_ll_ids, &pdev->dev);
 	if (of_id)
@@ -1771,16 +1868,10 @@ static int intel_fpga_etile_probe(struct platform_device *pdev)
 	of_property_read_u32(pdev->dev.of_node, "max-frame-size",
 			     &priv->dev->max_mtu);
 
-	/* Make sure DMA buffer size is larger than the max frame size
-	 * plus some alignment offset and a VLAN header. If the max frame size is
-	 * 1518, a VLAN header would be additional 4 bytes and additional
-	 * headroom for alignment is 2 bytes, 2048 is just fine.
+	/* The DMA buffer size already accounts for an alignment bias
+	 * to avoid unaligned access exceptions for the NIOS processor,
 	 */
-	if (of_property_read_u32(pdev->dev.of_node, "altr,rx-dma-buffer-size",
-				 &priv->dma_priv.rx_dma_buf_sz)) {
-		dev_warn(&pdev->dev, "cannot obtain Rx dma buffer size\n");
-		priv->dma_priv.rx_dma_buf_sz = 2048;
-	}
+	priv->dma_priv.rx_dma_buf_sz = INTEL_FPGA_RXDMABUFFER_SIZE;
 
 	/* Get MAC PMA digital delays from device tree */
 	if (of_property_read_u32(pdev->dev.of_node, "altr,tx-pma-delay-ns",
@@ -1858,6 +1949,27 @@ static int intel_fpga_etile_probe(struct platform_device *pdev)
 	ret = of_get_phy_mode(np, &priv->phy_iface);
 	if (ret) {
 		dev_err(&pdev->dev, "incorrect phy-mode\n");
+		goto err_free_netdev;
+	}
+
+	/* create phylink */
+	priv->phylink = phylink_create(&priv->phylink_config, pdev->dev.fwnode,
+				       priv->phy_iface, &intel_fpga_etile_phylink_ops);
+	if (IS_ERR(priv->phylink)) {
+		dev_err(&pdev->dev, "failed to create phylink\n");
+		ret = PTR_ERR(priv->phylink);
+		goto err_free_netdev;
+	}
+
+	/* read the fixed link properties*/
+	fixed_node = fwnode_get_named_child_node(pdev->dev.fwnode, "fixed-link");
+	if (fixed_node) {
+		fwnode_property_read_u32(fixed_node, "speed", &priv->link_speed);
+		priv->duplex = DUPLEX_FULL;
+		dev_info(&pdev->dev, "\tfixed link speed:%d full duplex:%d\n",
+			 priv->link_speed, priv->duplex);
+	} else {
+		dev_err(&pdev->dev, "fixed link property undefined\n");
 		goto err_free_netdev;
 	}
 
