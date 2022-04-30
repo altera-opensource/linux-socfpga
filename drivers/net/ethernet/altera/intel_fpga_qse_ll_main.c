@@ -1250,8 +1250,8 @@ static void intel_fpga_qse_mac_config(struct phylink_config *config,
 			     phy_csroffs(reconfig_busy), PHY_RECONFIG_BUSY)) {
 		csrwr32(0, priv->phy_reconfig_csr,
 			phy_csroffs(logical_chan_num));
-		switch (state->speed) {
-		case SPEED_10000:
+		switch (state->interface) {
+		case PHY_INTERFACE_MODE_10GBASER:
 			speed_reconfig |= (PHY_ETH_SPEED_10000 |
 					   PHY_RECONFIG_START);
 			break;
