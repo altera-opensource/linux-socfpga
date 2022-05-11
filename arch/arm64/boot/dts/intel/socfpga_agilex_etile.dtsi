@@ -1,0 +1,128 @@
+// SPDX-License-Identifier: GPL-2.0
+/*
+ * Copyright(C) 2022, Intel Corporation
+ */
+
+/* Add this piece of dtsi fragment as #include "socfpga_agilex_etile.dtsi"
+ * in the file socfpga_agilex_socdk.dts. Compile it in the kernel along with
+ * socfpga_agilex.dtsi
+ */
+
+/{
+	soc {
+		clocks {
+			ptp_ctrl_10G_clk: ptp_ctrl_10G_clk {
+				#clock-cells = <0>;
+				compatible = "fixed-clock";
+				clock-frequency = <156250000>;
+				clock-output-names = "ptp_ctrl_10G_clk-clk";
+			};
+		};
+
+		agilex_hps_bridges: bridge@80000000 {
+			compatible = "simple-bus";
+			reg = <0x80000000 0x60000000>,
+				<0xf9000000 0x00100000>;
+			reg-names = "axi_h2f", "axi_h2f_lw";
+			#address-cells = <0x2>;
+			#size-cells = <0x1>;
+			ranges = <0x00000000 0x00000000 0xf9000000 0x00100000>,
+				<0x00000001 0x02000010 0x82000010 0x00000010>,
+				<0x00000001 0x02000020 0x82000020 0x00000010>,
+				<0x00000001 0x02001000 0x82001000 0x00000800>,
+				<0x00000001 0x02080000 0x82080000 0x00004000>,
+				<0x00000001 0x02100000 0x82100000 0x00080000>,
+				<0x00000001 0x02000040 0x82000040 0x00000020>,
+				<0x00000001 0x02000800 0x82000800 0x00000020>,
+				<0x00000001 0x02000820 0x82000820 0x00000020>,
+				<0x00000001 0x02000900 0x82000900 0x00000020>,
+				<0x00000001 0x02000920 0x82000920 0x00000020>,
+				<0x00000001 0x02000940 0x82000940 0x00000020>,
+				<0x00000001 0x00000300 0xf9000300 0x00000010>,
+				<0x00000001 0x02000000 0x82000000 0x00000010>;
+
+			etile_0_etile: ethernet@0x102001000 {
+				compatible = "altr,etile-msgdma-2.0";
+				reg-names = "rsfec", "eth_reconfig", "xcvr", "tod_ctrl",
+						"tx_pref", "tx_csr", "rx_pref", "rx_csr",
+						"rx_fifo";
+				reg = <0x00000001 0x02001000 0x00000800>,
+					<0x00000001 0x02080000 0x00004000>,
+					<0x00000001 0x02100000 0x00080000>,
+					<0x00000001 0x02000040 0x00000040>,
+					<0x00000001 0x02000800 0x00000020>,
+					<0x00000001 0x02000820 0x00000020>,
+					<0x00000001 0x02000900 0x00000020>,
+					<0x00000001 0x02000920 0x00000020>,
+					<0x00000001 0x02000940 0x00000020>;
+				//dma-coherent;
+				phy-mode = "25gbase-kr";
+				qsfp = <&qsfp_eth0>;
+				clocks = <&ptp_ctrl_10G_clk>;
+				clock-names = "tod_clk";
+				interrupt-parent = <&intc>;
+				interrupt-names = "tx_irq", "rx_irq";
+				interrupts = <0 24 4>,
+						<0 25 4>;
+				rx-fifo-depth = <0x4000>;
+				tx-fifo-depth = <0x1000>;
+				rx-fifo-almost-full = <0x2000>;
+				rx-fifo-almost-empty = <0x1000>;
+				//local-mac-address = [fa b1 0a 12 72 44];
+				altr,tx-pma-delay-ns = <0xD>;
+				altr,rx-pma-delay-ns = <0x8>;
+				altr,tx-pma-delay-fns = <0x24D>;
+				altr,rx-pma-delay-fns = <0x3E97>;
+				altr,tx-external-phy-delay-ns = <0x0>;
+				altr,rx-external-phy-delay-ns = <0x0>;
+				fec-type = "kr-fec";
+				fec-cw-pos-rx = <3>;
+				altr,has-ptp;
+				status = "okay";
+				fixed-link {
+					speed =<25000>;
+					full-duplex;
+				};
+			};
+
+			qsfp_eth0: qsfp-eth0 {
+				compatible = "sff,qsfp";
+				i2c-bus = <&i2c0>;
+				qsfpdd_initmode-gpio = <&qsfpdd_status_pio_1 0 GPIO_ACTIVE_HIGH>;
+				qsfpdd_modseln-gpio = <&qsfpdd_status_pio_1 2 GPIO_ACTIVE_LOW>;
+				qsfpdd_modprsn-gpio = <&qsfpdd_status_pio 0 GPIO_ACTIVE_LOW>;
+				qsfpdd_resetn-gpio = <&qsfpdd_status_pio_1 1 GPIO_ACTIVE_LOW>;
+				qsfpdd_intn-gpio = <&qsfpdd_status_pio 1 GPIO_ACTIVE_LOW>;
+				maximum-power-milliwatt = <1000>;
+				status = "okay";
+			};
+
+			qsfpdd_status_pio: gpio@2000010 {
+				compatible = "altr,pio-1.0";
+				reg = <0x00000001 0x02000010 0x10>;
+				interrupt-parent = <&intc>;
+				interrupts = <0 23 4>;
+				altr,gpio-bank-width = <4>;
+				altr,interrupt-type = <2>;
+				altr,interrupt_type = <2>;
+				#gpio-cells = <2>;
+				gpio-controller;
+				status = "okay";
+			};
+
+			qsfpdd_status_pio_1: gpio@2000020 {
+				compatible = "altr,pio-1.0";
+				reg = <0x00000001 0x02000020 0x10>;
+				interrupt-parent = <&intc>;
+				interrupts = <0 23 4>;
+				altr,gpio-bank-width = <4>;
+				altr,interrupt-type = <2>;
+				altr,interrupt_type = <2>;
+				#gpio-cells = <2>;
+				gpio-controller;
+				status = "okay";
+			};
+		};
+
+	};
+};
