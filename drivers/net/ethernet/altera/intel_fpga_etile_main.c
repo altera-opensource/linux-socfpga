@@ -34,6 +34,7 @@
 #include <linux/phylink.h>
 #include <linux/ptp_classify.h>
 #include <linux/sfp.h>
+#include <linux/qsfp.h>
 #include <linux/skbuff.h>
 #include <asm/cacheflush.h>
 
@@ -45,6 +46,7 @@
 #include "intel_fpga_tod.h"
 #include "intel_fpga_etile.h"
 
+struct qsfp *qsfp_tmp;
 /* Module parameters */
 static int debug = -1;
 module_param(debug, int, 0644);
@@ -1412,8 +1414,11 @@ static int etile_open(struct net_device *dev)
 	if (priv->dmaops->start_txdma)
 		priv->dmaops->start_txdma(&priv->dma_priv);
 
-	if (priv->phylink)
+	if (priv->phylink) {
+		/* Reset qsfp poll delay after PMA adaptation flow */
+		priv->qsfp_poll_delay_count = 0;
 		phylink_start(priv->phylink);
+	}
 
 	return 0;
 
@@ -1625,7 +1630,6 @@ static void intel_fpga_etile_mac_pcs_get_state(struct phylink_config *config,
 	/* fixed speed for now */
 	state->speed = SPEED_25000;
 	state->duplex = DUPLEX_FULL;
-	state->link = 1;
 }
 
 static void intel_fpga_etile_mac_an_restart(struct phylink_config *config)
@@ -1636,6 +1640,10 @@ static void intel_fpga_etile_mac_an_restart(struct phylink_config *config)
 static void intel_fpga_etile_get_pcs_fixed_state(struct phylink_config *config,
 						 struct phylink_link_state *state)
 {
+	const int qsfp_pma_delay = 5;
+	int qsfp_channel_info;
+	int qsfp_module_info;
+	u32 bit_mask;
 	struct intel_fpga_etile_eth_private *priv =
 		netdev_priv(to_net_dev(config->dev));
 
@@ -1644,6 +1652,75 @@ static void intel_fpga_etile_get_pcs_fixed_state(struct phylink_config *config,
 
 	state->speed = priv->link_speed;
 	state->duplex = DUPLEX_FULL;
+	state->link = 1;
+
+	/* Delay QSFP poll after PMA Adaptation flow */
+	if (priv->qsfp_poll_delay_count < qsfp_pma_delay) {
+		priv->qsfp_poll_delay_count++;
+		return;
+	}
+
+	qsfp_module_info = get_cable_attach(qsfp_tmp);
+	if (qsfp_module_info == 1) {
+		qsfp_channel_info = get_channel_info(qsfp_tmp);
+		/* Unsupported channel info feature */
+		if (qsfp_channel_info < 0) {
+			if (priv->old_qsfp_channel_info !=
+				qsfp_channel_info) {
+				priv->old_qsfp_channel_info = qsfp_channel_info;
+				netdev_err(priv->dev,
+					   "QSFP channel info not implemented!\n");
+			}
+
+			priv->oldlink = 1;
+			return;
+		}
+
+		/* Verify the lane number */
+		switch (priv->rsfec_cw_pos_rx) {
+		case 0:
+			/* Channel 1 */
+			bit_mask = QSFP_CHANNEL_1_TX_LOS;
+			break;
+		case 1:
+			/* Channel 2 */
+			bit_mask = QSFP_CHANNEL_2_TX_LOS;
+			break;
+		case 2:
+			/* Channel 3 */
+			bit_mask = QSFP_CHANNEL_3_TX_LOS;
+			break;
+		case 3:
+		default:
+			/* Channel 4 */
+			bit_mask = QSFP_CHANNEL_4_TX_LOS;
+			break;
+		}
+
+		/* Check for specified qsfp channel state change */
+		if ((qsfp_channel_info & bit_mask) !=
+		    (priv->old_qsfp_channel_info & bit_mask)) {
+			/* Check if signal is lost on TX channel */
+			if (qsfp_channel_info & bit_mask) {
+				state->link = 0;
+				priv->oldlink = 0;
+				netdev_err(priv->dev,
+					   "QSFP channel (0x%x & 0x%x) is down!\n",
+					   qsfp_channel_info, bit_mask);
+			} else {
+				priv->oldlink = 1;
+			}
+		}
+
+		priv->old_qsfp_channel_info = qsfp_channel_info;
+	} else {
+		/* QSFP module not present */
+		if (priv->oldlink != qsfp_module_info)
+			netdev_err(priv->dev, "QSFP module is not present!\n");
+
+		state->link = 0;
+		priv->oldlink = qsfp_module_info;
+	}
 }
 
 static void intel_fpga_etile_mac_config(struct phylink_config *config,
@@ -1722,6 +1799,7 @@ static int intel_fpga_etile_probe(struct platform_device *pdev)
 	priv->phylink_config.dev = &priv->dev->dev;
 	priv->phylink_config.type = PHYLINK_NETDEV;
 	priv->phylink_config.get_fixed_state = intel_fpga_etile_get_pcs_fixed_state;
+	priv->phylink_config.poll_fixed_state = true;
 
 	of_id = of_match_device(intel_fpga_etile_ll_ids, &pdev->dev);
 	if (of_id)
