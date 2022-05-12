@@ -1565,6 +1565,16 @@
 #define INTEL_FPGA_BYTE_ALIGN	8
 #define INTEL_FPGA_WORD_ALIGN	32
 
+/* QSFP SFF 8636 REV2.9 Channel Status Interrupt Flags */
+#define QSFP_CHANNEL_1_RX_LOS	BIT(0)
+#define QSFP_CHANNEL_2_RX_LOS	BIT(1)
+#define QSFP_CHANNEL_3_RX_LOS	BIT(2)
+#define QSFP_CHANNEL_4_RX_LOS	BIT(3)
+#define QSFP_CHANNEL_1_TX_LOS	BIT(4)
+#define QSFP_CHANNEL_2_TX_LOS	BIT(5)
+#define QSFP_CHANNEL_3_TX_LOS	BIT(6)
+#define QSFP_CHANNEL_4_TX_LOS	BIT(7)
+
 /* Ethernet Reconfiguration Interface Register Base Addresses
  * Word Offset	Register Type
  * 0x0B0-0x0E8	Auto Negotiation and Link Training registers
@@ -2640,6 +2650,10 @@ struct intel_fpga_etile_eth_private {
 	/* ethtool msglvl option */
 	u32 msg_enable;
 	struct altera_dmaops *dmaops;
+
+	/* previous qsfp channel info */
+	int old_qsfp_channel_info;
+	int qsfp_poll_delay_count;
 };
 
 /* Function prototypes
