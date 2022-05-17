@@ -37,6 +37,8 @@ properties:
         items:
           - const: thead,th1520-i2c
           - const: snps,designware-i2c
+      - description: Intel's SoCFPGA I2C controller
+        const: intel,socfpga-i2c
 
   reg:
     minItems: 1
