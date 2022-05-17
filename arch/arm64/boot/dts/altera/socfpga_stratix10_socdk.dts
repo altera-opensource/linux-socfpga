@@ -4,6 +4,7 @@
  */
 
 #include "socfpga_stratix10.dtsi"
+#include "socfpga_stratix10_qse.dtsi"
 
 / {
 	model = "SoCFPGA Stratix 10 SoCDK";
