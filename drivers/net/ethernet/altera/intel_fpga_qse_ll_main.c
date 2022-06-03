@@ -1237,6 +1237,7 @@ static void intel_fpga_qse_validate(struct phylink_config *config,
 	__ETHTOOL_DECLARE_LINK_MODE_MASK(mask) = { 0, };
 
 	if (state->interface != PHY_INTERFACE_MODE_NA &&
+	    state->interface != PHY_INTERFACE_MODE_1000BASEX &&
 	    state->interface != PHY_INTERFACE_MODE_10GBASER) {
 		bitmap_zero(supported, __ETHTOOL_LINK_MODE_MASK_NBITS);
 		return;
@@ -1254,7 +1255,9 @@ static void intel_fpga_qse_validate(struct phylink_config *config,
 
 	switch (state->interface) {
 	case PHY_INTERFACE_MODE_NA:
+	case PHY_INTERFACE_MODE_1000BASEX:
 	case PHY_INTERFACE_MODE_10GBASER:
+		phylink_set(mask, 1000baseX_Full);
 		phylink_set(mask, 10000baseT_Full);
 		phylink_set(mask, 10000baseCR_Full);
 		phylink_set(mask, 10000baseSR_Full);
@@ -1262,6 +1265,7 @@ static void intel_fpga_qse_validate(struct phylink_config *config,
 		phylink_set(mask, 10000baseLRM_Full);
 		phylink_set(mask, 10000baseER_Full);
 		phylink_set(mask, 10000baseKR_Full);
+		phylink_set(mac_supported, 1000baseX_Full);
 		phylink_set(mac_supported, 10000baseT_Full);
 		phylink_set(mac_supported, 10000baseCR_Full);
 		phylink_set(mac_supported, 10000baseSR_Full);
@@ -1269,7 +1273,6 @@ static void intel_fpga_qse_validate(struct phylink_config *config,
 		phylink_set(mac_supported, 10000baseLRM_Full);
 		phylink_set(mac_supported, 10000baseER_Full);
 		phylink_set(mac_supported, 10000baseKR_Full);
-		state->speed = SPEED_10000;
 		break;
 	default:
 		break;
@@ -1289,15 +1292,14 @@ static void intel_fpga_qse_mac_pcs_get_state(struct phylink_config *config,
 {
 	struct intel_fpga_qse_private *priv =
 			netdev_priv(to_net_dev(config->dev));
-	u32 speed_reconfig;
 
-	speed_reconfig = csrrd32(priv->phy_reconfig_csr,
-				 phy_csroffs(speed_reconfig));
-	if (speed_reconfig & PHY_ETH_SPEED_10000) {
+	if (state->interface == PHY_INTERFACE_MODE_10GBASER) {
 		state->speed = SPEED_10000;
-		state->duplex = DUPLEX_FULL;
+	} else if (state->interface == PHY_INTERFACE_MODE_1000BASEX) {
+		state->speed = SPEED_1000;
 	}
 
+	state->duplex = DUPLEX_FULL;
 	state->link = 1;
 
 }
@@ -1324,7 +1326,11 @@ static void intel_fpga_qse_mac_config(struct phylink_config *config,
 			phy_csroffs(logical_chan_num));
 		switch (state->interface) {
 		case PHY_INTERFACE_MODE_10GBASER:
-			speed_reconfig |= (PHY_ETH_SPEED_10000 |
+			speed_reconfig = (PHY_ETH_SPEED_10000 |
+					   PHY_RECONFIG_START);
+			break;
+		case PHY_INTERFACE_MODE_1000BASEX:
+			speed_reconfig = (PHY_ETH_SPEED_1000 |
 					   PHY_RECONFIG_START);
 			break;
 		default:
