@@ -54,7 +54,7 @@
 					<0x00000001 0x00000540 0x00000020>,
 					<0x00000001 0x00030100 0x00000010>;
 				dma-coherent;
-				phy-mode = "10gbase-kr";
+				phy-mode = "10gbase-r";
 				sfp = <&sfp_eth0>;
 				clocks = <&ptp_ctrl_10G_clk>;
 				clock-names = "tod_clk";
