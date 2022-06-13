@@ -293,6 +293,7 @@ struct dw_i2c_dev {
 
 #define MODEL_MSCC_OCELOT	0x00000100
 #define MODEL_BAIKAL_BT1	0x00000200
+#define MODEL_SOCFPGA		0x00000400
 #define MODEL_MASK		0x00000f00
 
 int i2c_dw_init_regmap(struct dw_i2c_dev *dev);
