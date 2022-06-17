@@ -1555,7 +1555,7 @@ static const struct net_device_ops intel_fpga_etile_netdev_ops = {
 	.ndo_set_mac_address	= eth_mac_addr,
 	.ndo_set_rx_mode	= etile_set_rx_mode,
 	.ndo_change_mtu		= etile_change_mtu,
-	.ndo_do_ioctl		= etile_do_ioctl,
+	.ndo_eth_ioctl		= etile_do_ioctl,
 	.ndo_get_stats64	= etile_get_stats64
 };
 
