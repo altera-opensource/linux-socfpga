@@ -1145,7 +1145,7 @@ static struct net_device_ops altera_tse_netdev_ops = {
 	.ndo_set_rx_mode	= tse_set_rx_mode,
 	.ndo_change_mtu		= tse_change_mtu,
 	.ndo_validate_addr	= eth_validate_addr,
-	.ndo_do_ioctl		= tse_do_ioctl,
+	.ndo_eth_ioctl		= tse_do_ioctl,
 };
 
 /* Probe Altera TSE MAC device
