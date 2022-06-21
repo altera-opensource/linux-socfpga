@@ -317,9 +317,10 @@ static inline void binder_alloc_set_vma(struct binder_alloc *alloc,
 
 	if (vma) {
 		vm_start = vma->vm_start;
-		mmap_assert_write_locked(alloc->vma_vm_mm);
+		alloc->vma_vm_mm = vma->vm_mm;
 	}
 
+	mmap_assert_write_locked(alloc->vma_vm_mm);
 	alloc->vma_addr = vm_start;
 }
 
