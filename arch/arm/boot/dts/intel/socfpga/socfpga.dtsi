@@ -671,7 +671,7 @@
 		i2c0: i2c@ffc04000 {
 			#address-cells = <1>;
 			#size-cells = <0>;
-			compatible = "snps,designware-i2c";
+			compatible = "intel,socfpga-i2c", "snps,designware-i2c";
 			reg = <0xffc04000 0x1000>;
 			resets = <&rst I2C0_RESET>;
 			clocks = <&l4_sp_clk>;
@@ -682,7 +682,7 @@
 		i2c1: i2c@ffc05000 {
 			#address-cells = <1>;
 			#size-cells = <0>;
-			compatible = "snps,designware-i2c";
+			compatible = "intel,socfpga-i2c", "snps,designware-i2c";
 			reg = <0xffc05000 0x1000>;
 			resets = <&rst I2C1_RESET>;
 			clocks = <&l4_sp_clk>;
@@ -693,7 +693,7 @@
 		i2c2: i2c@ffc06000 {
 			#address-cells = <1>;
 			#size-cells = <0>;
-			compatible = "snps,designware-i2c";
+			compatible = "intel,socfpga-i2c", "snps,designware-i2c";
 			reg = <0xffc06000 0x1000>;
 			resets = <&rst I2C2_RESET>;
 			clocks = <&l4_sp_clk>;
@@ -704,7 +704,7 @@
 		i2c3: i2c@ffc07000 {
 			#address-cells = <1>;
 			#size-cells = <0>;
-			compatible = "snps,designware-i2c";
+			compatible = "intel,socfpga-i2c", "snps,designware-i2c";
 			reg = <0xffc07000 0x1000>;
 			resets = <&rst I2C3_RESET>;
 			clocks = <&l4_sp_clk>;
