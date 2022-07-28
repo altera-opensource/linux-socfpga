@@ -136,7 +136,7 @@ static int smb2_get_data_area_len(unsigned int *off, unsigned int *len,
 		    ((struct smb2_write_req *)hdr)->Length) {
 			*off = max_t(unsigned int,
 				     le16_to_cpu(((struct smb2_write_req *)hdr)->DataOffset),
-				     offsetof(struct smb2_write_req, Buffer) - 4);
+				     offsetof(struct smb2_write_req, Buffer));
 			*len = le32_to_cpu(((struct smb2_write_req *)hdr)->Length);
 			break;
 		}
