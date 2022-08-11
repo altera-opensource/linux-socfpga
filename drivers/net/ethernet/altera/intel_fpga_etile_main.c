@@ -735,7 +735,7 @@ static int eth_etile_tx_rx_user_flow(struct intel_fpga_etile_eth_private *priv)
 	case PHY_INTERFACE_MODE_10GBASER:
 		ui_value = INTEL_FPGA_ETILE_UI_VALUE_10G;
 		break;
-	case PHY_INTERFACE_MODE_25GKR:
+	case PHY_INTERFACE_MODE_25GBASER:
 		ui_value = INTEL_FPGA_ETILE_UI_VALUE_25G;
 		break;
 	default:
@@ -1569,7 +1569,7 @@ static void intel_fpga_etile_validate(struct phylink_config *config,
 	if (state->interface != PHY_INTERFACE_MODE_NA &&
 	    state->interface != PHY_INTERFACE_MODE_10GKR &&
 	    state->interface != PHY_INTERFACE_MODE_10GBASER &&
-	    state->interface != PHY_INTERFACE_MODE_25GKR) {
+	    state->interface != PHY_INTERFACE_MODE_25GBASER) {
 		bitmap_zero(supported, __ETHTOOL_LINK_MODE_MASK_NBITS);
 		return;
 	}
@@ -1603,7 +1603,7 @@ static void intel_fpga_etile_validate(struct phylink_config *config,
 		phylink_set(mac_supported, 10000baseKR_Full);
 		state->speed = SPEED_10000;
 		break;
-	case PHY_INTERFACE_MODE_25GKR:
+	case PHY_INTERFACE_MODE_25GBASER:
 		phylink_set(mask, 25000baseCR_Full);
 		phylink_set(mask, 25000baseKR_Full);
 		phylink_set(mask, 25000baseSR_Full);
@@ -1774,7 +1774,6 @@ static int intel_fpga_etile_probe(struct platform_device *pdev)
 	struct resource *rsfec;
 	struct intel_fpga_etile_eth_private *priv;
 	struct device_node *np = pdev->dev.of_node;
-	const unsigned char *macaddr;
 	const struct of_device_id *of_id = NULL;
 	struct fwnode_handle *fixed_node;
 
@@ -1991,10 +1990,8 @@ static int intel_fpga_etile_probe(struct platform_device *pdev)
 	}
 
 	/* get default MAC address from device tree */
-	macaddr = of_get_mac_address(pdev->dev.of_node);
-	if (!IS_ERR(macaddr))
-		ether_addr_copy(ndev->dev_addr, macaddr);
-	else
+	ret = of_get_mac_address(pdev->dev.of_node, ndev->dev_addr);
+	if (ret)
 		eth_hw_addr_random(ndev);
 
 	/* initialize netdev */
