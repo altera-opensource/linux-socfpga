@@ -150,7 +150,7 @@ void ui_adjustments(struct timer_list *t)
 		ui_value = INTEL_FPGA_ETILE_UI_VALUE_10G;
 		ui_value_16bit_fns = ui_value >> 8;
 		break;
-	case PHY_INTERFACE_MODE_25GKR:
+	case PHY_INTERFACE_MODE_25GBASER:
 		ui_value = INTEL_FPGA_ETILE_UI_VALUE_25G;
 		ui_value_16bit_fns = ui_value >> 8;
 		break;
