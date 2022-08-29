@@ -5450,7 +5450,6 @@ static inline bool io_poll_complete(struct io_kiocb *req, __poll_t mask)
 static void io_poll_task_func(struct io_kiocb *req, bool *locked)
 {
 	struct io_ring_ctx *ctx = req->ctx;
-	struct io_kiocb *nxt;
 
 	if (io_poll_rewait(req, &req->poll)) {
 		spin_unlock(&ctx->completion_lock);
@@ -5474,11 +5473,8 @@ static void io_poll_task_func(struct io_kiocb *req, bool *locked)
 		spin_unlock(&ctx->completion_lock);
 		io_cqring_ev_posted(ctx);
 
-		if (done) {
-			nxt = io_put_req_find_next(req);
-			if (nxt)
-				io_req_task_submit(nxt, locked);
-		}
+		if (done)
+			io_put_req(req);
 	}
 }
 
