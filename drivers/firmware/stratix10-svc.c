@@ -570,6 +570,7 @@ static int svc_normal_to_secure_thread(void *data)
 			a0 = INTEL_SIP_SMC_FIRMWARE_VERSION;
 			a1 = 0;
 			a2 = 0;
+			break;
 		case COMMAND_RSU_DCMF_STATUS:
 			a0 = INTEL_SIP_SMC_RSU_DCMF_STATUS;
 			a1 = 0;
