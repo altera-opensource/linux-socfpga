@@ -359,10 +359,6 @@ struct altera_tse_mac {
 
 struct altera_tse_private;
 
-#define ALTERA_DTYPE_SGDMA 1
-#define ALTERA_DTYPE_MSGDMA 2
-#define ALTERA_DTYPE_MSGDMA_PREF 3
-
 /* This structure is private to each device.
  */
 struct altera_tse_private {
@@ -394,19 +390,6 @@ struct altera_tse_private {
 	/* Hash filter settings */
 	u32 hash_filter;
 	u32 added_unicast;
-
-	/* Descriptor memory info for managing SGDMA */
-	u32 txdescmem;
-	u32 rxdescmem;
-	dma_addr_t rxdescmem_busaddr;
-	dma_addr_t txdescmem_busaddr;
-	u32 txctrlreg;
-	u32 rxctrlreg;
-	dma_addr_t rxdescphys;
-	dma_addr_t txdescphys;
-
-	struct list_head txlisthd;
-	struct list_head rxlisthd;
 
 	/* MAC command_config register protection */
 	spinlock_t mac_cfg_lock;
