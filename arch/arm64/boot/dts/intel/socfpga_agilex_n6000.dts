@@ -1,15 +1,16 @@
-// SPDX-License-Identifier:     GPL-2.0
+// SPDX-License-Identifier: GPL-2.0
 /*
- * Copyright (C) 2019, Intel Corporation
+ * Copyright (C) 2021-2022, Intel Corporation
  */
 #include "socfpga_agilex.dtsi"
 
 / {
-	model = "SoCFPGA Agilex SoCDK";
-	compatible = "intel,socfpga-agilex-socdk", "intel,socfpga-agilex";
+	model = "SoCFPGA Agilex n6000";
+	compatible = "intel,socfpga-agilex-n6000", "intel,socfpga-agilex";
 
 	aliases {
-		serial0 = &uart0;
+		serial0 = &uart1;
+		serial1 = &uart0;
 		ethernet0 = &gmac0;
 		ethernet1 = &gmac1;
 		ethernet2 = &gmac2;
@@ -19,81 +20,27 @@
 		stdout-path = "serial0:115200n8";
 	};
 
-	leds {
-		compatible = "gpio-leds";
-		led0 {
-			label = "hps_led0";
-			gpios = <&portb 20 GPIO_ACTIVE_HIGH>;
-		};
-
-		led1 {
-			label = "hps_led1";
-			gpios = <&portb 19 GPIO_ACTIVE_HIGH>;
-		};
-
-		led2 {
-			label = "hps_led2";
-			gpios = <&portb 21 GPIO_ACTIVE_HIGH>;
-		};
-	};
-
-	memory {
+	memory@0 {
 		device_type = "memory";
 		/* We expect the bootloader to fill in the reg */
 		reg = <0 0 0 0>;
 	};
-};
 
-&gpio1 {
-	status = "okay";
-};
+	soc {
+		bus@80000000 {
+			compatible = "simple-bus";
+			reg = <0x80000000 0x60000000>,
+				<0xf9000000 0x00100000>;
+			reg-names = "axi_h2f", "axi_h2f_lw";
+			#address-cells = <2>;
+			#size-cells = <1>;
+			ranges = <0x00000000 0x00000000 0xf9000000 0x00001000>;
 
-&gmac2 {
-	status = "okay";
-	phy-mode = "rgmii";
-	phy-handle = <&phy0>;
-
-	max-frame-size = <9000>;
-
-	mdio0 {
-		#address-cells = <1>;
-		#size-cells = <0>;
-		compatible = "snps,dwmac-mdio";
-		phy0: ethernet-phy@0 {
-			reg = <4>;
-
-			txd0-skew-ps = <0>; /* -420ps */
-			txd1-skew-ps = <0>; /* -420ps */
-			txd2-skew-ps = <0>; /* -420ps */
-			txd3-skew-ps = <0>; /* -420ps */
-			rxd0-skew-ps = <420>; /* 0ps */
-			rxd1-skew-ps = <420>; /* 0ps */
-			rxd2-skew-ps = <420>; /* 0ps */
-			rxd3-skew-ps = <420>; /* 0ps */
-			txen-skew-ps = <0>; /* -420ps */
-			txc-skew-ps = <900>; /* 0ps */
-			rxdv-skew-ps = <420>; /* 0ps */
-			rxc-skew-ps = <1680>; /* 780ps */
-		};
-	};
-};
-
-&nand {
-	status = "okay";
-
-	flash@0 {
-		#address-cells = <1>;
-		#size-cells = <1>;
-		reg = <0>;
-		nand-bus-width = <16>;
-
-		partition@0 {
-			label = "u-boot";
-			reg = <0 0x200000>;
-		};
-		partition@200000 {
-			label = "root";
-			reg = <0x200000 0x3fe00000>;
+			dma-controller@0 {
+				compatible = "intel,hps-copy-engine";
+				reg = <0x00000000 0x00000000 0x00001000>;
+				#dma-cells = <1>;
+			};
 		};
 	};
 };
@@ -106,13 +53,16 @@
 	status = "okay";
 };
 
-&usb0 {
+&uart1 {
 	status = "okay";
-	disable-over-current;
 };
 
 &watchdog0 {
 	status = "okay";
+};
+
+&fpga_mgr {
+	status = "disabled";
 };
 
 &temp_volt {
@@ -200,4 +150,3 @@
 		};
 	};
 };
-
