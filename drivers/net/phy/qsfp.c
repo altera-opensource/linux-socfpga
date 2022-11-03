@@ -21,8 +21,6 @@
 
 #include "swphy.h"
 
-static u8 previous_state = 1;
-static struct qsfp *qsfp;
 static void qsfp_sm_event(struct qsfp *qsfp, unsigned int event);
 static void get_module_revision(struct qsfp *qsfp);
 
@@ -87,9 +85,12 @@ enum {
 };
 
 static const char *const mod_state_strings[] = {
-	[QSFP_MOD_EMPTY] = "empty",	[QSFP_MOD_ERROR] = "error",
-	[QSFP_MOD_PROBE] = "probe",	[QSFP_MOD_WAITDEV] = "waitdev",
-	[QSFP_MOD_HPOWER] = "hpower",	[QSFP_MOD_WAITPWR] = "waitpwr",
+	[QSFP_MOD_EMPTY] = "empty",
+	[QSFP_MOD_ERROR] = "error",
+	[QSFP_MOD_PROBE] = "probe",
+	[QSFP_MOD_WAITDEV] = "waitdev",
+	[QSFP_MOD_HPOWER] = "hpower",
+	[QSFP_MOD_WAITPWR] = "waitpwr",
 	[QSFP_MOD_PRESENT] = "present",
 };
 
@@ -114,11 +115,16 @@ static const char *dev_state_to_str(unsigned short dev_state)
 }
 
 static const char *const event_strings[] = {
-	[QSFP_E_INSERT] = "insert",	    [QSFP_E_REMOVE] = "remove",
-	[QSFP_E_DEV_ATTACH] = "dev_attach", [QSFP_E_DEV_DETACH] = "dev_detach",
-	[QSFP_E_DEV_DOWN] = "dev_down",	    [QSFP_E_DEV_UP] = "dev_up",
-	[QSFP_E_TX_FAULT] = "tx_fault",	    [QSFP_E_TX_CLEAR] = "tx_clear",
-	[QSFP_E_TX_LOS] = "tx_los",	    [QSFP_E_RX_LOS] = "rx_los",
+	[QSFP_E_INSERT] = "insert",
+	[QSFP_E_REMOVE] = "remove",
+	[QSFP_E_DEV_ATTACH] = "dev_attach",
+	[QSFP_E_DEV_DETACH] = "dev_detach",
+	[QSFP_E_DEV_DOWN] = "dev_down",
+	[QSFP_E_DEV_UP] = "dev_up",
+	[QSFP_E_TX_FAULT] = "tx_fault",
+	[QSFP_E_TX_CLEAR] = "tx_clear",
+	[QSFP_E_TX_LOS] = "tx_los",
+	[QSFP_E_RX_LOS] = "rx_los",
 	[QSFP_E_TIMEOUT] = "timeout",
 };
 
@@ -151,8 +157,11 @@ static const char *sm_state_to_str(unsigned short sm_state)
 }
 
 static const char *const gpio_of_names[] = {
-	"qsfpdd_modprsn", "qsfpdd_intn",    "qsfpdd_initmode",
-	"qsfpdd_resetn",  "qsfpdd_modseln",
+	"qsfpdd_modprsn",
+	"qsfpdd_intn",
+	"qsfpdd_initmode",
+	"qsfpdd_resetn",
+	"qsfpdd_modseln",
 };
 
 static const enum gpiod_flags gpio_flags[] = {
@@ -259,13 +268,16 @@ struct qsfp {
 
 static bool qsfp_module_supported(const struct qsfp_eeprom_id *id)
 {
-	if (id->base.etile_qsfp_identifier == SFF8024_ID_QSFP_28)
+	if (id->base.etile_qsfp_identifier == SFF8024_ID_QSFP ||
+	    id->base.etile_qsfp_identifier == SFF8024_ID_QSFP_PLUS ||
+		id->base.etile_qsfp_identifier == SFF8024_ID_QSFP_28)
 		return true;
 
 	/* qsfp GPON module Ubiquiti U-Fiber Instant has in its EEPROM stored
 	 * phys id SFF instead of qsfp. Therefore mark this module explicitly
 	 * as supported based on vendor name and pn match.
 	 */
+
 	if (id->base.etile_qsfp_identifier == SFF8024_ID_QSFP_DD_INF_8628 &&
 	    id->base.etile_qsfp_ext_identifier == QSFP_EXT_IDENTIFIER &&
 	    !memcmp(id->base.etile_qsfp_vendor_name, "UBNT            ", 16) &&
@@ -451,9 +463,8 @@ static int qsfp_write(struct qsfp *qsfp, bool a2, u8 addr, void *buf,
 static void qsfp_soft_start_poll(struct qsfp *qsfp)
 {
 	u8 status;
-	//const struct qsfp_eeprom_id *id = &qsfp->id;
-	qsfp_read(qsfp, false, QSFP_OPTIONS, &status, sizeof(status));
 
+	qsfp_read(qsfp, false, QSFP_OPTIONS, &status, sizeof(status));
 	qsfp->state_soft_mask = 0;
 
 	if (qsfp->id.base.etile_qsfp_options_3 & QSFP_OPTIONS_TX_DISABLE)
@@ -497,33 +508,9 @@ static unsigned int qsfp_check(void *buf, size_t len)
 	return check;
 }
 
-/* Helpers */
-static void qsfp_module_tx_disable(struct qsfp *qsfp)
-{
-	dev_dbg(qsfp->dev, "tx disable %u -> %u\n",
-		qsfp->id.base.etile_qsfp_options_3 & QSFP_OPTIONS_TX_DISABLE ?
-			1 :
-			      0,
-		1);
-	qsfp->id.base.etile_qsfp_options_3 |= QSFP_OPTIONS_TX_DISABLE;
-	qsfp_set_state(qsfp, qsfp->state);
-}
-
-static void qsfp_module_tx_enable(struct qsfp *qsfp)
-{
-	dev_dbg(qsfp->dev, "tx disable %u -> %u\n",
-		qsfp->id.base.etile_qsfp_options_3 & QSFP_OPTIONS_TX_DISABLE ?
-			1 :
-			      0,
-		0);
-	qsfp->id.base.etile_qsfp_options_3 &= ~QSFP_OPTIONS_TX_DISABLE;
-	qsfp_set_state(qsfp, qsfp->state);
-}
-
 static void qsfp_module_tx_fault_reset(struct qsfp *qsfp)
 {
 	unsigned int state = qsfp->id.base.etile_qsfp_options_3;
-
 	int ret;
 
 	ret = qsfp_read(qsfp, false, QSFP_OPTIONS, &state, sizeof(state));
@@ -541,12 +528,11 @@ static void qsfp_module_tx_fault_reset(struct qsfp *qsfp)
 /* qsfp state machine */
 static void qsfp_sm_set_timer(struct qsfp *qsfp, unsigned int timeout)
 {
-	if (timeout) {
+	if (timeout)
 		mod_delayed_work(system_power_efficient_wq, &qsfp->timeout,
 				 timeout);
-	} else {
+	else
 		cancel_delayed_work(&qsfp->timeout);
-	}
 }
 
 static void qsfp_sm_next(struct qsfp *qsfp, unsigned int state,
@@ -600,7 +586,6 @@ static int qsfp_sm_probe_phy(struct qsfp *qsfp, bool is_c45)
 		dev_err(qsfp->dev, "qsfp_add_phy failed: %d\n", err);
 		return err;
 	}
-
 	qsfp->mod_phy = phy;
 
 	return 0;
@@ -620,26 +605,39 @@ static void qsfp_sm_link_down(struct qsfp *qsfp)
 static void qsfp_sm_link_check_los(struct qsfp *qsfp)
 {
 	bool los = false;
+	int ret;
+	u8 buf[16] = {0};
 
+	ret = qsfp_read(qsfp, false, QSFP_RX_TX_LOSS, buf, 1);
 	if (los)
 		qsfp_sm_next(qsfp, QSFP_S_WAIT_LOS, 0);
 	else
-
 		qsfp_sm_link_up(qsfp);
 }
 
 static bool qsfp_los_event_active(struct qsfp *qsfp, unsigned int event)
 {
 	int ret;
-	u8 buf[16];
+	u8 buf[16] = {0};
 
-	ret = qsfp_read(qsfp, false, QSFP_PHYS_ID, buf, 1);
+	ret = qsfp_read(qsfp, false, QSFP_RX_TX_LOSS, buf, 1);
+
+	if ((buf[0] & 0x80) || (buf[0] & 0x08))
+		return 1;
 
 	return 0;
 }
 
 static bool qsfp_los_event_inactive(struct qsfp *qsfp, unsigned int event)
 {
+	int ret;
+	u8 buf[16] = {0};
+
+	ret = qsfp_read(qsfp, false, QSFP_RX_TX_LOSS, buf, 1);
+
+	if (!(buf[0] & (1 << 3)))
+		return 1;
+
 	return 0;
 }
 
@@ -648,11 +646,10 @@ static void qsfp_sm_fault(struct qsfp *qsfp, unsigned int next_state, bool warn)
 	if (qsfp->sm_fault_retries && !--qsfp->sm_fault_retries) {
 		dev_err(qsfp->dev,
 			"module persistently indicates fault, disabling\n");
-		qsfp_sm_next(qsfp, QSFP_S_TX_DISABLE, 0);
+			qsfp_sm_next(qsfp, QSFP_S_TX_DISABLE, 0);
 	} else {
 		if (warn)
 			dev_err(qsfp->dev, "module transmit fault indicated\n");
-
 		qsfp_sm_next(qsfp, next_state, T_FAULT_RECOVER);
 	}
 }
@@ -681,9 +678,10 @@ static int qsfp_sm_probe_for_phy(struct qsfp *qsfp)
 		break;
 
 	default:
-
+	if (qsfp->id.base.etile_qsfp_spec_compliance_1[2] & SFF8024_QSFP_e1000_base_t) {
 		err = qsfp_sm_probe_phy(qsfp, false);
 		break;
+		}
 	}
 	return err;
 }
@@ -730,14 +728,6 @@ static int qsfp_sm_mod_hpower(struct qsfp *qsfp, bool enable)
 {
 	u8 val;
 	int err;
-
-	static void *gpio_reg;
-	u32 gpio_reg_val;
-
-	gpio_reg = ioremap(0x82000020, 4);
-	gpio_reg_val = readl(gpio_reg);
-	gpio_reg_val = gpio_reg_val & 0xfffffffe;
-	writel(gpio_reg_val, gpio_reg);
 
 	qsfp_set_state(qsfp, qsfp->state & QSFP_INIT);
 
@@ -799,11 +789,11 @@ static bool qsfp_id_needs_byte_io(struct qsfp *qsfp, void *buf, size_t len)
 	return true;
 }
 
-static void get_module_revision(struct qsfp *old)
+static void get_module_revision(struct qsfp *qsfp)
 {
 	int ret;
-	u8 buf[16];
-	char buf_16[16];
+	u8 buf[16] = {0};
+	char buf_16[16] = {'\0'};
 
 		ret = qsfp_read(qsfp, false, QSFP_VENDOR_NAME, buf_16, 16);
 		buf_16[15] = '\0';
@@ -818,18 +808,6 @@ static void get_module_revision(struct qsfp *old)
 		qsfp->module_revision = buf[0];
 }
 
-int get_cable_attach(struct qsfp *old)
-{
-	return qsfp->module_present;
-}
-EXPORT_SYMBOL(get_cable_attach);
-
-int get_channel_info(struct qsfp *old)
-{
-	return qsfp->channel_number;
-}
-EXPORT_SYMBOL(get_channel_info);
-
 static int qsfp_select_eeprom_page(struct qsfp *qsfp)
 {
 	int err;
@@ -840,94 +818,6 @@ static int qsfp_select_eeprom_page(struct qsfp *qsfp)
 	err = qsfp_write(qsfp, false, QSFP_PAGE_SELECT_BYTE, &i, 1);
 
 	ret = qsfp_read(qsfp, false, QSFP_PAGE_SELECT_BYTE, buf, 1);
-
-	return 0;
-}
-
-static int qsfp_status_indicators(struct qsfp *qsfp)
-{
-	int ret;
-	u8 buf[16];
-	bool flag = false;
-	static unsigned int prv_buf, prv_buf_rx;
-
-	qsfp->state = qsfp_gpio_get_state(qsfp);
-	if (qsfp->state & QSFP_F_PRESENT) {
-		ret = qsfp_read(qsfp, false, QSFP_STATUS, buf, 1);
-		qsfp->module_revision = buf[0];
-		if (qsfp->module_revision == 0x0) {
-			qsfp->module_present = TRUE;
-			qsfp->channel_number = -EOPNOTSUPP;
-		}
-
-		if (qsfp->module_revision == 0x7 || qsfp->module_revision == 0x8) {
-			ret = qsfp_read(qsfp, false, QSFP_OPTIONS, buf, 1);
-
-			if (buf[0] & QSFP_OPTIONS_TX_LOSS_SIGNAL) {
-				ret = qsfp_read(qsfp, false, QSFP_RX_TX_LOSS, buf, 1);
-
-			if (prv_buf != buf[0]) {
-				prv_buf = buf[0];
-				flag = true;
-			}
-			if (flag) {
-				qsfp->module_present = TRUE;
-				qsfp->channel_number = buf[0];
-			} else {
-				qsfp->module_present = TRUE;
-				qsfp->channel_number = buf[0];
-			}
-			} else {
-				ret = qsfp_read(qsfp, false, QSFP_RX_TX_LOSS, buf, 1);
-				buf[0] = buf[0] & 0xf;
-			if (prv_buf_rx != buf[0]) {
-				prv_buf_rx = buf[0];
-				flag = true;
-				}
-			if (flag) {
-				qsfp->module_present = TRUE;
-				qsfp->channel_number = buf[0];
-			} else {
-				qsfp->module_present = TRUE;
-				qsfp->channel_number = buf[0];
-			}
-		}
-	}
-
-	} else {
-		qsfp->module_present = -EINVAL;
-		qsfp->channel_number = -EOPNOTSUPP;
-		}
-
-	return 0;
-}
-
-static int qsfp_state_indicators(struct qsfp *qsfp)
-{
-	int ret;
-	u8 buf[16];
-	bool flag = false;
-
-	qsfp->state = qsfp_gpio_get_state(qsfp);
-	qsfp->state &= QSFP_F_PRESENT;
-	if (previous_state != qsfp->state) {
-		previous_state = (qsfp->state);
-		flag = true;
-	}
-
-	if (flag) {
-		if (qsfp->state & QSFP_F_PRESENT) {
-			ret = qsfp_read(qsfp, false, QSFP_PHYS_ID, buf, 1);
-
-			get_module_revision(qsfp);
-			pr_info("module: %s pn: %s sn: %s rev: %x\n", qsfp->vender_name,
-				qsfp->part_number, qsfp->sn_number, qsfp->module_revision);
-
-		} else {
-			qsfp->module_present = -EINVAL;
-			qsfp->channel_number = -EOPNOTSUPP;
-		}
-	}
 
 	return 0;
 }
@@ -1074,7 +964,7 @@ static int qsfp_sm_mod_probe(struct qsfp *qsfp, bool report)
 			"module is not supported - phys id 0x%02x 0x%02x\n",
 			qsfp->id.base.etile_qsfp_identifier_1,
 			qsfp->id.base.etile_qsfp_ext_identifier);
-		return -EINVAL;
+			return -EINVAL;
 	}
 
 	/* Parse the module power requirement */
@@ -1105,22 +995,25 @@ static void qsfp_sm_mod_remove(struct qsfp *qsfp)
 /* This state machine tracks the upstream's state */
 static void qsfp_sm_device(struct qsfp *qsfp, unsigned int event)
 {
+	int ret;
+	u8 buf[16] = {0};
+
+	ret = qsfp_read(qsfp, false, QSFP_RX_TX_LOSS, buf, 1);
+
 	switch (qsfp->sm_dev_state) {
 	default:
 		if (event == QSFP_E_DEV_ATTACH)
 			qsfp->sm_dev_state = QSFP_DEV_DOWN;
 		break;
 	case QSFP_DEV_DOWN:
-
-		if (event == QSFP_E_DEV_DETACH)
+		if (event == QSFP_E_DEV_DETACH) {
 			qsfp->sm_dev_state = QSFP_DEV_DETACHED;
-
-		else if (event == QSFP_E_DEV_UP)
+		} else if (event == QSFP_E_DEV_UP) {
+			ret = qsfp_read(qsfp, false, QSFP_RX_TX_LOSS, buf, 1);
 			qsfp->sm_dev_state = QSFP_DEV_UP;
+		}
 		break;
-
 	case QSFP_DEV_UP:
-
 		if (event == QSFP_E_DEV_DETACH)
 			qsfp->sm_dev_state = QSFP_DEV_DETACHED;
 		else if (event == QSFP_E_DEV_DOWN)
@@ -1135,6 +1028,16 @@ static void qsfp_sm_device(struct qsfp *qsfp, unsigned int event)
 static void qsfp_sm_module(struct qsfp *qsfp, unsigned int event)
 {
 	int err;
+	int ret;
+	u8 buf[16] = {0};
+
+	ret = qsfp_read(qsfp, false, QSFP_RX_TX_LOSS, buf, 1);
+
+	/* modules have been found to require a delay between read and write operations.
+	 *Hence adding delay which will keep the i2C bus idle for few seconds
+	 */
+
+	mdelay(50);
 
 	/* Handle remove event globally, it resets this state machine */
 	if (event == QSFP_E_REMOVE) {
@@ -1148,8 +1051,9 @@ static void qsfp_sm_module(struct qsfp *qsfp, unsigned int event)
 	if (qsfp->sm_dev_state < QSFP_DEV_DOWN &&
 	    qsfp->sm_mod_state > QSFP_MOD_WAITDEV) {
 		if (qsfp->module_power_mw > 1000 &&
-		    qsfp->sm_mod_state > QSFP_MOD_HPOWER)
+		    qsfp->sm_mod_state > QSFP_MOD_HPOWER){
 			qsfp_sm_mod_hpower(qsfp, false);
+			}
 		qsfp_sm_mod_next(qsfp, QSFP_MOD_WAITDEV, 0);
 		return;
 	}
@@ -1181,20 +1085,21 @@ static void qsfp_sm_module(struct qsfp *qsfp, unsigned int event)
 				break;
 			}
 		}
+
 		if (err < 0) {
 			qsfp_sm_mod_next(qsfp, QSFP_MOD_ERROR, 0);
 			break;
 		}
 
+		qsfp_sm_mod_next(qsfp, QSFP_MOD_WAITDEV, 0);
+
 		fallthrough;
 	case QSFP_MOD_WAITDEV:
-
 		/* Ensure that the device is attached before proceeding */
 		if (qsfp->sm_dev_state < QSFP_DEV_DOWN)
 			break;
 
 		/* Report the module insertion to the upstream device */
-		qsfp->id.base.etile_qsfp_identifier = 0x11; //
 		err = qsfp_module_insert(qsfp->qsfp_bus, &qsfp->id);
 
 		if (err < 0) {
@@ -1220,12 +1125,10 @@ static void qsfp_sm_module(struct qsfp *qsfp, unsigned int event)
 			}
 			break;
 		}
-
 		qsfp_sm_mod_next(qsfp, QSFP_MOD_WAITPWR, T_HPOWER_LEVEL);
 		break;
 
 	case QSFP_MOD_WAITPWR:
-
 		/* Wait for T_HPOWER_LEVEL to time out */
 		if (event != QSFP_E_TIMEOUT)
 			break;
@@ -1237,6 +1140,8 @@ insert:
 
 	case QSFP_MOD_PRESENT:
 	case QSFP_MOD_ERROR:
+			ret = qsfp_read(qsfp, false, QSFP_RX_TX_LOSS, buf, 1);
+
 		break;
 	}
 }
@@ -1245,19 +1150,22 @@ static void qsfp_sm_main(struct qsfp *qsfp, unsigned int event)
 {
 	unsigned long timeout;
 	int ret;
+	u8 buf[16] = {0};
+
+	ret = qsfp_read(qsfp, false, QSFP_RX_TX_LOSS, buf, 1);
 
 	/* Some events are global */
 	if (qsfp->sm_state != QSFP_S_DOWN &&
 	    (qsfp->sm_mod_state != QSFP_MOD_PRESENT ||
 	     qsfp->sm_dev_state != QSFP_DEV_UP)) {
 		if (qsfp->sm_state == QSFP_S_LINK_UP &&
-		    qsfp->sm_dev_state == QSFP_DEV_UP)
+		    qsfp->sm_dev_state == QSFP_DEV_UP){
 			qsfp_sm_link_down(qsfp);
+			}
 		if (qsfp->sm_state > QSFP_S_INIT)
 			qsfp_module_stop(qsfp->qsfp_bus);
 		if (qsfp->mod_phy)
 			qsfp_sm_phy_detach(qsfp);
-		qsfp_module_tx_disable(qsfp);
 		qsfp_soft_stop_poll(qsfp);
 		qsfp_sm_next(qsfp, QSFP_S_DOWN, 0);
 		return;
@@ -1266,16 +1174,14 @@ static void qsfp_sm_main(struct qsfp *qsfp, unsigned int event)
 	/* The main state machine */
 	switch (qsfp->sm_state) {
 	case QSFP_S_DOWN:
+			ret = qsfp_read(qsfp, false, QSFP_RX_TX_LOSS, buf, 1);
 
 		if (qsfp->sm_mod_state != QSFP_MOD_PRESENT ||
-		    qsfp->sm_dev_state != QSFP_DEV_UP)
+		    qsfp->sm_dev_state != QSFP_DEV_UP){
 			break;
+			}
 
-		if (!(qsfp->id.base.etile_qsfp_diag_monitor &
-		      QSFP_DIAGMON_ADDRMODE))
 			qsfp_soft_start_poll(qsfp);
-
-		qsfp_module_tx_enable(qsfp);
 
 		/* Initialise the fault clearance retries */
 		qsfp->sm_fault_retries = N_FAULT_INIT;
@@ -1284,13 +1190,12 @@ static void qsfp_sm_main(struct qsfp *qsfp, unsigned int event)
 		 * while TX_DISABLE is asserted. The earliest we want to do
 		 * anything (such as probe for a PHY) is 50ms.
 		 */
+
 		qsfp_sm_next(qsfp, QSFP_S_WAIT, T_WAIT);
 		break;
 
 	case QSFP_S_WAIT:
-
 		if (event != QSFP_E_TIMEOUT)
-
 			break;
 
 		if (qsfp->id.base.etile_qsfp_options_3 &
@@ -1305,7 +1210,6 @@ static void qsfp_sm_main(struct qsfp *qsfp, unsigned int event)
 				timeout -= T_WAIT;
 			else
 				timeout = 1;
-
 			qsfp_sm_next(qsfp, QSFP_S_INIT, timeout);
 		} else {
 			/* TX_FAULT is not asserted, assume the module has
@@ -1316,7 +1220,6 @@ static void qsfp_sm_main(struct qsfp *qsfp, unsigned int event)
 		break;
 
 	case QSFP_S_INIT:
-
 		if (event == QSFP_E_TIMEOUT &&
 		    qsfp->id.base.etile_qsfp_options_3 &
 			    QSFP_OPTIONS_TX_FAULT) {
@@ -1335,7 +1238,6 @@ init_done:
 		break;
 
 	case QSFP_S_INIT_PHY:
-
 		if (event != QSFP_E_TIMEOUT)
 			break;
 phy_probe:
@@ -1347,8 +1249,10 @@ phy_probe:
 			if (--qsfp->sm_phy_retries) {
 				qsfp_sm_next(qsfp, QSFP_S_INIT_PHY,
 					     T_PHY_RETRY);
-					dev_info(qsfp->dev, "PHY detected\n");
 				break;
+			} else {
+				/*earlier ported the driver wrongly from SFP*/
+				dev_info(qsfp->dev, "no PHY detected\n");
 			}
 		} else if (ret) {
 			qsfp_sm_next(qsfp, QSFP_S_FAIL, 0);
@@ -1365,26 +1269,21 @@ phy_probe:
 		break;
 
 	case QSFP_S_INIT_TX_FAULT:
-
 		if (event == QSFP_E_TIMEOUT) {
 			qsfp_module_tx_fault_reset(qsfp);
 			qsfp_sm_next(qsfp, QSFP_S_INIT,
 				     qsfp->module_t_start_up);
 		}
-
 		break;
 
 	case QSFP_S_WAIT_LOS:
-
 		if (event == QSFP_E_TX_FAULT)
 			qsfp_sm_fault(qsfp, QSFP_S_TX_FAULT, true);
 		else if (qsfp_los_event_inactive(qsfp, event))
 			qsfp_sm_link_up(qsfp);
-
 		break;
 
 	case QSFP_S_LINK_UP:
-
 		if (event == QSFP_E_TX_FAULT) {
 			qsfp_sm_link_down(qsfp);
 			qsfp_sm_fault(qsfp, QSFP_S_TX_FAULT, true);
@@ -1392,21 +1291,17 @@ phy_probe:
 			qsfp_sm_link_down(qsfp);
 			qsfp_sm_next(qsfp, QSFP_S_WAIT_LOS, 0);
 		}
-
 		break;
 
 	case QSFP_S_TX_FAULT:
-
 		if (event == QSFP_E_TIMEOUT) {
 			qsfp_module_tx_fault_reset(qsfp);
 			qsfp_sm_next(qsfp, QSFP_S_REINIT,
 				     qsfp->module_t_start_up);
 		}
-
 		break;
 
 	case QSFP_S_REINIT:
-
 		if (event == QSFP_E_TIMEOUT &&
 		    qsfp->id.base.etile_qsfp_options_3 &
 			    QSFP_OPTIONS_TX_FAULT) {
@@ -1417,11 +1312,9 @@ phy_probe:
 				 "module transmit fault recovered\n");
 			qsfp_sm_link_check_los(qsfp);
 		};
-
 		break;
 
 	case QSFP_S_TX_DISABLE:
-
 		break;
 	}
 }
@@ -1447,25 +1340,25 @@ static void qsfp_sm_event(struct qsfp *qsfp, unsigned int event)
 	mutex_unlock(&qsfp->sm_mutex);
 }
 
-void qsfp_attach(struct qsfp *old)
+void qsfp_attach(struct qsfp *qsfp)
 {
 	qsfp_sm_event(qsfp, QSFP_E_DEV_ATTACH);
 }
 EXPORT_SYMBOL(qsfp_attach);
 
-void qsfp_detach(struct qsfp *old)
+void qsfp_detach(struct qsfp *qsfp)
 {
 	qsfp_sm_event(qsfp, QSFP_E_DEV_DETACH);
 }
 EXPORT_SYMBOL(qsfp_detach);
 
-void qsfp_start(struct qsfp *old)
+void qsfp_start(struct qsfp *qsfp)
 {
 	qsfp_sm_event(qsfp, QSFP_E_DEV_UP);
 }
 EXPORT_SYMBOL(qsfp_start);
 
-void qsfp_stop(struct qsfp *old)
+void qsfp_stop(struct qsfp *qsfp)
 {
 	qsfp_sm_event(qsfp, QSFP_E_DEV_DOWN);
 }
@@ -1540,36 +1433,50 @@ static void qsfp_timeout(struct work_struct *work)
 
 static void qsfp_check_state(struct qsfp *qsfp)
 {
-	unsigned int state, i, changed;
+	unsigned int state, changed;
+	int ret;
+	u8 buf[16] = {0};
+	static unsigned int prv_buf, prv_buf_rx;
+	bool flag = false;
 
 	mutex_lock(&qsfp->st_mutex);
 	state = qsfp_get_state(qsfp);
 
 	changed = state ^ qsfp->state;
-	changed &= QSFP_F_PRESENT | QSFP_OPTIONS_TX_LOSS_SIGNAL |
-		   QSFP_OPTIONS_TX_FAULT;
-
-	for (i = 0; i < GPIO_MAX; i++)
-		if (changed & BIT(i))
-			dev_dbg(qsfp->dev, "%s %u -> %u\n", gpio_of_names[i],
-				!!(qsfp->state & BIT(i)), !!(state & BIT(i)));
+	changed &= QSFP_F_PRESENT;
 
 	qsfp->state = state;
 
 	rtnl_lock();
-	if (changed & QSFP_F_PRESENT)
+	if (changed & QSFP_F_PRESENT) {
 		qsfp_sm_event(qsfp, state & QSFP_F_PRESENT ? QSFP_E_INSERT :
 								   QSFP_E_REMOVE);
+	}
 
-	if (changed & QSFP_OPTIONS_TX_FAULT)
-		qsfp_sm_event(qsfp, state & QSFP_OPTIONS_TX_FAULT ?
-					    QSFP_E_TX_FAULT :
-						  QSFP_E_TX_CLEAR);
-
-	if (changed & QSFP_OPTIONS_TX_LOSS_SIGNAL)
-		qsfp_sm_event(qsfp, state & QSFP_OPTIONS_TX_LOSS_SIGNAL ?
+	ret = qsfp_read(qsfp, false, QSFP_OPTIONS, buf, 1);
+			if (buf[0] & QSFP_OPTIONS_TX_LOSS_SIGNAL) {
+				ret = qsfp_read(qsfp, false, QSFP_RX_TX_LOSS, buf, 1);
+			if (prv_buf != buf[0]) {
+				prv_buf = buf[0];
+				flag = true;
+			}
+			if (flag) {
+				qsfp_sm_event(qsfp, state & QSFP_OPTIONS_TX_LOSS_SIGNAL ?
 					    QSFP_E_TX_LOS :
 						  QSFP_E_RX_LOS);
+			}
+			} else {
+				ret = qsfp_read(qsfp, false, QSFP_RX_TX_LOSS, buf, 1);
+				buf[0] = buf[0] & 0xf;
+			if (prv_buf_rx != buf[0]) {
+				prv_buf_rx = buf[0];
+				flag = true;
+				}
+			if (flag)
+				qsfp_sm_event(qsfp, state & QSFP_OPTIONS_TX_LOSS_SIGNAL ?
+					    QSFP_E_TX_LOS :
+						  QSFP_E_RX_LOS);
+			}
 
 	rtnl_unlock();
 	mutex_unlock(&qsfp->st_mutex);
@@ -1589,9 +1496,6 @@ static void qsfp_poll(struct work_struct *work)
 	struct qsfp *qsfp = container_of(work, struct qsfp, poll.work);
 
 	qsfp_check_state(qsfp);
-
-	qsfp_state_indicators(qsfp);
-	qsfp_status_indicators(qsfp);
 
 	if (qsfp->state_soft_mask &
 		    (QSFP_OPTIONS_TX_LOSS_SIGNAL | QSFP_OPTIONS_TX_FAULT) ||
@@ -1640,8 +1544,7 @@ static int qsfp_probe(struct platform_device *pdev)
 	struct i2c_adapter *i2c;
 	char *qsfp_irq_name;
 	int err, i;
-	static void *reg_addr;
-	u32 reg_value;
+	struct qsfp *qsfp;
 
 	qsfp = qsfp_alloc(&pdev->dev);
 
@@ -1668,13 +1571,6 @@ static int qsfp_probe(struct platform_device *pdev)
 
 		qsfp->type = id->data;
 		sff = qsfp->type;
-
-		reg_addr = ioremap(0xffd11000, 0x40);
-		reg_addr += 0x28;
-		reg_value = readl(reg_addr);
-		//bring out from reset by writing to bit 8//
-		reg_value &= 0xfffffeff;
-		writel(reg_value, reg_addr);
 
 		np = of_parse_phandle(node, "i2c-bus", 0);
 
@@ -1715,8 +1611,6 @@ static int qsfp_probe(struct platform_device *pdev)
 
 		return err;
 	}
-	qsfp_reset(qsfp, 0);
-
 	for (i = 0; i < GPIO_MAX; i++)
 		if (sff->gpios & BIT(i)) {
 			qsfp->gpio[i] = devm_gpiod_get_optional
@@ -1728,8 +1622,6 @@ static int qsfp_probe(struct platform_device *pdev)
 
 	qsfp->get_state = qsfp_gpio_get_state;
 	qsfp->set_state = qsfp_gpio_set_state;
-
-	qsfp_reset(qsfp, 1);
 
 	/* Modules that have no detect signal are always present */
 	if (!(qsfp->gpio[GPIO_MODULE_PRESENT]))
@@ -1831,7 +1723,7 @@ static struct platform_driver qsfp_driver = {
 
 static int qsfp_init(void)
 {
-	poll_jiffies = msecs_to_jiffies(1000);
+	poll_jiffies = msecs_to_jiffies(5000);
 
 	return platform_driver_register(&qsfp_driver);
 }
@@ -1844,5 +1736,5 @@ static void qsfp_exit(void)
 module_exit(qsfp_exit);
 
 MODULE_ALIAS("platform:qsfp");
-MODULE_AUTHOR("Malku Deepak");
+MODULE_AUTHOR("Malku, Deepak Nagaraju");
 MODULE_LICENSE("GPL v2");
