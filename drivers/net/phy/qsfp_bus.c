@@ -8,14 +8,15 @@
 #include <linux/rtnetlink.h>
 #include <linux/slab.h>
 #include <linux/qsfp.h>
-
-
+#include <linux/of_platform.h>
 
 struct qsfp_quirk {
 	const char *vendor;
 	const char *part;
 	void (*modes)(const struct qsfp_eeprom_id *id, unsigned long *modes);
 };
+
+
 
 /**
  * struct qsfp_bus - internal representation of a qsfp bus
@@ -174,10 +175,18 @@ int qsfp_parse_port(struct qsfp_bus *bus, const struct qsfp_eeprom_id *id,
 			break;
 		}
 		fallthrough;
-	case SFF8024_QSFP_DD_CONNECTOR_SG: /* guess */
+	case SFF8024_QSFP_DD_CONNECTOR_SG:
 	case SFF8024_QSFP_DD_CONNECTOR_HSSDC_II:
-	case SFF8024_QSFP_DD_CONNECTOR_NOSEPARATE:
 	case SFF8024_QSFP_DD_CONNECTOR_MXC_2X16:
+	case SFF8024_QSFP_DD_CONNECTOR_NOSEPARATE:
+		/*supporting connector type with extended
+		 *spec for both electrical and optical interface
+		 */
+		if (id->base.etile_qsfp_ext_spec_compliance &
+			SFF8024_QSFP_ECC_100G_25GAUI_C2M_AOC_LOW_BER) {
+			port = PORT_AUI;
+			break;
+		}
 		port = PORT_OTHER;
 		break;
 	default:
@@ -196,9 +205,13 @@ int qsfp_parse_port(struct qsfp_bus *bus, const struct qsfp_eeprom_id *id,
 		case PORT_TP:
 			phylink_set(support, TP);
 			break;
+
+	/*added support to AUI(Attachment Unit Interface) port*/
+		case PORT_AUI:
+			phylink_set(support, AUI);
+			break;
 		}
 	}
-
 	return port;
 }
 EXPORT_SYMBOL_GPL(qsfp_parse_port);
@@ -214,6 +227,8 @@ EXPORT_SYMBOL_GPL(qsfp_parse_port);
 
 bool qsfp_may_have_phy(struct qsfp_bus *bus, const struct qsfp_eeprom_id *id)
 {
+	if (id->base.etile_qsfp_spec_compliance_1[4] & SFF8024_QSFP_e1000_base_t)
+		return true;
 	if (id->base.etile_qsfp_identifier != SFF8024_ID_QSFP_DD_INF_8628) {
 		switch (id->base.etile_qsfp_spec_compliance_1[0]) {
 		case SFF8636_QSFP_DD_ECC_100GBASE_CR4:
@@ -240,61 +255,108 @@ EXPORT_SYMBOL_GPL(qsfp_may_have_phy);
 void qsfp_parse_support(struct qsfp_bus *bus, const struct qsfp_eeprom_id *id,
 			unsigned long *support)
 {
-	unsigned int etile_qsfp_br_nom, etile_qsfp_br_max, etile_qsfp_br_min;
-	__ETHTOOL_DECLARE_LINK_MODE_MASK(modes) = {
-		0,
-	};
-
-	/* Decode the bitrate information to MBd */
-	etile_qsfp_br_min = 0;
-	etile_qsfp_br_nom = 0;
-	etile_qsfp_br_max = 0;
-	if (id->base.etile_qsfp_br_nom) {
-		if (id->base.etile_qsfp_br_nom != 255) {
-			etile_qsfp_br_nom = id->base.etile_qsfp_br_nom * 100;
-			etile_qsfp_br_min = etile_qsfp_br_nom -
-					    id->base.etile_qsfp_br_nom *
-						    id->base.etile_qsfp_br_min;
-			etile_qsfp_br_max = etile_qsfp_br_nom +
-					    id->base.etile_qsfp_br_nom *
-						    id->base.etile_qsfp_br_max;
-		} else if (id->base.etile_qsfp_br_max) {
-			etile_qsfp_br_nom = 250 * id->base.etile_qsfp_br_max;
-			etile_qsfp_br_max = etile_qsfp_br_nom +
-					    etile_qsfp_br_nom *
-						    id->base.etile_qsfp_br_min /
-						    100;
-			etile_qsfp_br_min = etile_qsfp_br_nom -
-					    etile_qsfp_br_nom *
-						    id->base.etile_qsfp_br_min /
-						    100;
-		}
-
-		/* When using passive cables, in case neither BR,min nor BR,max
-		 * are specified, set etile_qsfp_br_min to 0 as the nominal value is then
-		 * used as the maximum.
-		 */
-	}
+	__ETHTOOL_DECLARE_LINK_MODE_MASK(modes) = { 0,};
 
 	/* Set ethtool support from the compliance fields. */
-	if (id->base.etile_qsfp_spec_compliance_1)
+	if (id->base.etile_qsfp_spec_compliance_1[0] & SFF8024_QSFP_10g_base_sr)
 		phylink_set(modes, 10000baseSR_Full);
-	if (id->base.etile_qsfp_spec_compliance_1)
+
+	if (id->base.etile_qsfp_spec_compliance_1[0] & SFF8024_QSFP_10g_base_lr)
 		phylink_set(modes, 10000baseLR_Full);
 
-	switch (id->base.etile_qsfp_spec_compliance_1[0]) {
-	case SFF8636_QSFP_DD_ECC_100GBASE_CR4:
+	if (id->base.etile_qsfp_spec_compliance_1[0] & SFF8024_QSFP_10g_base_lrm)
+		phylink_set(modes, 10000baseLRM_Full);
+
+	if (id->base.etile_qsfp_spec_compliance_1[0] & 0x8) {
+		if (id->base.etile_qsfp_ext_spec_compliance & 0x18)
+			phylink_set(modes, 2500baseX_Full);
+	}
+
+	if ((id->base.etile_qsfp_spec_compliance_1[3] & SFF8024_QSFP_e1000_base_sx) ||
+	    (id->base.etile_qsfp_spec_compliance_1[3] & SFF8024_QSFP_e1000_base_lx) ||
+	    (id->base.etile_qsfp_spec_compliance_1[3] & SFF8024_QSFP_e1000_base_cx)) {
+		phylink_set(modes, 1000baseX_Full);
+		}
+
+	if (id->base.etile_qsfp_spec_compliance_1[3] & SFF8024_QSFP_e1000_base_t) {
+		phylink_set(modes, 1000baseT_Half);
+		phylink_set(modes, 1000baseT_Full);
+	}
+
+	switch (id->base.etile_qsfp_ext_spec_compliance) {
+	case SFF8024_QSFP_ECC_UNSPEC:
+		phylink_set(modes, 25000baseKR_Full);
 		break;
-	case SFF8636_QSFP_DD_ECC_CAUI4:
+	case SFF8024_QSFP_ECC_100GBASE_SR4_25GBASE_SR:
 		phylink_set(modes, 100000baseSR4_Full);
 		phylink_set(modes, 25000baseSR_Full);
 		break;
-
+	case SFF8024_QSFP_ECC_100GBASE_LR4_25GBASE_LR:
+	case SFF8024_QSFP_ECC_100GBASE_ER4_25GBASE_ER:
+		phylink_set(modes, 100000baseLR4_ER4_Full);
+		break;
+	case SFF8024_QSFP_ECC_100GBASE_CR4:
+		phylink_set(modes, 100000baseCR4_Full);
+		fallthrough;
+	case SFF8024_QSFP_ECC_25GBASE_CR_S:
+	case SFF8024_QSFP_ECC_25GBASE_CR_N:
+		phylink_set(modes, 25000baseCR_Full);
+		break;
+	case SFF8024_QSFP_ECC_10GBASE_T_SFI:
+	case SFF8024_QSFP_ECC_10GBASE_T_SR:
+		phylink_set(modes, 10000baseT_Full);
+		break;
+	case SFF8024_QSFP_ECC_5GBASE_T:
+		phylink_set(modes, 5000baseT_Full);
+		break;
+	case SFF8024_QSFP_ECC_2_5GBASE_T:
+		phylink_set(modes, 2500baseT_Full);
+		break;
+	case SFF8024_QSFP_ECC_100G_25GAUI_C2M_AOC_LOW_BER:
+		phylink_set(modes, 100000baseKR4_Full);
+		phylink_set(modes, 25000baseKR_Full);
+		break;
+	case SFF8024_QSFP_ECC_100GBASE_SR10:
+		phylink_set(modes, 100000baseSR4_Full);
+		break;
+	case SFF8024_QSFP_ECC_100G_25GAUI_C2M_AOC:
+		phylink_set(modes, 100000baseSR4_Full);
+		phylink_set(modes, 25000baseSR_Full);
+		break;
+	case SFF8024_QSFP_ECC_100G_CWDM4:
+		phylink_set(modes, 100000baseCR4_Full);
+		break;
+	case SFF8024_QSFP_ECC_100G_PSM4:
+		phylink_set(modes, 100000baseCR4_Full);
+		break;
+	case SFF8024_QSFP_ECC_10M:
+		phylink_set(modes, 10baseT_Full);
+		break;
+	case SFF8024_QSFP_ECC_40GBASE_ER:
+		phylink_set(modes, 40000baseLR4_Full);
+		break;
+	case SFF8024_QSFP_ECC_10GBASE_SR:
+		phylink_set(modes, 10000baseSR_Full);
+		break;
+	case SFF8024_QSFP_ECC_100G_CLR4:
+		phylink_set(modes, 100000baseLR4_ER4_Full);
+		break;
+	case SFF8024_QSFP_ECC_100G_ACC_25G_ACC:
+		phylink_set(modes, 100000baseCR4_Full);
+		phylink_set(modes, 25000baseCR_Full);
+		break;
 	default:
 		dev_warn(bus->qsfp_dev,
 			 "Unknown/unsupported extended compliance code: 0x%02x\n",
-			 id->base.etile_qsfp_spec_compliance_1[0]);
+			 id->base.etile_qsfp_ext_spec_compliance);
 		break;
+	}
+
+/* For fibre channel SFP, derive possible BaseX modes */
+	if ((id->base.etile_qsfp_spec_compliance_1[7] & SFF8024_QSFP_fc_speed_100) ||
+	    (id->base.etile_qsfp_spec_compliance_1[7] & SFF8024_QSFP_fc_speed_200) ||
+	    (id->base.etile_qsfp_spec_compliance_1[7] & SFF8024_QSFP_fc_speed_400)) {
+		phylink_set(modes, 2500baseX_Full);
 	}
 
 	/* If we haven't discovered any modes that this module supports, try
@@ -302,16 +364,10 @@ void qsfp_parse_support(struct qsfp_bus *bus, const struct qsfp_eeprom_id *id,
 	 * 1310nm/1550nm) are not 1000BASE-BX compliant due to the differing
 	 * wavelengths, so do not set any transceiver bits.
 	 */
-	if (bitmap_empty(modes, __ETHTOOL_LINK_MODE_MASK_NBITS)) {
-		/* If the bit rate allows 1000baseX */
-		if (etile_qsfp_br_nom && etile_qsfp_br_min <= 1300 &&
-		    etile_qsfp_br_max >= 1200)
-			phylink_set(modes, 1000baseX_Full);
-	}
 
-	if (bus->qsfp_quirk)
-		bus->qsfp_quirk->modes(id, modes);
-
+	if (bitmap_empty(modes, __ETHTOOL_LINK_MODE_MASK_NBITS))
+		if (bus->qsfp_quirk)
+			bus->qsfp_quirk->modes(id, modes);
 	bitmap_or(support, support, modes, __ETHTOOL_LINK_MODE_MASK_NBITS);
 
 	phylink_set(support, Autoneg);
@@ -339,8 +395,12 @@ phy_interface_t qsfp_select_interface(struct qsfp_bus *bus,
 	    phylink_test(link_modes, 10000baseT_Full))
 		return PHY_INTERFACE_MODE_10GBASER;
 
-	if (phylink_test(link_modes, 2500baseX_Full))
-		return PHY_INTERFACE_MODE_2500BASEX;
+	if (phylink_test(link_modes, 2500baseX_Full) ||
+	    phylink_test(link_modes, 25000baseKR_Full) ||
+		phylink_test(link_modes, 25000baseSR_Full) ||
+		phylink_test(link_modes, 25000baseCR_Full))
+
+		return PHY_INTERFACE_MODE_25GBASER;
 
 	if (phylink_test(link_modes, 1000baseT_Half) ||
 	    phylink_test(link_modes, 1000baseT_Full))
@@ -358,8 +418,7 @@ EXPORT_SYMBOL_GPL(qsfp_select_interface);
 static LIST_HEAD(qsfp_buses);
 static DEFINE_MUTEX(qsfp_mutex);
 
-static const struct qsfp_upstream_ops *
-qsfp_get_upstream_ops(struct qsfp_bus *bus)
+static const struct qsfp_upstream_ops *qsfp_get_upstream_ops(struct qsfp_bus *bus)
 {
 	return bus->registered ? bus->upstream_ops : NULL;
 }
@@ -423,19 +482,16 @@ static int qsfp_register_bus(struct qsfp_bus *bus)
 	const struct qsfp_upstream_ops *ops = bus->upstream_ops;
 	int ret;
 
-	pr_info("qsfp register bus\n");
-
 	if (ops) {
 		if (ops->link_down)
 			ops->link_down(bus->upstream);
-		if (ops->connect_phy /*&& bus->phydev*/) {
+		if (ops->connect_phy && bus->phydev) {
 			ret = ops->connect_phy(bus->upstream, bus->phydev);
 			if (ret)
 				return ret;
 		}
 	}
 	bus->registered = true;
-
 	bus->socket_ops->attach(bus->qsfp);
 	if (bus->started)
 		bus->socket_ops->start(bus->qsfp);
@@ -562,6 +618,10 @@ struct qsfp_bus *qsfp_bus_find_fwnode(struct fwnode_handle *fwnode)
 	else if (ret < 0)
 		return ERR_PTR(ret);
 
+if (!fwnode_device_is_available(ref.fwnode)) {
+	fwnode_handle_put(ref.fwnode);
+		return NULL;
+	}
 	bus = qsfp_bus_get(ref.fwnode);
 	fwnode_handle_put(ref.fwnode);
 	if (!bus)
@@ -689,8 +749,6 @@ int qsfp_module_insert(struct qsfp_bus *bus, const struct qsfp_eeprom_id *id)
 {
 	const struct qsfp_upstream_ops *ops = qsfp_get_upstream_ops(bus);
 	int ret = 0;
-
-	pr_info("Tessolve module insert\n");
 
 	bus->qsfp_quirk = qsfp_lookup_quirk(id);
 
