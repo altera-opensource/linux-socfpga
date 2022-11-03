@@ -15,60 +15,58 @@
 
 struct qsfp;
 struct qsfp_eeprom_base {
-	u8 etile_qsfp_identifier;					//0x00 00
-	u8 etile_qsfp_revision;						//0x01 01
-	u8 etile_qsfp_status;						//0x02 02
-	u8 etile_qsfp_interrupt_flags[19];			//0x03 03
-	u8 etile_qsfp_device_monitors[12];			//0x16 22
-	u8 etile_qsfp_channel_monitors[48];			//0x22 34
-	u8 RESERVED_0[4];							//0x52 82
-	u8 etile_qsfp_control[13];					//0x56 86
-	u8 RESERVED_1;								//0x63 99
+	u8 etile_qsfp_identifier;			//0x00 00
+	u8 etile_qsfp_revision;				//0x01 01
+	u8 etile_qsfp_status;				//0x02 02
+	u8 etile_qsfp_interrupt_flags[19];		//0x03 03
+	u8 etile_qsfp_device_monitors[12];		//0x16 22
+	u8 etile_qsfp_channel_monitors[48];		//0x22 34
+	u8 RESERVED_0[4];				//0x52 82
+	u8 etile_qsfp_control[13];			//0x56 86
+	u8 RESERVED_1;					//0x63 99
 	u8 etile_qsfp_device_channel_masks[5];		//0x64 100
-	u8 etile_qsfp_vendor_specific[2];			//0x69 105
-	u8 RESERVED_2;								//0x6b 107
-	u8 etile_device_properties_1[3];			//0x6c 108
-	u8 etile_pci_express[2];					//0x6f 111
-	u8 etile_device_properties_2[2];			//0x71 113
-	u8 RESERVED_3[4];							//0x74 115
-	u8 etile_qsfp_password_change[4];			//0x77 119
+	u8 etile_qsfp_vendor_specific[2];		//0x69 105
+	u8 RESERVED_2;					//0x6b 107
+	u8 etile_device_properties_1[3];		//0x6c 108
+	u8 etile_pci_express[2];			//0x6f 111
+	u8 etile_device_properties_2[2];		//0x71 113
+	u8 RESERVED_3[4];				//0x74 115
+	u8 etile_qsfp_password_change[4];		//0x77 119
 	u8 etile_qsfp_password_entry_area[4];		//0x7b 123
-	u8 etile_qsfp_page_select_byte;				//0x7f 127
-	u8 etile_qsfp_identifier_1;					//0x80 128
-	u8 etile_qsfp_ext_identifier;				//0x81 129
-	u8 etile_qsfp_connector_type;				//0x82 130
-	u8 etile_qsfp_spec_compliance_1[8];			//0x83 131
-	u8 etile_qsfp_encoding;						//0x8b 139
-	u8 etile_qsfp_br_nom;						//0x8c 140
-	u8 etile_qsfp_ext_compliance;				//0x8d 141
-	u8 etile_qsfp_link_lenghth_1;				//0x8e 142
-	u8 etile_qsfp_link_lenghth_2;				//0x8f 143
-	u8 etile_qsfp_link_lenghth_3;				//0x90 144
-	u8 etile_qsfp_link_lenghth_4;				//0x91 145
-	u8 etile_qsfp_link_lenghth_5;				//0x92 146
-	u8 etile_qsfp_device_technology;			//0x93 147
-	char etile_qsfp_vendor_name[16];			//0x94 148
-	u8 etile_qsfp_extended_module;				//0xa4 164
-	char etile_qsfp_vendor_oui[3];				//0xa5 165
-	char etile_qsfp_vendor_pn[16];				//0xa8 168
-	char etile_qsfp_vendor_rev[2];				//0xb8 184
-	u8 etile_qsfp_wavelength_copper[2];			//0xba 186
+	u8 etile_qsfp_page_select_byte;			//0x7f 127
+	u8 etile_qsfp_identifier_1;			//0x80 128
+	u8 etile_qsfp_ext_identifier;			//0x81 129
+	u8 etile_qsfp_connector_type;			//0x82 130
+	u8 etile_qsfp_spec_compliance_1[8];		//0x83 131
+	u8 etile_qsfp_encoding;				//0x8b 139
+	u8 etile_qsfp_br_nom;				//0x8c 140
+	u8 etile_qsfp_ext_compliance;			//0x8d 141
+	u8 etile_qsfp_link_lenghth_1;			//0x8e 142
+	u8 etile_qsfp_link_lenghth_2;			//0x8f 143
+	u8 etile_qsfp_link_lenghth_3;			//0x90 144
+	u8 etile_qsfp_link_lenghth_4;			//0x91 145
+	u8 etile_qsfp_link_lenghth_5;			//0x92 146
+	u8 etile_qsfp_device_technology;		//0x93 147
+	char etile_qsfp_vendor_name[16];		//0x94 148
+	u8 etile_qsfp_extended_module;			//0xa4 164
+	char etile_qsfp_vendor_oui[3];			//0xa5 165
+	char etile_qsfp_vendor_pn[16];			//0xa8 168
+	char etile_qsfp_vendor_rev[2];			//0xb8 184
+	u8 etile_qsfp_wavelength_copper[2];		//0xba 186
 	u8 etile_qsfp_wavelength_tolerance[2];		//0xbc 188
-	u8 etile_qsfp_max_case_temp[1];				//0xbe 190
-	u8 etile_qsfp_cc_base;						//0xbf 191
-	u8 etile_qsfp_ext_spec_compliance;			//0xc0 192
-	u8 etile_qsfp_options_1;					//0xc1 193
-	u8 etile_qsfp_options_2;					//0xc2 194
-	u8 etile_qsfp_options_3;					//0xc3 195
+	u8 etile_qsfp_max_case_temp[1];			//0xbe 190
+	u8 etile_qsfp_cc_base;				//0xbf 191
+	u8 etile_qsfp_ext_spec_compliance;		//0xc0 192
+	u8 etile_qsfp_options_1;			//0xc1 193
+	u8 etile_qsfp_options_2;			//0xc2 194
+	u8 etile_qsfp_options_3;			//0xc3 195
 	char etile_qsfp_vendor_serial_number[16];	//0xc4 196
 	char etile_qsfp_vendor_date_code[8];		//0xd4 212
-	u8 etile_qsfp_diag_monitor;					//0xdc 220
-	u8 etile_qsfp_enhanced_options;				//0xdd 221
-	u8 etile_qsfp_br_nom_1;						//0xde 222
-	u8 etile_qsfp_cc_ext;						//0xdf 223
+	u8 etile_qsfp_diag_monitor;			//0xdc 220
+	u8 etile_qsfp_enhanced_options;			//0xdd 221
+	u8 etile_qsfp_br_nom_1;				//0xde 222
+	u8 etile_qsfp_cc_ext;				//0xdf 223
 	u8 etile_qsfp_venodor_specific_id[32];		//0xe0 224
-	u8 etile_qsfp_br_max;						//TBD
-	u8 etile_qsfp_br_min;						//TBD
 
 } __packed;
 
@@ -91,7 +89,7 @@ struct qsfp_eeprom_id {
 
 enum {
 
-	SFF8024_ID_QSFP_DD_INF_8628	= 0x18,
+
 	SFF8024_QSFP_DD_ENCODING_UNSPEC	= 0x00,
 	SFF8024_QSFP_DD_ENCODING_8B10B	= 0x01,
 	SFF8024_QSFP_DD_ENCODING_4B5B	= 0x02,
@@ -101,10 +99,16 @@ enum {
 	SFF8024_QSFP_DD_ENCODING_8436_MANCHESTER	= 0x06,
 	SFF8024_QSFP_DD_ENCODING_256B257B	= 0x07,
 	SFF8024_QSFP_DD_ENCODING_PAM4	= 0x08,
+	SFF8024_ID_QSFP	= 0x0c,
+	SFF8024_ID_QSFP_PLUS	= 0x0d,
 	SFF8024_ID_QSFP_28	= 0x11,
+	SFF8024_ID_QSFP_DD_INF_8628	= 0x18,
+	SFF8024_ID_QSFP_8X	= 0x19,
+
+
 
 	SFF8024_QSFP_DD_CONNECTOR_UNSPEC = 0x00,
-	SFF8024_QSFP_DD_CONNECTOR_SC = 0x01,
+	SFF8024_QSFP_DD_CONNECTOR_SC =	0x01,
 	SFF8024_QSFP_DD_CONNECTOR_FIBRE_CHANNEL_STYLE1 = 0x02,
 	SFF8024_QSFP_DD_CONNECTOR_FIBRE_CHANNEL_STYLE2 = 0x03,
 	SFF8024_QSFP_DD_CONNECTOR_BNC_TNC = 0x04,
@@ -134,6 +138,88 @@ enum {
 	SFF8636_QSFP_DD_ECC_50GAUI2_C2M = 2,
 	SFF8636_QSFP_DD_ECC_50GAUI1_C2M = 1,
 	SFF8636_QSFP_DD_ECC_CDAUI8_C2M = 0,
+
+
+	SFF8024_QSFP_ECC_UNSPEC		= 0x00,
+	SFF8024_QSFP_ECC_100G_25GAUI_C2M_AOC	= 0x01,
+	SFF8024_QSFP_ECC_100GBASE_SR4_25GBASE_SR = 0x02,
+	SFF8024_QSFP_ECC_100GBASE_LR4_25GBASE_LR = 0x03,
+	SFF8024_QSFP_ECC_100GBASE_ER4_25GBASE_ER = 0x04,
+	SFF8024_QSFP_ECC_100GBASE_SR10	= 0x05,
+	SFF8024_QSFP_ECC_100G_CWDM4	= 0x06,
+	SFF8024_QSFP_ECC_100G_PSM4	= 0x07,
+	SFF8024_QSFP_ECC_100G_ACC_25G_AUI	= 0x08,
+	SFF8024_QSFP_ECC_100GBASE_CR4	= 0x0b,
+	SFF8024_QSFP_ECC_25GBASE_CR_S	= 0x0c,
+	SFF8024_QSFP_ECC_25GBASE_CR_N	= 0x0d,
+	SFF8024_QSFP_ECC_10M	= 0x0e,
+	SFF8024_QSFP_ECC_40GBASE_ER	= 0x10,
+	SFF8024_QSFP_ECC_10GBASE_SR	= 0x11,
+	SFF8024_QSFP_ECC_40G_PSM4	= 0x12,
+	SFF8024_QSFP_ECC_10GBASE_T_SFI	= 0x16,
+	SFF8024_QSFP_ECC_100G_CLR4	= 0x17,
+	SFF8024_QSFP_ECC_100G_AOC_25G_AOC	= 0x18,
+	SFF8024_QSFP_ECC_100G_ACC_25G_ACC	= 0x19,
+	SFF8024_QSFP_ECC_10GBASE_T_SR	= 0x1c,
+	SFF8024_QSFP_ECC_5GBASE_T		= 0x1d,
+	SFF8024_QSFP_ECC_2_5GBASE_T		= 0x1e,
+	SFF8024_QSFP_ECC_100G_25GAUI_C2M_AOC_LOW_BER = 0x18,
+
+	SFF8024_QSFP_10g_base_unsp = 0x8,
+	SFF8024_QSFP_10g_base_lrm = 0x7,
+	SFF8024_QSFP_10g_base_lr = 0x6,
+	SFF8024_QSFP_10g_base_sr = 0x5,
+	SFF8024_QSFP_40g_base_cr4 = 0x4,
+	SFF8024_QSFP_40g_base_sr4 = 0x3,
+	SFF8024_QSFP_40g_base_lr4 = 0x2,
+	SFF8024_QSFP_40g_active_cable = 0x1,
+
+	SFF8024_QSFP_sonet_oc48_long_reach = 2,
+	SFF8024_QSFP_sonet_oc48_intermediate_reach = 1,
+	SFF8024_QSFP_sonet_oc48_short_reach = 0,
+
+	SFF8024_QSFP_SAS_24 = 7,
+	SFF8024_QSFP_SAS_12 = 6,
+	SFF8024_QSFP_SAS_6 = 5,
+	SFF8024_QSFP_SAS_3 = 4,
+
+	SFF8024_QSFP_e1000_base_t = 3,
+	SFF8024_QSFP_e1000_base_cx = 2,
+	SFF8024_QSFP_e1000_base_lx = 1,
+	SFF8024_QSFP_e1000_base_sx = 0,
+
+	SFF8024_QSFP_fc_ll_v = 7,
+	SFF8024_QSFP_fc_ll_s = 6,
+	SFF8024_QSFP_fc_ll_i = 5,
+	SFF8024_QSFP_fc_ll_l = 4,
+	SFF8024_QSFP_fc_ll_m = 3,
+	SFF8024_QSFP_fc_tech_reserved = 2,
+	SFF8024_QSFP_fc_tech_lc = 1,
+	SFF8024_QSFP_fc_tech_electrical_inter_enclosure = 0,
+
+	SFF8024_QSFP_fc_tech_electrical_intra_enclosure = 7,
+	SFF8024_QSFP_fc_tech_sn = 6,
+	SFF8024_QSFP_fc_tech_sl = 5,
+	SFF8024_QSFP_fc_tech_ll = 4,
+
+
+	SFF8024_QSFP_fc_media_tw = 7,
+	SFF8024_QSFP_fc_media_tp = 6,
+	SFF8024_QSFP_fc_media_mi = 5,
+	SFF8024_QSFP_fc_media_tv = 4,
+	SFF8024_QSFP_fc_media_m6 = 3,
+	SFF8024_QSFP_fc_media_m5 = 2,
+	SFF8024_QSFP_unallocated_9_1 = 1,
+	SFF8024_QSFP_fc_media_sm = 0,
+
+	SFF8024_QSFP_fc_speed_1200 = 7,
+	SFF8024_QSFP_fc_speed_800 = 6,
+	SFF8024_QSFP_fc_speed_1600 = 5,
+	SFF8024_QSFP_fc_speed_400 = 4,
+	SFF8024_QSFP_fc_speed_3200 = 3,
+	SFF8024_QSFP_fc_speed_200 = 2,
+	SFF8024_QSFP_unallocated_10_1 = 1,
+	SFF8024_QSFP_fc_speed_100 = 0,
 
 };
 
@@ -294,21 +380,6 @@ struct qsfp_socket_ops {
 			     u8 *data);
 };
 
-int qsfp_add_phy(struct qsfp_bus *bus, struct phy_device *phydev);
-void qsfp_remove_phy(struct qsfp_bus *bus);
-void qsfp_link_up(struct qsfp_bus *bus);
-void qsfp_link_down(struct qsfp_bus *bus);
-int qsfp_module_insert(struct qsfp_bus *bus, const struct qsfp_eeprom_id *id);
-void qsfp_module_remove(struct qsfp_bus *bus);
-int qsfp_module_start(struct qsfp_bus *bus);
-void qsfp_module_stop(struct qsfp_bus *bus);
-int qsfp_link_configure(struct qsfp_bus *bus, const struct qsfp_eeprom_id *id);
-struct qsfp_bus *qsfp_register_socket(struct device *dev, struct qsfp *qsfp,
-				      const struct qsfp_socket_ops *ops);
-void qsfp_unregister_socket(struct qsfp_bus *bus);
-
-int get_cable_attach(struct qsfp *old);
-int get_channel_info(struct qsfp *old);
 
 #if IS_ENABLED(CONFIG_QSFP)
 int qsfp_parse_port(struct qsfp_bus *bus, const struct qsfp_eeprom_id *id,
@@ -329,6 +400,24 @@ struct qsfp_bus *qsfp_bus_find_fwnode(struct fwnode_handle *fwnode);
 int qsfp_bus_add_upstream(struct qsfp_bus *bus, void *upstream,
 			  const struct qsfp_upstream_ops *ops);
 void qsfp_bus_del_upstream(struct qsfp_bus *bus);
+
+int qsfp_add_phy(struct qsfp_bus *bus, struct phy_device *phydev);
+void qsfp_remove_phy(struct qsfp_bus *bus);
+void qsfp_link_up(struct qsfp_bus *bus);
+void qsfp_link_down(struct qsfp_bus *bus);
+int qsfp_module_insert(struct qsfp_bus *bus, const struct qsfp_eeprom_id *id);
+void qsfp_module_remove(struct qsfp_bus *bus);
+int qsfp_module_start(struct qsfp_bus *bus);
+void qsfp_module_stop(struct qsfp_bus *bus);
+int qsfp_link_configure(struct qsfp_bus *bus, const struct qsfp_eeprom_id *id);
+struct qsfp_bus *qsfp_register_socket(struct device *dev, struct qsfp *qsfp,
+				      const struct qsfp_socket_ops *ops);
+void qsfp_unregister_socket(struct qsfp_bus *bus);
+
+int get_cable_attach(struct qsfp *old);
+int get_channel_info(struct qsfp *old);
+
+
 #else
 
 static inline int qsfp_parse_port(struct qsfp_bus *bus,
