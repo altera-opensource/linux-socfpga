@@ -47,6 +47,7 @@
 #include "intel_fpga_etile.h"
 
 struct qsfp *qsfp_tmp;
+const char *phy_mode_etile;
 /* Module parameters */
 static int debug = -1;
 module_param(debug, int, 0644);
@@ -1586,7 +1587,11 @@ static void intel_fpga_etile_validate(struct phylink_config *config,
 
 	switch (state->interface) {
 	case PHY_INTERFACE_MODE_10GKR:
+	case PHY_INTERFACE_MODE_NA:
+	case PHY_INTERFACE_MODE_1000BASEX:
 	case PHY_INTERFACE_MODE_10GBASER:
+		phylink_set(mask, 1000baseX_Full);
+		phylink_set(mask, 1000baseT_Full);
 		phylink_set(mask, 10000baseT_Full);
 		phylink_set(mask, 10000baseCR_Full);
 		phylink_set(mask, 10000baseSR_Full);
@@ -1594,6 +1599,8 @@ static void intel_fpga_etile_validate(struct phylink_config *config,
 		phylink_set(mask, 10000baseLRM_Full);
 		phylink_set(mask, 10000baseER_Full);
 		phylink_set(mask, 10000baseKR_Full);
+		phylink_set(mac_supported, 1000baseX_Full);
+		phylink_set(mac_supported, 1000baseT_Full);
 		phylink_set(mac_supported, 10000baseT_Full);
 		phylink_set(mac_supported, 10000baseCR_Full);
 		phylink_set(mac_supported, 10000baseSR_Full);
@@ -1602,7 +1609,7 @@ static void intel_fpga_etile_validate(struct phylink_config *config,
 		phylink_set(mac_supported, 10000baseER_Full);
 		phylink_set(mac_supported, 10000baseKR_Full);
 		state->speed = SPEED_10000;
-		break;
+		fallthrough;
 	case PHY_INTERFACE_MODE_25GBASER:
 		phylink_set(mask, 25000baseCR_Full);
 		phylink_set(mask, 25000baseKR_Full);
@@ -1627,100 +1634,25 @@ static void intel_fpga_etile_validate(struct phylink_config *config,
 static void intel_fpga_etile_mac_pcs_get_state(struct phylink_config *config,
 					       struct phylink_link_state *state)
 {
-	/* fixed speed for now */
-	state->speed = SPEED_25000;
-	state->duplex = DUPLEX_FULL;
+	struct intel_fpga_etile_eth_private *priv =
+		netdev_priv(to_net_dev(config->dev));
+		state->duplex = DUPLEX_FULL;
+		state->link = 1;
+		/*Based on phy mode in dtsi file will set the speed*/
+		if (!strcmp(phy_mode_etile, "10gbase-r")) {
+			state->speed = SPEED_10000;
+			priv->link_speed = state->speed;
+		} else if (!strcmp(phy_mode_etile, "25gbase-r")) {
+			state->speed = SPEED_25000;
+			priv->link_speed = state->speed;
+		} else {
+			netdev_err(priv->dev, "%s: speed mode not supported\n", __func__);
+		}
 }
 
 static void intel_fpga_etile_mac_an_restart(struct phylink_config *config)
 {
 	/* Not Supported */
-}
-
-static void intel_fpga_etile_get_pcs_fixed_state(struct phylink_config *config,
-						 struct phylink_link_state *state)
-{
-	const int qsfp_pma_delay = 5;
-	int qsfp_channel_info;
-	int qsfp_module_info;
-	u32 bit_mask;
-	struct intel_fpga_etile_eth_private *priv =
-		netdev_priv(to_net_dev(config->dev));
-
-	if (!priv)
-		return;
-
-	state->speed = priv->link_speed;
-	state->duplex = DUPLEX_FULL;
-	state->link = 1;
-
-	/* Delay QSFP poll after PMA Adaptation flow */
-	if (priv->qsfp_poll_delay_count < qsfp_pma_delay) {
-		priv->qsfp_poll_delay_count++;
-		return;
-	}
-
-	qsfp_module_info = get_cable_attach(qsfp_tmp);
-	if (qsfp_module_info == 1) {
-		qsfp_channel_info = get_channel_info(qsfp_tmp);
-		/* Unsupported channel info feature */
-		if (qsfp_channel_info < 0) {
-			if (priv->old_qsfp_channel_info !=
-				qsfp_channel_info) {
-				priv->old_qsfp_channel_info = qsfp_channel_info;
-				netdev_err(priv->dev,
-					   "QSFP channel info not implemented!\n");
-			}
-
-			priv->oldlink = 1;
-			return;
-		}
-
-		/* Verify the lane number */
-		switch (priv->rsfec_cw_pos_rx) {
-		case 0:
-			/* Channel 1 */
-			bit_mask = QSFP_CHANNEL_1_TX_LOS;
-			break;
-		case 1:
-			/* Channel 2 */
-			bit_mask = QSFP_CHANNEL_2_TX_LOS;
-			break;
-		case 2:
-			/* Channel 3 */
-			bit_mask = QSFP_CHANNEL_3_TX_LOS;
-			break;
-		case 3:
-		default:
-			/* Channel 4 */
-			bit_mask = QSFP_CHANNEL_4_TX_LOS;
-			break;
-		}
-
-		/* Check for specified qsfp channel state change */
-		if ((qsfp_channel_info & bit_mask) !=
-		    (priv->old_qsfp_channel_info & bit_mask)) {
-			/* Check if signal is lost on TX channel */
-			if (qsfp_channel_info & bit_mask) {
-				state->link = 0;
-				priv->oldlink = 0;
-				netdev_err(priv->dev,
-					   "QSFP channel (0x%x & 0x%x) is down!\n",
-					   qsfp_channel_info, bit_mask);
-			} else {
-				priv->oldlink = 1;
-			}
-		}
-
-		priv->old_qsfp_channel_info = qsfp_channel_info;
-	} else {
-		/* QSFP module not present */
-		if (priv->oldlink != qsfp_module_info)
-			netdev_err(priv->dev, "QSFP module is not present!\n");
-
-		state->link = 0;
-		priv->oldlink = qsfp_module_info;
-	}
 }
 
 static void intel_fpga_etile_mac_config(struct phylink_config *config,
@@ -1775,7 +1707,6 @@ static int intel_fpga_etile_probe(struct platform_device *pdev)
 	struct intel_fpga_etile_eth_private *priv;
 	struct device_node *np = pdev->dev.of_node;
 	const struct of_device_id *of_id = NULL;
-	struct fwnode_handle *fixed_node;
 
 	ndev = alloc_etherdev(sizeof(struct intel_fpga_etile_eth_private));
 	if (!ndev) {
@@ -1797,8 +1728,6 @@ static int intel_fpga_etile_probe(struct platform_device *pdev)
 	priv->flow_ctrl = flow_ctrl;
 	priv->phylink_config.dev = &priv->dev->dev;
 	priv->phylink_config.type = PHYLINK_NETDEV;
-	priv->phylink_config.get_fixed_state = intel_fpga_etile_get_pcs_fixed_state;
-	priv->phylink_config.poll_fixed_state = true;
 
 	of_id = of_match_device(intel_fpga_etile_ll_ids, &pdev->dev);
 	if (of_id)
@@ -2027,24 +1956,22 @@ static int intel_fpga_etile_probe(struct platform_device *pdev)
 		goto err_free_netdev;
 	}
 
+	ret  = of_property_read_string(pdev->dev.of_node, "phy-mode",
+				       &priv->phy_mode);
+	if (ret < 0) {
+		dev_err(&pdev->dev, "cannot obtain phy_mode\n");
+		return ret;
+	}
+	dev_info(&pdev->dev, "\t phymode is %s\n", priv->phy_mode);
+
+	phy_mode_etile =  priv->phy_mode;
+
 	/* create phylink */
 	priv->phylink = phylink_create(&priv->phylink_config, pdev->dev.fwnode,
 				       priv->phy_iface, &intel_fpga_etile_phylink_ops);
 	if (IS_ERR(priv->phylink)) {
 		dev_err(&pdev->dev, "failed to create phylink\n");
 		ret = PTR_ERR(priv->phylink);
-		goto err_free_netdev;
-	}
-
-	/* read the fixed link properties*/
-	fixed_node = fwnode_get_named_child_node(pdev->dev.fwnode, "fixed-link");
-	if (fixed_node) {
-		fwnode_property_read_u32(fixed_node, "speed", &priv->link_speed);
-		priv->duplex = DUPLEX_FULL;
-		dev_info(&pdev->dev, "\tfixed link speed:%d full duplex:%d\n",
-			 priv->link_speed, priv->duplex);
-	} else {
-		dev_err(&pdev->dev, "fixed link property undefined\n");
 		goto err_free_netdev;
 	}
 
