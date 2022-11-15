@@ -2654,6 +2654,7 @@ struct intel_fpga_etile_eth_private {
 	/* previous qsfp channel info */
 	int old_qsfp_channel_info;
 	int qsfp_poll_delay_count;
+	const char *phy_mode;
 };
 
 /* Function prototypes
