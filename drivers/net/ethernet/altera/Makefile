@@ -15,6 +15,16 @@ ifeq ($(CONFIG_INTEL_FPGA_QSE_LL),y)
 	obj-$(CONFIG_INTEL_FPGA_QSE_LL) += intel_fpga_qse_ll.o
 	intel_fpga_qse_ll-objs := intel_fpga_qse_ll_main.o intel_fpga_qse_ll_ethtool.o
 endif
+
+ifeq ($(CONFIG_INTEL_FPGA_HSSISS),y)
+	obj-$(CONFIG_INTEL_FPGA_HSSISS) += intel_fpga_hssi.o
+        ifeq ($(CONFIG_DEBUG_FS),y)
+		intel_fpga_hssi-objs := intel_fpga_hssiss.o intel_fpga_hssiss_debug.o
+        else
+		intel_fpga_hssi-objs := intel_fpga_hssiss.o
+        endif
+endif
+
 ifeq ($(CONFIG_INTEL_FPGA_ETILE),y)
 	obj-$(CONFIG_INTEL_FPGA_ETILE) += intel_fpga_etile.o
 	intel_fpga_etile-objs := intel_fpga_etile_main.o intel_fpga_etile_fec.o \

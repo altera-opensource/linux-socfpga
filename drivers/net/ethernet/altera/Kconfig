@@ -8,6 +8,22 @@ config NET_ALTERA_ETH
 
 	  If you have a network (Ethernet) IP belonging to this class, say Y.
 
+config INTEL_FPGA_HSSISS
+	tristate "Intel FPGA HSSI Subsystem support"
+	help
+	  This driver supports the Intel FPGA HSSI subsystem.
+
+	  To compile this driver as a module, choose M here. The module
+	  will be called intel_fpga_hssiss.
+
+config INTEL_FPGA_UTIL
+	tristate "Utility driver for helper APIs"
+	help
+	  This driver adds helper APIs for both HSSI SS and etile.
+
+	  To compile this driver as a module, choose M here. The module
+	  will be called altera_util.
+
 if NET_ALTERA_ETH
 
 config ALTERA_TSE
@@ -31,6 +47,8 @@ config INTEL_FPGA_QSE_LL
 	  To compile this driver as a module, choose M here. The module
 	  will be called intel_fpga_qse_ll.
 
+endif
+
 config INTEL_FPGA_ETILE
 	tristate "Intel FPGA E-tile Ethernet MAC support"
 	select PTP_1588_CLOCK
@@ -41,5 +59,4 @@ config INTEL_FPGA_ETILE
 	  To compile this driver as a module, choose M here. The module
 	  will be called intel_fpga_etile.
 
-endif
 
