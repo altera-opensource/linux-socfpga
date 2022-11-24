@@ -97,8 +97,11 @@ static const struct flash_info macronix_nor_parts[] = {
 			      SPI_NOR_QUAD_READ) },
 	{ "mx66l1g55g",  INFO(0xc2261b, 0, 64 * 1024, 2048)
 		NO_SFDP_FLAGS(SPI_NOR_QUAD_READ) },
-	{ "mx66u2g45g",	 INFO(0xc2253c, 0, 64 * 1024, 4096)
+	{ "mx66u2g45g",  INFO(0xc2253c, 0, 64 * 1024, 4096)
 		NO_SFDP_FLAGS(SECT_4K | SPI_NOR_DUAL_READ | SPI_NOR_QUAD_READ)
+		FIXUP_FLAGS(SPI_NOR_4B_OPCODES) },
+	{ "mx66u2g45g",	 INFO(0xc2253c, 0, 64 * 1024, 4096)
+		NO_SFDP_FLAGS(SECT_4K | SPI_NOR_DUAL_READ)
 		FIXUP_FLAGS(SPI_NOR_4B_OPCODES) },
 };
 
