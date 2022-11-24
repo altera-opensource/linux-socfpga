@@ -79,10 +79,6 @@
 				fec-cw-pos-rx = <3>;
 				altr,has-ptp;
 				status = "okay";
-				fixed-link {
-					speed =<25000>;
-					full-duplex;
-				};
 			};
 
 			qsfp_eth0: qsfp-eth0 {
