@@ -158,6 +158,12 @@ static const struct flash_info macronix_nor_parts[] = {
 		.name = "mx25l25655e",
 		.size = SZ_32M,
 	}, {
+		.id = SNOR_ID(0xc2, 0x25, 0x3b),
+		.name = "mx66u1g45g",
+		.size = SZ_128M,
+		.flags = SECT_4K | SPI_NOR_DUAL_READ | SPI_NOR_QUAD_READ,
+		.fixup_flags = SPI_NOR_4B_OPCODES,
+	}, {
 		.id = SNOR_ID(0xc2, 0x26, 0x1b),
 		.name = "mx66l1g55g",
 		.size = SZ_128M,
