@@ -1,7 +1,7 @@
 # SPDX-License-Identifier: GPL-2.0
 # Makefile for Linux PHY drivers
 
-libphy-y			:= phy.o phy-c45.o phy-core.o phy_device.o \
+libphy-y			:= phy.o phy-c45.o phy-core.o phy_device.o\
 				   linkmode.o
 mdio-bus-y			+= mdio_bus.o mdio_device.o
 
@@ -30,7 +30,7 @@ obj-$(CONFIG_SFP)		+= sfp.o
 sfp-obj-$(CONFIG_SFP)		+= sfp-bus.o
 obj-y				+= $(sfp-obj-y) $(sfp-obj-m)
 
-obj-$(CONFIG_QSFP)		+= qsfp.o
+obj-$(CONFIG_QSFP)		+= qsfp.o qsfp-mem.o
 qsfp-obj-$(CONFIG_QSFP)		+= qsfp_bus.o
 obj-y				+= $(qsfp-obj-y) $(qsfp-obj-m)
 
@@ -89,3 +89,4 @@ obj-$(CONFIG_STE10XP)		+= ste10Xp.o
 obj-$(CONFIG_TERANETICS_PHY)	+= teranetics.o
 obj-$(CONFIG_VITESSE_PHY)	+= vitesse.o
 obj-$(CONFIG_XILINX_GMII2RGMII) += xilinx_gmii2rgmii.o
+obj-$(CONFIG_INTEL_QSFP_MEM)    += qsfp-mem.o
