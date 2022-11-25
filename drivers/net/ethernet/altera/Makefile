@@ -7,6 +7,7 @@ obj-$(CONFIG_NET_ALTERA_ETH) += altera_eth.o
 altera_eth-objs := altera_utils.o intel_fpga_tod.o altera_eth_dma.o \
 		   altera_sgdma.o altera_msgdma.o \
 		   altera_msgdma_prefetcher.o
+
 ifeq ($(CONFIG_ALTERA_TSE),y)
 	obj-$(CONFIG_ALTERA_TSE) += altera_tse.o
 	altera_tse-objs := altera_tse_main.o altera_tse_ethtool.o
@@ -17,16 +18,24 @@ ifeq ($(CONFIG_INTEL_FPGA_QSE_LL),y)
 endif
 
 ifeq ($(CONFIG_INTEL_FPGA_HSSISS),y)
-	obj-$(CONFIG_INTEL_FPGA_HSSISS) += intel_fpga_hssi.o
+        obj-$(CONFIG_INTEL_FPGA_HSSISS) += intel_fpga_hssi.o
         ifeq ($(CONFIG_DEBUG_FS),y)
-		intel_fpga_hssi-objs := intel_fpga_hssiss.o intel_fpga_hssiss_debug.o
+                intel_fpga_hssi-objs := intel_fpga_hssiss.o \
+					intel_fpga_hssiss_debug.o \
+					intel_fpga_eth_hssi_itf.o
         else
-		intel_fpga_hssi-objs := intel_fpga_hssiss.o
+                intel_fpga_hssi-objs := intel_fpga_hssiss.o \
+					intel_fpga_eth_hssi_itf.o
         endif
 endif
 
 ifeq ($(CONFIG_INTEL_FPGA_ETILE),y)
 	obj-$(CONFIG_INTEL_FPGA_ETILE) += intel_fpga_etile.o
-	intel_fpga_etile-objs := intel_fpga_etile_main.o intel_fpga_etile_fec.o \
-				 intel_fpga_etile_ethtool.o
+        intel_fpga_etile-objs := intel_fpga_eth_main.o      \
+				 intel_fpga_hssi_etile_fec.o     \
+				 intel_fpga_etile_driver.o  \
+                                 intel_fpga_hssi_etile_ethtool.o \
+				 intel_fpga_eth_hssi_itf.o
 endif
+
+
