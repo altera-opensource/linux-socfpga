@@ -42,6 +42,18 @@
 				#dma-cells = <1>;
 			};
 		};
+
+	         hssiss_0_hssiss: hssiss_0_hssiss {
+			compatible = "intel, hssiss-1.0";
+			reg-names = "sscsr";
+			reg = <0x80160000 0x00001000>;
+			reset-mode ="reg";
+			cold-reset {
+				ofs = <0x7B8>;
+				rst-bit = <0>;
+				rst-ack = <1>;
+			};
+		};
 	};
 };
 
