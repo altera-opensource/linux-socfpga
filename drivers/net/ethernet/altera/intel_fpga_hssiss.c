@@ -43,9 +43,8 @@ static u32 etile_addrmap[] =
 static int read_poll_timeout(void __iomem *base,
 		unsigned int csr_addroff, u32 offs, u32 sel, bool atomic)
 {
-	u32 val, val1;
+	u32 val;
 	unsigned long timeout, start;
-	int count = 0, count1 = 0;
 
 	start = jiffies;
 	timeout = start + usecs_to_jiffies(FW_ACK_POLL_TIMEOUT_US);
@@ -58,47 +57,32 @@ static int read_poll_timeout(void __iomem *base,
 		if ((val & sel) == sel)
 			return val;
 
-		count++;
-
 	} while(time_before(jiffies, timeout));
 
-	start = jiffies;
-	timeout = start + msecs_to_jiffies(1000);
-	do {
-		val1 = csrrd32(base, 0x8);
-		if (val1 != 0x18418b9d)
-			printk("Value at 0x8: %x\n", val1);
-		count1++;
-	} while (time_before(jiffies, timeout));
-	printk("read_poll_timeout: ret = %x, count: %d\n", val, count);
-	printk("read_poll_timeout: val = %x, count1: %d\n", val1, count1);
-
 	return -ETIME;
-}
-
-static int hssiss_mailbox_regbits_clear(void __iomem *base,
-			unsigned int csr_addroff, u32 offs,
-			int idx, int numbits, bool atomic)
-{
-	u32 val;
-	int ret;
-
-	val = csrrd32_withoffset(base, csr_addroff, offs);
-	val = clear_reg_bits(val, idx, numbits);
-	csrwr32_withoffset(val, base, csr_addroff, offs);
-
-	ret = read_poll_timeout(base, csr_addroff, offs, MASK(idx, numbits), atomic);
-	return (ret > 0 ? 0 : ret);
 }
 
 static int hssiss_mailbox_reg_set(void __iomem *base,
 		unsigned int csr_addroff, u32 offs, u32 setval, bool atomic)
 {
-	int ret;
+	u32 val;
+	unsigned long timeout, start;
 
+	start = jiffies;
+	timeout = start + usecs_to_jiffies(FW_ACK_POLL_TIMEOUT_US);
 	csrwr32_withoffset(setval, base, csr_addroff, offs);
-	ret = read_poll_timeout(base, csr_addroff, offs, setval, atomic);
-	return (ret > 0 ? 0 : ret);
+	do {
+		if (atomic)
+			udelay(2 * FW_ACK_POLL_INTERVAL_US);
+		else
+			usleep_range(FW_ACK_POLL_INTERVAL_US, 2 * FW_ACK_POLL_INTERVAL_US);
+
+		val = csrrd32_withoffset(base, csr_addroff, offs);
+		if (val == setval)
+			return 0;
+	} while(time_before(jiffies, timeout));
+
+	return -ETIME;
 }
 
 static int hssiss_sal_execute(struct platform_device *pdev, u32 ctrl_addr,
@@ -123,10 +107,6 @@ static int hssiss_sal_execute(struct platform_device *pdev, u32 ctrl_addr,
 	if (ret < 0)
 		goto unlock;
 
-#if 0
-	if ((ctrl_addr & 0xff) == 0x7)
-		dev_info(&pdev->dev, "ctrl: %x, cmd: %x\n", ctrl_addr, cmd_sts);
-#endif
 
 	csrwr32_withoffset(ctrl_addr, base, csr_addroff, HSSISS_CSR_CTRLADDR);
 	csrwr32_withoffset(cmd_sts, base, csr_addroff, HSSISS_CSR_CMDSTS);
