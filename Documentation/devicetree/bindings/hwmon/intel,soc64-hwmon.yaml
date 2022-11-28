@@ -10,129 +10,30 @@ maintainers:
   - Ang Tien Sung <tien.sung.ang@intel.com>
 
 description: |
-  The Intel SoC FPGA hardware monitor unit provides on-chip voltage and
-  temperature sensors. You can use these sensors to monitor external
-  voltages and on-chip operating conditions such as internal power rails
-  and on-chip junction temperatures.
-
-  The specific sensor configurations vary for each device family and
-  each device within a family does not offer all potential sensor
-  options. The information below attempts to illustrate the super set of
-  possible sensor options that are potentially available within each
-  device family, but the user should check the documentation for the
-  specific device they are using to verify which sensor options it
-  actually provides.
-
-  Stratix 10 Device Family
-
-    Stratix 10 Voltage Sensors
-
-      page 0, channel 2 = 0.8V VCC
-      page 0, channel 3 = 1.0V VCCIO
-      page 0, channel 6 = 0.9V VCCERAM
-
-    Stratix 10 Temperature Sensors
-
-      page 0, channel 0 = main die
-      page 0, channel 1 = tile bottom left
-      page 0, channel 2 = tile middle left
-      page 0, channel 3 = tile top left
-      page 0, channel 4 = tile bottom right
-      page 0, channel 5 = tile middle right
-      page 0, channel 6 = tile top right
-      page 0, channel 7 = hbm2 bottom
-      page 0, channel 8 = hbm2 top
-
-  Agilex Device Family
-
-    Agilex Voltage Sensors
-
-      page 0, channel 2 = 0.8V VCC
-      page 0, channel 3 = 1.8V VCCIO_SDM
-      page 0, channel 4 = 1.8V VCCPT
-      page 0, channel 5 = 1.2V VCCRCORE
-      page 0, channel 6 = 0.9V VCCH
-      page 0, channel 7 = 0.8V VCCL
-
-    Agilex Temperature Sensors
-
-      page 0, channel 0 = main die sdm max
-      page 0, channel 1 = main die sdm 1
-
-      page 1, channel 0 = main die corner bottom left max
-      page 1, channel 1 = main die corner bottom left 1
-      page 1, channel 2 = main die corner bottom left 2
-
-      page 2, channel 0 = main die corner top left max
-      page 2, channel 1 = main die corner top left 1
-      page 2, channel 2 = main die corner top left 2
-
-      page 3, channel 0 = main die corner bottom right max
-      page 3, channel 1 = main die corner bottom right 1
-      page 3, channel 2 = main die corner bottom right 2
-
-      page 4, channel 0 = main die corner top right max
-      page 4, channel 1 = main die corner top right 1
-      page 4, channel 2 = main die corner top right 2
-
-      page 5, channel 0 = tile die bottom left max
-      page 5, channel 1 = tile die bottom left 1
-      page 5, channel 6..2 = tile die bottom left 6..2 R-tile only
-      page 5, channel 5..2 = tile die bottom left 5..2 F-tile only
-      page 5, channel 4..2 = tile die bottom left 4..2 E-tile only
-
-      page 7, channel 0 = tile die top left max
-      page 7, channel 1 = tile die top left 1
-      page 7, channel 6..2 = tile die top left 6..2 R-tile only
-      page 7, channel 5..2 = tile die top left 5..2 F-tile only
-      page 7, channel 4..2 = tile die top left 4..2 E-tile only
-
-      page 8, channel 0 = tile die bottom right max
-      page 8, channel 1 = tile die bottom right 1
-      page 8, channel 6..2 = tile die bottom right 6..2 R-tile only
-      page 8, channel 5..2 = tile die bottom right 5..2 F-tile only
-      page 8, channel 4..2 = tile die bottom right 4..2 E-tile only
-
-      page 10, channel 0 = tile die top right max
-      page 10, channel 1 = tile die top right 1
-      page 10, channel 6..2 = tile die top right 6..2 R-tile only
-      page 10, channel 5..2 = tile die top right 5..2 F-tile only
-      page 10, channel 4..2 = tile die top right 4..2 E-tile only
-
-  N5X Device Family
-
-    N5X Voltage Sensors
-
-      page 0, channel 2 = 0.8V VDD
-      page 0, channel 3 = 0.8V VDD_SDM
-      page 0, channel 4 = 1.8V VCCADC
-      page 0, channel 5 = 1.8V VCCPD
-      page 0, channel 6 = 1.8V VCCIO_SDM
-      page 0, channel 7 = 0.8V VDD_HPS
-
-    N5X Temperature Sensors
-
-      page 0, channel 0 = main die
+  This is the Intel SoC FPGA hardware monitor unit provides you with
+  on-chip voltage and temperature sensors. You can use these sensors
+  to monitor external voltages and on-chip operation conditions such
+  as internal power rail and on-chip junction temperature.
 
 properties:
   compatible: "intel,soc64-hwmon"
   temperature:
     description:
       Specifies the possible mappings of temperature sensors
-      diodes on the SOC FPGA main die and tile die.
+      diodes on the SOC FPGA main die.
   voltage:
     description:
-      Specifies the possible mappings of the voltage sensors on the
-      SOC FPGA analog to digital converter of the Secure Device Manager
-      (SDM).
+      Specifies the possible mappings of the voltage sensors
+      on the SOC FPGA analog to digital converter of the secure device
+      manager (SDM).
   input:
     description:
       Specifies each sensor.
   reg:
     description:
-      The sensor mapping address is denoted by the lower 16-bits being
+      The sensor mapping address denoted by lower 16bits being
       the channel mask location that defines the channel number.
-      The upper 16-bits denotes the page number.
+      The upper 16bits denotes the page number.
       The bit mask of 0x1 represents channel 1. The supported
       page and channel is dependent on the SOC FPGA variant.
       Page number greater than 0 is only supported on the
@@ -198,7 +99,7 @@ examples:
         };
 
         input@10002 {
-          label = "Main Die corner bottom left 2";
+          label = "Main Die corner bottom left 1";
           reg = <0x10002>;
         };
 
@@ -223,12 +124,12 @@ examples:
         };
 
         input@40001 {
-          label = "Main Die corner top right 1 HPS";
+          label = "Main Die corner top right HPS 1";
           reg = <0x40001>;
         };
 
         input@40002 {
-          label = "Main Die corner top right 2";
+          label = "Main Die corner bottom right";
           reg = <0x40002>;
         };
       };
