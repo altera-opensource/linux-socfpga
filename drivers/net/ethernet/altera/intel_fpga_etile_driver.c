@@ -13,8 +13,6 @@
 #include "intel_fpga_eth_hssi_itf.h"
 #include <linux/interrupt.h>
 
-//#define DEBUG
-
 static void etile_set_mac(struct intel_fpga_etile_eth_private *priv, bool enable)
 {
         struct platform_device *pdev = priv->pdev_hssi;

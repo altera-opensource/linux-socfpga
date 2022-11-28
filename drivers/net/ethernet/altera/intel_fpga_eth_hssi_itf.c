@@ -22,7 +22,7 @@ u32 hssi_csrrd32(struct platform_device *pdev, enum tile_reg_type regbank, u32 c
 
 	if (ret_status != INTEL_FPGA_RET_SUCCESS)
   	{
-  		dev_err(&pdev->dev, "Preetam error reading the 32 bit regbank %d offset %x rc %x \n", 
+  		dev_err(&pdev->dev, "Error reading the 32 bit regbank %d offset %x rc %x \n", 
 			regbank, offset, ret_status);
   	}
   	return ret_value;
@@ -95,7 +95,7 @@ void hssi_csrwr32(struct platform_device *pdev,
   	if (ret_status != INTEL_FPGA_RET_SUCCESS)
   	{
   		dev_err(&pdev->dev, 
-			"Preetam error writing 32 bit regbank %d offset %x rc %x\n", 
+			"Error writing 32 bit regbank %d offset %x rc %x\n", 
 			regbank, offset, ret_status);
   	} 
 }
@@ -144,7 +144,7 @@ int hssi_csrrd8_errcheck(struct platform_device *pdev,
   	else
   	{
   		dev_err(&pdev->dev, 
-			"Error csr read access 8 bit regbank %d offset %x rc %x\n", 
+			"csr read access error 8 bit regbank %d offset %x rc %x\n", 
 			regbank, offset, ret_status);
   	}
 
@@ -167,7 +167,7 @@ void hssi_csrwr8(struct platform_device *pdev, enum tile_reg_type regbank, u32 c
   	if (ret_status != INTEL_FPGA_RET_SUCCESS)
   	{
   		dev_err(&pdev->dev, 
-			"Preetam csr write access 8 bit error, regbank %d offset %x rc %d \n", 
+			"Error reading access 8 bit, regbank %d offset %x rc %d \n", 
 			regbank, offset, ret_status);
   	}
 }
