@@ -2,7 +2,7 @@
 #include "altera_eth_dma.h"
 #include "altera_msgdma_prefetcher.h"
 
-#ifdef CONFIG_INTEL_FPGA_ETILE
+#ifdef CONFIG_INTEL_FPGA_HSSI_ETILE
 #include "intel_fpga_eth_etile.h"
 #endif
 
