@@ -112,7 +112,6 @@ static void etile_fill_stats(struct net_device *dev, struct ethtool_stats *dummy
 	struct platform_device *pdev = priv->pdev_hssi;
 	u32 chan = priv->chan;
 
-	hssi_reset_mac_stats(pdev, chan, true, true);	
 	/* Tx packets */
 	buf[0] = hssi_read_mac_stats64(pdev, chan, MACSTAT_TX_PACKETS);
 
