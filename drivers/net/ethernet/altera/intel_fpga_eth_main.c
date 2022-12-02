@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-2.0
-/* Intel FPGA E-tile Ethernet MAC driver
+/* Intel FPGA Ethernet MAC driver
  * Copyright (C) 2020-2022 Intel Corporation. All rights reserved
  *
  * Contributors:
@@ -222,7 +222,7 @@ static void xtile_free_skbufs(struct net_device *dev)
 
 /* Reallocate the skb for the reception process
  */
-static inline void etile_rx_refill(struct intel_fpga_etile_eth_private *priv)
+static inline void xtile_rx_refill(struct intel_fpga_etile_eth_private *priv)
 {
 	unsigned int rxsize = priv->dma_priv.rx_ring_size;
 	unsigned int entry;
@@ -245,7 +245,7 @@ static inline void etile_rx_refill(struct intel_fpga_etile_eth_private *priv)
 
 /* Pull out the VLAN tag and fix up the packet
  */
-static inline void etile_rx_vlan(struct net_device *dev, struct sk_buff *skb)
+static inline void xtile_rx_vlan(struct net_device *dev, struct sk_buff *skb)
 {
 	struct ethhdr *eth_hdr;
 	u16 vid;
@@ -261,7 +261,7 @@ static inline void etile_rx_vlan(struct net_device *dev, struct sk_buff *skb)
 
 /* Receive a packet: retrieve and pass over to upper levels
  */
-static int etile_rx(struct intel_fpga_etile_eth_private *priv, int limit)
+static int xtile_rx(struct intel_fpga_etile_eth_private *priv, int limit)
 {
 	unsigned int count = 0;
 	unsigned int next_entry;
@@ -317,14 +317,14 @@ static int etile_rx(struct intel_fpga_etile_eth_private *priv, int limit)
 				       16, 1, skb->data, pktlength, true);
 		}
 
-		etile_rx_vlan(priv->dev, skb);
+		xtile_rx_vlan(priv->dev, skb);
 		skb->protocol = eth_type_trans(skb, priv->dev);
 		skb_checksum_none_assert(skb);
 		napi_gro_receive(&priv->napi, skb);
 		priv->dev->stats.rx_packets++;
 		priv->dev->stats.rx_bytes += pktlength;
 		entry = next_entry;
-		etile_rx_refill(priv);
+		xtile_rx_refill(priv);
 	}
 
 	return count;
@@ -332,7 +332,7 @@ static int etile_rx(struct intel_fpga_etile_eth_private *priv, int limit)
 
 /* Reclaim resources after transmission completes
  */
-int etile_tx_complete(struct intel_fpga_etile_eth_private *priv)
+static int xtile_tx_complete(struct intel_fpga_etile_eth_private *priv)
 {
 	unsigned int txsize = priv->dma_priv.tx_ring_size;
 	u32 ready;
@@ -393,14 +393,14 @@ static int xtile_poll(struct napi_struct *napi, int budget)
         priv->dmaops->enable_txirq(&priv->dma_priv);
         spin_unlock_irqrestore(&priv->rxdma_irq_lock, flags);
 
-        txcomplete = etile_tx_complete(priv);
+        txcomplete = xtile_tx_complete(priv);
 
 	spin_lock_irqsave(&priv->rxdma_irq_lock, flags);
 	disable_irq(priv->rx_irq);
 	priv->dmaops->enable_rxirq(&priv->dma_priv);
 	spin_unlock_irqrestore(&priv->rxdma_irq_lock, flags);
 
-	rxcomplete = etile_rx(priv, budget);
+	rxcomplete = xtile_rx(priv, budget);
 
         netdev_dbg(priv->dev,
                    "TX/RX complete: %d/%d of budget %d\n",
@@ -543,6 +543,14 @@ static int xtile_open(struct net_device *dev)
         int ret = 0;
         int i;
 
+	/* Check Ethernet Port X status, if the port is not stable then  */
+	/* no use to continue further 					 */
+        eth_portstatus = hssi_ethport_is_stable(pdev, chan);
+        if ( eth_portstatus == false){
+        	ret = -EREMOTEIO;
+		goto phy_error;
+        }
+
         /* Create and initialize the TX/RX descriptors chains. */
         priv->dma_priv.rx_ring_size = dma_rx_num;
         priv->dma_priv.tx_ring_size = dma_tx_num;
@@ -552,14 +560,6 @@ static int xtile_open(struct net_device *dev)
         if (ret) {
                 netdev_err(dev, "Cannot initialize DMA\n");
                 goto phy_error;
-        }
-        
-	/* Check Ethernet Port X status, if the port is not stable then  */
-	/* no use to continue further 					 */
-        eth_portstatus = hssi_ethport_is_stable(pdev, chan);
-        if ( eth_portstatus == false){
-        	ret = -EREMOTEIO;
-		goto phy_error;
         }
         
 	/*  Initialize the MAC layer */
@@ -958,6 +958,7 @@ static void intel_fpga_xtile_mac_pcs_get_state(struct phylink_config *config,
 	state->speed = SPEED_10000;
 	state->duplex = DUPLEX_FULL;
 	state->link = 1;
+
 }
 
 static void intel_fpga_xtile_mac_an_restart(struct phylink_config *config)
