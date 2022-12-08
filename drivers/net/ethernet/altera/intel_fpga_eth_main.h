@@ -16,7 +16,9 @@
 
 int fec_init(struct platform_device *pdev, struct intel_fpga_etile_eth_private *priv);
 void intel_fpga_xtile_set_ethtool_ops(struct net_device *dev);
-int xtile_check_counter_complete(struct intel_fpga_etile_eth_private *priv, u32 regbank,
-                                 size_t offs, u8 bit_mask, bool set_bit,
-                                 int align);
 
+#if 0
+int xtile_check_counter_complete(struct intel_fpga_etile_eth_private *priv, u32 regbank,
+				 size_t offs, u8 bit_mask, bool set_bit,
+				 int align);
+#endif
