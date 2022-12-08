@@ -178,8 +178,7 @@ void ui_adjustments(struct timer_list *t)
 	 */
 	if (tx_tam_count_est > MAX_COUNT_OFFSET) {
 		netdev_warn(priv->dev,
-			    "Est count exceeded:tx_tam_count_est: %u = tx_tam_delta:%llu / "
-			    "(tx_tam_interval:%u * ui_value_16bit_fns:0x%x)\n",
+			    "Est count exceeded:tx_tam_count_est: %u = tx_tam_delta:%llu / (tx_tam_interval:%u * ui_value_16bit_fns:0x%x)\n",
 			    tx_tam_count_est, tx_tam_delta, tx_tam_interval,
 			    ui_value_16bit_fns);
 		netdev_warn(priv->dev, "tx_tam_nth: %llu, tx_tam_initial: %llu\n",
@@ -189,8 +188,7 @@ void ui_adjustments(struct timer_list *t)
 
 	if (rx_tam_count_est > MAX_COUNT_OFFSET) {
 		netdev_warn(priv->dev,
-			    "Est count exceeded:rx_tam_count_est: %u = rx_tam_delta:%llu / "
-			    "(rx_tam_interval:%u * ui_value_16bit_fns:0x%x)\n",
+			    "Est count exceeded:rx_tam_count_est: %u = rx_tam_delta:%llu / (rx_tam_interval:%u * ui_value_16bit_fns:0x%x)\n",
 			    rx_tam_count_est, rx_tam_delta, rx_tam_interval,
 			    ui_value_16bit_fns);
 		netdev_warn(priv->dev, "rx_tam_nth: %llu, rx_tam_initial: %llu\n",
@@ -220,27 +218,27 @@ void ui_adjustments(struct timer_list *t)
 	if (priv->link_speed == SPEED_25000) {
 		if (tx_ui > 0x9EE42 || tx_ui < 0x9EDC0) {
 			netdev_warn(priv->dev,
-				    "%s: TX UI value(0x%llx) is not within "
-				    "0x9EDC0 to 0x9EE42 range\n", __func__, tx_ui);
+				    "%s: TX UI value(0x%llx) is not within 0x9EDC0 to 0x9EE42 range\n",
+				    __func__, tx_ui);
 			goto ui_restart;
 		}
 		if (rx_ui > 0x9EE42 || rx_ui < 0x9EDC0) {
 			netdev_warn(priv->dev,
-				    "%s: RX UI value(0x%llx) is not within "
-				    "0x9EDC0 to 0x9EE42 range\n", __func__, rx_ui);
+				    "%s: RX UI value(0x%llx) is not within 0x9EDC0 to 0x9EE42 range\n",
+				    __func__, rx_ui);
 			goto ui_restart;
 		}
 	} else {
 		if (tx_ui > 0x18D3A4 || tx_ui < 0x18D25F) {
 			netdev_warn(priv->dev,
-				    "%s: TX UI value (0x%llx) is not within "
-				    "0x18D25F to 0x18D3A4 range\n", __func__, tx_ui);
+				    "%s: TX UI value (0x%llx) is not within 0x18D25F to 0x18D3A4 range\n",
+				    __func__, tx_ui);
 			goto ui_restart;
 		}
 		if (rx_ui > 0x18D3A4 || rx_ui < 0x18D25F) {
 			netdev_warn(priv->dev,
-				    "%s: RX UI value (0x%llx) is not within "
-				    "0x18D25F to 0x18D3A4 range\n", __func__, rx_ui);
+				    "%s: RX UI value (0x%llx) is not within 0x18D25F to 0x18D3A4 range\n",
+				    __func__, rx_ui);
 			goto ui_restart;
 		}
 	}
