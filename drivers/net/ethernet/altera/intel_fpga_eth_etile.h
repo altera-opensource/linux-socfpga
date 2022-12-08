@@ -1570,7 +1570,7 @@
 #define INTEL_FPGA_BYTE_ALIGN	8
 #define INTEL_FPGA_WORD_ALIGN	32
 
-#define MOD_PARAM_PERM  S_IRUSR|S_IWUSR|S_IRGRP|S_IROTH
+#define MOD_PARAM_PERM  0644
 
 /* Ethernet Reconfiguration Interface Register Base Addresses
  * Word Offset	Register Type
@@ -2644,10 +2644,14 @@ struct intel_fpga_etile_eth_private {
 void ui_adjustments(struct timer_list *t);
 
 int init_mac(struct intel_fpga_etile_eth_private *priv);
-void enable_port_loopback(struct intel_fpga_etile_eth_private * priv, int port);
+void enable_port_loopback(struct intel_fpga_etile_eth_private *priv, int port);
 void xtile_get_stats64(struct net_device *dev,
-                       struct rtnl_link_stats64 *storage);
-void pma_reset(struct intel_fpga_etile_eth_private * priv, bool tx_reset, bool rx_reset);
+		       struct rtnl_link_stats64 *storage);
+void pma_reset(struct intel_fpga_etile_eth_private *priv, bool tx_reset, bool rx_reset);
+
+int xtile_check_counter_complete(struct intel_fpga_etile_eth_private *priv, u32 regbank,
+				 size_t offs, u8 bit_mask, bool set_bit,
+				 int align);
 
 #ifdef CONFIG_INTEL_FPGA_ETILE_DEBUG_FS
 int intel_fpga_etile_init_fs(struct net_device *dev);
