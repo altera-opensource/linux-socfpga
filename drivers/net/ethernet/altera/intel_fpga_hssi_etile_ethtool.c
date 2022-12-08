@@ -27,16 +27,6 @@
 
 #define ARRAY_LEN(arr) ((int)((int)sizeof(arr) / (int)sizeof(arr[0])))
 
-enum {
-  PORT_DOWN_ERR_IDX = 0,
-};
-
-enum diag_test_index {
-        INTERNAL_LP_TEST = 0,
-        EXTERNAL_LP_TEST = 1,
-        DIAG_TEST_MAX = 2,
-};
-
 static char const stat_gstrings[][ETH_GSTRING_LEN] = {
 	"tx_packets",
 	"rx_packets",
@@ -71,15 +61,10 @@ static char const stat_gstrings[][ETH_GSTRING_LEN] = {
 	"rx_runts",
 };
 
-static char etile_test_strings[][ETH_GSTRING_LEN] = {
-        "Internal lb test  (on/offline)",
-        "External lb test (external_lb)",
-};
-
 static void etile_get_drvinfo(struct net_device *dev,
 			      struct ethtool_drvinfo *info)
 {
-	strscpy(info->driver, "intel_fpga_etile", ETH_GSTRING_LEN);
+	strscpy(info->driver, "intel_fpga_hssi_etile", ETH_GSTRING_LEN);
 	strscpy(info->version, "v1.0", ETH_GSTRING_LEN);
 	strscpy(info->bus_info, "platform", ETH_GSTRING_LEN);
 }
@@ -89,18 +74,13 @@ static void etile_get_drvinfo(struct net_device *dev,
  */
 static void etile_gstrings(struct net_device *dev, u32 stringset, u8 *buf)
 {
-	switch (stringset)
-	{
-   	  case ETH_SS_STATS:
-	     memcpy(buf, stat_gstrings, ETILE_STATS_LEN * ETH_GSTRING_LEN);
-	     return;
+	switch (stringset) {
 
-	  case ETH_SS_TEST:
-	     memcpy(buf, *etile_test_strings, sizeof(etile_test_strings));
-             return;
-
-	  default:
-	     return;
+	case ETH_SS_STATS:
+		memcpy(buf, stat_gstrings, ETILE_STATS_LEN * ETH_GSTRING_LEN);
+		return;
+	default:
+		return;
 	}
 }
 
@@ -209,13 +189,9 @@ static void etile_fill_stats(struct net_device *dev, struct ethtool_stats *dummy
 static int etile_sset_count(struct net_device *dev, int sset)
 {
 	switch (sset) {
-  	  case ETH_SS_STATS:
+	case ETH_SS_STATS:
 		return ETILE_STATS_LEN;
-
-	  case ETH_SS_TEST:
-		return ARRAY_LEN(etile_test_strings);
-	    
-	  default:
+	default:
 		return -EOPNOTSUPP;
 	}
 }
@@ -245,7 +221,7 @@ static void etile_get_regs(struct net_device *dev, struct ethtool_regs *regs,
 {
 	struct intel_fpga_etile_eth_private *priv = netdev_priv(dev);
 
-        struct platform_device *pdev  = priv->pdev_hssi;
+	struct platform_device *pdev  = priv->pdev_hssi;
 	u32 chan = priv->chan;
 
 	u32 *buf = regbuf;
@@ -601,8 +577,7 @@ static int etile_set_pauseparam(struct net_device *dev,
 {
 	struct intel_fpga_etile_eth_private *priv = netdev_priv(dev);
 	struct platform_device *pdev = priv->pdev_hssi;
-	
-	u32 chan = priv-> chan;
+	u32 chan = priv->chan;
 
 	int new_pause = FLOW_OFF;
 	int ret = 0;
@@ -650,6 +625,7 @@ static int etile_get_ts_info(struct net_device *dev,
 
 #if 0
 	struct intel_fpga_etile_eth_private *priv = netdev_priv(dev);
+
 	if (priv->ptp_priv.ptp_clock)
 		info->phc_index = ptp_clock_index(priv->ptp_priv.ptp_clock);
 	else
@@ -693,40 +669,6 @@ static int etile_get_link_ksettings(struct net_device *dev,
 	return phylink_ethtool_ksettings_get(priv->phylink, cmd);
 }
 
-static void etile_link_test(struct net_device *netdev,
- 			    struct ethtool_test *eth_test, u64 *data)
-{
-	struct intel_fpga_etile_eth_private *priv = netdev_priv(netdev);
-#if 0
-	enum diag_test_index test_index = 0;
-#endif
-
-  	/* don't support loopback test when netdev is closed. */
-  	if (!(netdev->flags & IFF_UP)) 
-  	{
-		netif_err(priv, drv, netdev,
-                	  "Do not support loopback test when netdev is closed\n");
-        	eth_test->flags |= ETH_TEST_FL_FAILED;
-        	data[PORT_DOWN_ERR_IDX] = 1;
-        	return;
-  	}
-#if 0    
-	netif_carrier_off(netdev);
-        netif_tx_disable(netdev);
-
-	err = do_lp_test(priv, eth_test->flags, LP_DEFAULT_TIME,
-                         &test_index);
-        if (err) {
-                eth_test->flags |= ETH_TEST_FL_FAILED;
-                data[test_index] = 1;
-        }
-
-	        
-	netif_tx_wake_all_queues(netdev);
-#endif
-
-}
-
 static const struct ethtool_ops xtile_ethtool_ops = {
 	.get_drvinfo = etile_get_drvinfo,
 	.get_regs_len = etile_reglen,
@@ -742,7 +684,6 @@ static const struct ethtool_ops xtile_ethtool_ops = {
 	.get_ts_info = etile_get_ts_info,
 	.get_link_ksettings = etile_get_link_ksettings,
 	.set_link_ksettings = etile_set_link_ksettings,
-	.self_test = etile_link_test,
 };
 
 void intel_fpga_xtile_set_ethtool_ops(struct net_device *netdev)
