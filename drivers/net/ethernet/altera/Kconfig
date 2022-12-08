@@ -39,8 +39,6 @@ config INTEL_FPGA_QSE_LL
 	  To compile this driver as a module, choose M here. The module
 	  will be called intel_fpga_qse_ll.
 
-endif
-
 config INTEL_FPGA_ETILE
 	tristate "Intel FPGA E-tile Ethernet MAC support"
 	select PTP_1588_CLOCK
@@ -51,14 +49,6 @@ config INTEL_FPGA_ETILE
 	  To compile this driver as a module, choose M here. The module
 	  will be called intel_fpga_etile.
 
-config INTEL_FPGA_HSSISS
-	tristate "Intel FPGA HSSI Subsystem support"
-	help
-	  This driver supports the Intel FPGA HSSI subsystem.
-
-	  To compile this driver as a module, choose M here. The module
-	  will be called intel_fpga_hssiss.
-
 config INTEL_FPGA_HSSI_ETILE
 	tristate "Intel FPGA HSSI based 10/25G Etile MAC driver support"
 	select PTP_1588_CLOCK
@@ -68,4 +58,14 @@ config INTEL_FPGA_HSSI_ETILE
 
 	  To compile this driver as a module, choose M here. The module
 	  will be called intel_fpga_hssi_etile.
+
+endif
+
+config INTEL_FPGA_HSSISS
+	tristate "Intel FPGA HSSI Subsystem support"
+	help
+	  This driver supports the Intel FPGA HSSI subsystem.
+
+	  To compile this driver as a module, choose M here. The module
+	  will be called intel_fpga_hssiss.
 
