@@ -192,6 +192,7 @@ enum stratix10_svc_command_code {
 	COMMAND_POLL_SERVICE_STATUS = 40,
 	COMMAND_FCS_CRYPTO_ECDH_REQUEST_INIT = 50,
 	COMMAND_FCS_CRYPTO_ECDH_REQUEST_FINALIZE,
+	COMMAND_FCS_SDOS_DATA_EXT,
 	/* for generic mailbox send command */
 	COMMAND_MBOX_SEND_CMD = 100,
 	/* Non-mailbox SMC Call */
