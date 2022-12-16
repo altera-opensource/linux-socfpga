@@ -243,8 +243,8 @@ void ui_adjustments(struct timer_list *t)
 		}
 	}
 
-	hssi_csrwr32(pdev, HSSI_ETH_RECONFIG, chan, eth_ptp_csroffs(tx_ui_reg), false, tx_ui);
-	hssi_csrwr32(pdev, HSSI_ETH_RECONFIG, chan, eth_ptp_csroffs(rx_ui_reg), false, rx_ui);
+	hssi_csrwr32(pdev, HSSI_ETH_RECONFIG, chan, eth_ptp_csroffs(tx_ui_reg), tx_ui);
+	hssi_csrwr32(pdev, HSSI_ETH_RECONFIG, chan, eth_ptp_csroffs(rx_ui_reg), rx_ui);
 
 ui_restart:
 	mod_timer(&priv->fec_timer, jiffies + msecs_to_jiffies(1000));

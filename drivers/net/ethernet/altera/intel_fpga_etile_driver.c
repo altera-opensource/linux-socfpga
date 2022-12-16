@@ -13,7 +13,8 @@
 #include "intel_fpga_eth_hssi_itf.h"
 #include <linux/interrupt.h>
 
-static void etile_set_mac(struct intel_fpga_etile_eth_private *priv, bool enable)
+static void etile_set_mac(struct intel_fpga_etile_eth_private *priv, 
+			  bool enable)
 {
 	struct platform_device *pdev = priv->pdev_hssi;
 	u32 chan = priv->chan;
@@ -41,7 +42,8 @@ static void etile_set_mac(struct intel_fpga_etile_eth_private *priv, bool enable
 	}
 }
 
-static void etile_update_mac_addr(struct intel_fpga_etile_eth_private *priv, u8 *addr)
+static void etile_update_mac_addr(struct intel_fpga_etile_eth_private *priv, 
+				  u8 *addr)
 {
 	u32 msb;
 	u32 lsb;
@@ -53,9 +55,9 @@ static void etile_update_mac_addr(struct intel_fpga_etile_eth_private *priv, u8 
 
 	/* Set MAC address */
 	hssi_csrwr32(pdev, HSSI_ETH_RECONFIG, chan,
-		     eth_tx_mac_csroffs(tx_mac_source_addr_lower_bytes), false, lsb);
+		     eth_tx_mac_csroffs(tx_mac_source_addr_lower_bytes), lsb);
 	hssi_csrwr32(pdev, HSSI_ETH_RECONFIG, chan,
-		     eth_tx_mac_csroffs(tx_mac_source_addr_higher_bytes), false, msb);
+		     eth_tx_mac_csroffs(tx_mac_source_addr_higher_bytes), msb);
 
 	hssi_set_bit(pdev, HSSI_ETH_RECONFIG, chan,
 		     eth_tx_mac_csroffs(tx_mac_conf), ETH_TX_MAC_DISABLE_S_ADDR_EN);
@@ -101,7 +103,7 @@ static void etile_set_mac_flow_ctrl(struct intel_fpga_etile_eth_private *priv)
 		netdev_info(priv->dev, "E-tile tx_flow_ctrl: 0x%08x\n", reg);
 
 	hssi_csrwr32(pdev, HSSI_ETH_RECONFIG, chan,
-		eth_pause_and_priority_csroffs(pause_quanta_0), false, priv->pause);
+		eth_pause_and_priority_csroffs(pause_quanta_0), priv->pause);
 
 	reg = hssi_csrrd32(pdev, HSSI_ETH_RECONFIG, chan,
 		      eth_pause_and_priority_csroffs(pause_quanta_0));
@@ -153,7 +155,7 @@ static int eth_etile_tx_rx_user_flow(struct intel_fpga_etile_eth_private *priv)
 
 	/* Step 2 Write TX extra latency*/
 	hssi_csrwr32(pdev, HSSI_ETH_RECONFIG, chan,
-		     eth_ptp_csroffs(tx_ptp_extra_latency), false, tx_extra_latency);
+		     eth_ptp_csroffs(tx_ptp_extra_latency), tx_extra_latency);
 
 	// TX PTP is up
 	// Adjust TX UI
@@ -233,7 +235,7 @@ static int eth_etile_tx_rx_user_flow(struct intel_fpga_etile_eth_private *priv)
 
 	/* Step 5 Write RX extra Latency */
 	hssi_csrwr32(pdev, HSSI_ETH_RECONFIG,
-		     chan, eth_ptp_csroffs(rx_ptp_extra_latency), false,
+		     chan, eth_ptp_csroffs(rx_ptp_extra_latency),
 		     rx_extra_latency);
 
 	netdev_info(priv->dev, "tx_extra_latency:0x%x , rx_extra_latency:0x%x\n",
@@ -249,7 +251,9 @@ static int eth_etile_tx_rx_user_flow(struct intel_fpga_etile_eth_private *priv)
 	return 0;
 }
 
-void pma_reset(struct intel_fpga_etile_eth_private *priv, bool tx_reset, bool rx_reset)
+void pma_digital_reset(struct intel_fpga_etile_eth_private *priv, 
+		       bool tx_reset, 
+		       bool rx_reset)
 {
 	struct platform_device *pdev = priv->pdev_hssi;
 	u32 chan = priv->chan;
@@ -261,9 +265,11 @@ void pma_reset(struct intel_fpga_etile_eth_private *priv, bool tx_reset, bool rx
 	 */
 
 	if (rx_reset)
-		hssi_csrwr8(pdev, HSSI_ETH_RECONFIG, chan, eth_phy_csroffs(phy_config), 0x4);
+		hssi_csrwr8(pdev, HSSI_ETH_RECONFIG, 
+			    chan, eth_phy_csroffs(phy_config), 0x4);
 	if (tx_reset)
-		hssi_csrwr8(pdev, HSSI_ETH_RECONFIG, chan, eth_phy_csroffs(phy_config), 0x2);
+		hssi_csrwr8(pdev, HSSI_ETH_RECONFIG, 
+			    chan, eth_phy_csroffs(phy_config), 0x2);
 }
 
 int init_mac(struct intel_fpga_etile_eth_private *priv)
@@ -274,7 +280,6 @@ int init_mac(struct intel_fpga_etile_eth_private *priv)
 	etile_set_mac(priv, true);
 	etile_update_mac_addr(priv, priv->dev->dev_addr);
 
-	/* if the link goes down anytime, this whole process above needs to be repeated */
 	ret = eth_etile_tx_rx_user_flow(priv);
 	if (ret < 0) {
 		netdev_err(priv->dev, "Tx & Rx user flow failed\n");
@@ -305,8 +310,9 @@ static void etile_get_stats64(struct net_device *dev,
 
 	storage->collisions = 0;
 
-	storage->rx_length_errors = hssi_read_mac_stats64(pdev, chan, MACSTAT_RX_UNDERSIZE) +
-				    hssi_read_mac_stats64(pdev, chan, MACSTAT_RX_OVERSIZE);
+	storage->rx_length_errors = 
+		hssi_read_mac_stats64(pdev, chan, MACSTAT_RX_UNDERSIZE) +
+		hssi_read_mac_stats64(pdev, chan, MACSTAT_RX_OVERSIZE);
 	storage->rx_over_errors = 0;
 
 	storage->rx_crc_errors = hssi_read_mac_stats64(pdev, chan, MACSTAT_RX_CRC_ERRORS);
@@ -324,12 +330,20 @@ static void etile_get_stats64(struct net_device *dev,
 	/* tx stats */
 	storage->tx_bytes = hssi_read_mac_stats64(pdev, chan, MACSTAT_TX_BYTES);
 
-	lsb = hssi_csrrd32_atomic(pdev, HSSI_ETH_RECONFIG, chan, eth_tx_stats_csroffs(tx_malformed_ctrl_lsb));
-	msb = hssi_csrrd32_atomic(pdev, HSSI_ETH_RECONFIG, chan, eth_tx_stats_csroffs(tx_malformed_ctrl_msb));
+	lsb = hssi_csrrd32_atomic(pdev, 
+			          HSSI_ETH_RECONFIG, chan, 
+				  eth_tx_stats_csroffs(tx_malformed_ctrl_lsb));
+	msb = hssi_csrrd32_atomic(pdev, 
+			          HSSI_ETH_RECONFIG, chan, 
+				  eth_tx_stats_csroffs(tx_malformed_ctrl_msb));
 	storage->tx_errors = ((u64)msb << 32) | lsb;
 
-	lsb = hssi_csrrd32_atomic(pdev, HSSI_ETH_RECONFIG, chan, eth_tx_stats_csroffs(tx_dropped_ctrl_lsb));
-	msb = hssi_csrrd32_atomic(pdev, HSSI_ETH_RECONFIG, chan, eth_tx_stats_csroffs(tx_dropped_ctrl_msb));
+	lsb = hssi_csrrd32_atomic(pdev, 
+			          HSSI_ETH_RECONFIG, chan, 
+				  eth_tx_stats_csroffs(tx_dropped_ctrl_lsb));
+	msb = hssi_csrrd32_atomic(pdev, 
+			          HSSI_ETH_RECONFIG, chan, 
+				  eth_tx_stats_csroffs(tx_dropped_ctrl_msb));
 	storage->tx_dropped = ((u64)msb << 32) | lsb;
 
 	storage->tx_aborted_errors = 0;
@@ -348,36 +362,3 @@ void xtile_get_stats64(struct net_device *dev,
 {
   etile_get_stats64(dev, storage);
 }
-
-#if 0
-int xtile_do_ioctl(struct net_device *dev, struct ifreq *ifr, int cmd)
-{
-  return etile_do_ioctl(dev, ifr, cmd);
-}
-
-int xtile_open(struct net_device *dev)
-{
-  return etile_open(dev);
-}
-
-int xtile_shutdown(struct net_device *dev)
-{
-  return etile_shutdown(dev);
-}
-
-void xtile_set_rx_mode(struct net_device *dev)
-{
-  etile_set_rx_mode(dev);
-}
-
-int xtile_change_mtu(struct net_device *dev, int new_mtu)
-{
-  return etile_change_mtu(dev, new_mtu);
-}
-
-int xtile_start_xmit(struct sk_buff *skb, struct net_device *dev)
-{
-  return etile_start_xmit(skb, dev);
-}
-
-#endif

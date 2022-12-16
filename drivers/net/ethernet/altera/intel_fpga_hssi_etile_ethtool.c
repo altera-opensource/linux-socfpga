@@ -62,8 +62,8 @@ static char const stat_gstrings[][ETH_GSTRING_LEN] = {
 };
 
 static void etile_get_drvinfo(struct net_device *dev,
-			      struct ethtool_drvinfo *info)
-{
+			      struct ethtool_drvinfo *info) {
+
 	strscpy(info->driver, "intel_fpga_hssi_etile", ETH_GSTRING_LEN);
 	strscpy(info->version, "v1.0", ETH_GSTRING_LEN);
 	strscpy(info->bus_info, "platform", ETH_GSTRING_LEN);
@@ -72,8 +72,7 @@ static void etile_get_drvinfo(struct net_device *dev,
 /* Fill in a buffer with the strings which correspond to the
  * stats
  */
-static void etile_gstrings(struct net_device *dev, u32 stringset, u8 *buf)
-{
+static void etile_gstrings(struct net_device *dev, u32 stringset, u8 *buf) {
 	switch (stringset) {
 
 	case ETH_SS_STATS:
@@ -84,9 +83,10 @@ static void etile_gstrings(struct net_device *dev, u32 stringset, u8 *buf)
 	}
 }
 
-static void etile_fill_stats(struct net_device *dev, struct ethtool_stats *dummy,
-			     u64 *buf)
-{
+static void etile_fill_stats(struct net_device *dev, 
+			     struct ethtool_stats *dummy,
+			     u64 *buf) {
+
 	struct intel_fpga_etile_eth_private *priv = netdev_priv(dev);
 
 	struct platform_device *pdev = priv->pdev_hssi;
@@ -186,8 +186,7 @@ static void etile_fill_stats(struct net_device *dev, struct ethtool_stats *dummy
 	buf[30] = hssi_read_mac_stats64(pdev, chan, MACSTAT_RX_RUNTS);
 }
 
-static int etile_sset_count(struct net_device *dev, int sset)
-{
+static int etile_sset_count(struct net_device *dev, int sset) {
 	switch (sset) {
 	case ETH_SS_STATS:
 		return ETILE_STATS_LEN;
@@ -196,29 +195,29 @@ static int etile_sset_count(struct net_device *dev, int sset)
 	}
 }
 
-static u32 etile_get_msglevel(struct net_device *dev)
-{
+static u32 etile_get_msglevel(struct net_device *dev) {
+
 	struct intel_fpga_etile_eth_private *priv = netdev_priv(dev);
 
 	return priv->msg_enable;
 }
 
+static void etile_set_msglevel(struct net_device *dev, uint32_t data) {
 
-static void etile_set_msglevel(struct net_device *dev, uint32_t data)
-{
 	struct intel_fpga_etile_eth_private *priv = netdev_priv(dev);
 
 	priv->msg_enable = data;
 }
 
-static int etile_reglen(struct net_device *dev)
-{
+static int etile_reglen(struct net_device *dev) {
+
 	return ETILE_NUM_REGS * sizeof(u32);
 }
 
-static void etile_get_regs(struct net_device *dev, struct ethtool_regs *regs,
-			   void *regbuf)
-{
+static void etile_get_regs(struct net_device *dev, 
+			   struct ethtool_regs *regs,
+			   void *regbuf) {
+
 	struct intel_fpga_etile_eth_private *priv = netdev_priv(dev);
 
 	struct platform_device *pdev  = priv->pdev_hssi;
@@ -240,152 +239,662 @@ static void etile_get_regs(struct net_device *dev, struct ethtool_regs *regs,
 
 	regs->version = 1;
 	/* Auto Negotiation and Link Training Registers */
-	buf[0] = hssi_csrrd32(pdev, HSSI_ETH_RECONFIG, chan, eth_auto_neg_link_csroffs(anlt_sequencer_config));
-	buf[1] = hssi_csrrd32(pdev, HSSI_ETH_RECONFIG, chan, eth_auto_neg_link_csroffs(anlt_sequencer_status));
-	buf[2] = hssi_csrrd32(pdev, HSSI_ETH_RECONFIG, chan, eth_auto_neg_link_csroffs(auto_neg_conf_1));
-	buf[3] = hssi_csrrd32(pdev, HSSI_ETH_RECONFIG, chan, eth_auto_neg_link_csroffs(auto_neg_conf_2));
-	buf[4] = hssi_csrrd32(pdev, HSSI_ETH_RECONFIG, chan, eth_auto_neg_link_csroffs(auto_neg_stat));
-	buf[5] = hssi_csrrd32(pdev, HSSI_ETH_RECONFIG, chan, eth_auto_neg_link_csroffs(auto_neg_conf_3));
-	buf[6] = hssi_csrrd32(pdev, HSSI_ETH_RECONFIG, chan, eth_auto_neg_link_csroffs(auto_neg_conf_4));
-	buf[7] = hssi_csrrd32(pdev, HSSI_ETH_RECONFIG, chan, eth_auto_neg_link_csroffs(auto_neg_conf_5));
-	buf[8] = hssi_csrrd32(pdev, HSSI_ETH_RECONFIG, chan, eth_auto_neg_link_csroffs(auto_neg_conf_6));
-	buf[9] = hssi_csrrd32(pdev, HSSI_ETH_RECONFIG, chan, eth_auto_neg_link_csroffs(auto_neg_stat_1));
-	buf[10] = hssi_csrrd32(pdev, HSSI_ETH_RECONFIG, chan, eth_auto_neg_link_csroffs(auto_neg_stat_2));
-	buf[11] = hssi_csrrd32(pdev, HSSI_ETH_RECONFIG, chan, eth_auto_neg_link_csroffs(auto_neg_stat_3));
-	buf[12] = hssi_csrrd32(pdev, HSSI_ETH_RECONFIG, chan, eth_auto_neg_link_csroffs(auto_neg_stat_4));
-	buf[13] = hssi_csrrd32(pdev, HSSI_ETH_RECONFIG, chan, eth_auto_neg_link_csroffs(auto_neg_stat_5));
-	buf[14] = hssi_csrrd32(pdev, HSSI_ETH_RECONFIG, chan, eth_auto_neg_link_csroffs(auto_neg_an_channel_override));
-	buf[15] = hssi_csrrd32(pdev, HSSI_ETH_RECONFIG, chan,
-			  eth_auto_neg_link_csroffs(auto_neg_const_next_page_override));
-	buf[16] = hssi_csrrd32(pdev, HSSI_ETH_RECONFIG, chan,
-			  eth_auto_neg_link_csroffs(auto_neg_const_next_page_lp_stat));
-	buf[17] = hssi_csrrd32(pdev, HSSI_ETH_RECONFIG, chan, eth_auto_neg_link_csroffs(link_train_conf_1));
-	buf[18] = hssi_csrrd32(pdev, HSSI_ETH_RECONFIG, chan, eth_auto_neg_link_csroffs(link_train_stat_1));
-	buf[19] = hssi_csrrd32(pdev, HSSI_ETH_RECONFIG, chan, eth_auto_neg_link_csroffs(link_train_conf_lane_0));
-	buf[20] = hssi_csrrd32(pdev, HSSI_ETH_RECONFIG, chan, eth_auto_neg_link_csroffs(link_train_conf_lane_1));
-	buf[21] = hssi_csrrd32(pdev, HSSI_ETH_RECONFIG, chan, eth_auto_neg_link_csroffs(link_train_conf_lane_2));
-	buf[22] = hssi_csrrd32(pdev, HSSI_ETH_RECONFIG, chan, eth_auto_neg_link_csroffs(link_train_conf_lane_3));
+	buf[0] = hssi_csrrd32(pdev, 
+			      HSSI_ETH_RECONFIG, 
+			      chan, 
+			      eth_auto_neg_link_csroffs(anlt_sequencer_config));
+
+	buf[1] = hssi_csrrd32(pdev, 
+			      HSSI_ETH_RECONFIG, 
+			      chan, 
+			      eth_auto_neg_link_csroffs(anlt_sequencer_status));
+
+	buf[2] = hssi_csrrd32(pdev, 
+			      HSSI_ETH_RECONFIG, 
+			      chan, 
+			      eth_auto_neg_link_csroffs(auto_neg_conf_1));
+
+	buf[3] = hssi_csrrd32(pdev, 
+			      HSSI_ETH_RECONFIG, 
+			      chan, 
+			      eth_auto_neg_link_csroffs(auto_neg_conf_2));
+
+	buf[4] = hssi_csrrd32(pdev, 
+			      HSSI_ETH_RECONFIG, 
+			      chan, 
+			      eth_auto_neg_link_csroffs(auto_neg_stat));
+
+	buf[5] = hssi_csrrd32(pdev, 
+			      HSSI_ETH_RECONFIG, 
+			      chan, 
+			      eth_auto_neg_link_csroffs(auto_neg_conf_3));
+
+	buf[6] = hssi_csrrd32(pdev, 
+			      HSSI_ETH_RECONFIG, 
+			      chan, 
+			      eth_auto_neg_link_csroffs(auto_neg_conf_4));
+
+	buf[7] = hssi_csrrd32(pdev, 
+			      HSSI_ETH_RECONFIG, 
+			      chan, 
+			      eth_auto_neg_link_csroffs(auto_neg_conf_5));
+
+	buf[8] = hssi_csrrd32(pdev, 
+			      HSSI_ETH_RECONFIG, 
+			      chan, 
+			      eth_auto_neg_link_csroffs(auto_neg_conf_6));
+
+	buf[9] = hssi_csrrd32(pdev, 
+			      HSSI_ETH_RECONFIG, 
+			      chan, 
+			      eth_auto_neg_link_csroffs(auto_neg_stat_1));
+
+	buf[10] = hssi_csrrd32(pdev, 
+			       HSSI_ETH_RECONFIG, 
+			       chan, 
+			       eth_auto_neg_link_csroffs(auto_neg_stat_2));
+
+	buf[11] = hssi_csrrd32(pdev, 
+			       HSSI_ETH_RECONFIG, 
+			       chan, 
+			       eth_auto_neg_link_csroffs(auto_neg_stat_3));
+
+	buf[12] = hssi_csrrd32(pdev, 
+			       HSSI_ETH_RECONFIG, 
+			       chan, 
+			       eth_auto_neg_link_csroffs(auto_neg_stat_4));
+
+	buf[13] = hssi_csrrd32(pdev, 
+			       HSSI_ETH_RECONFIG, 
+			       chan, 
+			       eth_auto_neg_link_csroffs(auto_neg_stat_5));
+
+	buf[14] = hssi_csrrd32(pdev, 
+			       HSSI_ETH_RECONFIG, 
+			       chan, 
+			       eth_auto_neg_link_csroffs(auto_neg_an_channel_override));
+
+	buf[15] = hssi_csrrd32(pdev, 
+			       HSSI_ETH_RECONFIG, 
+			       chan,
+			       eth_auto_neg_link_csroffs(auto_neg_const_next_page_override));
+
+	buf[16] = hssi_csrrd32(pdev, 
+			       HSSI_ETH_RECONFIG, 
+			       chan,
+			       eth_auto_neg_link_csroffs(auto_neg_const_next_page_lp_stat));
+
+	buf[17] = hssi_csrrd32(pdev, 
+			       HSSI_ETH_RECONFIG, 
+			       chan, 
+			       eth_auto_neg_link_csroffs(link_train_conf_1));
+
+	buf[18] = hssi_csrrd32(pdev, 
+			       HSSI_ETH_RECONFIG, 
+			       chan, 
+			       eth_auto_neg_link_csroffs(link_train_stat_1));
+
+	buf[19] = hssi_csrrd32(pdev, 
+			       HSSI_ETH_RECONFIG, 
+			       chan, 
+			       eth_auto_neg_link_csroffs(link_train_conf_lane_0));
+
+	buf[20] = hssi_csrrd32(pdev, 
+			       HSSI_ETH_RECONFIG, 
+			       chan, 
+			       eth_auto_neg_link_csroffs(link_train_conf_lane_1));
+
+	buf[21] = hssi_csrrd32(pdev, 
+			       HSSI_ETH_RECONFIG, 
+			       chan, 
+			       eth_auto_neg_link_csroffs(link_train_conf_lane_2));
+
+	buf[22] = hssi_csrrd32(pdev, 
+			       HSSI_ETH_RECONFIG, 
+			       chan, eth_auto_neg_link_csroffs(link_train_conf_lane_3));
 
 	/* PHY registers */
-	buf[23] = hssi_csrrd32(pdev, HSSI_ETH_RECONFIG, chan, eth_phy_csroffs(phy_rev_id));
-	buf[24] = hssi_csrrd32(pdev, HSSI_ETH_RECONFIG, chan, eth_phy_csroffs(phy_scratch));
-	buf[25] = hssi_csrrd32(pdev, HSSI_ETH_RECONFIG, chan, eth_phy_csroffs(phy_loopback));
-	buf[26] = hssi_csrrd32(pdev, HSSI_ETH_RECONFIG, chan, eth_phy_csroffs(phy_config));
-	buf[27] = hssi_csrrd32(pdev, HSSI_ETH_RECONFIG, chan, eth_phy_csroffs(phy_cdr_pll_locked));
-	buf[28] = hssi_csrrd32(pdev, HSSI_ETH_RECONFIG, chan, eth_phy_csroffs(phy_tx_datapath_ready));
-	buf[29] = hssi_csrrd32(pdev, HSSI_ETH_RECONFIG, chan, eth_phy_csroffs(phy_frm_err_detect));
-	buf[30] = hssi_csrrd32(pdev, HSSI_ETH_RECONFIG, chan, eth_phy_csroffs(phy_clr_frm_err));
-	buf[31] = hssi_csrrd32(pdev, HSSI_ETH_RECONFIG, chan, eth_phy_csroffs(phy_pcs_stat_anlt));
-	buf[32] = hssi_csrrd32(pdev, HSSI_ETH_RECONFIG, chan, eth_phy_csroffs(phy_pcs_err_inject));
-	buf[33] = hssi_csrrd32(pdev, HSSI_ETH_RECONFIG, chan, eth_phy_csroffs(phy_am_lock));
-	buf[34] = hssi_csrrd32(pdev, HSSI_ETH_RECONFIG, chan, eth_phy_csroffs(phy_dskew_chng));
-	buf[35] = hssi_csrrd32(pdev, HSSI_ETH_RECONFIG, chan, eth_phy_csroffs(phy_ber_cnt));
-	buf[36] = hssi_csrrd32(pdev, HSSI_ETH_RECONFIG, chan, eth_phy_csroffs(phy_aib_transfer_ready_stat));
-	buf[37] = hssi_csrrd32(pdev, HSSI_ETH_RECONFIG, chan, eth_phy_csroffs(phy_soft_rc_reset_stat));
-	buf[38] = hssi_csrrd32(pdev, HSSI_ETH_RECONFIG, chan, eth_phy_csroffs(phy_pcs_virtual_ln_0));
-	buf[39] = hssi_csrrd32(pdev, HSSI_ETH_RECONFIG, chan, eth_phy_csroffs(phy_pcs_virtual_ln_1));
-	buf[40] = hssi_csrrd32(pdev, HSSI_ETH_RECONFIG, chan, eth_phy_csroffs(phy_pcs_virtual_ln_2));
-	buf[41] = hssi_csrrd32(pdev, HSSI_ETH_RECONFIG, chan, eth_phy_csroffs(phy_pcs_virtual_ln_3));
-	buf[42] = hssi_csrrd32(pdev, HSSI_ETH_RECONFIG, chan, eth_phy_csroffs(phy_recovered_clk_freq));
-	buf[43] = hssi_csrrd32(pdev, HSSI_ETH_RECONFIG, chan, eth_phy_csroffs(phy_tx_clk_freq));
-	buf[44] = hssi_csrrd32(pdev, HSSI_ETH_RECONFIG, chan, eth_phy_csroffs(phy_tx_pld_conf));
-	buf[45] = hssi_csrrd32(pdev, HSSI_ETH_RECONFIG, chan, eth_phy_csroffs(phy_tx_pld_stat));
-	buf[46] = hssi_csrrd32(pdev, HSSI_ETH_RECONFIG, chan, eth_phy_csroffs(phy_dynamic_deskew_buf_stat));
-	buf[47] = hssi_csrrd32(pdev, HSSI_ETH_RECONFIG, chan, eth_phy_csroffs(phy_rx_pld_conf));
-	buf[48] = hssi_csrrd32(pdev, HSSI_ETH_RECONFIG, chan, eth_phy_csroffs(phy_rx_pcs_conf));
-	buf[49] = hssi_csrrd32(pdev, HSSI_ETH_RECONFIG, chan, eth_phy_csroffs(phy_bip_cnt_0));
-	buf[50] = hssi_csrrd32(pdev, HSSI_ETH_RECONFIG, chan, eth_phy_csroffs(phy_bip_cnt_1));
-	buf[51] = hssi_csrrd32(pdev, HSSI_ETH_RECONFIG, chan, eth_phy_csroffs(phy_bip_cnt_2));
-	buf[52] = hssi_csrrd32(pdev, HSSI_ETH_RECONFIG, chan, eth_phy_csroffs(phy_bip_cnt_3));
-	buf[53] = hssi_csrrd32(pdev, HSSI_ETH_RECONFIG, chan, eth_phy_csroffs(phy_bip_cnt_4));
-	buf[54] = hssi_csrrd32(pdev, HSSI_ETH_RECONFIG, chan, eth_phy_csroffs(phy_bip_cnt_5));
-	buf[55] = hssi_csrrd32(pdev, HSSI_ETH_RECONFIG, chan, eth_phy_csroffs(phy_bip_cnt_6));
-	buf[56] = hssi_csrrd32(pdev, HSSI_ETH_RECONFIG, chan, eth_phy_csroffs(phy_bip_cnt_7));
-	buf[57] = hssi_csrrd32(pdev, HSSI_ETH_RECONFIG, chan, eth_phy_csroffs(phy_bip_cnt_8));
-	buf[58] = hssi_csrrd32(pdev, HSSI_ETH_RECONFIG, chan, eth_phy_csroffs(phy_bip_cnt_9));
-	buf[59] = hssi_csrrd32(pdev, HSSI_ETH_RECONFIG, chan, eth_phy_csroffs(phy_bip_cnt_10));
-	buf[60] = hssi_csrrd32(pdev, HSSI_ETH_RECONFIG, chan, eth_phy_csroffs(phy_bip_cnt_11));
-	buf[61] = hssi_csrrd32(pdev, HSSI_ETH_RECONFIG, chan, eth_phy_csroffs(phy_bip_cnt_12));
-	buf[62] = hssi_csrrd32(pdev, HSSI_ETH_RECONFIG, chan, eth_phy_csroffs(phy_bip_cnt_13));
-	buf[63] = hssi_csrrd32(pdev, HSSI_ETH_RECONFIG, chan, eth_phy_csroffs(phy_bip_cnt_14));
-	buf[64] = hssi_csrrd32(pdev, HSSI_ETH_RECONFIG, chan, eth_phy_csroffs(phy_bip_cnt_15));
-	buf[65] = hssi_csrrd32(pdev, HSSI_ETH_RECONFIG, chan, eth_phy_csroffs(phy_bip_cnt_16));
-	buf[66] = hssi_csrrd32(pdev, HSSI_ETH_RECONFIG, chan, eth_phy_csroffs(phy_bip_cnt_17));
-	buf[67] = hssi_csrrd32(pdev, HSSI_ETH_RECONFIG, chan, eth_phy_csroffs(phy_bip_cnt_18));
-	buf[68] = hssi_csrrd32(pdev, HSSI_ETH_RECONFIG, chan, eth_phy_csroffs(phy_bip_cnt_19));
-	buf[69] = hssi_csrrd32(pdev, HSSI_ETH_RECONFIG, chan, eth_phy_csroffs(phy_timer_window_hiber_check));
-	buf[70] = hssi_csrrd32(pdev, HSSI_ETH_RECONFIG, chan, eth_phy_csroffs(phy_hiber_frm_err));
-	buf[71] = hssi_csrrd32(pdev, HSSI_ETH_RECONFIG, chan, eth_phy_csroffs(phy_err_block_cnt));
-	buf[72] = hssi_csrrd32(pdev, HSSI_ETH_RECONFIG, chan, eth_phy_csroffs(phy_deskew_dept_0));
-	buf[73] = hssi_csrrd32(pdev, HSSI_ETH_RECONFIG, chan, eth_phy_csroffs(phy_deskew_dept_1));
-	buf[74] = hssi_csrrd32(pdev, HSSI_ETH_RECONFIG, chan, eth_phy_csroffs(phy_deskew_dept_2));
-	buf[75] = hssi_csrrd32(pdev, HSSI_ETH_RECONFIG, chan, eth_phy_csroffs(phy_deskew_dept_3));
-	buf[76] = hssi_csrrd32(pdev, HSSI_ETH_RECONFIG, chan, eth_phy_csroffs(phy_rx_pcs_test_err_cnt));
+	buf[23] = hssi_csrrd32(pdev, 
+			       HSSI_ETH_RECONFIG, 
+			       chan, 
+			       eth_phy_csroffs(phy_rev_id));
+
+	buf[24] = hssi_csrrd32(pdev, 
+			       HSSI_ETH_RECONFIG, 
+			       chan, 
+			       eth_phy_csroffs(phy_scratch));
+
+	buf[25] = hssi_csrrd32(pdev, 
+			       HSSI_ETH_RECONFIG, 
+			       chan, 
+			       eth_phy_csroffs(phy_loopback));
+
+	buf[26] = hssi_csrrd32(pdev, 
+			       HSSI_ETH_RECONFIG, 
+			       chan, 
+			       eth_phy_csroffs(phy_config));
+
+	buf[27] = hssi_csrrd32(pdev, 
+			       HSSI_ETH_RECONFIG, 
+			       chan, 
+			       eth_phy_csroffs(phy_cdr_pll_locked));
+
+	buf[28] = hssi_csrrd32(pdev, 
+			       HSSI_ETH_RECONFIG, 
+			       chan, 
+			       eth_phy_csroffs(phy_tx_datapath_ready));
+
+	buf[29] = hssi_csrrd32(pdev, 
+			       HSSI_ETH_RECONFIG, 
+			       chan, 
+			       eth_phy_csroffs(phy_frm_err_detect));
+
+	buf[30] = hssi_csrrd32(pdev, 
+			       HSSI_ETH_RECONFIG, 
+			       chan, 
+			       eth_phy_csroffs(phy_clr_frm_err));
+
+	buf[31] = hssi_csrrd32(pdev, 
+			       HSSI_ETH_RECONFIG, 
+			       chan, 
+			       eth_phy_csroffs(phy_pcs_stat_anlt));
+
+	buf[32] = hssi_csrrd32(pdev, 
+			       HSSI_ETH_RECONFIG, 
+			       chan, 
+			       eth_phy_csroffs(phy_pcs_err_inject));
+
+	buf[33] = hssi_csrrd32(pdev, 
+			       HSSI_ETH_RECONFIG, 
+			       chan, 
+			       eth_phy_csroffs(phy_am_lock));
+
+	buf[34] = hssi_csrrd32(pdev, 
+			       HSSI_ETH_RECONFIG, 
+			       chan, 
+			       eth_phy_csroffs(phy_dskew_chng));
+
+	buf[35] = hssi_csrrd32(pdev, 
+			       HSSI_ETH_RECONFIG, 
+			       chan, 
+			       eth_phy_csroffs(phy_ber_cnt));
+
+	buf[36] = hssi_csrrd32(pdev, 
+			       HSSI_ETH_RECONFIG, 
+			       chan, 
+			       eth_phy_csroffs(phy_aib_transfer_ready_stat));
+
+	buf[37] = hssi_csrrd32(pdev, 
+			       HSSI_ETH_RECONFIG, 
+			       chan, 
+			       eth_phy_csroffs(phy_soft_rc_reset_stat));
+
+	buf[38] = hssi_csrrd32(pdev, 
+			       HSSI_ETH_RECONFIG, 
+			       chan, 
+			       eth_phy_csroffs(phy_pcs_virtual_ln_0));
+
+	buf[39] = hssi_csrrd32(pdev, 
+			       HSSI_ETH_RECONFIG, 
+			       chan, 
+			       eth_phy_csroffs(phy_pcs_virtual_ln_1));
+
+	buf[40] = hssi_csrrd32(pdev, 
+			       HSSI_ETH_RECONFIG, 
+			       chan, 
+			       eth_phy_csroffs(phy_pcs_virtual_ln_2));
+
+	buf[41] = hssi_csrrd32(pdev, 
+			       HSSI_ETH_RECONFIG, 
+			       chan, 
+			       eth_phy_csroffs(phy_pcs_virtual_ln_3));
+
+	buf[42] = hssi_csrrd32(pdev, 
+			       HSSI_ETH_RECONFIG, 
+			       chan, 
+			       eth_phy_csroffs(phy_recovered_clk_freq));
+
+	buf[43] = hssi_csrrd32(pdev, 
+			       HSSI_ETH_RECONFIG, 
+			       chan, 
+			       eth_phy_csroffs(phy_tx_clk_freq));
+
+	buf[44] = hssi_csrrd32(pdev, 
+			       HSSI_ETH_RECONFIG, 
+			       chan, 
+			       eth_phy_csroffs(phy_tx_pld_conf));
+
+	buf[45] = hssi_csrrd32(pdev, 
+			       HSSI_ETH_RECONFIG, 
+			       chan, 
+			       eth_phy_csroffs(phy_tx_pld_stat));
+
+	buf[46] = hssi_csrrd32(pdev, 
+			       HSSI_ETH_RECONFIG, 
+			       chan, 
+			       eth_phy_csroffs(phy_dynamic_deskew_buf_stat));
+
+	buf[47] = hssi_csrrd32(pdev, 
+			       HSSI_ETH_RECONFIG, 
+			       chan, 
+			       eth_phy_csroffs(phy_rx_pld_conf));
+
+	buf[48] = hssi_csrrd32(pdev, 
+			       HSSI_ETH_RECONFIG, 
+			       chan, 
+			       eth_phy_csroffs(phy_rx_pcs_conf));
+
+	buf[49] = hssi_csrrd32(pdev, 
+			       HSSI_ETH_RECONFIG, 
+			       chan, 
+			       eth_phy_csroffs(phy_bip_cnt_0));
+
+	buf[50] = hssi_csrrd32(pdev, 
+			       HSSI_ETH_RECONFIG, 
+			       chan, 
+			       eth_phy_csroffs(phy_bip_cnt_1));
+
+	buf[51] = hssi_csrrd32(pdev, 
+			       HSSI_ETH_RECONFIG, 
+			       chan, 
+			       eth_phy_csroffs(phy_bip_cnt_2));
+
+	buf[52] = hssi_csrrd32(pdev, 
+			       HSSI_ETH_RECONFIG, 
+			       chan, 
+			       eth_phy_csroffs(phy_bip_cnt_3));
+
+	buf[53] = hssi_csrrd32(pdev, 
+			       HSSI_ETH_RECONFIG, 
+			       chan, 
+			       eth_phy_csroffs(phy_bip_cnt_4));
+
+	buf[54] = hssi_csrrd32(pdev, 
+			       HSSI_ETH_RECONFIG, 
+			       chan, 
+			       eth_phy_csroffs(phy_bip_cnt_5));
+
+	buf[55] = hssi_csrrd32(pdev, 
+			       HSSI_ETH_RECONFIG, 
+			       chan, 
+			       eth_phy_csroffs(phy_bip_cnt_6));
+
+	buf[56] = hssi_csrrd32(pdev, 
+			       HSSI_ETH_RECONFIG, 
+			       chan, 
+			       eth_phy_csroffs(phy_bip_cnt_7));
+
+	buf[57] = hssi_csrrd32(pdev, 
+			       HSSI_ETH_RECONFIG, 
+			       chan, 
+			       eth_phy_csroffs(phy_bip_cnt_8));
+
+	buf[58] = hssi_csrrd32(pdev, 
+			       HSSI_ETH_RECONFIG, 
+			       chan, 
+			       eth_phy_csroffs(phy_bip_cnt_9));
+
+	buf[59] = hssi_csrrd32(pdev, 
+			       HSSI_ETH_RECONFIG, 
+			       chan, 
+			       eth_phy_csroffs(phy_bip_cnt_10));
+
+	buf[60] = hssi_csrrd32(pdev, 
+			       HSSI_ETH_RECONFIG, 
+			       chan, 
+			       eth_phy_csroffs(phy_bip_cnt_11));
+
+	buf[61] = hssi_csrrd32(pdev, 
+			       HSSI_ETH_RECONFIG, 
+			       chan, 
+			       eth_phy_csroffs(phy_bip_cnt_12));
+
+	buf[62] = hssi_csrrd32(pdev, 
+			       HSSI_ETH_RECONFIG, 
+			       chan, 
+			       eth_phy_csroffs(phy_bip_cnt_13));
+
+	buf[63] = hssi_csrrd32(pdev, 
+			       HSSI_ETH_RECONFIG, 
+			       chan, 
+			       eth_phy_csroffs(phy_bip_cnt_14));
+
+	buf[64] = hssi_csrrd32(pdev, 
+			       HSSI_ETH_RECONFIG, 
+			       chan, 
+			       eth_phy_csroffs(phy_bip_cnt_15));
+
+	buf[65] = hssi_csrrd32(pdev, 
+			       HSSI_ETH_RECONFIG, 
+			       chan, 
+			       eth_phy_csroffs(phy_bip_cnt_16));
+
+	buf[66] = hssi_csrrd32(pdev,
+			       HSSI_ETH_RECONFIG, 
+			       chan, 
+			       eth_phy_csroffs(phy_bip_cnt_17));
+
+	buf[67] = hssi_csrrd32(pdev, 
+			       HSSI_ETH_RECONFIG, 
+			       chan, 
+			       eth_phy_csroffs(phy_bip_cnt_18));
+
+	buf[68] = hssi_csrrd32(pdev, 
+			       HSSI_ETH_RECONFIG, 
+			       chan, 
+			       eth_phy_csroffs(phy_bip_cnt_19));
+
+	buf[69] = hssi_csrrd32(pdev, 
+			       HSSI_ETH_RECONFIG, 
+			       chan, 
+			       eth_phy_csroffs(phy_timer_window_hiber_check));
+
+	buf[70] = hssi_csrrd32(pdev,
+			       HSSI_ETH_RECONFIG, 
+			       chan, 
+			       eth_phy_csroffs(phy_hiber_frm_err));
+
+	buf[71] = hssi_csrrd32(pdev, 
+			       HSSI_ETH_RECONFIG, 
+			       chan, 
+			       eth_phy_csroffs(phy_err_block_cnt));
+
+	buf[72] = hssi_csrrd32(pdev, 
+			       HSSI_ETH_RECONFIG, 
+			       chan, 
+			       eth_phy_csroffs(phy_deskew_dept_0));
+
+	buf[73] = hssi_csrrd32(pdev, 
+			       HSSI_ETH_RECONFIG, 
+			       chan, 
+			       eth_phy_csroffs(phy_deskew_dept_1));
+
+	buf[74] = hssi_csrrd32(pdev, 
+			       HSSI_ETH_RECONFIG, 
+			       chan, 
+			       eth_phy_csroffs(phy_deskew_dept_2));
+
+	buf[75] = hssi_csrrd32(pdev, 
+			       HSSI_ETH_RECONFIG, 
+			       chan, 
+			       eth_phy_csroffs(phy_deskew_dept_3));
+
+	buf[76] = hssi_csrrd32(pdev, 
+			       HSSI_ETH_RECONFIG, 
+			       chan, 
+			       eth_phy_csroffs(phy_rx_pcs_test_err_cnt));
 
 	/* TX MAC Registers */
-	buf[77] = hssi_csrrd32(pdev, HSSI_ETH_RECONFIG, chan, eth_tx_mac_csroffs(tx_mac_rev_id));
-	buf[78] = hssi_csrrd32(pdev, HSSI_ETH_RECONFIG, chan, eth_tx_mac_csroffs(tx_mac_scratch));
-	buf[79] = hssi_csrrd32(pdev, HSSI_ETH_RECONFIG, chan, eth_tx_mac_csroffs(tx_mac_link_fault));
-	buf[80] = hssi_csrrd32(pdev, HSSI_ETH_RECONFIG, chan, eth_tx_mac_csroffs(tx_mac_ipg_col_rem));
-	buf[81] = hssi_csrrd32(pdev, HSSI_ETH_RECONFIG, chan, eth_tx_mac_csroffs(tx_mac_max_frm_size));
-	buf[82] = hssi_csrrd32(pdev, HSSI_ETH_RECONFIG, chan, eth_tx_mac_csroffs(tx_mac_conf));
-	buf[83] = hssi_csrrd32(pdev, HSSI_ETH_RECONFIG, chan, eth_tx_mac_csroffs(tx_mac_ehip_conf));
-	buf[84] = hssi_csrrd32(pdev, HSSI_ETH_RECONFIG, chan, eth_tx_mac_csroffs(tx_mac_source_addr_lower_bytes));
-	buf[85] = hssi_csrrd32(pdev, HSSI_ETH_RECONFIG, chan, eth_tx_mac_csroffs(tx_mac_source_addr_higher_bytes));
+	buf[77] = hssi_csrrd32(pdev, 
+			       HSSI_ETH_RECONFIG, 
+			       chan, 
+			       eth_tx_mac_csroffs(tx_mac_rev_id));
+
+	buf[78] = hssi_csrrd32(pdev, 
+			       HSSI_ETH_RECONFIG, 
+			       chan, 
+			       eth_tx_mac_csroffs(tx_mac_scratch));
+
+	buf[79] = hssi_csrrd32(pdev, 
+			       HSSI_ETH_RECONFIG, 
+			       chan, 
+			       eth_tx_mac_csroffs(tx_mac_link_fault));
+
+	buf[80] = hssi_csrrd32(pdev, 
+			       HSSI_ETH_RECONFIG, 
+			       chan, 
+			       eth_tx_mac_csroffs(tx_mac_ipg_col_rem));
+
+	buf[81] = hssi_csrrd32(pdev, 
+			       HSSI_ETH_RECONFIG, 
+			       chan, 
+			       eth_tx_mac_csroffs(tx_mac_max_frm_size));
+
+	buf[82] = hssi_csrrd32(pdev, 
+			       HSSI_ETH_RECONFIG, 
+			       chan, 
+			       eth_tx_mac_csroffs(tx_mac_conf));
+
+	buf[83] = hssi_csrrd32(pdev, 
+			       HSSI_ETH_RECONFIG, 
+			       chan, 
+			       eth_tx_mac_csroffs(tx_mac_ehip_conf));
+
+	buf[84] = hssi_csrrd32(pdev, 
+			       HSSI_ETH_RECONFIG, 
+			       chan, 
+			       eth_tx_mac_csroffs(tx_mac_source_addr_lower_bytes));
+
+	buf[85] = hssi_csrrd32(pdev, 
+			       HSSI_ETH_RECONFIG, 
+			       chan, 
+			       eth_tx_mac_csroffs(tx_mac_source_addr_higher_bytes));
 
 	/* RX MAC Registers */
-	buf[86] = hssi_csrrd32(pdev, HSSI_ETH_RECONFIG, chan, eth_rx_mac_csroffs(rx_mac_rev_id));
-	buf[87] = hssi_csrrd32(pdev, HSSI_ETH_RECONFIG, chan, eth_rx_mac_csroffs(rx_mac_scratch));
-	buf[88] = hssi_csrrd32(pdev, HSSI_ETH_RECONFIG, chan, eth_rx_mac_csroffs(rx_mac_max_frm_size));
-	buf[89] = hssi_csrrd32(pdev, HSSI_ETH_RECONFIG, chan, eth_rx_mac_csroffs(rx_mac_frwd_rx_crc));
-	buf[90] = hssi_csrrd32(pdev, HSSI_ETH_RECONFIG, chan, eth_rx_mac_csroffs(rx_max_link_fault));
-	buf[91] = hssi_csrrd32(pdev, HSSI_ETH_RECONFIG, chan, eth_rx_mac_csroffs(rx_mac_conf));
-	buf[92] = hssi_csrrd32(pdev, HSSI_ETH_RECONFIG, chan, eth_rx_mac_csroffs(rx_mac_ehip_conf));
+	buf[86] = hssi_csrrd32(pdev, 
+			       HSSI_ETH_RECONFIG, 
+			       chan, 
+			       eth_rx_mac_csroffs(rx_mac_rev_id));
+
+	buf[87] = hssi_csrrd32(pdev, 
+			       HSSI_ETH_RECONFIG, 
+			       chan, 
+			       eth_rx_mac_csroffs(rx_mac_scratch));
+
+	buf[88] = hssi_csrrd32(pdev, 
+			       HSSI_ETH_RECONFIG, 
+			       chan, 
+			       eth_rx_mac_csroffs(rx_mac_max_frm_size));
+
+	buf[89] = hssi_csrrd32(pdev, 
+			       HSSI_ETH_RECONFIG, 
+			       chan, 
+			       eth_rx_mac_csroffs(rx_mac_frwd_rx_crc));
+
+	buf[90] = hssi_csrrd32(pdev, 
+			       HSSI_ETH_RECONFIG, 
+			       chan, 
+			       eth_rx_mac_csroffs(rx_max_link_fault));
+
+	buf[91] = hssi_csrrd32(pdev, 
+			       HSSI_ETH_RECONFIG, 
+			       chan, 
+			       eth_rx_mac_csroffs(rx_mac_conf));
+
+	buf[92] = hssi_csrrd32(pdev, 
+			       HSSI_ETH_RECONFIG, 
+			       chan, 
+			       eth_rx_mac_csroffs(rx_mac_ehip_conf));
 
 	/* Pause and Priority Registers */
-	buf[93] = hssi_csrrd32(pdev, HSSI_ETH_RECONFIG, chan, eth_pause_and_priority_csroffs(txsfc_module_revision_id));
-	buf[94] = hssi_csrrd32(pdev, HSSI_ETH_RECONFIG, chan, eth_pause_and_priority_csroffs(txsfc_scratch_register));
-	buf[95] = hssi_csrrd32(pdev, HSSI_ETH_RECONFIG, chan, eth_pause_and_priority_csroffs(enable_tx_pause_ports));
-	buf[96] = hssi_csrrd32(pdev, HSSI_ETH_RECONFIG, chan, eth_pause_and_priority_csroffs(tx_pause_request));
-	buf[97] = hssi_csrrd32(pdev, HSSI_ETH_RECONFIG, chan,
-			  eth_pause_and_priority_csroffs(enable_automatic_tx_pause_retransmission));
-	buf[98] = hssi_csrrd32(pdev, HSSI_ETH_RECONFIG, chan, eth_pause_and_priority_csroffs(retransmit_holdoff_quanta));
-	buf[99] = hssi_csrrd32(pdev, HSSI_ETH_RECONFIG, chan, eth_pause_and_priority_csroffs(retransmit_pause_quanta));
-	buf[100] = hssi_csrrd32(pdev, HSSI_ETH_RECONFIG, chan, eth_pause_and_priority_csroffs(enable_tx_xoff));
-	buf[101] = hssi_csrrd32(pdev, HSSI_ETH_RECONFIG, chan, eth_pause_and_priority_csroffs(enable_uniform_holdoff));
-	buf[102] = hssi_csrrd32(pdev, HSSI_ETH_RECONFIG, chan, eth_pause_and_priority_csroffs(set_uniform_holdoff));
-	buf[103] = hssi_csrrd32(pdev, HSSI_ETH_RECONFIG, chan, eth_pause_and_priority_csroffs(flow_control_fields_lsb));
-	buf[104] = hssi_csrrd32(pdev, HSSI_ETH_RECONFIG, chan, eth_pause_and_priority_csroffs(flow_control_fields_msb));
-	buf[105] = hssi_csrrd32(pdev, HSSI_ETH_RECONFIG, chan, eth_pause_and_priority_csroffs(flow_control_frames_lsb));
-	buf[106] = hssi_csrrd32(pdev, HSSI_ETH_RECONFIG, chan, eth_pause_and_priority_csroffs(flow_control_frames_msb));
-	buf[107] = hssi_csrrd32(pdev, HSSI_ETH_RECONFIG, chan,
-			   eth_pause_and_priority_csroffs(tx_flow_control_feature_cfg));
-	buf[108] = hssi_csrrd32(pdev, HSSI_ETH_RECONFIG, chan, eth_pause_and_priority_csroffs(pause_quanta_0));
-	buf[109] = hssi_csrrd32(pdev, HSSI_ETH_RECONFIG, chan, eth_pause_and_priority_csroffs(pause_quanta_1));
-	buf[110] = hssi_csrrd32(pdev, HSSI_ETH_RECONFIG, chan, eth_pause_and_priority_csroffs(pause_quanta_2));
-	buf[111] = hssi_csrrd32(pdev, HSSI_ETH_RECONFIG, chan, eth_pause_and_priority_csroffs(pause_quanta_3));
-	buf[112] = hssi_csrrd32(pdev, HSSI_ETH_RECONFIG, chan, eth_pause_and_priority_csroffs(pause_quanta_4));
-	buf[113] = hssi_csrrd32(pdev, HSSI_ETH_RECONFIG, chan, eth_pause_and_priority_csroffs(pause_quanta_5));
-	buf[114] = hssi_csrrd32(pdev, HSSI_ETH_RECONFIG, chan, eth_pause_and_priority_csroffs(pause_quanta_6));
-	buf[115] = hssi_csrrd32(pdev, HSSI_ETH_RECONFIG, chan, eth_pause_and_priority_csroffs(pause_quanta_7));
-	buf[116] = hssi_csrrd32(pdev, HSSI_ETH_RECONFIG, chan, eth_pause_and_priority_csroffs(pfc_holdoff_quanta_0));
-	buf[117] = hssi_csrrd32(pdev, HSSI_ETH_RECONFIG, chan, eth_pause_and_priority_csroffs(pfc_holdoff_quanta_1));
-	buf[118] = hssi_csrrd32(pdev, HSSI_ETH_RECONFIG, chan, eth_pause_and_priority_csroffs(pfc_holdoff_quanta_2));
-	buf[119] = hssi_csrrd32(pdev, HSSI_ETH_RECONFIG, chan, eth_pause_and_priority_csroffs(pfc_holdoff_quanta_3));
-	buf[120] = hssi_csrrd32(pdev, HSSI_ETH_RECONFIG, chan, eth_pause_and_priority_csroffs(pfc_holdoff_quanta_4));
-	buf[121] = hssi_csrrd32(pdev, HSSI_ETH_RECONFIG, chan, eth_pause_and_priority_csroffs(pfc_holdoff_quanta_5));
-	buf[122] = hssi_csrrd32(pdev, HSSI_ETH_RECONFIG, chan, eth_pause_and_priority_csroffs(pfc_holdoff_quanta_6));
-	buf[123] = hssi_csrrd32(pdev, HSSI_ETH_RECONFIG, chan, eth_pause_and_priority_csroffs(pfc_holdoff_quanta_7));
-	buf[124] = hssi_csrrd32(pdev, HSSI_ETH_RECONFIG, chan, eth_pause_and_priority_csroffs(rxsfc_module_revision_id));
-	buf[125] = hssi_csrrd32(pdev, HSSI_ETH_RECONFIG, chan, eth_pause_and_priority_csroffs(rxsfc_scratch_register));
-	buf[126] = hssi_csrrd32(pdev, HSSI_ETH_RECONFIG, chan,
-			   eth_pause_and_priority_csroffs(enable_rx_pause_frame_processing_fields));
-	buf[127] = hssi_csrrd32(pdev, HSSI_ETH_RECONFIG, chan,
-			   eth_pause_and_priority_csroffs(forward_flow_control_frames));
-	buf[128] = hssi_csrrd32(pdev, HSSI_ETH_RECONFIG, chan, eth_pause_and_priority_csroffs(rx_pause_frames_lsb));
-	buf[129] = hssi_csrrd32(pdev, HSSI_ETH_RECONFIG, chan, eth_pause_and_priority_csroffs(rx_pause_frames_msb));
-	buf[130] = hssi_csrrd32(pdev, HSSI_ETH_RECONFIG, chan,
-			   eth_pause_and_priority_csroffs(rx_flow_control_feature_cfg));
+	buf[93] = hssi_csrrd32(pdev, 
+			       HSSI_ETH_RECONFIG, 
+			       chan, 
+			       eth_pause_and_priority_csroffs(txsfc_module_revision_id));
+
+	buf[94] = hssi_csrrd32(pdev, 
+			       HSSI_ETH_RECONFIG, 
+			       chan, 
+			       eth_pause_and_priority_csroffs(txsfc_scratch_register));
+
+	buf[95] = hssi_csrrd32(pdev, 
+			       HSSI_ETH_RECONFIG, 
+			       chan, 
+			       eth_pause_and_priority_csroffs(enable_tx_pause_ports));
+
+	buf[96] = hssi_csrrd32(pdev, 
+			       HSSI_ETH_RECONFIG, 
+			       chan, 
+			       eth_pause_and_priority_csroffs(tx_pause_request));
+
+	buf[97] = hssi_csrrd32(pdev, 
+			       HSSI_ETH_RECONFIG, 
+			       chan,
+			       eth_pause_and_priority_csroffs(enable_automatic_tx_pause_retransmission));
+
+	buf[98] = hssi_csrrd32(pdev, 
+			       HSSI_ETH_RECONFIG, 
+			       chan, 
+			       eth_pause_and_priority_csroffs(retransmit_holdoff_quanta));
+
+	buf[99] = hssi_csrrd32(pdev, 
+			       HSSI_ETH_RECONFIG, 
+			       chan, 
+			       eth_pause_and_priority_csroffs(retransmit_pause_quanta));
+
+	buf[100] = hssi_csrrd32(pdev, 
+			        HSSI_ETH_RECONFIG, 
+				chan, 
+				eth_pause_and_priority_csroffs(enable_tx_xoff));
+
+	buf[101] = hssi_csrrd32(pdev, 
+			        HSSI_ETH_RECONFIG, 
+				chan, 
+				eth_pause_and_priority_csroffs(enable_uniform_holdoff));
+
+	buf[102] = hssi_csrrd32(pdev, 
+			        HSSI_ETH_RECONFIG, 
+				chan, 
+				eth_pause_and_priority_csroffs(set_uniform_holdoff)); 
+
+	buf[103] = hssi_csrrd32(pdev, 
+			        HSSI_ETH_RECONFIG, 
+				chan, 
+				eth_pause_and_priority_csroffs(flow_control_fields_lsb));
+
+	buf[104] = hssi_csrrd32(pdev, 
+			        HSSI_ETH_RECONFIG, 
+				chan, 
+				eth_pause_and_priority_csroffs(flow_control_fields_msb));
+
+	buf[105] = hssi_csrrd32(pdev, 
+			        HSSI_ETH_RECONFIG, 
+				chan, 
+				eth_pause_and_priority_csroffs(flow_control_frames_lsb));
+
+	buf[106] = hssi_csrrd32(pdev, 
+			        HSSI_ETH_RECONFIG, 
+				chan, 
+				eth_pause_and_priority_csroffs(flow_control_frames_msb));
+
+	buf[107] = hssi_csrrd32(pdev, 
+			        HSSI_ETH_RECONFIG, 
+				chan,
+			        eth_pause_and_priority_csroffs(tx_flow_control_feature_cfg));
+
+	buf[108] = hssi_csrrd32(pdev, 
+			        HSSI_ETH_RECONFIG, 
+				chan, 
+				eth_pause_and_priority_csroffs(pause_quanta_0));
+
+	buf[109] = hssi_csrrd32(pdev, 
+			        HSSI_ETH_RECONFIG, 
+				chan, 
+				eth_pause_and_priority_csroffs(pause_quanta_1));
+
+	buf[110] = hssi_csrrd32(pdev, 
+			        HSSI_ETH_RECONFIG, 
+				chan, 
+				eth_pause_and_priority_csroffs(pause_quanta_2));
+
+	buf[111] = hssi_csrrd32(pdev, 
+			        HSSI_ETH_RECONFIG, 
+				chan, 
+				eth_pause_and_priority_csroffs(pause_quanta_3));
+
+	buf[112] = hssi_csrrd32(pdev, 
+			        HSSI_ETH_RECONFIG, 
+				chan, 
+				eth_pause_and_priority_csroffs(pause_quanta_4));
+
+	buf[113] = hssi_csrrd32(pdev, 
+			        HSSI_ETH_RECONFIG, 
+				chan, 
+				eth_pause_and_priority_csroffs(pause_quanta_5));
+
+	buf[114] = hssi_csrrd32(pdev, 
+			        HSSI_ETH_RECONFIG, 
+				chan, 
+				eth_pause_and_priority_csroffs(pause_quanta_6));
+
+	buf[115] = hssi_csrrd32(pdev, 
+			        HSSI_ETH_RECONFIG, 
+				chan, 
+				eth_pause_and_priority_csroffs(pause_quanta_7));
+
+	buf[116] = hssi_csrrd32(pdev, 
+			        HSSI_ETH_RECONFIG, 
+				chan, 
+				eth_pause_and_priority_csroffs(pfc_holdoff_quanta_0));
+
+	buf[117] = hssi_csrrd32(pdev, 
+			        HSSI_ETH_RECONFIG, 
+				chan, 
+				eth_pause_and_priority_csroffs(pfc_holdoff_quanta_1));
+
+	buf[118] = hssi_csrrd32(pdev, 
+			        HSSI_ETH_RECONFIG, 
+				chan, 
+				eth_pause_and_priority_csroffs(pfc_holdoff_quanta_2));
+
+	buf[119] = hssi_csrrd32(pdev, 
+			        HSSI_ETH_RECONFIG, 
+				chan, 
+				eth_pause_and_priority_csroffs(pfc_holdoff_quanta_3));
+
+	buf[120] = hssi_csrrd32(pdev, 
+			        HSSI_ETH_RECONFIG, 
+				chan, 
+				eth_pause_and_priority_csroffs(pfc_holdoff_quanta_4));
+
+	buf[121] = hssi_csrrd32(pdev, 
+			        HSSI_ETH_RECONFIG, 
+				chan, 
+				eth_pause_and_priority_csroffs(pfc_holdoff_quanta_5));
+
+	buf[122] = hssi_csrrd32(pdev, 
+			        HSSI_ETH_RECONFIG, 
+				chan, 
+				eth_pause_and_priority_csroffs(pfc_holdoff_quanta_6));
+
+	buf[123] = hssi_csrrd32(pdev, 
+			        HSSI_ETH_RECONFIG, 
+				chan, 
+				eth_pause_and_priority_csroffs(pfc_holdoff_quanta_7));
+
+	buf[124] = hssi_csrrd32(pdev, 
+			        HSSI_ETH_RECONFIG, 
+				chan, 
+				eth_pause_and_priority_csroffs(rxsfc_module_revision_id));
+
+	buf[125] = hssi_csrrd32(pdev, 
+			        HSSI_ETH_RECONFIG, 
+				chan, 
+				eth_pause_and_priority_csroffs(rxsfc_scratch_register));
+
+	buf[126] = hssi_csrrd32(pdev, 
+			        HSSI_ETH_RECONFIG, 
+				chan,
+			        eth_pause_and_priority_csroffs(enable_rx_pause_frame_processing_fields));
+
+	buf[127] = hssi_csrrd32(pdev, 
+			        HSSI_ETH_RECONFIG, chan,
+			        eth_pause_and_priority_csroffs(forward_flow_control_frames));
+
+	buf[128] = hssi_csrrd32(pdev, 
+			        HSSI_ETH_RECONFIG, 
+				chan, 
+				eth_pause_and_priority_csroffs(rx_pause_frames_lsb));
+
+	buf[129] = hssi_csrrd32(pdev, 
+			        HSSI_ETH_RECONFIG, 
+				chan, 
+				eth_pause_and_priority_csroffs(rx_pause_frames_msb));
+
+	buf[130] = hssi_csrrd32(pdev, 
+			        HSSI_ETH_RECONFIG, 
+				chan,
+			        eth_pause_and_priority_csroffs(rx_flow_control_feature_cfg));
 
 	/* TX Statistics Counter Registers */
 	buf[131] = hssi_csrrd32(pdev, HSSI_ETH_RECONFIG, chan, eth_tx_stats_csroffs(tx_fragments_lsb));
@@ -612,7 +1121,7 @@ static int etile_set_pauseparam(struct net_device *dev,
 	}
 
 	hssi_csrwr32(pdev, HSSI_ETH_RECONFIG, chan,
-		eth_pause_and_priority_csroffs(pause_quanta_0), false, priv->pause);
+		eth_pause_and_priority_csroffs(pause_quanta_0), priv->pause);
 	priv->flow_ctrl = new_pause;
 out:
 	spin_unlock(&priv->mac_cfg_lock);
@@ -653,6 +1162,19 @@ static int etile_set_link_ksettings(struct net_device *dev,
 
 	if (!priv)
 		return -ENODEV;
+
+	if (cmd->base.autoneg == AUTONEG_ENABLE) {
+                pr_err("Auto-negotiation is not currently supported\n");
+                return -EOPNOTSUPP;
+        }
+
+        switch (cmd->base.speed) {
+        case SPEED_10000:
+                break;
+        default:
+                pr_err("10G speed is only supported speed\n");
+                return -EOPNOTSUPP;
+        }
 
 	return phylink_ethtool_ksettings_set(priv->phylink, cmd);
 }
