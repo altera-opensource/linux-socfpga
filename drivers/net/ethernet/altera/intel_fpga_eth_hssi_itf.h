@@ -43,8 +43,13 @@ void hssi_csrwr32(struct platform_device *pdev,
 		  enum tile_reg_type regbank,
 		  u32 chan,
 		  u32 offset,
-		  bool atomicity,
 		  u32 reg_value);
+
+void hssi_csrwr32_atomic(struct platform_device *pdev,
+		         enum tile_reg_type regbank,
+		  	 u32 chan,
+		  	 u32 offset,
+		  	 u32 reg_value);
 
 u8   hssi_csrrd8(struct platform_device *pdev,
 		 enum tile_reg_type regbank,

@@ -2589,6 +2589,15 @@ struct intel_fpga_etile_eth_private {
 	u32 tx_irq;
 	u32 rx_irq;
 
+	u32 tx_irqcount;
+	u32 rx_irqcount;
+
+	u32 xtile_pollcount;
+	u32 txcomp;
+	u32 rxcomp;
+
+	u32 intr_missed;
+
 	/* RX/TX MAC FIFO configs */
 	u32 tx_fifo_depth;
 	u32 rx_fifo_depth;
@@ -2647,7 +2656,7 @@ int init_mac(struct intel_fpga_etile_eth_private *priv);
 void enable_port_loopback(struct intel_fpga_etile_eth_private *priv, int port);
 void xtile_get_stats64(struct net_device *dev,
 		       struct rtnl_link_stats64 *storage);
-void pma_reset(struct intel_fpga_etile_eth_private *priv, bool tx_reset, bool rx_reset);
+void pma_digital_reset(struct intel_fpga_etile_eth_private *priv, bool tx_reset, bool rx_reset);
 
 int xtile_check_counter_complete(struct intel_fpga_etile_eth_private *priv, u32 regbank,
 				 size_t offs, u8 bit_mask, bool set_bit,
