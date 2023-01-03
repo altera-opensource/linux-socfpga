@@ -613,6 +613,9 @@ static int dwxgmac2_del_hw_vlan_rx_fltr(struct net_device *dev,
 static void dwxgmac2_restore_hw_vlan_rx_fltr(struct net_device *dev,
 						struct mac_device_info *hw)
 {
+	void __iomem *ioaddr = hw->pcsr;
+	u32 value;
+	u32 hash;
 	u32 val;
 	int i;
 
@@ -628,6 +631,13 @@ static void dwxgmac2_restore_hw_vlan_rx_fltr(struct net_device *dev,
 			val = hw->vlan_filter[i];
 			dwxgmac2_write_vlan_filter(dev, hw, i, val);
 		}
+	}
+
+	hash = readl(ioaddr + XGMAC_VLAN_HASH_TABLE);
+	if (hash & XGMAC_VLAN_VLHT) {
+		value = readl(ioaddr + XGMAC_VLAN_TAG);
+		value |= XGMAC_VLAN_VTHM;
+		writel(value, ioaddr + XGMAC_VLAN_TAG);
 	}
 }
 
@@ -710,7 +720,9 @@ static void dwxgmac2_set_filter(struct mac_device_info *hw,
 	}
 
 	/* VLAN Filtering */
-	if (dev->features & NETIF_F_HW_VLAN_CTAG_FILTER)
+	if (dev->flags & IFF_PROMISC && !hw->vlan_fail_q_en)
+		value &= ~XGMAC_FILTER_VTFE;
+	else if (dev->features & NETIF_F_HW_VLAN_CTAG_FILTER)
 		value |= XGMAC_FILTER_VTFE;
 
 	writel(value, ioaddr + XGMAC_PACKET_FILTER);
