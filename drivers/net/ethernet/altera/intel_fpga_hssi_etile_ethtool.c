@@ -1,14 +1,9 @@
-// SPDX-License-Identifier: GPL-2.0
+// SPDX-License-Identifier: GPL
 /* Ethtool support for Intel FPGA E-tile Ethernet MAC driver
- * Copyright (C) 2019-2022 Intel Corporation. All rights reserved
+ * Copyright (C) 2022,2023 Intel Corporation. All rights reserved
  *
  * Contributors:
- *   Roman Bulgakov
- *   Yu Ying Choo
- *   Dalon Westergreen
- *   Joyce Ooi
- *
- * Original driver contributed by GlobalLogic.
+ *   Preetam Narayan
  */
 
 #include <linux/ethtool.h>
@@ -1067,8 +1062,8 @@ static void etile_get_regs(struct net_device *dev,
 }
 
 static void etile_get_pauseparam(struct net_device *dev,
-				 struct ethtool_pauseparam *pauseparam)
-{
+				 struct ethtool_pauseparam *pauseparam) {
+	
 	struct intel_fpga_etile_eth_private *priv = netdev_priv(dev);
 
 	pauseparam->rx_pause = 0;
@@ -1082,8 +1077,8 @@ static void etile_get_pauseparam(struct net_device *dev,
 }
 
 static int etile_set_pauseparam(struct net_device *dev,
-				struct ethtool_pauseparam *pauseparam)
-{
+				struct ethtool_pauseparam *pauseparam) {
+
 	struct intel_fpga_etile_eth_private *priv = netdev_priv(dev);
 	struct platform_device *pdev = priv->pdev_hssi;
 	u32 chan = priv->chan;
@@ -1100,28 +1095,35 @@ static int etile_set_pauseparam(struct net_device *dev,
 
 	if (pauseparam->rx_pause) {
 		new_pause |= FLOW_RX;
-		hssi_set_bit(pdev, HSSI_ETH_RECONFIG, chan,
-			    eth_pause_and_priority_csroffs(rx_flow_control_feature_cfg),
-			    ETH_RX_EN_STD_FLOW_CTRL);
-	} else {
-		hssi_clear_bit(pdev, HSSI_ETH_RECONFIG, chan,
-			      eth_pause_and_priority_csroffs(rx_flow_control_feature_cfg),
-			      ETH_RX_EN_STD_FLOW_CTRL);
+		hssi_set_bit_atomic(pdev, 
+				    HSSI_ETH_RECONFIG, chan,
+			    	    eth_pause_and_priority_csroffs(rx_flow_control_feature_cfg),
+			    	    ETH_RX_EN_STD_FLOW_CTRL);
+	} 
+	else {
+		hssi_clear_bit_atomic(pdev, 
+			       	      HSSI_ETH_RECONFIG, chan,
+			              eth_pause_and_priority_csroffs(rx_flow_control_feature_cfg),
+			              ETH_RX_EN_STD_FLOW_CTRL);
 	}
 
 	if (pauseparam->tx_pause) {
 		new_pause |= FLOW_TX;
-		hssi_set_bit(pdev, HSSI_ETH_RECONFIG, chan,
-			     eth_pause_and_priority_csroffs(tx_flow_control_feature_cfg),
-			     ETH_TX_EN_STD_FLOW_CTRL);
-	} else {
-		hssi_clear_bit(pdev, HSSI_ETH_RECONFIG, chan,
-			      eth_pause_and_priority_csroffs(tx_flow_control_feature_cfg),
-			      ETH_TX_EN_STD_FLOW_CTRL);
+		hssi_set_bit_atomic(pdev, 
+			     	    HSSI_ETH_RECONFIG, chan,
+			            eth_pause_and_priority_csroffs(tx_flow_control_feature_cfg),
+			            ETH_TX_EN_STD_FLOW_CTRL);
+	} 
+	else {
+		hssi_clear_bit_atomic(pdev, 
+				      HSSI_ETH_RECONFIG, chan,
+			      	      eth_pause_and_priority_csroffs(tx_flow_control_feature_cfg),
+			      	      ETH_TX_EN_STD_FLOW_CTRL);
 	}
 
-	hssi_csrwr32(pdev, HSSI_ETH_RECONFIG, chan,
-		eth_pause_and_priority_csroffs(pause_quanta_0), priv->pause);
+	hssi_csrwr32_atomic(pdev, HSSI_ETH_RECONFIG, chan,
+			    eth_pause_and_priority_csroffs(pause_quanta_0), priv->pause);
+	
 	priv->flow_ctrl = new_pause;
 out:
 	spin_unlock(&priv->mac_cfg_lock);
@@ -1132,14 +1134,13 @@ static int etile_get_ts_info(struct net_device *dev,
 			     struct ethtool_ts_info *info)
 {
 
-#if 0
 	struct intel_fpga_etile_eth_private *priv = netdev_priv(dev);
 
 	if (priv->ptp_priv.ptp_clock)
 		info->phc_index = ptp_clock_index(priv->ptp_priv.ptp_clock);
 	else
-#endif
 		info->phc_index = -1;
+
 	info->so_timestamping = SOF_TIMESTAMPING_TX_HARDWARE |
 				SOF_TIMESTAMPING_RX_HARDWARE |
 				SOF_TIMESTAMPING_RAW_HARDWARE;
@@ -1184,12 +1185,81 @@ static int etile_get_link_ksettings(struct net_device *dev,
 				    struct ethtool_link_ksettings *cmd)
 {
 	struct intel_fpga_etile_eth_private *priv = netdev_priv(dev);
+	int ret;
 
 	if (!priv)
 		return -ENODEV;
 
-	return phylink_ethtool_ksettings_get(priv->phylink, cmd);
+	if (!netif_running(dev))
+	{
+		cmd->base.speed = 0;
+		cmd->base.duplex = DUPLEX_UNKNOWN;
+	}
+
+	ret = phylink_ethtool_ksettings_get(priv->phylink, cmd);
+	return ret;
 }
+
+static int etile_get_link_ext_state(struct net_device *net_dev,
+                        	    struct ethtool_link_ext_state_info *link_ext_state_info)
+{
+	struct intel_fpga_etile_eth_private *priv = netdev_priv(net_dev);
+
+	if (netif_carrier_ok(net_dev))
+		return -ENODATA;
+
+	if (priv->cable_unplugged)
+		link_ext_state_info->link_ext_state =
+                        ETHTOOL_LINK_EXT_STATE_NO_CABLE;
+
+	return 0;
+}
+
+#ifdef TO_BE_IMPLEMENTED
+static int etile_map_reset_flags(struct net_device *net_dev, u32 *flags) {
+
+        struct intel_fpga_etile_eth_private *priv = netdev_priv(net_dev);
+	struct platform_device *pdev = priv->pdev_hssi;
+
+	u32 ethflag = *flags;
+        
+	if (!priv)
+                return -ENODEV;
+
+	while(ethflag != 0) {
+
+		switch(ethflag & 1) {
+
+		case ETH_RESET_PHY:
+			pma_digital_reset(priv, true, true);
+			pma_analog_reset(priv);
+			ethflag &= ~ETH_RESET_PHY;
+			break;
+
+		case ETH_RESET_ALL:
+			hssi_cold_rst(pdev);
+			priv->dmaops->reset_dma(&priv->dma_priv);
+			ethflag &= ~ETH_RESET_ALL;
+			break;
+
+		case ETH_RESET_DMA:
+			priv->dmaops->reset_dma(&priv->dma_priv);
+			ethflag &= ~ETH_RESET_DMA;
+			break;
+
+		case ETH_RESET_FILTER:
+			priv->dma_priv.hwts_tx_en = 0;
+			priv->dma_priv.hwts_rx_en = 0;
+			break;
+
+		default:
+			break;
+		}
+
+		ethflag >>= 1;
+	}	
+}
+#endif
 
 static const struct ethtool_ops xtile_ethtool_ops = {
 	.get_drvinfo = etile_get_drvinfo,
@@ -1206,6 +1276,7 @@ static const struct ethtool_ops xtile_ethtool_ops = {
 	.get_ts_info = etile_get_ts_info,
 	.get_link_ksettings = etile_get_link_ksettings,
 	.set_link_ksettings = etile_set_link_ksettings,
+	.get_link_ext_state = etile_get_link_ext_state,
 };
 
 void intel_fpga_xtile_set_ethtool_ops(struct net_device *netdev)
