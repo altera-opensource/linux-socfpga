@@ -24,11 +24,13 @@
 #include <linux/phy.h>
 #include <linux/ptp_clock_kernel.h>
 #include <linux/timer.h>
+#include <linux/phylink.h>
 #include "intel_fpga_tod.h"
 #include "altera_eth_dma.h"
 #include "altera_msgdma.h"
 #include "altera_msgdma_prefetcher.h"
 #include "altera_sgdma.h"
+#include "intel_fpga_eth_qsfp.h"
 
 #define INTEL_FPGA_RET_SUCCESS                          0
 
@@ -2563,103 +2565,73 @@ struct intel_fpga_rx_fifo {
 #define rx_fifo_csroffs(a)	(offsetof(struct intel_fpga_rx_fifo, a))
 
 struct intel_fpga_etile_eth_private {
+	
+	const char *fec_type;
 	struct net_device *dev;
-	struct device *device;
-	struct napi_struct napi;
-	struct timer_list fec_timer;
-
-	/* Phylink */
-	struct phylink *phylink;
-	struct phylink_config phylink_config;
-	/* MAC address space */
+	struct device     *device;
+	struct phylink    *phylink;
+	struct qsfp_ops   *qsfp_ops;
+	struct altera_dmaops *dmaops;
 	struct platform_device *pdev_hssi;
-	/* Shared DMA structure */
-	struct altera_dma_private dma_priv;
-
-	/* Shared PTP structure */
-	struct intel_fpga_tod_private ptp_priv;
-
-	u32 ptp_enable;
-	u32 chan;
+	struct qsfp_reg_space __iomem *qsfp_reg;
 	struct intel_fpga_rx_fifo __iomem *rx_fifo;
-	/* RS-FEC address space */
-	struct intel_fpga_etile_rsfec __iomem *rsfec;
-
-	/* Interrupts */
+	
+	u32 chan;
 	u32 tx_irq;
 	u32 rx_irq;
-
-	u32 tx_irqcount;
-	u32 rx_irqcount;
-
-	u32 xtile_pollcount;
-	u32 txcomp;
-	u32 rxcomp;
-
-	u32 intr_missed;
-
-	/* RX/TX MAC FIFO configs */
+	u32 max_mtu;
 	u32 tx_fifo_depth;
 	u32 rx_fifo_depth;
 	u32 rx_fifo_almost_full;
 	u32 rx_fifo_almost_empty;
-	u32 max_mtu;
-
-	/* MAC command_config register protection */
-	spinlock_t mac_cfg_lock;
-	/* Tx path protection */
-	spinlock_t tx_lock;
-
-	/* Rx DMA & interrupt control protection */
-	spinlock_t rxdma_irq_lock;
-
-	/* Rx DMA Buffer Size */
 	u32 rxdma_buffer_size;
-	/* MAC flow control */
-	unsigned int flow_ctrl;
-	unsigned int pause;
-
-	/* PMA digital delay */
+	u32 flow_ctrl;
+	u32 pause;
+	u32 msg_enable;
+	u32 link_speed;
+	
 	u32 tx_pma_delay_ns;
 	u32 rx_pma_delay_ns;
 	u32 tx_pma_delay_fns;
 	u32 rx_pma_delay_fns;
-
-	/* External PHY delay */
+	u32 rsfec_cw_pos_rx;
 	u32 tx_external_phy_delay_ns;
 	u32 rx_external_phy_delay_ns;
-
-	/* PHY */
-	void __iomem *mac_extra_control;
-	int phy_addr;		/* PHY's MDIO address, -1 for autodetection */
-	phy_interface_t phy_iface;
-	struct mii_bus *mdio;
-	u32 link_speed;
+	
 	u8 duplex;
-	int oldlink;
+	u8 qsfp_lane;
+	bool autoneg;
+	bool ptp_enable;
+	bool cable_unplugged;
+	
+	spinlock_t tx_lock;
+	spinlock_t mac_cfg_lock;
+	spinlock_t rxdma_irq_lock;
+	
+	struct napi_struct napi;
+	struct delayed_work dwork;
+	struct timer_list fec_timer;
+	struct altera_dma_private dma_priv;
+	struct phylink_config phylink_config;
+	struct intel_fpga_tod_private ptp_priv;
 
-	/* FEC */
-	const char *fec_type;
-	u32 rsfec_cw_pos_rx;
-
-	/* ethtool msglvl option */
-	u32 msg_enable;
-	struct altera_dmaops *dmaops;
-
+	phy_interface_t phy_iface;
 };
 
-/* Function prototypes
- */
+/* Function prototypes */
 void ui_adjustments(struct timer_list *t);
-
 int init_mac(struct intel_fpga_etile_eth_private *priv);
-void enable_port_loopback(struct intel_fpga_etile_eth_private *priv, int port);
 void xtile_get_stats64(struct net_device *dev,
 		       struct rtnl_link_stats64 *storage);
-void pma_digital_reset(struct intel_fpga_etile_eth_private *priv, bool tx_reset, bool rx_reset);
-
-int xtile_check_counter_complete(struct intel_fpga_etile_eth_private *priv, u32 regbank,
-				 size_t offs, u8 bit_mask, bool set_bit,
+void pma_digital_reset(struct intel_fpga_etile_eth_private *priv, 
+		       bool tx_reset, 
+		       bool rx_reset);
+void pma_analog_reset(struct intel_fpga_etile_eth_private *priv);
+int xtile_check_counter_complete(struct intel_fpga_etile_eth_private *priv, 
+				 u32 regbank,
+				 size_t offs, 
+				 u8 bit_mask, 
+				 bool set_bit,
 				 int align);
 
 #ifdef CONFIG_INTEL_FPGA_ETILE_DEBUG_FS
