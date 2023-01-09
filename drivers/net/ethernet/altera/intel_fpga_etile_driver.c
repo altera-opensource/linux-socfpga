@@ -1,11 +1,10 @@
-// SPDX-License-Identifier: GPL-2.0
+// SPDX-License-Identifier: GPL
 /* Intel FPGA E-tile Ethernet MAC driver
- * Copyright (C) 2022 Intel Corporation. All rights reserved
+ * Copyright (C) 2022,2023 Intel Corporation. All rights reserved
  *
  * Contributors:
  *   Preetam Narayan
  *
- * Original driver contributed by GlobalLogic.
  */
 
 #include <linux/phylink.h>
@@ -270,6 +269,41 @@ void pma_digital_reset(struct intel_fpga_etile_eth_private *priv,
 	if (tx_reset)
 		hssi_csrwr8(pdev, HSSI_ETH_RECONFIG, 
 			    chan, eth_phy_csroffs(phy_config), 0x2);
+}
+
+void pma_analog_reset(struct intel_fpga_etile_eth_private *priv) 
+{
+	struct platform_device *pdev = priv->pdev_hssi;
+	u32 chan = priv->chan;
+
+	/* Step:  Trigger PMA analog reset
+         *      1.      PMA AVMM Write, Offset = 0x200, value = 0x0
+         *      2.      PMA AVMM Write, Offset = 0x201, value = 0x0
+         *      3.      PMA AVMM Write, Offset = 0x202, value = 0x0
+         *      4.      PMA AVMM Write, Ofset = 0x203, value = 0x81
+         *      5.      PMA AVMM Read, Offset = 0x207, expected value = 0x80
+         *      6.      PMA AVMM Read, Offset = 0x204, expected value = 0x0 (channel #)
+         */
+	hssi_csrwr8(pdev, HSSI_PHY_XCVR_PMAAVMM, chan, eth_pma_avmm_csroffs(reg_200), 0x0);
+	hssi_csrwr8(pdev, HSSI_PHY_XCVR_PMAAVMM, chan, eth_pma_avmm_csroffs(reg_201), 0x0);
+	hssi_csrwr8(pdev, HSSI_PHY_XCVR_PMAAVMM, chan, eth_pma_avmm_csroffs(reg_202), 0x0);
+	hssi_csrwr8(pdev, HSSI_PHY_XCVR_PMAAVMM, chan, eth_pma_avmm_csroffs(reg_203), 0x81);
+
+        if (xtile_check_counter_complete(priv, HSSI_PHY_XCVR_PMAAVMM, 
+					 eth_pma_avmm_csroffs(reg_207),
+                                         XCVR_PMA_AVMM_207_LAST_OP_ON_200_203_SUCCESS,
+                                         true, INTEL_FPGA_BYTE_ALIGN)) {
+                netdev_err(priv->dev, "Analog PMA reset failed, abort\n");
+                return ;
+        }
+
+        if (xtile_check_counter_complete(priv, HSSI_PHY_XCVR_PMAAVMM,
+					 eth_pma_avmm_csroffs(reg_204),
+                                         XCVR_PMA_AVMM_204_RET_PHYS_CHANNEL_NUMBER,
+                                         false, INTEL_FPGA_BYTE_ALIGN))
+                netdev_warn(priv->dev, "Cannot read channel number\n");
+
+
 }
 
 int init_mac(struct intel_fpga_etile_eth_private *priv)
