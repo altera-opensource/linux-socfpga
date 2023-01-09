@@ -6,8 +6,8 @@
  *   Preetam Narayan
  */
 
-#ifndef __HSSI_CSRACCESS_ITF__
-#define __HSSI_CSRACCESS_ITF__
+#ifndef __INTEL_FPGA_ETH_HSSI_ITF_H__
+#define __INTEL_FPGA_ETH_HSSI_ITF_H__
 
 #include <linux/kernel.h>
 #include <linux/platform_device.h>
@@ -86,6 +86,18 @@ void hssi_clear_bit(struct platform_device *pdev,
 		    u32 offset,
 		    u32 bit_mask);
 
+void hssi_set_bit_atomic(struct platform_device *pdev,
+                  	  enum tile_reg_type regbank,
+                  	  u32 chan,
+                  	  u32 offset,
+                  	  u32 bit_mask);
+
+void hssi_clear_bit_atomic(struct platform_device *pdev,
+                    	   enum tile_reg_type regbank,
+                    	   u32 chan,
+                    	   u32 offset,
+                    	   u32 bit_mask);
+
 bool hssi_bit_is_set(struct platform_device *pdev,
 		     enum tile_reg_type regbank,
 		     u32 chan,
@@ -110,9 +122,13 @@ int hssi_dis_serial_loopback(struct platform_device *pdev,
 			      u32 chan);
 
 bool hssi_ethport_is_stable(struct platform_device *pdev,
-			    u32 chan);
+			    u32 chan, bool);
 
 u64  hssi_read_mac_stats64(struct platform_device *pdev,
 			   u32 chan,
 			   enum hssiss_mac_stat_counter_type stat_type);
-#endif //__HSSI_CSRACCESS_ITF__
+
+void hssi_disable_hotplug(struct platform_device *pdev);
+
+void hssi_enable_hotplug(struct platform_device *pdev);
+#endif 

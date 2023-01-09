@@ -1,6 +1,6 @@
-// SPDX-License-Identifier: GPL-2.0
+// SPDX-License-Identifier: GPL
 /* Intel FPGA HSSI-SS interface API
- * Copyright (C) 2022 Intel Corporation. All rights reserved
+ * Copyright (C) 2022,2023 Intel Corporation. All rights reserved
  *
     * Contributors:
     *   Preetam Narayan
@@ -224,6 +224,21 @@ void hssi_set_bit(struct platform_device *pdev,
 	hssi_csrwr32(pdev, regbank, chan, offset, value);
 }
 
+void hssi_set_bit_atomic(struct platform_device *pdev,
+                 	  enum tile_reg_type regbank,
+                  	  u32 chan,
+                 	  u32 offset,
+                 	  u32 bit_mask) {
+        u32 value;
+
+        value = hssi_csrrd32_atomic(pdev, regbank, chan, offset);
+
+        value |= bit_mask;
+
+        hssi_csrwr32_atomic(pdev, regbank, chan, offset, value);
+}
+
+
 void hssi_clear_bit(struct platform_device *pdev, 
 		    enum tile_reg_type regbank, 
 		    u32 chan, 
@@ -236,6 +251,20 @@ void hssi_clear_bit(struct platform_device *pdev,
 	value &= ~bit_mask;
 
 	hssi_csrwr32(pdev, regbank, chan, offset, value);
+}
+
+void hssi_clear_bit_atomic(struct platform_device *pdev,
+                    	    enum tile_reg_type regbank,
+                    	    u32 chan,
+                     	    u32 offset,
+                    	    u32 bit_mask) {
+        u32 value;
+
+        value = hssi_csrrd32_atomic(pdev, regbank, chan, offset);
+
+        value &= ~bit_mask;
+
+        hssi_csrwr32_atomic(pdev, regbank, chan, offset, value);
 }
 
 bool hssi_bit_is_set(struct platform_device *pdev, 
@@ -350,7 +379,17 @@ int hssi_dis_serial_loopback(struct platform_device *pdev, u32 chan)
 	return ret_status;
 }
 
-bool hssi_ethport_is_stable(struct platform_device *pdev, u32 chan) {
+#if 0
+void hssi_disable_hotplug(struct platform_device *pdev) {
+	hssiss_hotplug_enable(pdev, false);
+}
+
+void hssi_enable_hotplug(struct platform_device *pdev) {
+	hssiss_hotplug_enable(pdev, true);
+}
+#endif
+
+bool hssi_ethport_is_stable(struct platform_device *pdev, u32 chan, bool logging) {
 
 	bool retstatus;
 	hssi_eth_port_sts pstatus;
@@ -363,6 +402,12 @@ bool hssi_ethport_is_stable(struct platform_device *pdev, u32 chan) {
 	retstatus =  pstatus.part.tx_lanes_stable &
 		     pstatus.part.rx_pcs_ready    &
 		     pstatus.part.tx_pll_locked;
+
+	/* only print if the logging is enabled */
+	/* logging is needed only at start up   */
+	if (logging == false) {
+		goto res;
+	}
 
 	if (!retstatus) {
 
@@ -379,6 +424,6 @@ bool hssi_ethport_is_stable(struct platform_device *pdev, u32 chan) {
 		pstatus.part.tx_lanes_stable,
 		pstatus.part.rx_pcs_ready,
 		pstatus.part.tx_pll_locked);
-
+res:
 	return retstatus;
 }
