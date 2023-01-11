@@ -2633,6 +2633,7 @@ int xtile_check_counter_complete(struct intel_fpga_etile_eth_private *priv,
 				 u8 bit_mask, 
 				 bool set_bit,
 				 int align);
+void etile_update_mac_addr(struct intel_fpga_etile_eth_private *priv, u8 *addr);
 
 #ifdef CONFIG_INTEL_FPGA_ETILE_DEBUG_FS
 int intel_fpga_etile_init_fs(struct net_device *dev);

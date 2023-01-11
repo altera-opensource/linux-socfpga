@@ -41,8 +41,8 @@ static void etile_set_mac(struct intel_fpga_etile_eth_private *priv,
 	}
 }
 
-static void etile_update_mac_addr(struct intel_fpga_etile_eth_private *priv, 
-				  u8 *addr)
+void etile_update_mac_addr(struct intel_fpga_etile_eth_private *priv, 
+			   u8 *addr)
 {
 	u32 msb;
 	u32 lsb;
