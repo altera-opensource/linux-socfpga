@@ -462,8 +462,10 @@ static irqreturn_t intel_fpga_xtile_isr(int irq, void *dev_id)
 		__napi_schedule(&priv->napi);
 	}
 
-	priv->dmaops->clear_rxirq(&priv->dma_priv);
-	priv->dmaops->clear_txirq(&priv->dma_priv);
+	if ( irq == priv->rx_irq )
+		priv->dmaops->clear_rxirq(&priv->dma_priv);
+	else
+		priv->dmaops->clear_txirq(&priv->dma_priv);
 
 	spin_unlock(&priv->rxdma_irq_lock);
 
