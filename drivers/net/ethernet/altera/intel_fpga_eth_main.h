@@ -19,6 +19,8 @@
 
 typedef struct intel_fpga_etile_eth_private intel_fpga_xtile_eth_private;
 
+int xtile_start_xmit(struct sk_buff *skb, struct net_device *dev);
+
 int fec_init(struct platform_device *pdev, struct intel_fpga_etile_eth_private *priv);
 void intel_fpga_xtile_set_ethtool_ops(struct net_device *dev);
 

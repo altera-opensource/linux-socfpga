@@ -652,10 +652,8 @@ static int xtile_open(struct net_device *dev)
 
 init_error:
 	xtile_free_skbufs(dev);
-	xtile_free_skbufs(dev);
-phy_error:
-
 alloc_skbuf_error:
+phy_error:
 	return ret;
 }
 
@@ -704,6 +702,20 @@ static int xtile_shutdown(struct net_device *dev)
 	return 0;
 }
 
+static int xtile_change_mac(struct net_device *dev, void *inet_ds) {
+	
+	struct sockaddr *addr = inet_ds;
+	intel_fpga_xtile_eth_private *priv = netdev_priv(dev);
+	        
+	if (!is_valid_ether_addr(addr->sa_data))
+                return -EADDRNOTAVAIL;
+        
+	memcpy(dev->dev_addr, addr->sa_data, ETH_ALEN);
+	etile_update_mac_addr(priv, priv->dev->dev_addr);
+        
+	return 0;
+}
+
 /* Transmit a packet (called by the kernel). Dispatches
  * either the SGDMA method for transmitting or the
  * MSGDMA method, assumes no scatter/gather support,
@@ -713,7 +725,7 @@ static int xtile_shutdown(struct net_device *dev)
  *
  * Exec: xmit time taken 10us 
  */
-static int xtile_start_xmit(struct sk_buff *skb, struct net_device *dev)
+int xtile_start_xmit(struct sk_buff *skb, struct net_device *dev)
 {
 	unsigned int entry;
 	dma_addr_t dma_addr;
@@ -921,7 +933,7 @@ static const struct net_device_ops intel_fpga_xtile_netdev_ops = {
 	.ndo_open		= xtile_open,
 	.ndo_stop		= xtile_shutdown,
 	.ndo_start_xmit		= xtile_start_xmit,
-	.ndo_set_mac_address	= eth_mac_addr,
+	.ndo_set_mac_address	= xtile_change_mac,
 	.ndo_set_rx_mode	= xtile_set_rx_mode,
 	.ndo_change_mtu		= xtile_change_mtu,
 	.ndo_do_ioctl		= xtile_do_ioctl,
@@ -1353,14 +1365,12 @@ static int intel_fpga_xtile_probe(struct platform_device *pdev)
 		goto err_init_fec;
 	}
 
-#if 0
 	/* disable hotplug in hssi */
-	hssi_disable_hotplug(pdev_hssi);
-#endif
+	//hssi_disable_hotplug(pdev_hssi);
+	
 	return 0;
 
 err_init_fec:	
-err_init_phy:
 	unregister_netdev(ndev);
 err_register_netdev:
 	netif_napi_del(&priv->napi);
@@ -1397,7 +1407,6 @@ intel_fpga_xtile_qsfp_up(intel_fpga_xtile_eth_private *priv) {
         }
 
         napi_enable(&priv->napi);
-	
 	rtnl_unlock();
 }
 
@@ -1406,10 +1415,7 @@ intel_fpga_xtile_qsfp_down(intel_fpga_xtile_eth_private *priv) {
 
 	rtnl_lock();
         netif_stop_queue(priv->dev);
-	
-
         napi_disable(&priv->napi);
-
 	rtnl_unlock();
 }
 
