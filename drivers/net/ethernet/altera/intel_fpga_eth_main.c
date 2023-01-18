@@ -1,15 +1,10 @@
-// SPDX-License-Identifier: GPL-2.0
+// SPDX-License-Identifier: GPL
 /* Intel FPGA Ethernet MAC driver
- * Copyright (C) 2020-2022 Intel Corporation. All rights reserved
+ * Copyright (C) 2022,2023 Intel Corporation. All rights reserved
  *
  * Contributors:
- *   Roman Bulgakov
- *   Yu Ying Choov
- *   Dalon Westergreen
- *   Joyce Ooi
- *   Arzu Ozdogan-tackin
+ * 	Preetam Narayan
  *
- * Original driver contributed by GlobalLogic.
  */
 
 #include <linux/etherdevice.h>
@@ -33,7 +28,6 @@
 #include "intel_fpga_eth_main.h"
 #include "intel_fpga_eth_hssi_itf.h"
 
-#define WATCHDOG_TX_TIMEOUT (1 * HZ)/3
 #define MAX_STABILITY_CHECK  10
 
 /* Module parameters */
@@ -230,6 +224,9 @@ static void xtile_free_skbufs(struct net_device *dev)
 
 	for (i = 0; i < tx_descs; i++)
 		xtile_free_tx_buffer(priv, &priv->dma_priv.tx_ring[i]);
+
+	kfree(priv->dma_priv.tx_ring);
+	kfree(priv->dma_priv.rx_ring);
 }
 
 /* Reallocate the skb for the reception process
@@ -462,10 +459,8 @@ static irqreturn_t intel_fpga_xtile_isr(int irq, void *dev_id)
 		__napi_schedule(&priv->napi);
 	}
 
-	if ( irq == priv->rx_irq )
-		priv->dmaops->clear_rxirq(&priv->dma_priv);
-	else
-		priv->dmaops->clear_txirq(&priv->dma_priv);
+	priv->dmaops->clear_rxirq(&priv->dma_priv);
+	priv->dmaops->clear_txirq(&priv->dma_priv);
 
 	spin_unlock(&priv->rxdma_irq_lock);
 
@@ -690,6 +685,13 @@ static int xtile_shutdown(struct net_device *dev)
 
 	/* Unregister TX interrupt */
 	devm_free_irq(priv->device, priv->tx_irq, dev);
+
+        /* to ensure we have acquired the lock and do proper cleaning */
+        spin_lock(&priv->tx_lock);
+        spin_lock(&priv->mac_cfg_lock);
+
+        spin_unlock(&priv->tx_lock);
+        spin_unlock(&priv->mac_cfg_lock);
 
 	/* disable and reset the MAC, empties fifo */
 	/* Trigger RX digital reset */
