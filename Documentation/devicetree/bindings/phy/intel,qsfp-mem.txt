@@ -1,0 +1,16 @@
+* Intel QSFP Memory controller subsystem
+
+Required properties:
+- compatible: Should be "intel,qsfp-mem"
+- reg: Address and length of the register set for the device. It contains
+  the information of registers in the same order as described by reg-names
+- reg-names: Should contain the reg names
+
+Example:
+
+		qsfp_eth0: qsfp-eth0 {
+			   compatible = "intel,qsfp-mem";
+			   reg-names = "qsfp-mem-controller";
+			   reg = <0x00000001 0x80112000 0x00001000>,
+			   status = "okay";
+		};

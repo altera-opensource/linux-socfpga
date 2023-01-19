@@ -61,6 +61,29 @@ config SFP
 	depends on HWMON || HWMON=n
 	select MDIO_I2C
 
+config QSFP_MEM_CORE
+	tristate "QSFP Controller subsystem core code" if COMPILE_TEST
+	depends on HWMON || HWMON=n
+	help
+	  The core code for the QSFP Controller subsystem for Intel FPGAs used
+	  by other interafce module drivers for access to the QSFP controller
+	  subsystem registers
+
+config QSFP_MEM
+	tristate "Memory based platform driver for QSFP Controller subsystem in Intel FPGAs"
+	select QSFP_MEM_CORE
+	help
+	  Adds support for a QSFP controller subsystem that shadows the QSFP module's
+	  memory pages in memory
+
+config QSFP_MEM_DFL
+	tristate "DFL bus driver for QSFP Controller subsystem in Intel FPGAs"
+	depends on FPGA_DFL
+	select QSFP_MEM_CORE
+	help
+	  This is a Device Feature List (DFL) bus driver for the
+	  QSFP Controller subsystem in Intel FPGAs.
+
 comment "MII PHY device drivers"
 
 config QSFP
