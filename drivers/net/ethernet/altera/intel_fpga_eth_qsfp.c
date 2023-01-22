@@ -22,13 +22,7 @@ qsfp_lane_mapper(intel_fpga_xtile_eth_private *priv) {
 
 	pdev = container_of(priv->device, struct platform_device, dev);
 
-        /* QSFP has four lanes, each lane is considered one port and
-         * corresponds to linux network interface
-         */
-        if (priv->qsfp_lane >= 0 && priv->qsfp_lane <=3)
-                dev_qsfp  = of_parse_phandle(pdev->dev.of_node, "qsfp0", 0);
-        else
-                dev_qsfp  = of_parse_phandle(pdev->dev.of_node, "qsfp1", 0);
+        dev_qsfp  = of_parse_phandle(pdev->dev.of_node, "qsfp", 0);
 
         pdev_qsfp = of_find_device_by_node(dev_qsfp);
 
