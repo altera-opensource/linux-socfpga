@@ -67,13 +67,15 @@
 		hssi_0_eth: hssi_0_eth{
 
 				reg-names = "tx_pref"  , 
-					    "tx_csr"   , 
+					    "tx_csr"   ,
+					    "tx_fifo"  , 
 					    "rx_pref"  , 
 					    "rx_csr"   , 
 					    "rx_fifo"  ;
 
 				reg =   <0x82000800 0x00000020>,
 					<0x82000820 0x00000020>,
+					<0x82000840 0x00000020>,
 					<0x82000900 0x00000020>,
 					<0x82000920 0x00000020>,
 					<0x82000940 0x00000020>;
@@ -82,8 +84,8 @@
 				chan = <0x8>;
 				phy-mode = "10gbase-r";
 				tod = <&tod_0_clk>;
-				qsfp0 = <&qsfp_eth0>;
-				qsfp1 = <&qsfp_eth1>;
+				qsfp = <&qsfp_eth0>;
+				qsfp-lane = <0x0>;
 				hssiss = <&hssiss_0_hssiss>;
 				clock-names = "tod_clk";
 				altr,tx-pma-delay-ns = <0xD>;
@@ -97,7 +99,6 @@
 				interrupt-parent = <&intc>;
 				interrupt-names = "tx_irq", "rx_irq";
 				interrupts = <0 24 4>, <0 25 4>;
-				qsfp-lane = <0x0>;
 				rx-fifo-depth = <0x4000>;
 				tx-fifo-depth = <0x1000>;
 				rx-fifo-almost-full = <0x2000>;
