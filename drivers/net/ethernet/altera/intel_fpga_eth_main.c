@@ -55,6 +55,7 @@ static int pause = MAC_PAUSEFRAME_QUANTA;
 module_param(pause, int, MOD_PARAM_PERM);
 MODULE_PARM_DESC(pause, "Flow Control Pause Time");
 
+extern const struct attribute_group *msgdma_attr_groups[];
 
 #define RX_DESCRIPTORS 512
 static int dma_rx_num = RX_DESCRIPTORS;
@@ -408,9 +409,10 @@ static int xtile_poll(struct napi_struct *napi, int budget)
 
 	rxcomplete = xtile_rx(priv, budget);
 
-	netdev_dbg(priv->dev,
-		   "TX/RX complete: %d/%d of budget %d\n",
-		   txcomplete, rxcomplete, budget);
+	if (unlikely(netif_msg_intr(priv)))
+		netdev_info(priv->dev,
+		   	    "TX/RX complete: %d/%d of budget %d\n",
+		   	    txcomplete, rxcomplete, budget);
 
 	spin_lock_irqsave(&priv->rxdma_irq_lock, flags);
 
@@ -752,14 +754,13 @@ int xtile_start_xmit(struct sk_buff *skb, struct net_device *dev)
 		goto err;
 	}
 
-	if (unlikely(netif_msg_tx_queued(priv))) 
-	{
+	if (unlikely(netif_msg_tx_queued(priv))) {
 		netdev_info(dev, "sending skb of len=%d\n", skb->len);
-	
-		if (netif_msg_pktdata(priv))
-			print_hex_dump(KERN_ERR, "data: ", DUMP_PREFIX_OFFSET,
-				       16, 1, skb->data, skb->len, true);
 	}
+	
+	if (netif_msg_pktdata(priv))
+		print_hex_dump(KERN_ERR, "data: ", DUMP_PREFIX_OFFSET,
+			       16, 1, skb->data, skb->len, true);
 
 	/* Map the first skb fragment */
 	entry = priv->dma_priv.tx_prod % txsize;
@@ -1101,6 +1102,7 @@ static int intel_fpga_xtile_probe(struct platform_device *pdev)
 	struct device_node *np;
 	struct net_device *ndev;
 	struct resource *rx_fifo;
+	struct resource *tx_fifo;
 	struct device_node *dev_hssi;
 	const unsigned char *macaddr;
 	struct fwnode_handle *fixed_node;
@@ -1210,6 +1212,16 @@ static int intel_fpga_xtile_probe(struct platform_device *pdev)
 	if (netif_msg_probe(priv))
 		dev_info(&pdev->dev, "\tRX FIFO  at 0x%08lx\n",
 			 (unsigned long)rx_fifo->start);
+
+        /* Tx Fifo */
+        ret = request_and_map(pdev, "tx_fifo", &tx_fifo,
+                              (void __iomem **)&priv->tx_fifo);
+        if (ret)
+                goto err_free_netdev;
+
+        if (netif_msg_probe(priv))
+                dev_info(&pdev->dev, "\tTX FIFO  at 0x%08lx\n",
+                         (unsigned long)tx_fifo->start);
 
 	if (dma_set_mask_and_coherent(priv->device, 
 				      DMA_BIT_MASK(priv->dmaops->dmamask))) {
@@ -1473,6 +1485,9 @@ static struct platform_driver intel_fpga_xtile_driver = {
 		.name	= INTEL_FPGA_ETILE_ETH_RESOURCE_NAME,
 		.owner	= THIS_MODULE,
 		.of_match_table = intel_fpga_xtile_ll_ids,
+#ifdef CONFIG_DEBUG_FS
+		.dev_groups = msgdma_attr_groups,
+#endif
 		},
 };
 
