@@ -2563,6 +2563,7 @@ struct intel_fpga_rx_fifo {
 };
 
 #define rx_fifo_csroffs(a)	(offsetof(struct intel_fpga_rx_fifo, a))
+#define tx_fifo_csroffs(a)	(offsetof(struct intel_fpga_rx_fifo, a))
 
 struct intel_fpga_etile_eth_private {
 	
@@ -2575,6 +2576,7 @@ struct intel_fpga_etile_eth_private {
 	struct platform_device *pdev_hssi;
 	struct qsfp_reg_space __iomem *qsfp_reg;
 	struct intel_fpga_rx_fifo __iomem *rx_fifo;
+	struct intel_fpga_rx_fifo __iomem *tx_fifo;
 	
 	u32 chan;
 	u32 tx_irq;

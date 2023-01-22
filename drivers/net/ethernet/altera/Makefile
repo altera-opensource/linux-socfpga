@@ -37,12 +37,16 @@ endif
 
 ifeq ($(CONFIG_INTEL_FPGA_HSSI_ETILE),y)
 	obj-$(CONFIG_INTEL_FPGA_HSSI_ETILE) += intel_fpga_hssi_etile.o
-        intel_fpga_hssi_etile-objs := intel_fpga_eth_main.o           \
-				      intel_fpga_hssi_etile_fec.o     \
-				      intel_fpga_etile_driver.o       \
-                                      intel_fpga_hssi_etile_ethtool.o \
-				      intel_fpga_eth_hssi_itf.o	      \
-				      intel_fpga_eth_qsfp.o
+        ifeq ($(CONFIG_DEBUG_FS),y)
+                intel_fpga_hssi_etile-objs := intel_fpga_eth_debug.o
+	else
+                intel_fpga_hssi_etile-objs := intel_fpga_eth_main.o           \
+				      	      intel_fpga_hssi_etile_fec.o     \
+				      	      intel_fpga_etile_driver.o       \
+                                              intel_fpga_hssi_etile_ethtool.o \
+				              intel_fpga_eth_hssi_itf.o	      \
+				              intel_fpga_eth_qsfp.o	    
+	endif	
 endif
 
 
