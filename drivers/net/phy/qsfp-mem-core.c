@@ -107,17 +107,33 @@ int check_qsfp_plugin(struct qsfp *qsfp)
 }
 EXPORT_SYMBOL_GPL(check_qsfp_plugin);
 
-u32 qsfp_connected_show(struct qsfp *qsfp)
+ssize_t qsfp_connected_show(struct device *dev, struct device_attribute *attr, char *buf)
 {
+	struct qsfp *qsfp = dev_get_drvdata(dev);
 	u32 plugin;
 
 	mutex_lock(&qsfp->lock);
 	plugin = check_qsfp_plugin(qsfp) && (qsfp->init == QSFP_INIT_DONE);
 	mutex_unlock(&qsfp->lock);
 
-	return plugin;
+	return sysfs_emit(buf, "%u\n", plugin);
 }
-EXPORT_SYMBOL_GPL(qsfp_connected_show);
+static DEVICE_ATTR_RO(qsfp_connected);
+
+static struct attribute *qsfp_mem_attrs[] = {
+	&dev_attr_qsfp_connected.attr,
+	NULL,
+};
+
+static const struct attribute_group qsfp_mem_group = {
+	.attrs = qsfp_mem_attrs,
+};
+
+const struct attribute_group *qsfp_mem_groups[] = {
+	&qsfp_mem_group,
+	NULL,
+};
+EXPORT_SYMBOL_GPL(qsfp_mem_groups);
 
 void qsfp_check_hotplug(struct work_struct *work)
 {

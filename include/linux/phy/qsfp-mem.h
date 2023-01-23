@@ -45,6 +45,6 @@ int qsfp_init_work(struct qsfp *qsfp);
 int qsfp_register_regmap(struct qsfp *qsfp);
 void qsfp_remove_device(struct qsfp *qsfp);
 int check_qsfp_plugin(struct qsfp *qsfp);
-u32 qsfp_connected_show(struct qsfp *qsfp);
+extern const struct attribute_group *qsfp_mem_groups[];
 
 #endif //__LINUX_QSFP_MEM_H
