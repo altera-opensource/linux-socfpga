@@ -318,6 +318,7 @@ static int xtile_rx(intel_fpga_xtile_eth_private *priv, int limit)
 		if (netif_msg_pktdata(priv)) {
 			netdev_info(priv->dev, "frame received %d bytes\n",
 				    pktlength);
+
 			print_hex_dump(KERN_ERR, "data: ", DUMP_PREFIX_OFFSET,
 				       16, 1, skb->data, pktlength, true);
 		}
@@ -1382,7 +1383,7 @@ static int intel_fpga_xtile_probe(struct platform_device *pdev)
 	}
 
 	/* disable hotplug in hssi */
-	//hssi_disable_hotplug(pdev_hssi);
+	hssi_disable_hotplug(pdev_hssi);
 	
 	return 0;
 

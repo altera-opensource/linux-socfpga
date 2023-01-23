@@ -44,7 +44,6 @@ ifeq ($(CONFIG_INTEL_FPGA_HSSI_ETILE),y)
 				      	      intel_fpga_hssi_etile_fec.o     \
 				      	      intel_fpga_etile_driver.o       \
                                               intel_fpga_hssi_etile_ethtool.o \
-				              intel_fpga_eth_hssi_itf.o	      \
 				              intel_fpga_eth_qsfp.o	    
 	endif	
 endif
