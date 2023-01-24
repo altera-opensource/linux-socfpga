@@ -11,7 +11,7 @@
 
 
 u32 hssi_csrrd32(struct platform_device *pdev, 
-		 enum tile_reg_type regbank,
+		 enum hssiss_tile_reg_type regbank,
 		 u32 chan, 
 		 u32 offset) {
 	u32 ret_value;
@@ -34,7 +34,7 @@ u32 hssi_csrrd32(struct platform_device *pdev,
 }
 
 u32 hssi_csrrd32_atomic(struct platform_device *pdev, 
-			enum tile_reg_type regbank, 
+			enum hssiss_tile_reg_type regbank, 
 			u32 chan, 
 			u32 offset) {
 	u32 ret_value;
@@ -57,7 +57,7 @@ u32 hssi_csrrd32_atomic(struct platform_device *pdev,
 }
 
 int hssi_csrrd32_errcheck(struct platform_device *pdev,
-			  enum tile_reg_type regbank,
+			  enum hssiss_tile_reg_type regbank,
 			  u32 chan,
 			  u32 offset,
 			  bool atomicity,
@@ -85,7 +85,7 @@ int hssi_csrrd32_errcheck(struct platform_device *pdev,
 
 
 static void hssi_csrwr32_local(struct platform_device *pdev,
-		  	       enum tile_reg_type regbank,
+		  	       enum hssiss_tile_reg_type regbank,
 		  	       u32 chan,
 		  	       u32 offset,
 		  	       bool atomicity,
@@ -114,7 +114,7 @@ static void hssi_csrwr32_local(struct platform_device *pdev,
 }
 
 void hssi_csrwr32(struct platform_device *pdev,
-                  enum tile_reg_type regbank,
+                  enum hssiss_tile_reg_type regbank,
                   u32 chan,
                   u32 offset,
                   u32 reg_value) {
@@ -123,7 +123,7 @@ void hssi_csrwr32(struct platform_device *pdev,
 }
 
 void hssi_csrwr32_atomic(struct platform_device *pdev,
-                  	 enum tile_reg_type regbank,
+                  	 enum hssiss_tile_reg_type regbank,
                   	 u32 chan,
                   	 u32 offset,
                   	 u32 reg_value) {
@@ -132,7 +132,7 @@ void hssi_csrwr32_atomic(struct platform_device *pdev,
 }
 
 u8 hssi_csrrd8(struct platform_device *pdev, 
-	       enum tile_reg_type regbank, 
+	       enum hssiss_tile_reg_type regbank, 
 	       u32 chan, 
 	       u32 offset) {
 	
@@ -144,7 +144,7 @@ u8 hssi_csrrd8(struct platform_device *pdev,
 }
 
 u8 hssi_csrrd8_atomic(struct platform_device *pdev, 
-		      enum tile_reg_type regbank, 
+		      enum hssiss_tile_reg_type regbank, 
 		      u32 chan, 
 		      u32 offset) {
 	u8 ret_value;
@@ -155,7 +155,7 @@ u8 hssi_csrrd8_atomic(struct platform_device *pdev,
 }
 
 int hssi_csrrd8_errcheck(struct platform_device *pdev,
-			 enum tile_reg_type regbank,
+			 enum hssiss_tile_reg_type regbank,
 			 u32 chan,
 			 u32 offset,
 			 bool atomic, u8 *reg_value) {
@@ -187,7 +187,7 @@ int hssi_csrrd8_errcheck(struct platform_device *pdev,
 }
 
 void hssi_csrwr8(struct platform_device *pdev, 
-		 enum tile_reg_type regbank, 
+		 enum hssiss_tile_reg_type regbank, 
 		 u32 chan, 
 		 u32 offset, 
 		 u8 reg_value) {
@@ -211,7 +211,7 @@ void hssi_csrwr8(struct platform_device *pdev,
 }
 
 void hssi_set_bit(struct platform_device *pdev, 
-		  enum tile_reg_type regbank, 
+		  enum hssiss_tile_reg_type regbank, 
 		  u32 chan, 
 		  u32 offset, 
 		  u32 bit_mask) {
@@ -240,7 +240,7 @@ void hssi_set_bit_atomic(struct platform_device *pdev,
 
 
 void hssi_clear_bit(struct platform_device *pdev, 
-		    enum tile_reg_type regbank, 
+		    enum hssiss_tile_reg_type regbank, 
 		    u32 chan, 
 		    u32 offset, 
 		    u32 bit_mask) {
@@ -268,7 +268,7 @@ void hssi_clear_bit_atomic(struct platform_device *pdev,
 }
 
 bool hssi_bit_is_set(struct platform_device *pdev, 
-		     enum tile_reg_type regbank, 
+		     enum hssiss_tile_reg_type regbank, 
 		     u32 chan, 
 		     u32 offset, 
 		     u32 bit_mask) {
@@ -280,7 +280,7 @@ bool hssi_bit_is_set(struct platform_device *pdev,
 }
 
 bool hssi_bit_is_clear(struct platform_device *pdev, 
-		       enum tile_reg_type regbank, 
+		       enum hssiss_tile_reg_type regbank, 
 		       u32 chan, 
 		       u32 offset, 
 		       u32 bit_mask) {

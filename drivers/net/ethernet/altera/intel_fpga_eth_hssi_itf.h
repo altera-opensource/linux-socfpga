@@ -23,65 +23,65 @@ enum access_type {
 #define INTEL_FPGA_RET_SUCCESS 0
 
 u32  hssi_csrrd32(struct platform_device *pdev,
-		  enum tile_reg_type regbank,
+		  enum hssiss_tile_reg_type regbank,
 		  u32 chan,
 		  u32 offset);
 
 u32  hssi_csrrd32_atomic(struct platform_device *pdev,
-			 enum tile_reg_type regbank,
+			 enum hssiss_tile_reg_type regbank,
 			 u32 chan,
 			 u32 offset);
 
 int  hssi_csrrd32_errcheck(struct platform_device *pdev,
-			   enum tile_reg_type regbank,
+			   enum hssiss_tile_reg_type regbank,
 			   u32 chan,
 			   u32 offset,
 			   bool atomocity,
 			   u32 *ret_value);
 
 void hssi_csrwr32(struct platform_device *pdev,
-		  enum tile_reg_type regbank,
+		  enum hssiss_tile_reg_type regbank,
 		  u32 chan,
 		  u32 offset,
 		  u32 reg_value);
 
 void hssi_csrwr32_atomic(struct platform_device *pdev,
-		         enum tile_reg_type regbank,
+		         enum hssiss_tile_reg_type regbank,
 		  	 u32 chan,
 		  	 u32 offset,
 		  	 u32 reg_value);
 
 u8   hssi_csrrd8(struct platform_device *pdev,
-		 enum tile_reg_type regbank,
+		 enum hssiss_tile_reg_type regbank,
 		 u32 chan,
 		 u32 offset);
 
 u8   hssi_csrrd8_atomic(struct platform_device *pdev,
-			enum tile_reg_type regbank,
+			enum hssiss_tile_reg_type regbank,
 			u32 chan,
 			u32 offset);
 
 int  hssi_csrrd8_errcheck(struct platform_device *pdev,
-			  enum tile_reg_type regbank,
+			  enum hssiss_tile_reg_type regbank,
 			  u32 chan,
 			  u32 offset,
 			  bool atomic,
 			  u8 *reg_value);
 
 void hssi_csrwr8(struct platform_device *pdev,
-		 enum tile_reg_type regbank,
+		 enum hssiss_tile_reg_type regbank,
 		 u32 chan,
 		 u32 offset,
 		 u8 reg_value);
 
 void hssi_set_bit(struct platform_device *pdev,
-		  enum tile_reg_type regbank,
+		  enum hssiss_tile_reg_type regbank,
 		  u32 chan,
 		  u32 offset,
 		  u32 bit_mask);
 
 void hssi_clear_bit(struct platform_device *pdev,
-		    enum tile_reg_type regbank,
+		    enum hssiss_tile_reg_type regbank,
 		    u32 chan,
 		    u32 offset,
 		    u32 bit_mask);
@@ -99,13 +99,13 @@ void hssi_clear_bit_atomic(struct platform_device *pdev,
                     	   u32 bit_mask);
 
 bool hssi_bit_is_set(struct platform_device *pdev,
-		     enum tile_reg_type regbank,
+		     enum hssiss_tile_reg_type regbank,
 		     u32 chan,
 		     u32 offset,
 		     u32 bit_mask);
 
 bool hssi_bit_is_clear(struct platform_device *pdev,
-		       enum tile_reg_type regbank,
+		       enum hssiss_tile_reg_type regbank,
 		       u32 chan,
 		       u32 offset,
 		       u32 bit_mask);
