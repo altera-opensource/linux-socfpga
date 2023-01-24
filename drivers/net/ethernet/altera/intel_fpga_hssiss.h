@@ -75,6 +75,9 @@
 #define HSSI_DR_GRP_MASK	GENMASK(6, 4)
 #define HSSI_DR_PROFILE_MASK	GENMASK(3, 0)
 
+#define HSSISS_VER_CSR_ADDR_MASK		GENMASK(31, 16)
+#define HSSISS_VER_CSR_ADDR_SHIFT		16
+
 /*
  * Bestcase: 100ns, max: 10ms, driver interval: 10us
  * For DR and enable/disable loopback SAL sequences, the whole operation might
@@ -226,7 +229,12 @@ typedef union eth_port_status {
 	u32 full;
 } hssi_eth_port_sts;
 
-enum tile_reg_type {
+enum hssiss_tile {
+	HSSISS_ETILE = 0x1,
+	HSSISS_FTILE = 0x2,
+};
+
+enum hssiss_tile_reg_type {
 	HSSI_ETH_RECONFIG,
 	HSSI_RSFEC,
 	HSSI_PHY_XCVR_PMACAP,
@@ -244,7 +252,7 @@ struct get_set_csr_data {
 	u32 offs;
 	u32 data;	/* wr for set_csr, read for get_csr */
 	unsigned int ch;
-	enum tile_reg_type reg_type;
+	enum hssiss_tile_reg_type reg_type;
 	bool word;
 };
 
@@ -352,6 +360,7 @@ struct hssiss_private {
 
 	/* private data */
 	unsigned int dfh_feature_rev;
+	unsigned int ver; /* 1: etile, 2: ftile */
 	unsigned int csr_addroff;
 	union hssiss_feature_list feature_list;
 
@@ -372,6 +381,7 @@ int hssiss_execute_sal_cmd_atomic(struct platform_device *pdev,
 		enum hssiss_salcmd cmd, void *data);
 hssi_eth_port_sts hssiss_get_ethport_status(struct platform_device *pdev, int port);
 int hssi_cold_rst(struct platform_device *pdev);
+void hssiss_hotplug_enable(struct platform_device *pdev, bool enable);
 
 #ifdef CONFIG_DEBUG_FS
 struct hssiss_dbg *hssiss_dbgfs_init(struct platform_device *pdev);

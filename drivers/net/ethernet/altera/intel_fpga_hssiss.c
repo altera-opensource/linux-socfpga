@@ -36,9 +36,11 @@ static struct hssiss_salcmd_to_name salcmd_name[] = {
 	{SAL_FW_VERSION, 0xFF, "SAL_FW_VERSION"},
 };
 
-#define ETILE_ADDR_OFFSET_INCR 0x200000
+#define ADDR_OFFSET_INCR 0x200000
 static u32 etile_addrmap[] =
 	{0x0200000, 0x0204000, 0x0240000, 0x0250000, 0x0260000, 0x0261000, 0x0262000};
+static u32 ftile_addrmap[] =
+	{0x0200000, 0, 0x0300000, 0, 0, 0x0261000, 0};
 
 static int read_poll_timeout(void __iomem *base,
 		unsigned int csr_addroff, u32 offs, u32 sel, bool atomic)
@@ -173,8 +175,16 @@ static int get_set_csr(struct platform_device *pdev, u32 cmd, void *csr_data,
 	u32 addr;
 	struct get_set_csr_data *data = (struct get_set_csr_data *)csr_data;
 
-	u32 base = (data->ch * ETILE_ADDR_OFFSET_INCR) +
-			etile_addrmap[data->reg_type];
+	u32 base;
+	if (priv->ver == HSSISS_ETILE) {
+		base = (data->ch * ADDR_OFFSET_INCR) +
+				etile_addrmap[data->reg_type];
+	} else if (priv->ver == HSSISS_FTILE) {
+		base = (data->ch * ADDR_OFFSET_INCR) +
+				ftile_addrmap[data->reg_type];
+	} else {
+		return -EIO;
+	}
 
 	addr = hssiss_make_get_set_csr_addr(base, data->offs, data->word);
 
@@ -259,7 +269,7 @@ static int reset_mac_stat(struct platform_device *pdev, u32 cmd,
 	u32 cmd_sts = 0;
 	struct reset_mac_stat_data *data = (struct reset_mac_stat_data *)priv_data;
 
-	ctrl_addr &= data->port << HSSI_SAL_CTRLADDR_PORT_SHIFT;
+	ctrl_addr |= data->port << HSSI_SAL_CTRLADDR_PORT_SHIFT;
 
 	if (data->tx)
 		ctrl_addr |= HSSI_SAL_RESET_MAC_STAT_TX;
@@ -449,6 +459,24 @@ hssi_eth_port_sts hssiss_get_ethport_status(struct platform_device *pdev, int po
 	return port_sts;
 }
 
+/* Enable/disable hotplug */
+void hssiss_hotplug_enable(struct platform_device *pdev, bool enable)
+{
+	struct hssiss_private *priv = platform_get_drvdata(pdev);
+	u32 val;
+
+	val = csrrd32_withoffset(priv->sscsr, priv->csr_addroff,
+				HSSISS_CSR_HOTPLUG_DBG_CTRL);
+
+	if (enable)
+		val &= ~0x1;
+	else
+		val |= 0x1;
+
+	csrwr32_withoffset(val, priv->sscsr, priv->csr_addroff,
+				HSSISS_CSR_HOTPLUG_DBG_CTRL);
+}
+
 int hssi_cold_rst(struct platform_device *pdev)
 {
 	struct hssiss_private *priv = platform_get_drvdata(pdev);
@@ -563,21 +591,11 @@ static ssize_t hssiss_hotplug_disable_store(struct device *dev,
 		struct device_attribute *attr, const char *buf, size_t len)
 {
 	struct platform_device *pdev = to_platform_device(dev);
-	struct hssiss_private *priv = platform_get_drvdata(pdev);
-	u32 val;
 	int disable;
 
 	sscanf(buf, "%d", &disable);
 
-	val = csrrd32_withoffset(priv->sscsr, priv->csr_addroff,
-				HSSISS_CSR_HOTPLUG_DBG_CTRL);
-	if (disable)
-		val |= 0x1;
-	else
-		val &= ~0x1;
-
-	csrwr32_withoffset(val, priv->sscsr, priv->csr_addroff,
-				HSSISS_CSR_HOTPLUG_DBG_CTRL);
+	hssiss_hotplug_enable(pdev, (disable? false:true));
 
 	return len;
 }
@@ -613,6 +631,7 @@ static int hssiss_probe(struct platform_device *pdev)
 	const struct of_device_id *of_id = NULL;
 	struct device_node *np = pdev->dev.of_node;
 	struct fwnode_handle *cold_rst;
+	unsigned int version;
 	const char *rm;
 	int ret;
 
@@ -657,6 +676,9 @@ static int hssiss_probe(struct platform_device *pdev)
 	priv->feature_list.full =
 		csrrd32_withoffset(priv->sscsr,
 			priv->csr_addroff, HSSISS_CSR_COMMON_FEATURE_LIST);
+	version = csrrd32_withoffset(priv->sscsr, priv->csr_addroff, HSSISS_CSR_VER);
+	priv->ver = (version & HSSISS_VER_CSR_ADDR_MASK) >>
+				HSSISS_VER_CSR_ADDR_SHIFT;
 
 	platform_set_drvdata(pdev, priv);
 
