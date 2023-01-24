@@ -225,7 +225,7 @@ void hssi_set_bit(struct platform_device *pdev,
 }
 
 void hssi_set_bit_atomic(struct platform_device *pdev,
-                 	  enum tile_reg_type regbank,
+                 	  enum hssiss_tile_reg_type regbank,
                   	  u32 chan,
                  	  u32 offset,
                  	  u32 bit_mask) {
@@ -254,7 +254,7 @@ void hssi_clear_bit(struct platform_device *pdev,
 }
 
 void hssi_clear_bit_atomic(struct platform_device *pdev,
-                    	    enum tile_reg_type regbank,
+                    	    enum hssiss_tile_reg_type regbank,
                     	    u32 chan,
                      	    u32 offset,
                     	    u32 bit_mask) {
@@ -379,7 +379,6 @@ int hssi_dis_serial_loopback(struct platform_device *pdev, u32 chan)
 	return ret_status;
 }
 
-#if 0
 void hssi_disable_hotplug(struct platform_device *pdev) {
 	hssiss_hotplug_enable(pdev, false);
 }
@@ -387,7 +386,6 @@ void hssi_disable_hotplug(struct platform_device *pdev) {
 void hssi_enable_hotplug(struct platform_device *pdev) {
 	hssiss_hotplug_enable(pdev, true);
 }
-#endif
 
 bool hssi_ethport_is_stable(struct platform_device *pdev, u32 chan, bool logging) {
 

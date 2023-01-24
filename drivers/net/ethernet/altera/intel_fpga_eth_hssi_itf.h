@@ -87,13 +87,13 @@ void hssi_clear_bit(struct platform_device *pdev,
 		    u32 bit_mask);
 
 void hssi_set_bit_atomic(struct platform_device *pdev,
-                  	  enum tile_reg_type regbank,
+                  	  enum hssiss_tile_reg_type regbank,
                   	  u32 chan,
                   	  u32 offset,
                   	  u32 bit_mask);
 
 void hssi_clear_bit_atomic(struct platform_device *pdev,
-                    	   enum tile_reg_type regbank,
+                    	   enum hssiss_tile_reg_type regbank,
                     	   u32 chan,
                     	   u32 offset,
                     	   u32 bit_mask);
