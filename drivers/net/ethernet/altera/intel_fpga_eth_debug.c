@@ -13,10 +13,10 @@ static void xtile_prefetcher_reg_dump_tx(struct altera_dma_private *priv) {
 	netdev_info(priv->dev, "TX PREFETCHER:\n");
 	
 	ret = csrrd32(priv->tx_pref_csr, msgdma_pref_csroffs(control));
-	netdev_info(priv->dev, "\tCONTROL 	| 0x%x\n", ret);
+	netdev_info(priv->dev, "\tCONTROL      	     | 0x%x\n", ret);
 
 	ret = csrrd32(priv->tx_pref_csr, msgdma_pref_csroffs(status));
-	netdev_info(priv->dev, "\tSTATUS 	 | 0x%x\n", ret);
+	netdev_info(priv->dev, "\tSTATUS 	     | 0x%x\n", ret);
 
   	ret = csrrd32(priv->tx_pref_csr, msgdma_pref_csroffs(next_desc_lo));
   	netdev_info(priv->dev, "\tNEXT DESC LOW  | 0x%x\n", ret);
@@ -30,10 +30,10 @@ static void xtile_prefetcher_reg_dump_rx(struct altera_dma_private *priv) {
         netdev_info(priv->dev, "RX PREFETCHER:\n");
 
         ret = csrrd32(priv->rx_pref_csr, msgdma_pref_csroffs(control));
-        netdev_info(priv->dev, "\tCONTROL 	| 0x%x\n", ret);
+        netdev_info(priv->dev, "\tCONTROL 	    | 0x%x\n", ret);
 
         ret = csrrd32(priv->rx_pref_csr, msgdma_pref_csroffs(status));
-        netdev_info(priv->dev, "\tSTATUS  	| 0x%x\n", ret);
+        netdev_info(priv->dev, "\tSTATUS  	    | 0x%x\n", ret);
 
         ret = csrrd32(priv->rx_pref_csr, msgdma_pref_csroffs(next_desc_lo));
         netdev_info(priv->dev, "\tNEXT DESC LOW  | 0x%x\n", ret);
@@ -102,7 +102,7 @@ static void xtile_fifo_fill_level_rx(struct altera_dma_private *priv) {
 
 static void xtile_process_seq_no_tx(struct altera_dma_private *priv) {
 	
-	netdev_info(priv->dev, "Tx PROD/CONS     | 0x%x/%x\n", priv->tx_prod, priv->tx_cons);
+	netdev_info(priv->dev, "Tx PROD/CONS     | 0x%x/0x%x\n", priv->tx_prod, priv->tx_cons);
 }
 
 static void xtile_seq_no_dump_tx(struct altera_dma_private *priv) {
@@ -144,10 +144,10 @@ static u64 timestamp_to_ns(struct msgdma_pref_extended_desc *desc)
 static void xtile_unprocess_desc_tx(struct altera_dma_private *priv) {
 
 	u32 index;
-	u32 desc_ringsize = priv->rx_ring_size * 2;
+	u32 desc_ringsize = priv->tx_ring_size * 2;
 
 	for (index = 0; index < desc_ringsize; index++) {
-		if ( priv->pref_rxdesc[index].desc_control & 
+		if ( priv->pref_txdesc[index].desc_control & 
 				MSGDMA_PREF_DESC_CTL_OWNED_BY_HW) {
 			netdev_info(priv->dev, 
 				    "desc:%d: bytes %x ts %lld\n",
@@ -157,6 +157,7 @@ static void xtile_unprocess_desc_tx(struct altera_dma_private *priv) {
 		}
 	}
 }
+
 static void xtile_dma_regs(struct altera_dma_private *priv)
 {
 
@@ -193,6 +194,7 @@ static ssize_t show_msgdma_tx_desc_dump(struct device *dev,
         struct intel_fpga_etile_eth_private *priv=  netdev_priv(ndev);
 
 	xtile_unprocess_desc_tx(&priv->dma_priv);
+	
 	return sprintf(buf, "%x", 1);
 }
 
