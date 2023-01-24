@@ -553,6 +553,9 @@ static int xtile_open(struct net_device *dev)
 	/* perform pma analog reset */
 	pma_analog_reset(priv);
 
+	/* disable hotplug in hssi */
+	hssi_disable_hotplug(pdev);
+	
 	do 
 	{
 		eth_portstatus = hssi_ethport_is_stable(pdev, chan, true);
@@ -673,6 +676,7 @@ static int xtile_shutdown(struct net_device *dev)
 		phylink_stop(priv->phylink);
 
 	netif_stop_queue(dev);
+	napi_synchronize(&priv->napi);
 	napi_disable(&priv->napi);
 
 	/* Disable DMA interrupts */
@@ -1382,9 +1386,6 @@ static int intel_fpga_xtile_probe(struct platform_device *pdev)
 		goto err_init_fec;
 	}
 
-	/* disable hotplug in hssi */
-	hssi_disable_hotplug(pdev_hssi);
-	
 	return 0;
 
 err_init_fec:	
@@ -1427,11 +1428,12 @@ intel_fpga_xtile_qsfp_up(intel_fpga_xtile_eth_private *priv) {
 	rtnl_unlock();
 }
 
-void 
+static void 
 intel_fpga_xtile_qsfp_down(intel_fpga_xtile_eth_private *priv) {
 
 	rtnl_lock();
         netif_stop_queue(priv->dev);
+        napi_synchronize(&priv->napi);
         napi_disable(&priv->napi);
 	rtnl_unlock();
 }
