@@ -43,11 +43,22 @@
                                 #dma-cells = <1>;
                         };
         };
+
+                clocks {
+			tod_in_clock: tod_in_clock {
+				#clock-cells = <0>;
+				compatible = "fixed-clock";
+				clock-frequency = <156250000>;
+				clock-output-names = "tod_in_clock";
+			};
+		};
+
 		tod_0_clk: tod_0_clk{
-			compatible = "intel, tod_ctrl";
+			compatible = "intel, tod";
 			reg-names = "tod_ctrl";
 			reg = <0x81000040 0x00000040>;
-			clock-frequency = <156250000>;
+			clocks = <&tod_in_clock>;
+			clock-names = "tod_in_clock";
 			status = "okay";
 		};
 
@@ -87,7 +98,6 @@
 				qsfp = <&qsfp_eth0>;
 				qsfp-lane = <0x0>;
 				hssiss = <&hssiss_0_hssiss>;
-				clock-names = "tod_clk";
 				altr,tx-pma-delay-ns = <0xD>;
 				altr,rx-pma-delay-ns = <0x8>;
 				altr,tx-pma-delay-fns = <0x24D>;

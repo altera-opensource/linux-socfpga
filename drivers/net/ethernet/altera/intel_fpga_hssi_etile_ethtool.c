@@ -1136,8 +1136,8 @@ static int etile_get_ts_info(struct net_device *dev,
 
 	struct intel_fpga_etile_eth_private *priv = netdev_priv(dev);
 
-	if (priv->ptp_priv.ptp_clock)
-		info->phc_index = ptp_clock_index(priv->ptp_priv.ptp_clock);
+	if (priv->ptp_priv->ptp_clock)
+		info->phc_index = ptp_clock_index(priv->ptp_priv->ptp_clock);
 	else
 		info->phc_index = -1;
 
