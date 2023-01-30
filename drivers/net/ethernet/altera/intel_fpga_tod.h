@@ -32,7 +32,7 @@ struct intel_fpga_tod {
 #define tod_csroffs(a)	(offsetof(struct intel_fpga_tod, a))
 
 struct intel_fpga_tod_private {
-	struct net_device *dev;
+	struct device *dev;
 
 	struct ptp_clock_info ptp_clock_ops;
 	struct ptp_clock *ptp_clock;
@@ -47,10 +47,5 @@ struct intel_fpga_tod_private {
 
 int intel_fpga_tod_init(struct intel_fpga_tod_private *priv);
 void intel_fpga_tod_uinit(struct intel_fpga_tod_private *priv);
-int intel_fpga_tod_register(struct intel_fpga_tod_private *priv,
-			    struct device *device);
-void intel_fpga_tod_unregister(struct intel_fpga_tod_private *priv);
-int intel_fpga_tod_probe(struct platform_device *pdev,
-			 struct intel_fpga_tod_private *priv);
 
 #endif /* __INTEL_FPGA_TOD_H__ */

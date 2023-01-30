@@ -1114,6 +1114,8 @@ static int intel_fpga_xtile_probe(struct platform_device *pdev)
 	struct platform_device *pdev_hssi;
 	const struct xtile_spec_ops *op_ptr;
 	intel_fpga_xtile_eth_private *priv;
+	struct device_node *dev_tod;
+	struct platform_device *pdev_tod;
 
 	np = pdev->dev.of_node;
 
@@ -1132,7 +1134,6 @@ static int intel_fpga_xtile_probe(struct platform_device *pdev)
 	priv->pause	      = pause;
 	priv->device          = &pdev->dev;
 	priv->dma_priv.dev    = ndev;
-	priv->ptp_priv.dev    = ndev;
 	priv->dma_priv.device = &pdev->dev;
 	priv->msg_enable      = netif_msg_init(debug, default_msg_level);
 	priv->dma_priv.msg_enable = netif_msg_init(debug, default_msg_level);
@@ -1336,7 +1337,6 @@ static int intel_fpga_xtile_probe(struct platform_device *pdev)
 
 	spin_lock_init(&priv->tx_lock);
 	spin_lock_init(&priv->rxdma_irq_lock);
-	spin_lock_init(&priv->ptp_priv.tod_lock);
 	spin_lock_init(&priv->mac_cfg_lock);
 
 	/* check if phy-mode is present */
@@ -1369,6 +1369,18 @@ static int intel_fpga_xtile_probe(struct platform_device *pdev)
 	} else {
 		dev_err(&pdev->dev, "fixed link property undefined\n");
 		goto err_free_netdev;
+	}
+
+	if (priv->ptp_enable) {
+		dev_tod  = of_parse_phandle(pdev->dev.of_node, "tod", 0);
+		pdev_tod = of_find_device_by_node(dev_tod);
+		priv->ptp_priv = dev_get_drvdata(&pdev_tod->dev);
+		if (!priv->ptp_priv) {
+			dev_err(&pdev->dev, "PTP clock not available\n");
+			ret = -ENXIO;
+			goto err_free_netdev;
+		}
+		dev_info(&pdev->dev, "\tPTP Clock: %s\n", priv->ptp_priv->ptp_clock_ops.name);
 	}
 
 	ret = register_netdev(ndev);

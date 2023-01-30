@@ -279,8 +279,8 @@ static struct ptp_clock_info intel_fpga_tod_clock_ops = {
 };
 
 /* Register the PTP clock driver to kernel */
-int intel_fpga_tod_register(struct intel_fpga_tod_private *priv,
-			    struct device *device)
+static int intel_fpga_tod_register(struct intel_fpga_tod_private *priv,
+				   struct device *device)
 {
 	int ret = 0;
 	struct timespec64 ts = { 0, 0 };
@@ -289,8 +289,10 @@ int intel_fpga_tod_register(struct intel_fpga_tod_private *priv,
 
 	priv->ptp_clock = ptp_clock_register(&priv->ptp_clock_ops, device);
 	if (IS_ERR(priv->ptp_clock)) {
+		dev_err_probe(device, PTR_ERR(priv->ptp_clock), "cannot obtain ToD period clock\n");
 		priv->ptp_clock = NULL;
-		ret = -ENODEV;
+		ret = PTR_ERR(priv->ptp_clock);
+		goto err;
 	}
 
 	if (priv->tod_clk)
@@ -299,12 +301,15 @@ int intel_fpga_tod_register(struct intel_fpga_tod_private *priv,
 	/* Initialize the hardware clock to zero */
 	intel_fpga_tod_set_time(&priv->ptp_clock_ops, &ts);
 
+err:
 	return ret;
 }
 
 /* Remove/unregister the ptp clock driver from the kernel */
-void intel_fpga_tod_unregister(struct intel_fpga_tod_private *priv)
+static int intel_fpga_tod_unregister(struct platform_device *pdev)
 {
+	struct intel_fpga_tod_private *priv = dev_get_drvdata(&pdev->dev);
+
 	if (priv->ptp_clock) {
 		ptp_clock_unregister(priv->ptp_clock);
 		priv->ptp_clock = NULL;
@@ -312,37 +317,71 @@ void intel_fpga_tod_unregister(struct intel_fpga_tod_private *priv)
 
 	if (priv->tod_clk)
 		clk_disable_unprepare(priv->tod_clk);
+
+	return 0;
 }
 
 /* Common PTP probe function */
-int intel_fpga_tod_probe(struct platform_device *pdev,
-			 struct intel_fpga_tod_private *priv)
+static int intel_fpga_tod_probe(struct platform_device *pdev)
 {
-	struct resource *ptp_res;
 	int ret = -ENODEV;
+	struct resource *ptp_res;
+	struct intel_fpga_tod_private *priv;
+	struct device *dev = &pdev->dev;
 
-	priv->dev = (struct net_device *)platform_get_drvdata(pdev);
-
+	priv = devm_kzalloc(dev, sizeof(struct intel_fpga_tod_private), GFP_KERNEL);
+	if (!priv) {
+		dev_err_probe(dev, PTR_ERR(priv), "Could not allocate memory for ToD\n");
+		ret = -ENOMEM;
+		goto err;
+	}
 	/* Time-of-Day (ToD) Clock address space */
 	ret = request_and_map(pdev, "tod_ctrl", &ptp_res,
 			      (void __iomem **)&priv->tod_ctrl);
 	if (ret)
 		goto err;
 
-	dev_info(&pdev->dev, "\tTOD Ctrl at 0x%08lx\n",
-		 (unsigned long)ptp_res->start);
+	priv->dev = dev;
 
 	/* Time-of-Day (ToD) Clock period clock */
-	priv->tod_clk = devm_clk_get(&pdev->dev, "tod_clk");
+	priv->tod_clk = devm_clk_get(&pdev->dev, "tod_in_clock");
 	if (IS_ERR(priv->tod_clk)) {
-		dev_err(&pdev->dev, "cannot obtain ToD period clock\n");
-		ret = -ENXIO;
+		ret = PTR_ERR(priv->tod_clk);
+		dev_err_probe(&pdev->dev, PTR_ERR(priv->tod_clk),
+			      "cannot obtain ToD period clock\n");
 		goto err;
 	}
 
+	ret = intel_fpga_tod_register(priv, dev);
+	if (ret)
+		goto err;
+
 	spin_lock_init(&priv->tod_lock);
+	dev_set_drvdata(dev, priv);
 err:
 	return ret;
 }
 
+static const struct of_device_id intel_fpga_tod_ids[] = {
+		{.compatible = "intel, tod",},
+		{ }
+};
+
+MODULE_DEVICE_TABLE(of, intel_fpga_tod_ids);
+
+static struct platform_driver intel_fpga_tod_driver = {
+	.probe		= intel_fpga_tod_probe,
+	.remove		= intel_fpga_tod_unregister,
+	.suspend	= NULL,
+	.resume		= NULL,
+	.driver		= {
+		.name = "tod",
+		.owner	= THIS_MODULE,
+		.of_match_table = intel_fpga_tod_ids,
+	},
+};
+
+module_platform_driver(intel_fpga_tod_driver);
+MODULE_DESCRIPTION("Intel FPGA ToD driver");
+MODULE_AUTHOR("Intel Corporation");
 MODULE_LICENSE("GPL");

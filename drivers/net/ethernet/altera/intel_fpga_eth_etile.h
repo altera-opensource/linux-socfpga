@@ -2615,7 +2615,7 @@ struct intel_fpga_etile_eth_private {
 	struct timer_list fec_timer;
 	struct altera_dma_private dma_priv;
 	struct phylink_config phylink_config;
-	struct intel_fpga_tod_private ptp_priv;
+	struct intel_fpga_tod_private *ptp_priv;
 
 	phy_interface_t phy_iface;
 };

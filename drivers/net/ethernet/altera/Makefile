@@ -4,9 +4,12 @@
 #
 
 obj-$(CONFIG_NET_ALTERA_ETH) += altera_eth.o
-altera_eth-objs := altera_utils.o intel_fpga_tod.o altera_eth_dma.o \
+altera_eth-objs := altera_utils.o altera_eth_dma.o \
 		   altera_sgdma.o altera_msgdma.o \
 		   altera_msgdma_prefetcher.o
+
+obj-$(CONFIG_INTEL_FPGA_TOD) += intel_fpga_tod.o \
+				altera_utils.o
 
 ifeq ($(CONFIG_ALTERA_TSE),y)
 	obj-$(CONFIG_ALTERA_TSE) += altera_tse.o

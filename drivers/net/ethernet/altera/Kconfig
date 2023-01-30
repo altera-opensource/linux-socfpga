@@ -59,6 +59,14 @@ config INTEL_FPGA_HSSI_ETILE
 	  To compile this driver as a module, choose M here. The module
 	  will be called intel_fpga_hssi_etile.
 
+config INTEL_FPGA_TOD
+	tristate "Intel FPGA ToD driver support"
+	help
+	  This driver supports the Intel FPGA Time-of-day Clock.
+
+	  To compile this driver as a module, choose M here. The module
+	  will be called intel_fpga_tod.
+
 endif
 
 config INTEL_FPGA_HSSISS
