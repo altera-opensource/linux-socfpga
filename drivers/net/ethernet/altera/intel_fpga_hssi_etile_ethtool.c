@@ -1169,11 +1169,9 @@ static int etile_set_link_ksettings(struct net_device *dev,
                 return -EOPNOTSUPP;
         }
 
-        switch (cmd->base.speed) {
-        case SPEED_10000:
-                break;
-        default:
-                pr_err("10G speed is only supported speed\n");
+	if (!((priv->link_speed == cmd->base.speed) && 
+	    ((cmd->base.speed == SPEED_10000) || (cmd->base.speed == SPEED_25000))) ) {
+                pr_err("%d speed is only supported speed\n", priv->link_speed);
                 return -EOPNOTSUPP;
         }
 

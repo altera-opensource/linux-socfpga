@@ -28,7 +28,7 @@
 #include "intel_fpga_eth_main.h"
 #include "intel_fpga_eth_hssi_itf.h"
 
-#define MAX_STABILITY_CHECK  10
+#define MAX_STABILITY_CHECK  9
 
 /* Module parameters */
 static int debug = -1;
@@ -558,10 +558,13 @@ static int xtile_open(struct net_device *dev)
 	
 	do 
 	{
-		eth_portstatus = hssi_ethport_is_stable(pdev, chan, true);
+		eth_portstatus = hssi_ethport_is_stable(pdev, chan, false);
 		udelay(1);
 
 	} while( (eth_portstatus == false) && (count_test++ < MAX_STABILITY_CHECK));
+	
+		
+	eth_portstatus = hssi_ethport_is_stable(pdev, chan, true);
 	
 	/* We check for port stability to log the error and don't proceed further */
 	if (eth_portstatus == false) {
@@ -1035,7 +1038,13 @@ static void intel_fpga_xtile_mac_pcs_get_state(struct phylink_config *config,
 					       struct phylink_link_state *state)
 {
 	/* fixed speed for now */
-	state->speed = SPEED_10000;
+        intel_fpga_xtile_eth_private *priv =
+                netdev_priv(to_net_dev(config->dev));
+
+        if (!priv)
+                return;
+
+        state->speed = priv->link_speed;
 	state->duplex = DUPLEX_FULL;
 	state->link = 1;
 	
@@ -1431,23 +1440,19 @@ static int intel_fpga_xtile_remove(struct platform_device *pdev)
 static void 
 intel_fpga_xtile_qsfp_up(intel_fpga_xtile_eth_private *priv) {
 
-	rtnl_lock();
         if (netif_queue_stopped(priv->dev)) {
         	netif_wake_queue(priv->dev);
         }
 
         napi_enable(&priv->napi);
-	rtnl_unlock();
 }
 
 static void 
 intel_fpga_xtile_qsfp_down(intel_fpga_xtile_eth_private *priv) {
 
-	rtnl_lock();
         netif_stop_queue(priv->dev);
         napi_synchronize(&priv->napi);
         napi_disable(&priv->napi);
-	rtnl_unlock();
 }
 
 static const struct qsfp_ops qsfp_api = {

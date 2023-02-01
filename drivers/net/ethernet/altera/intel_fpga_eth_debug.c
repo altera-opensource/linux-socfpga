@@ -123,6 +123,23 @@ static void xtile_seq_no_dump_rx(struct altera_dma_private *priv) {
   	netdev_info(priv->dev, "Rx WRITE SEQ NO  | 0x%x\n", (ret & 0xffff0000)>>16);
 }
 
+static void xtile_comp_version_rx(struct altera_dma_private *priv) {
+
+        s32 ret;
+
+        ret = csrrd32(priv->rx_dma_csr, msgdma_csroffs(pad[2]));
+        netdev_info(priv->dev, "Rx COMP TYPE_VERSION 0x%x\n", ret);
+}
+
+static void xtile_comp_version_tx(struct altera_dma_private *priv) {
+
+        s32 ret;
+
+        ret = csrrd32(priv->tx_dma_csr, msgdma_csroffs(pad[2]));
+        netdev_info(priv->dev, "Tx COMP TYPE_VERSION 0x%x\n", ret);
+}
+
+
 static u64 timestamp_to_ns(struct msgdma_pref_extended_desc *desc)
 {
         u64 ns = 0;
@@ -160,13 +177,14 @@ static void xtile_unprocess_desc_tx(struct altera_dma_private *priv) {
 
 static void xtile_dma_regs(struct altera_dma_private *priv)
 {
-
+	xtile_comp_version_tx(priv);
 	xtile_seq_no_dump_tx(priv);
 	xtile_process_seq_no_tx(priv);
 	xtile_fifo_fill_level_tx(priv);
 	xtile_dispatcher_reg_dump_tx(priv);
 	xtile_prefetcher_reg_dump_tx(priv);
 	
+	xtile_comp_version_rx(priv);
 	xtile_seq_no_dump_rx(priv);
 	xtile_dispatcher_reg_dump_rx(priv);
 	xtile_prefetcher_reg_dump_rx(priv);
