@@ -1,0 +1,490 @@
+// SPDX-License-Identifier: GPL
+/*
+ * Copyright (C) 2022,2023 Intel Corporation
+ */
+#include "socfpga_agilex.dtsi"
+
+/ {
+	model = "SoCFPGA Agilex PTP solution";
+        compatible = "intel,socfpga-agilex-n6000", "intel,socfpga-agilex";
+
+        aliases {
+                serial0 = &uart1;
+                serial1 = &uart0;
+                ethernet0 = &gmac0;
+                ethernet1 = &gmac1;
+                ethernet2 = &gmac2;
+        };
+
+        chosen {
+                stdout-path = "serial0:115200n8";
+        };
+
+        memory@0 {
+                device_type = "memory";
+                /* We expect the bootloader to fill in the reg */
+                reg = <0 0 0 0>;
+        };
+
+        soc {
+                agilex_hps_bridges: bus@80000000 {
+                        compatible = "simple-bus";
+                        reg = <0x80000000 0x60000000>,
+                              <0xf9000000 0x00100000>;
+                        reg-names = "axi_h2f", "axi_h2f_lw";
+                        #address-cells = <2>;
+                        #size-cells = <1>;
+            		ranges =        <0x00000000 0x00000000 0xf9000000 0x00001000>,
+                                        <0x00000001 0x00000000 0x80000000 0x00040000>;
+
+                        dma-controller@0 {
+                                compatible = "intel,hps-copy-engine";
+                                reg = <0x00000000 0x00000000 0x00001000>;
+                                #dma-cells = <1>;
+                        };
+        };
+                clocks {
+                        tod_in_clock: tod_in_clock {
+                                #clock-cells = <0>;
+                                compatible = "fixed-clock";
+                                clock-frequency = <156250000>;
+                                clock-output-names = "tod_in_clock";
+                        };
+                };
+
+                tod_0_clk: tod_0_clk{
+                        compatible = "intel, tod";
+                        reg-names = "tod_ctrl";
+                        reg = <0x81000040 0x00000040>;
+                        clocks = <&tod_in_clock>;
+                        clock-names = "tod_in_clock";
+                        status = "okay";
+                };
+
+	         hssiss_0_hssiss: hssiss_0_hssiss {
+			compatible = "intel, hssiss-1.0";
+			reg-names = "sscsr";
+			reg = <0x80160000 0x00001000>;
+                        reset-mode ="reg";
+                        cold-reset {
+                                ofs = <0x7B8>;
+                                rst-bit = <0>;
+                                rst-ack = <1>;
+			};
+		};
+
+		hssi_0_eth: hssi_0_eth{
+
+				reg-names = "tx_pref"  ,
+					    "tx_csr"   ,
+					    "tx_fifo"  ,
+					    "rx_pref"  ,
+					    "rx_csr"   ,
+					    "rx_fifo"  ;
+
+				reg =   <0x82000800 0x00000020>,
+					<0x82000820 0x00000020>,
+					<0x82000840 0x00000020>,
+					<0x82000900 0x00000020>,
+					<0x82000920 0x00000020>,
+					<0x82000940 0x00000020>;
+
+				compatible = "altr,hssi-etile-1.0";
+				chan = <0x8>;
+				phy-mode = "25gbase-kr";
+				tod = <&tod_0_clk>;
+				qsfp = <&qsfp_eth0>;
+				qsfp-lane = <0x0>;
+				hssiss = <&hssiss_0_hssiss>;
+				clock-names = "tod_clk";
+				altr,tx-pma-delay-ns = <0xD>;
+				altr,rx-pma-delay-ns = <0x8>;
+				altr,tx-pma-delay-fns = <0x24D>;
+				altr,rx-pma-delay-fns = <0x3E97>;
+				altr,tx-external-phy-delay-ns = <0x0>;
+				altr,rx-external-phy-delay-ns = <0x0>;
+				fec-cw-pos-rx = <0x3>;
+				fec-type="no-fec";
+				interrupt-parent = <&intc>;
+				interrupt-names = "tx_irq", "rx_irq";
+				interrupts = <0 24 4>, <0 25 4>;
+				rx-fifo-depth = <0x4000>;
+				tx-fifo-depth = <0x1000>;
+				rx-fifo-almost-full = <0x2000>;
+				rx-fifo-almost-empty = <0x1000>;
+				altr,has-ptp;
+				altr,has-ptp-clockcleaner;
+				status = "okay";
+				fixed-link {
+					speed =<25000>;
+					full-duplex;
+				};
+			};
+
+		hssi_1_eth: hssi_1_eth{
+
+				reg-names = "tx_pref"  ,
+					    "tx_csr"   ,
+					    "tx_fifo"  ,
+					    "rx_pref"  ,
+					    "rx_csr"   ,
+					    "rx_fifo"  ;
+
+				reg =   <0x82001800 0x00000020>,
+					<0x82001820 0x00000020>,
+					<0x82001840 0x00000020>,
+					<0x82001900 0x00000020>,
+					<0x82001920 0x00000020>,
+					<0x82001940 0x00000020>;
+
+				compatible = "altr,hssi-etile-1.0";
+				chan = <0x9>;
+				phy-mode = "25gbase-kr";
+				tod = <&tod_0_clk>;
+				qsfp = <&qsfp_eth0>;
+				qsfp-lane = <0x0>;
+				hssiss = <&hssiss_0_hssiss>;
+				clock-names = "tod_clk";
+				altr,tx-pma-delay-ns = <0xD>;
+				altr,rx-pma-delay-ns = <0x8>;
+				altr,tx-pma-delay-fns = <0x24D>;
+				altr,rx-pma-delay-fns = <0x3E97>;
+				altr,tx-external-phy-delay-ns = <0x0>;
+				altr,rx-external-phy-delay-ns = <0x0>;
+				fec-cw-pos-rx = <0x3>;
+				fec-type="no-fec";
+				interrupt-parent = <&intc>;
+				interrupt-names = "tx_irq", "rx_irq";
+				interrupts = <0 26 4>, <0 27 4>;
+				rx-fifo-depth = <0x4000>;
+				tx-fifo-depth = <0x1000>;
+				rx-fifo-almost-full = <0x2000>;
+				rx-fifo-almost-empty = <0x1000>;
+				altr,has-ptp;
+				altr,has-ptp-clockcleaner;
+				status = "okay";
+				fixed-link {
+					speed =<25000>;
+					full-duplex;
+				};
+			};
+		hssi_2_eth: hssi_2_eth{
+
+				reg-names = "tx_pref"  ,
+					    "tx_csr"   ,
+					    "tx_fifo"  ,
+					    "rx_pref"  ,
+					    "rx_csr"   ,
+					    "rx_fifo"  ;
+
+				reg =   <0x82002800 0x00000020>,
+					<0x82002820 0x00000020>,
+					<0x82002840 0x00000020>,
+					<0x82002900 0x00000020>,
+					<0x82002920 0x00000020>,
+					<0x82002940 0x00000020>;
+
+				compatible = "altr,hssi-etile-1.0";
+				chan = <0xa>;
+				phy-mode = "25gbase-kr";
+				tod = <&tod_0_clk>;
+				qsfp = <&qsfp_eth0>;
+				qsfp-lane = <0x0>;
+				hssiss = <&hssiss_0_hssiss>;
+				clock-names = "tod_clk";
+				altr,tx-pma-delay-ns = <0xD>;
+				altr,rx-pma-delay-ns = <0x8>;
+				altr,tx-pma-delay-fns = <0x24D>;
+				altr,rx-pma-delay-fns = <0x3E97>;
+				altr,tx-external-phy-delay-ns = <0x0>;
+				altr,rx-external-phy-delay-ns = <0x0>;
+				fec-cw-pos-rx = <0x3>;
+				fec-type="no-fec";
+				interrupt-parent = <&intc>;
+				interrupt-names = "tx_irq", "rx_irq";
+				interrupts = <0 28 4>, <0 29 4>;
+				rx-fifo-depth = <0x4000>;
+				tx-fifo-depth = <0x1000>;
+				rx-fifo-almost-full = <0x2000>;
+				rx-fifo-almost-empty = <0x1000>;
+				altr,has-ptp;
+				altr,has-ptp-clockcleaner;
+				status = "okay";
+				fixed-link {
+					speed =<25000>;
+					full-duplex;
+				};
+			};
+		hssi_3_eth: hssi_3_eth{
+
+				reg-names = "tx_pref"  ,
+					    "tx_csr"   ,
+					    "tx_fifo"  ,
+					    "rx_pref"  ,
+					    "rx_csr"   ,
+					    "rx_fifo"  ;
+
+				reg =   <0x82003800 0x00000020>,
+					<0x82003820 0x00000020>,
+					<0x82003840 0x00000020>,
+					<0x82003900 0x00000020>,
+					<0x82003920 0x00000020>,
+					<0x82003940 0x00000020>;
+
+				compatible = "altr,hssi-etile-1.0";
+				chan = <0xb>;
+				phy-mode = "25gbase-kr";
+				tod = <&tod_0_clk>;
+				qsfp = <&qsfp_eth0>;
+				qsfp-lane = <0x0>;
+				hssiss = <&hssiss_0_hssiss>;
+				clock-names = "tod_clk";
+				altr,tx-pma-delay-ns = <0xD>;
+				altr,rx-pma-delay-ns = <0x8>;
+				altr,tx-pma-delay-fns = <0x24D>;
+				altr,rx-pma-delay-fns = <0x3E97>;
+				altr,tx-external-phy-delay-ns = <0x0>;
+				altr,rx-external-phy-delay-ns = <0x0>;
+				fec-cw-pos-rx = <0x3>;
+				fec-type="no-fec";
+				interrupt-parent = <&intc>;
+				interrupt-names = "tx_irq", "rx_irq";
+				interrupts = <0 30 4>, <0 31 4>;
+				rx-fifo-depth = <0x4000>;
+				tx-fifo-depth = <0x1000>;
+				rx-fifo-almost-full = <0x2000>;
+				rx-fifo-almost-empty = <0x1000>;
+				altr,has-ptp;
+				altr,has-ptp-clockcleaner;
+				status = "okay";
+				fixed-link {
+					speed =<25000>;
+					full-duplex;
+				};
+			};
+		hssi_4_eth: hssi_4_eth{
+
+				reg-names = "tx_pref"  ,
+					    "tx_csr"   ,
+					    "tx_fifo"  ,
+					    "rx_pref"  ,
+					    "rx_csr"   ,
+					    "rx_fifo"  ;
+
+				reg =   <0x82004800 0x00000020>,
+					<0x82004820 0x00000020>,
+					<0x82004840 0x00000020>,
+					<0x82004900 0x00000020>,
+					<0x82004920 0x00000020>,
+					<0x82004940 0x00000020>;
+
+				compatible = "altr,hssi-etile-1.0";
+				chan = <0xc>;
+				phy-mode = "25gbase-kr";
+				tod = <&tod_0_clk>;
+				qsfp = <&qsfp_eth1>;
+				qsfp-lane = <0x0>;
+				hssiss = <&hssiss_0_hssiss>;
+				clock-names = "tod_clk";
+				altr,tx-pma-delay-ns = <0xD>;
+				altr,rx-pma-delay-ns = <0x8>;
+				altr,tx-pma-delay-fns = <0x24D>;
+				altr,rx-pma-delay-fns = <0x3E97>;
+				altr,tx-external-phy-delay-ns = <0x0>;
+				altr,rx-external-phy-delay-ns = <0x0>;
+				fec-cw-pos-rx = <0x3>;
+				fec-type="no-fec";
+				interrupt-parent = <&intc>;
+				interrupt-names = "tx_irq", "rx_irq";
+				interrupts = <0 32 4>, <0 33 4>;
+				rx-fifo-depth = <0x4000>;
+				tx-fifo-depth = <0x1000>;
+				rx-fifo-almost-full = <0x2000>;
+				rx-fifo-almost-empty = <0x1000>;
+				altr,has-ptp;
+				altr,has-ptp-clockcleaner;
+				status = "okay";
+				fixed-link {
+					speed =<25000>;
+					full-duplex;
+				};
+			};
+		hssi_5_eth: hssi_5_eth{
+
+				reg-names = "tx_pref"  ,
+					    "tx_csr"   ,
+					    "tx_fifo"  ,
+					    "rx_pref"  ,
+					    "rx_csr"   ,
+					    "rx_fifo"  ;
+
+				reg =   <0x82005800 0x00000020>,
+					<0x82005820 0x00000020>,
+					<0x82005840 0x00000020>,
+					<0x82005900 0x00000020>,
+					<0x82005920 0x00000020>,
+					<0x82005940 0x00000020>;
+
+				compatible = "altr,hssi-etile-1.0";
+				chan = <0xd>;
+				phy-mode = "25gbase-kr";
+				tod = <&tod_0_clk>;
+				qsfp = <&qsfp_eth1>;
+				qsfp-lane = <0x0>;
+				hssiss = <&hssiss_0_hssiss>;
+				clock-names = "tod_clk";
+				altr,tx-pma-delay-ns = <0xD>;
+				altr,rx-pma-delay-ns = <0x8>;
+				altr,tx-pma-delay-fns = <0x24D>;
+				altr,rx-pma-delay-fns = <0x3E97>;
+				altr,tx-external-phy-delay-ns = <0x0>;
+				altr,rx-external-phy-delay-ns = <0x0>;
+				fec-cw-pos-rx = <0x3>;
+				fec-type="no-fec";
+				interrupt-parent = <&intc>;
+				interrupt-names = "tx_irq", "rx_irq";
+				interrupts = <0 34 4>, <0 35 4>;
+				rx-fifo-depth = <0x4000>;
+				tx-fifo-depth = <0x1000>;
+				rx-fifo-almost-full = <0x2000>;
+				rx-fifo-almost-empty = <0x1000>;
+				altr,has-ptp;
+				altr,has-ptp-clockcleaner;
+				status = "okay";
+				fixed-link {
+					speed =<25000>;
+					full-duplex;
+				};
+			};
+		hssi_6_eth: hssi_6_eth{
+
+				reg-names = "tx_pref"  ,
+					    "tx_csr"   ,
+					    "tx_fifo"  ,
+					    "rx_pref"  ,
+					    "rx_csr"   ,
+					    "rx_fifo"  ;
+
+				reg =   <0x82006800 0x00000020>,
+					<0x82006820 0x00000020>,
+					<0x82006840 0x00000020>,
+					<0x82006900 0x00000020>,
+					<0x82006920 0x00000020>,
+					<0x82006940 0x00000020>;
+
+				compatible = "altr,hssi-etile-1.0";
+				chan = <0xe>;
+				phy-mode = "25gbase-kr";
+				tod = <&tod_0_clk>;
+				qsfp = <&qsfp_eth1>;
+				qsfp-lane = <0x0>;
+				hssiss = <&hssiss_0_hssiss>;
+				clock-names = "tod_clk";
+				altr,tx-pma-delay-ns = <0xD>;
+				altr,rx-pma-delay-ns = <0x8>;
+				altr,tx-pma-delay-fns = <0x24D>;
+				altr,rx-pma-delay-fns = <0x3E97>;
+				altr,tx-external-phy-delay-ns = <0x0>;
+				altr,rx-external-phy-delay-ns = <0x0>;
+				fec-cw-pos-rx = <0x3>;
+				fec-type="no-fec";
+				interrupt-parent = <&intc>;
+				interrupt-names = "tx_irq", "rx_irq";
+				interrupts = <0 36 4>, <0 37 4>;
+				rx-fifo-depth = <0x4000>;
+				tx-fifo-depth = <0x1000>;
+				rx-fifo-almost-full = <0x2000>;
+				rx-fifo-almost-empty = <0x1000>;
+				altr,has-ptp;
+				altr,has-ptp-clockcleaner;
+				status = "okay";
+				fixed-link {
+					speed =<25000>;
+					full-duplex;
+				};
+			};
+		hssi_7_eth: hssi_7_eth{
+
+				reg-names = "tx_pref"  ,
+					    "tx_csr"   ,
+					    "tx_fifo"  ,
+					    "rx_pref"  ,
+					    "rx_csr"   ,
+					    "rx_fifo"  ;
+
+				reg =   <0x82007800 0x00000020>,
+					<0x82007820 0x00000020>,
+					<0x82007840 0x00000020>,
+					<0x82007900 0x00000020>,
+					<0x82007920 0x00000020>,
+					<0x82007940 0x00000020>;
+
+				compatible = "altr,hssi-etile-1.0";
+				chan = <0xf>;
+				phy-mode = "25gbase-kr";
+				tod = <&tod_0_clk>;
+				qsfp = <&qsfp_eth1>;
+				qsfp-lane = <0x0>;
+				hssiss = <&hssiss_0_hssiss>;
+				clock-names = "tod_clk";
+				altr,tx-pma-delay-ns = <0xD>;
+				altr,rx-pma-delay-ns = <0x8>;
+				altr,tx-pma-delay-fns = <0x24D>;
+				altr,rx-pma-delay-fns = <0x3E97>;
+				altr,tx-external-phy-delay-ns = <0x0>;
+				altr,rx-external-phy-delay-ns = <0x0>;
+				fec-cw-pos-rx = <0x3>;
+				fec-type="no-fec";
+				interrupt-parent = <&intc>;
+				interrupt-names = "tx_irq", "rx_irq";
+				interrupts = <0 38 4>, <0 39 4>;
+				rx-fifo-depth = <0x4000>;
+				tx-fifo-depth = <0x1000>;
+				rx-fifo-almost-full = <0x2000>;
+				rx-fifo-almost-empty = <0x1000>;
+				altr,has-ptp;
+				altr,has-ptp-clockcleaner;
+				status = "okay";
+				fixed-link {
+					speed =<25000>;
+					full-duplex;
+				};
+			};
+
+                qsfp_eth0: qsfp-eth0 {
+                        compatible = "intel,qsfp-mem";
+                        reg-names = "qsfp-mem-ctrl";
+                        reg = <0x80112000 0x00001000>;
+                        status = "okay";
+                };
+
+
+                qsfp_eth1: qsfp-eth1 {
+                        compatible = "intel,qsfp-mem";
+                        reg-names = "qsfp-mem-ctrl";
+                        reg = <0x80113000 0x00001000>;
+                        status = "okay";
+                };
+        };
+};
+
+&osc1 {
+        clock-frequency = <25000000>;
+};
+
+&uart0 {
+        status = "okay";
+};
+
+&uart1 {
+        status = "okay";
+};
+
+&watchdog0 {
+        status = "okay";
+};
+
+&fpga_mgr {
+        status = "disabled";
+};
+
