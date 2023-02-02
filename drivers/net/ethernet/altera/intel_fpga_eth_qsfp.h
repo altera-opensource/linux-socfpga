@@ -4,7 +4,7 @@
 
 #include "intel_fpga_eth_hssi_itf.h"
 
-#define QSFP_POLL_TIMEOUT 1500
+#define QSFP_POLL_TIMEOUT 500
 
 struct qsfp_reg_space {
 
