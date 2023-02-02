@@ -12,11 +12,11 @@
 #include "intel_fpga_eth_hssi_itf.h"
 #include <linux/interrupt.h>
 
-static void etile_set_mac(struct intel_fpga_etile_eth_private *priv, 
+static void etile_set_mac(struct intel_fpga_etile_eth_private *priv,
 			  bool enable)
 {
 	struct platform_device *pdev = priv->pdev_hssi;
-	u32 chan = priv->chan;
+	u32 chan = priv->tile_chan;
 
 	if (enable) {
 		/* Enable Tx datapath */
@@ -41,12 +41,12 @@ static void etile_set_mac(struct intel_fpga_etile_eth_private *priv,
 	}
 }
 
-void etile_update_mac_addr(struct intel_fpga_etile_eth_private *priv, 
+void etile_update_mac_addr(struct intel_fpga_etile_eth_private *priv,
 			   u8 *addr)
 {
 	u32 msb;
 	u32 lsb;
-	u32 chan = priv->chan;
+	u32 chan = priv->tile_chan;
 	struct platform_device *pdev = priv->pdev_hssi;
 
 	lsb = (addr[2] << 24) | (addr[3] << 16) | (addr[4] << 8) | addr[5];
@@ -66,7 +66,7 @@ static void etile_set_mac_flow_ctrl(struct intel_fpga_etile_eth_private *priv)
 {
 	u32 reg;
 	struct platform_device *pdev = priv->pdev_hssi;
-	u32 chan = priv->chan;
+	u32 chan = priv->tile_chan;
 
 	if (priv->flow_ctrl & FLOW_RX)
 
@@ -115,7 +115,7 @@ static int eth_etile_tx_rx_user_flow(struct intel_fpga_etile_eth_private *priv)
 {
 	int ret;
 	u32 ui_value;
-	u32 chan = priv->chan;
+	u32 chan = priv->tile_chan;
 
 	u32 tx_pma_delay_ns   = 0;
 	u32 tx_extra_latency  = 0;
@@ -250,12 +250,12 @@ static int eth_etile_tx_rx_user_flow(struct intel_fpga_etile_eth_private *priv)
 	return 0;
 }
 
-void pma_digital_reset(struct intel_fpga_etile_eth_private *priv, 
-		       bool tx_reset, 
+void pma_digital_reset(struct intel_fpga_etile_eth_private *priv,
+		       bool tx_reset,
 		       bool rx_reset)
 {
 	struct platform_device *pdev = priv->pdev_hssi;
-	u32 chan = priv->chan;
+	u32 chan = priv->tile_chan;
 
 	/* Trigger RX digital reset
 	 * 1.   EHIP CSR Write, Offset = 0x310, value = 0x4
@@ -264,92 +264,57 @@ void pma_digital_reset(struct intel_fpga_etile_eth_private *priv,
 	 */
 
 	if (rx_reset)
-		hssi_csrwr8(pdev, HSSI_ETH_RECONFIG, 
+		hssi_csrwr8(pdev, HSSI_ETH_RECONFIG,
 			    chan, eth_phy_csroffs(phy_config), 0x4);
 	if (tx_reset)
-		hssi_csrwr8(pdev, HSSI_ETH_RECONFIG, 
+		hssi_csrwr8(pdev, HSSI_ETH_RECONFIG,
 			    chan, eth_phy_csroffs(phy_config), 0x2);
-}
-
-void pma_analog_reset(struct intel_fpga_etile_eth_private *priv) 
-{
-	struct platform_device *pdev = priv->pdev_hssi;
-	u32 chan = priv->chan;
-
-	/* Step:  Trigger PMA analog reset
-         *      1.      PMA AVMM Write, Offset = 0x200, value = 0x0
-         *      2.      PMA AVMM Write, Offset = 0x201, value = 0x0
-         *      3.      PMA AVMM Write, Offset = 0x202, value = 0x0
-         *      4.      PMA AVMM Write, Ofset = 0x203, value = 0x81
-         *      5.      PMA AVMM Read, Offset = 0x207, expected value = 0x80
-         *      6.      PMA AVMM Read, Offset = 0x204, expected value = 0x0 (channel #)
-         */
-	hssi_csrwr8(pdev, HSSI_PHY_XCVR_PMAAVMM, chan, eth_pma_avmm_csroffs(reg_200), 0x0);
-	hssi_csrwr8(pdev, HSSI_PHY_XCVR_PMAAVMM, chan, eth_pma_avmm_csroffs(reg_201), 0x0);
-	hssi_csrwr8(pdev, HSSI_PHY_XCVR_PMAAVMM, chan, eth_pma_avmm_csroffs(reg_202), 0x0);
-	hssi_csrwr8(pdev, HSSI_PHY_XCVR_PMAAVMM, chan, eth_pma_avmm_csroffs(reg_203), 0x81);
-
-        if (xtile_check_counter_complete(priv, HSSI_PHY_XCVR_PMAAVMM, 
-					 eth_pma_avmm_csroffs(reg_207),
-                                         XCVR_PMA_AVMM_207_LAST_OP_ON_200_203_SUCCESS,
-                                         true, INTEL_FPGA_BYTE_ALIGN)) {
-                netdev_err(priv->dev, "Analog PMA reset failed, abort\n");
-                return ;
-        }
-
-        if (xtile_check_counter_complete(priv, HSSI_PHY_XCVR_PMAAVMM,
-					 eth_pma_avmm_csroffs(reg_204),
-                                         XCVR_PMA_AVMM_204_RET_PHYS_CHANNEL_NUMBER,
-                                         false, INTEL_FPGA_BYTE_ALIGN))
-                netdev_warn(priv->dev, "Cannot read channel number\n");
-
-
 }
 
 int init_mac(struct intel_fpga_etile_eth_private *priv)
 {
-	int ret;
+        int ret;
 
-	/* Enable in E-tile Tx datapath */
-	etile_set_mac(priv, true);
-	etile_update_mac_addr(priv, priv->dev->dev_addr);
+        /* Enable in E-tile Tx datapath */
+        etile_set_mac(priv, true);
+        etile_update_mac_addr(priv, priv->dev->dev_addr);
 
-	ret = eth_etile_tx_rx_user_flow(priv);
-	if (ret < 0) {
-		netdev_err(priv->dev, "Tx & Rx user flow failed\n");
-		return ret;
-	}
+        ret = eth_etile_tx_rx_user_flow(priv);
+        if (ret < 0) {
+                netdev_err(priv->dev, "Tx & Rx user flow failed\n");
+                return ret;
+        }
 
-	etile_set_mac_flow_ctrl(priv);
+        etile_set_mac_flow_ctrl(priv);
 
-	return 0;
+        return 0;
 }
-
-
 
 static void etile_get_stats64(struct net_device *dev,
 		       struct rtnl_link_stats64 *storage)
 {
 	struct intel_fpga_etile_eth_private *priv = netdev_priv(dev);
 	struct platform_device *pdev = priv->pdev_hssi;
-	u32 chan = priv->chan;
+	u32 hssi_port = priv->hssi_port;
+	u32 chan = priv->tile_chan;
 	u32 lsb;
 	u32 msb;
 
 
 	/* rx stats */
-	storage->rx_bytes  = hssi_read_mac_stats64(pdev, chan, MACSTAT_RX_TOTAL_BYTES);
+	storage->rx_bytes  = hssi_read_mac_stats64(pdev, hssi_port, MACSTAT_RX_TOTAL_BYTES);
 
-	storage->multicast = hssi_read_mac_stats64(pdev, chan, MACSTAT_RX_MULTICAST);
+	storage->multicast = hssi_read_mac_stats64(pdev, hssi_port, MACSTAT_RX_MULTICAST);
 
 	storage->collisions = 0;
 
-	storage->rx_length_errors = 
-		hssi_read_mac_stats64(pdev, chan, MACSTAT_RX_UNDERSIZE) +
-		hssi_read_mac_stats64(pdev, chan, MACSTAT_RX_OVERSIZE);
+	storage->rx_length_errors =
+		hssi_read_mac_stats64(pdev, hssi_port, MACSTAT_RX_UNDERSIZE) +
+		hssi_read_mac_stats64(pdev, hssi_port, MACSTAT_RX_OVERSIZE);
+
 	storage->rx_over_errors = 0;
 
-	storage->rx_crc_errors = hssi_read_mac_stats64(pdev, chan, MACSTAT_RX_CRC_ERRORS);
+	storage->rx_crc_errors = hssi_read_mac_stats64(pdev, hssi_port, MACSTAT_RX_CRC_ERRORS);
 
 	storage->rx_fifo_errors = 0;
 	storage->rx_missed_errors = 0;
@@ -362,21 +327,21 @@ static void etile_get_stats64(struct net_device *dev,
 	storage->rx_dropped += dev->stats.rx_dropped;
 
 	/* tx stats */
-	storage->tx_bytes = hssi_read_mac_stats64(pdev, chan, MACSTAT_TX_BYTES);
+	storage->tx_bytes = hssi_read_mac_stats64(pdev, hssi_port, MACSTAT_TX_BYTES);
 
-	lsb = hssi_csrrd32_atomic(pdev, 
-			          HSSI_ETH_RECONFIG, chan, 
+	lsb = hssi_csrrd32_atomic(pdev,
+			          HSSI_ETH_RECONFIG, chan,
 				  eth_tx_stats_csroffs(tx_malformed_ctrl_lsb));
-	msb = hssi_csrrd32_atomic(pdev, 
-			          HSSI_ETH_RECONFIG, chan, 
+	msb = hssi_csrrd32_atomic(pdev,
+			          HSSI_ETH_RECONFIG, chan,
 				  eth_tx_stats_csroffs(tx_malformed_ctrl_msb));
 	storage->tx_errors = ((u64)msb << 32) | lsb;
 
-	lsb = hssi_csrrd32_atomic(pdev, 
-			          HSSI_ETH_RECONFIG, chan, 
+	lsb = hssi_csrrd32_atomic(pdev,
+			          HSSI_ETH_RECONFIG, chan,
 				  eth_tx_stats_csroffs(tx_dropped_ctrl_lsb));
-	msb = hssi_csrrd32_atomic(pdev, 
-			          HSSI_ETH_RECONFIG, chan, 
+	msb = hssi_csrrd32_atomic(pdev,
+			          HSSI_ETH_RECONFIG, chan,
 				  eth_tx_stats_csroffs(tx_dropped_ctrl_msb));
 	storage->tx_dropped = ((u64)msb << 32) | lsb;
 

@@ -48,21 +48,23 @@ qsfp_addr_space_mapper(intel_fpga_xtile_eth_private *priv,
 void qsfp_link_status(struct work_struct *work) {
 
 	bool is_link_stable;
+	bool is_prev_iter_fine;
+	bool is_next_iter_fine;
         struct delayed_work *dwork;
-	bool is_next_iter_fine = false;
         intel_fpga_xtile_eth_private *priv;
-	static bool is_prev_iter_fine = true;
 
         dwork = to_delayed_work(work);
         priv = container_of(dwork, intel_fpga_xtile_eth_private, dwork);
 
-        priv->cable_unplugged = 
+	is_prev_iter_fine = priv->prev_link_state;
+        
+	priv->cable_unplugged =
 		priv->qsfp_reg->status_reg.qsfp_stat_bits.mod_presence;
 
-        is_link_stable = 
-		hssi_ethport_is_stable(priv->pdev_hssi, priv->chan, false);
+        is_link_stable =
+		hssi_ethport_is_stable(priv->pdev_hssi, priv->hssi_port, false);
 
-	is_next_iter_fine = 
+	is_next_iter_fine =
 		(is_link_stable == true) && (priv->cable_unplugged == false);
 
 	/* If the link is not stable to perform the networking function then 
@@ -83,7 +85,7 @@ void qsfp_link_status(struct work_struct *work) {
 			priv->qsfp_ops->qsfp_link_down(priv);
         }
 	
-	is_prev_iter_fine = is_next_iter_fine;
+	priv->prev_link_state = is_next_iter_fine;
 
 reshed:
         schedule_delayed_work(&priv->dwork, msecs_to_jiffies(QSFP_POLL_TIMEOUT));
@@ -93,8 +95,9 @@ reshed:
 static void 
 init_worker_thread(intel_fpga_xtile_eth_private *priv) {
 
+	priv->prev_link_state = true;
 	INIT_DELAYED_WORK(&priv->dwork, qsfp_link_status);
-	qsfp_link_status(&priv->dwork.work);
+        schedule_delayed_work(&priv->dwork, msecs_to_jiffies(QSFP_POLL_TIMEOUT));
 }
 
 void init_qsfp_ctrl_space(intel_fpga_xtile_eth_private *priv) {

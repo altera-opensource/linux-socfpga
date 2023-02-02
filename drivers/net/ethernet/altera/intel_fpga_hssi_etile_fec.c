@@ -56,7 +56,7 @@ void ui_adjustments(struct timer_list *t)
 {
 	struct intel_fpga_etile_eth_private *priv = from_timer(priv, t, fec_timer);
 	struct platform_device *pdev = priv->pdev_hssi;
-	u32 chan = priv->chan;
+	u32 chan = priv->tile_chan;
 
 	u32 tx_tam_l_initial, tx_tam_h_initial, tx_tam_count_initial;
 	u32 rx_tam_l_initial, rx_tam_h_initial, rx_tam_count_initial;

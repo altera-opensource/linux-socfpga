@@ -10,41 +10,41 @@
 #include "intel_fpga_eth_hssi_itf.h"
 
 
-u32 hssi_csrrd32(struct platform_device *pdev, 
+u32 hssi_csrrd32(struct platform_device *pdev,
 		 enum hssiss_tile_reg_type regbank,
-		 u32 chan, 
+		 u32 chan,
 		 u32 offset) {
 	u32 ret_value;
 
 	int ret_status = !INTEL_FPGA_RET_SUCCESS;
 
-	ret_status = hssi_csrrd32_errcheck(pdev, 
-					   regbank, 
-					   chan, 
-					   offset, 
-					   false, 
+	ret_status = hssi_csrrd32_errcheck(pdev,
+					   regbank,
+					   chan,
+					   offset,
+					   false,
 					   &ret_value);
 
 	if (ret_status != INTEL_FPGA_RET_SUCCESS) {
-		dev_err(&pdev->dev, 
+		dev_err(&pdev->dev,
 			"Error reading the 32 bit regbank %d offset %x rc %x\n",
 			regbank, offset, ret_status);
 	}
 	return ret_value;
 }
 
-u32 hssi_csrrd32_atomic(struct platform_device *pdev, 
-			enum hssiss_tile_reg_type regbank, 
-			u32 chan, 
+u32 hssi_csrrd32_atomic(struct platform_device *pdev,
+			enum hssiss_tile_reg_type regbank,
+			u32 chan,
 			u32 offset) {
 	u32 ret_value;
 	int ret_status = !INTEL_FPGA_RET_SUCCESS;
 
-	ret_status = hssi_csrrd32_errcheck(pdev, 
-					   regbank, 
-					   chan, 
-					   offset, 
-					   true, 
+	ret_status = hssi_csrrd32_errcheck(pdev,
+					   regbank,
+					   chan,
+					   offset,
+					   true,
 					   &ret_value);
 
 	if (ret_status != INTEL_FPGA_RET_SUCCESS) {
@@ -72,8 +72,8 @@ int hssi_csrrd32_errcheck(struct platform_device *pdev,
 	csr_access.reg_type  = regbank;
 
 	if (atomicity)
-		ret_status = hssiss_execute_sal_cmd_atomic(pdev, 
-							   SAL_GET_CSR,  
+		ret_status = hssiss_execute_sal_cmd_atomic(pdev,
+							   SAL_GET_CSR,
 							   &csr_access);
 	else
 		ret_status = hssiss_execute_sal_cmd(pdev, SAL_GET_CSR,  &csr_access);
@@ -100,8 +100,8 @@ static void hssi_csrwr32_local(struct platform_device *pdev,
 	csr_access.data      = reg_value;
 
 	if (atomicity)
-		ret_status = hssiss_execute_sal_cmd_atomic(pdev, 
-							   SAL_SET_CSR, 
+		ret_status = hssiss_execute_sal_cmd_atomic(pdev,
+							   SAL_SET_CSR,
 							   &csr_access);
 	else
 		ret_status = hssiss_execute_sal_cmd(pdev, SAL_SET_CSR,  &csr_access);
@@ -131,9 +131,9 @@ void hssi_csrwr32_atomic(struct platform_device *pdev,
         hssi_csrwr32_local(pdev, regbank, chan, offset, true, reg_value);
 }
 
-u8 hssi_csrrd8(struct platform_device *pdev, 
-	       enum hssiss_tile_reg_type regbank, 
-	       u32 chan, 
+u8 hssi_csrrd8(struct platform_device *pdev,
+	       enum hssiss_tile_reg_type regbank,
+	       u32 chan,
 	       u32 offset) {
 	
 	u8 ret_value;
@@ -143,9 +143,9 @@ u8 hssi_csrrd8(struct platform_device *pdev,
 	return ret_value;
 }
 
-u8 hssi_csrrd8_atomic(struct platform_device *pdev, 
-		      enum hssiss_tile_reg_type regbank, 
-		      u32 chan, 
+u8 hssi_csrrd8_atomic(struct platform_device *pdev,
+		      enum hssiss_tile_reg_type regbank,
+		      u32 chan,
 		      u32 offset) {
 	u8 ret_value;
 
@@ -168,15 +168,15 @@ int hssi_csrrd8_errcheck(struct platform_device *pdev,
 	csr_access.reg_type  = regbank;
 
 	if (atomic == true)
-		ret_status = hssiss_execute_sal_cmd_atomic(pdev, 
-				                           SAL_GET_CSR,  
+		ret_status = hssiss_execute_sal_cmd_atomic(pdev,
+				                           SAL_GET_CSR,
 							   &csr_access);
 	else
 		ret_status = hssiss_execute_sal_cmd(pdev, SAL_GET_CSR,  &csr_access);
 
 	if (ret_status == INTEL_FPGA_RET_SUCCESS) {
 		*reg_value = csr_access.data & 0xFF;
-  	} 
+  	}
 	else {
 		dev_err(&pdev->dev,
 			"csr read access error 8 bit regbank %d offset %x rc %x\n",
@@ -186,10 +186,10 @@ int hssi_csrrd8_errcheck(struct platform_device *pdev,
 	return ret_status;
 }
 
-void hssi_csrwr8(struct platform_device *pdev, 
-		 enum hssiss_tile_reg_type regbank, 
-		 u32 chan, 
-		 u32 offset, 
+void hssi_csrwr8(struct platform_device *pdev,
+		 enum hssiss_tile_reg_type regbank,
+		 u32 chan,
+		 u32 offset,
 		 u8 reg_value) {
 	
 	struct get_set_csr_data csr_access;
@@ -210,10 +210,10 @@ void hssi_csrwr8(struct platform_device *pdev,
 	}
 }
 
-void hssi_set_bit(struct platform_device *pdev, 
-		  enum hssiss_tile_reg_type regbank, 
-		  u32 chan, 
-		  u32 offset, 
+void hssi_set_bit(struct platform_device *pdev,
+		  enum hssiss_tile_reg_type regbank,
+		  u32 chan,
+		  u32 offset,
 		  u32 bit_mask) {
 	u32 value;
 
@@ -239,10 +239,10 @@ void hssi_set_bit_atomic(struct platform_device *pdev,
 }
 
 
-void hssi_clear_bit(struct platform_device *pdev, 
-		    enum hssiss_tile_reg_type regbank, 
-		    u32 chan, 
-		    u32 offset, 
+void hssi_clear_bit(struct platform_device *pdev,
+		    enum hssiss_tile_reg_type regbank,
+		    u32 chan,
+		    u32 offset,
 		    u32 bit_mask) {
 	u32 value;
 
@@ -267,10 +267,10 @@ void hssi_clear_bit_atomic(struct platform_device *pdev,
         hssi_csrwr32_atomic(pdev, regbank, chan, offset, value);
 }
 
-bool hssi_bit_is_set(struct platform_device *pdev, 
-		     enum hssiss_tile_reg_type regbank, 
-		     u32 chan, 
-		     u32 offset, 
+bool hssi_bit_is_set(struct platform_device *pdev,
+		     enum hssiss_tile_reg_type regbank,
+		     u32 chan,
+		     u32 offset,
 		     u32 bit_mask) {
 	u32 value;
 
@@ -279,10 +279,10 @@ bool hssi_bit_is_set(struct platform_device *pdev,
 	return (value & bit_mask) ? true : false;
 }
 
-bool hssi_bit_is_clear(struct platform_device *pdev, 
-		       enum hssiss_tile_reg_type regbank, 
-		       u32 chan, 
-		       u32 offset, 
+bool hssi_bit_is_clear(struct platform_device *pdev,
+		       enum hssiss_tile_reg_type regbank,
+		       u32 chan,
+		       u32 offset,
 		       u32 bit_mask) {
 	u32 value;
 
@@ -291,21 +291,21 @@ bool hssi_bit_is_clear(struct platform_device *pdev,
 	return (value & bit_mask) ? false : true;
 }
 
-void hssi_reset_mac_stats(struct platform_device *pdev, 
-			  u32 chan, 
-			  bool tx_rst, 
+void hssi_reset_mac_stats(struct platform_device *pdev,
+			  u32 port,
+			  bool tx_rst,
 			  bool rx_rst) {
 
-	struct reset_mac_stat_data rst_data = { 
-						.port = chan, 
-						.tx = tx_rst, 
-						.rx = rx_rst 
+	struct reset_mac_stat_data rst_data = {
+						.port = port,
+						.tx = tx_rst,
+						.rx = rx_rst
 	};
 
 	int ret_status;
 
-	ret_status = hssiss_execute_sal_cmd(pdev, 
-					    SAL_RESET_MAC_STAT, 
+	ret_status = hssiss_execute_sal_cmd(pdev,
+					    SAL_RESET_MAC_STAT,
 					    (void *)&rst_data);
 
 	if (ret_status != INTEL_FPGA_RET_SUCCESS) {
@@ -314,20 +314,20 @@ void hssi_reset_mac_stats(struct platform_device *pdev,
 
 }
 
-static u64  hssi_read_mac_stats(struct platform_device *pdev, 
-				u32 chan,
+static u64  hssi_read_mac_stats(struct platform_device *pdev,
+				u32 port,
 			  	enum hssiss_mac_stat_counter_type stat_type,
 			       	bool is_lsb) {
 
-	struct read_mac_stat_data mac_stat_data = { 
-						    .port_data = chan, 
-						    .type = stat_type, 
-						    .lsb = is_lsb 
+	struct read_mac_stat_data mac_stat_data = {
+						    .port_data = port,
+						    .type = stat_type,
+						    .lsb = is_lsb
 						  };
 	int ret_status;
 
-	 ret_status = hssiss_execute_sal_cmd_atomic(pdev, 
-			 			    SAL_READ_MAC_STAT, 
+	 ret_status = hssiss_execute_sal_cmd_atomic(pdev,
+			 			    SAL_READ_MAC_STAT,
 						    (void *)&mac_stat_data);
 
 	 if (ret_status != INTEL_FPGA_RET_SUCCESS) {
@@ -338,20 +338,20 @@ static u64  hssi_read_mac_stats(struct platform_device *pdev,
 	return mac_stat_data.port_data;
 }
 
-u64 hssi_read_mac_stats64(struct platform_device *pdev, u32 chan,
+u64 hssi_read_mac_stats64(struct platform_device *pdev, u32 port,
 			  enum hssiss_mac_stat_counter_type stat_type) {
 
-	return (u64)(hssi_read_mac_stats(pdev, chan, stat_type, false) << 32) |
-		     hssi_read_mac_stats(pdev, chan, stat_type, true);
+	return (u64)(hssi_read_mac_stats(pdev, port, stat_type, false) << 32) |
+		     hssi_read_mac_stats(pdev, port, stat_type, true);
 }
 
-int hssi_en_serial_loopback(struct platform_device *pdev, u32 chan)
+int hssi_en_serial_loopback(struct platform_device *pdev, u32 port)
 {
 	int ret_status;
 
-	ret_status = hssiss_execute_sal_cmd(pdev, 
-					    SAL_ENABLE_LOOPBACK, 
-					    (void *)&chan);
+	ret_status = hssiss_execute_sal_cmd(pdev,
+					    SAL_ENABLE_LOOPBACK,
+					    (void *)&port);
 
 	if (ret_status != INTEL_FPGA_RET_SUCCESS)
 	{
@@ -362,13 +362,13 @@ int hssi_en_serial_loopback(struct platform_device *pdev, u32 chan)
 	return ret_status;
 }
 
-int hssi_dis_serial_loopback(struct platform_device *pdev, u32 chan)
+int hssi_dis_serial_loopback(struct platform_device *pdev, u32 port)
 {
 	int ret_status;
 
-	ret_status = hssiss_execute_sal_cmd(pdev, 
-					    SAL_DISABLE_LOOPBACK, 
-					    (void *)&chan);
+	ret_status = hssiss_execute_sal_cmd(pdev,
+					    SAL_DISABLE_LOOPBACK,
+					    (void *)&port);
 
 	if (ret_status != INTEL_FPGA_RET_SUCCESS)
 	{
@@ -387,12 +387,12 @@ void hssi_enable_hotplug(struct platform_device *pdev) {
 	hssiss_hotplug_enable(pdev, true);
 }
 
-bool hssi_ethport_is_stable(struct platform_device *pdev, u32 chan, bool logging) {
+bool hssi_ethport_is_stable(struct platform_device *pdev, u32 port, bool logging) {
 
 	bool retstatus;
 	hssi_eth_port_sts pstatus;
 
-	pstatus = hssiss_get_ethport_status(pdev, chan);
+	pstatus = hssiss_get_ethport_status(pdev, port);
 
 	/* tx_lanes_stable, rx_pcs_ready and tx_pll_locked should be set for the
 	 * transmission to begin
