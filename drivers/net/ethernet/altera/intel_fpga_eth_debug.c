@@ -40,7 +40,7 @@ static void xtile_prefetcher_reg_dump_rx(struct altera_dma_private *priv) {
 
 }
 
-static void xtile_dispatcher_reg_dump_tx(struct altera_dma_private *priv) { 
+static void xtile_dispatcher_reg_dump_tx(struct altera_dma_private *priv) {
 
 	s32 ret;
 
@@ -79,8 +79,10 @@ static void xtile_fifo_fill_level_tx(struct altera_dma_private *priv) {
   	netdev_info(priv->dev, "\tWR FILL LEVEL  | 0x%x\n", MSGDMA_CSR_WR_FILL_LEVEL_GET(ret));
   	netdev_info(priv->dev, "\tRD FILL LEVEL  | 0x%x\n", MSGDMA_CSR_RD_FILL_LEVEL_GET(ret));
 
-  	ret = MSGDMA_CSR_RESP_FILL_LEVEL_GET(csrrd32(priv->tx_dma_csr, msgdma_csroffs(resp_fill_level)));
-  	netdev_info(priv->dev, "\tRSP FILL LEVEL | 0x%x\n", ret);
+  	ret = MSGDMA_CSR_RESP_FILL_LEVEL_GET(csrrd32(priv->tx_dma_csr,
+					     msgdma_csroffs(resp_fill_level)));
+  	
+	netdev_info(priv->dev, "\tRSP FILL LEVEL | 0x%x\n", ret);
 }
 
 static void xtile_fifo_fill_level_rx(struct altera_dma_private *priv) {
@@ -94,7 +96,7 @@ static void xtile_fifo_fill_level_rx(struct altera_dma_private *priv) {
   	netdev_info(priv->dev, "\tWR FILL LEVEL  | 0x%x\n", MSGDMA_CSR_WR_FILL_LEVEL_GET(ret));
   	netdev_info(priv->dev, "\tRD FILL LEVEL  | 0x%x\n", MSGDMA_CSR_RD_FILL_LEVEL_GET(ret));
 
-  	ret = MSGDMA_CSR_RESP_FILL_LEVEL_GET(csrrd32(priv->rx_dma_csr, 
+  	ret = MSGDMA_CSR_RESP_FILL_LEVEL_GET(csrrd32(priv->rx_dma_csr,
 					     msgdma_csroffs(resp_fill_level)));
 
   	netdev_info(priv->dev, "\tRSP FILL LEVEL | 0x%x\n", ret);
@@ -164,9 +166,9 @@ static void xtile_unprocess_desc_tx(struct altera_dma_private *priv) {
 	u32 desc_ringsize = priv->tx_ring_size * 2;
 
 	for (index = 0; index < desc_ringsize; index++) {
-		if ( priv->pref_txdesc[index].desc_control & 
+		if ( priv->pref_txdesc[index].desc_control &
 				MSGDMA_PREF_DESC_CTL_OWNED_BY_HW) {
-			netdev_info(priv->dev, 
+			netdev_info(priv->dev,
 				    "desc:%d: bytes %x ts %lld\n",
 				    index,
 				    priv->pref_txdesc[index].bytes_transferred,
@@ -183,6 +185,8 @@ static void xtile_dma_regs(struct altera_dma_private *priv)
 	xtile_fifo_fill_level_tx(priv);
 	xtile_dispatcher_reg_dump_tx(priv);
 	xtile_prefetcher_reg_dump_tx(priv);
+
+	netdev_info(priv->dev, "<==========================================>\n");
 	
 	xtile_comp_version_rx(priv);
 	xtile_seq_no_dump_rx(priv);

@@ -90,11 +90,11 @@
 					<0x82000940 0x00000020>;
 
 				compatible = "altr,hssi-etile-1.0";
-				chan = <0x8>;
+				hssi_port = <0x8>;
+				tile_chan = <12>;
 				phy-mode = "25gbase-kr";
 				tod = <&tod_0_clk>;
 				qsfp = <&qsfp_eth0>;
-				qsfp-lane = <0x0>;
 				hssiss = <&hssiss_0_hssiss>;
 				clock-names = "tod_clk";
 				altr,tx-pma-delay-ns = <0xD>;
@@ -138,11 +138,11 @@
 					<0x82001940 0x00000020>;
 
 				compatible = "altr,hssi-etile-1.0";
-				chan = <0x9>;
+				hssi_port = <0x9>;
+				tile_chan = <13>;
 				phy-mode = "25gbase-kr";
 				tod = <&tod_0_clk>;
 				qsfp = <&qsfp_eth0>;
-				qsfp-lane = <0x0>;
 				hssiss = <&hssiss_0_hssiss>;
 				clock-names = "tod_clk";
 				altr,tx-pma-delay-ns = <0xD>;
@@ -185,11 +185,11 @@
 					<0x82002940 0x00000020>;
 
 				compatible = "altr,hssi-etile-1.0";
-				chan = <0xa>;
+				hssi_port = <0xa>;
+				tile_chan = <14>;
 				phy-mode = "25gbase-kr";
 				tod = <&tod_0_clk>;
 				qsfp = <&qsfp_eth0>;
-				qsfp-lane = <0x0>;
 				hssiss = <&hssiss_0_hssiss>;
 				clock-names = "tod_clk";
 				altr,tx-pma-delay-ns = <0xD>;
@@ -232,11 +232,11 @@
 					<0x82003940 0x00000020>;
 
 				compatible = "altr,hssi-etile-1.0";
-				chan = <0xb>;
+				hssi_port = <0xb>;
+				tile_chan = <15>;
 				phy-mode = "25gbase-kr";
 				tod = <&tod_0_clk>;
 				qsfp = <&qsfp_eth0>;
-				qsfp-lane = <0x0>;
 				hssiss = <&hssiss_0_hssiss>;
 				clock-names = "tod_clk";
 				altr,tx-pma-delay-ns = <0xD>;
@@ -279,11 +279,11 @@
 					<0x82004940 0x00000020>;
 
 				compatible = "altr,hssi-etile-1.0";
-				chan = <0xc>;
+				hssi_port = <0xc>;
+				tile_chan = <20>;
 				phy-mode = "25gbase-kr";
 				tod = <&tod_0_clk>;
 				qsfp = <&qsfp_eth1>;
-				qsfp-lane = <0x0>;
 				hssiss = <&hssiss_0_hssiss>;
 				clock-names = "tod_clk";
 				altr,tx-pma-delay-ns = <0xD>;
@@ -326,11 +326,11 @@
 					<0x82005940 0x00000020>;
 
 				compatible = "altr,hssi-etile-1.0";
-				chan = <0xd>;
+				hssi_port = <0xd>;
+				tile_chan = <21>;
 				phy-mode = "25gbase-kr";
 				tod = <&tod_0_clk>;
 				qsfp = <&qsfp_eth1>;
-				qsfp-lane = <0x0>;
 				hssiss = <&hssiss_0_hssiss>;
 				clock-names = "tod_clk";
 				altr,tx-pma-delay-ns = <0xD>;
@@ -373,11 +373,11 @@
 					<0x82006940 0x00000020>;
 
 				compatible = "altr,hssi-etile-1.0";
-				chan = <0xe>;
+				hssi_port = <0xe>;
+				tile_chan = <22>;
 				phy-mode = "25gbase-kr";
 				tod = <&tod_0_clk>;
 				qsfp = <&qsfp_eth1>;
-				qsfp-lane = <0x0>;
 				hssiss = <&hssiss_0_hssiss>;
 				clock-names = "tod_clk";
 				altr,tx-pma-delay-ns = <0xD>;
@@ -420,11 +420,11 @@
 					<0x82007940 0x00000020>;
 
 				compatible = "altr,hssi-etile-1.0";
-				chan = <0xf>;
+				hssi_port = <0xf>;
+				tile_chan = <23>;
 				phy-mode = "25gbase-kr";
 				tod = <&tod_0_clk>;
 				qsfp = <&qsfp_eth1>;
-				qsfp-lane = <0x0>;
 				hssiss = <&hssiss_0_hssiss>;
 				clock-names = "tod_clk";
 				altr,tx-pma-delay-ns = <0xD>;

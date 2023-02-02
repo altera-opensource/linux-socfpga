@@ -2578,7 +2578,8 @@ struct intel_fpga_etile_eth_private {
 	struct intel_fpga_rx_fifo __iomem *rx_fifo;
 	struct intel_fpga_rx_fifo __iomem *tx_fifo;
 	
-	u32 chan;
+	u32 tile_chan;
+	u32 hssi_port;
 	u32 tx_irq;
 	u32 rx_irq;
 	u32 max_mtu;
@@ -2604,6 +2605,7 @@ struct intel_fpga_etile_eth_private {
 	u8 qsfp_lane;
 	bool autoneg;
 	bool ptp_enable;
+	bool prev_link_state;
 	bool cable_unplugged;
 	
 	spinlock_t tx_lock;
@@ -2628,7 +2630,6 @@ void xtile_get_stats64(struct net_device *dev,
 void pma_digital_reset(struct intel_fpga_etile_eth_private *priv, 
 		       bool tx_reset, 
 		       bool rx_reset);
-void pma_analog_reset(struct intel_fpga_etile_eth_private *priv);
 int xtile_check_counter_complete(struct intel_fpga_etile_eth_private *priv, 
 				 u32 regbank,
 				 size_t offs, 

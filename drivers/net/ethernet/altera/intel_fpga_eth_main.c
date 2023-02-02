@@ -34,7 +34,7 @@
 static int debug = -1;
 
 module_param(debug, int, MOD_PARAM_PERM);
-MODULE_PARM_DESC(debug, 
+MODULE_PARM_DESC(debug,
 		 "Message Level (-1: default, 0: no output, 16: all)");
 
 static const u32 default_msg_level =  NETIF_MSG_DRV    |
@@ -48,7 +48,7 @@ static const u32 default_msg_level =  NETIF_MSG_DRV    |
 static int flow_ctrl = FLOW_OFF;
 
 module_param(flow_ctrl, int, MOD_PARAM_PERM);
-MODULE_PARM_DESC(flow_ctrl, 
+MODULE_PARM_DESC(flow_ctrl,
 		 "Flow control (0: off, 1: rx, 2: tx, 3: on)");
 
 static int pause = MAC_PAUSEFRAME_QUANTA;
@@ -92,7 +92,7 @@ static inline u32 xtile_tx_avail(intel_fpga_xtile_eth_private *priv)
 }
 
 static int xtile_init_rx_buffer(intel_fpga_xtile_eth_private *priv,
-				struct altera_dma_buffer *rxbuffer, 
+				struct altera_dma_buffer *rxbuffer,
 				int len)
 {
 	rxbuffer->skb = netdev_alloc_skb_ip_align(priv->dev, len);
@@ -283,7 +283,7 @@ static int xtile_rx(intel_fpga_xtile_eth_private *priv, int limit)
 	u16 pktstatus;
 
 	while ( (count < limit) &&
-	        ((rxstatus = 
+	        ((rxstatus =
 		  priv->dmaops->get_rx_status(&priv->dma_priv)) != 0) ) {
 	
 		pktstatus = rxstatus >> 16;
@@ -384,7 +384,7 @@ static int xtile_tx_complete(intel_fpga_xtile_eth_private *priv)
 	return txcomplete;
 }
 
-/* NAPI polling function 
+/* NAPI polling function
  * Ref: from napi_schedule to poll call = 20us
 */
 static int xtile_poll(struct napi_struct *napi, int budget)
@@ -475,7 +475,7 @@ int xtile_check_counter_complete(intel_fpga_xtile_eth_private *priv, u32 regbank
 				 int align)
 {
 	int counter;
-	u32 chan = priv->chan;
+	u32 chan = priv->tile_chan;
 	struct platform_device *pdev = priv->pdev_hssi;
 
 	counter = 0;
@@ -529,13 +529,13 @@ int xtile_check_counter_complete(intel_fpga_xtile_eth_private *priv, u32 regbank
 	return 0;
 }
 
-static void xtile_clear_mac_statistics(struct platform_device *pdev, u32 chan)
+static void xtile_clear_mac_statistics(struct platform_device *pdev, u32 port)
 {
 	bool is_tx_reset = true;
 	bool is_rx_reset = true;
 
 	/* Clear all statistics counters for the receive and transmit path */
-	hssi_reset_mac_stats(pdev, chan, is_tx_reset, is_rx_reset);
+	hssi_reset_mac_stats(pdev, port, is_tx_reset, is_rx_reset);
 }
 
 /* Open and initialize the interface */
@@ -543,32 +543,25 @@ static int xtile_open(struct net_device *dev)
 {
 	intel_fpga_xtile_eth_private *priv = netdev_priv(dev);
 	struct platform_device *pdev = priv->pdev_hssi;
-	bool eth_portstatus = false;
-	u32 chan = priv->chan;
+	u32 hssi_port = priv->hssi_port;
+	bool eth_portstatus;
 	u32 count_test = 0;
 	unsigned long flags;
 	int ret = 0;
 	int i;
 
-	/* perform pma analog reset */
-	pma_analog_reset(priv);
-
-	/* disable hotplug in hssi */
-	hssi_disable_hotplug(pdev);
-	
-	do 
+	do
 	{
-		eth_portstatus = hssi_ethport_is_stable(pdev, chan, false);
+		eth_portstatus = hssi_ethport_is_stable(pdev, hssi_port, false);
 		udelay(1);
 
-	} while( (eth_portstatus == false) && (count_test++ < MAX_STABILITY_CHECK));
+	} while( (eth_portstatus == false) &&
+		 (count_test++ < MAX_STABILITY_CHECK) );
 	
-		
-	eth_portstatus = hssi_ethport_is_stable(pdev, chan, true);
+	eth_portstatus = hssi_ethport_is_stable(pdev, hssi_port, true);
 	
 	/* We check for port stability to log the error and don't proceed further */
 	if (eth_portstatus == false) {
-
 		ret = -EREMOTEIO;
 		goto phy_error;
 	}
@@ -598,7 +591,7 @@ static int xtile_open(struct net_device *dev)
 			    dev->dev_addr);
 
 	/* clear the MAC layer statistics to start afresh */
-	xtile_clear_mac_statistics(pdev, chan);
+	xtile_clear_mac_statistics(pdev, hssi_port);
 
 	/* Reset the mSGDMA engine and configure the mSGDMA register to           */
 	/* provide information of the Tx and Rx DMA ring start address in memory  */
@@ -670,7 +663,7 @@ static int xtile_shutdown(struct net_device *dev)
 	intel_fpga_xtile_eth_private *priv = netdev_priv(dev);
 	unsigned long flags;
 
-	/* stop polling for the QSFP presence, last status would 
+	/* stop polling for the QSFP presence, last status would
 	 * be the one displayed by ethtool */
 	deinit_qsfp_ctrl_space(priv);
 
@@ -720,13 +713,13 @@ static int xtile_change_mac(struct net_device *dev, void *inet_ds) {
 	
 	struct sockaddr *addr = inet_ds;
 	intel_fpga_xtile_eth_private *priv = netdev_priv(dev);
-	        
+	
 	if (!is_valid_ether_addr(addr->sa_data))
                 return -EADDRNOTAVAIL;
-        
+
 	memcpy(dev->dev_addr, addr->sa_data, ETH_ALEN);
 	etile_update_mac_addr(priv, priv->dev->dev_addr);
-        
+
 	return 0;
 }
 
@@ -737,7 +730,7 @@ static int xtile_change_mac(struct net_device *dev, void *inet_ds) {
  * physically contiguous fragment starting at
  * skb->data, for length of skb_headlen(skb).
  *
- * Exec: xmit time taken 10us 
+ * Exec: xmit time taken 10us
  */
 int xtile_start_xmit(struct sk_buff *skb, struct net_device *dev)
 {
@@ -751,7 +744,7 @@ int xtile_start_xmit(struct sk_buff *skb, struct net_device *dev)
 	
 	// pad with dummy bytes, DMA irq will stop otherwise
 	if (nopaged_len < 60)
-		nopaged_len = 60; 
+		nopaged_len = 60;
 
 	spin_lock_bh(&priv->tx_lock);
 	
@@ -775,7 +768,7 @@ int xtile_start_xmit(struct sk_buff *skb, struct net_device *dev)
 	buffer = &priv->dma_priv.tx_ring[entry];
 	
 	/* buffer is created prior just to keep the spin lock section short */
-	dma_addr = dma_map_single(priv->device, skb->data, 
+	dma_addr = dma_map_single(priv->device, skb->data,
 				  nopaged_len,
 				  DMA_TO_DEVICE);
 
@@ -813,7 +806,7 @@ int xtile_start_xmit(struct sk_buff *skb, struct net_device *dev)
 	if (!priv->dma_priv.hwts_tx_en)
 		skb_tx_timestamp(skb);
 
-	if (unlikely( NETDEV_TX_BUSY == 
+	if (unlikely( NETDEV_TX_BUSY ==
 		      priv->dmaops->tx_buffer(&priv->dma_priv, buffer)) ) {
 		
 		xtile_free_tx_buffer(priv, buffer);
@@ -837,7 +830,7 @@ allgood:
 err:
 	spin_unlock_bh(&priv->tx_lock);
 	netdev_err(priv->dev, "xmit NETDEV_TX_BUSY\n");
-	if (!netif_queue_stopped(dev)) 
+	if (!netif_queue_stopped(dev))
 		netif_stop_queue(dev);
 
 	return NETDEV_TX_BUSY;
@@ -964,7 +957,7 @@ static void intel_fpga_xtile_validate(struct phylink_config *config,
 
 	__ETHTOOL_DECLARE_LINK_MODE_MASK(mac_supported) = { 0, };
 	__ETHTOOL_DECLARE_LINK_MODE_MASK(mask) = { 0, };
-        
+
 	if (!priv)
                 return;
 
@@ -986,7 +979,7 @@ static void intel_fpga_xtile_validate(struct phylink_config *config,
                 phylink_clear(mask, Autoneg);
                 phylink_clear(mac_supported, Autoneg);
         }
-        
+
 	phylink_set(mask, Pause);
         phylink_set(mac_supported, Pause);
         phylink_set(mask, Asym_Pause);
@@ -1173,11 +1166,19 @@ static int intel_fpga_xtile_probe(struct platform_device *pdev)
 	priv->pdev_hssi = pdev_hssi;
 
 	/* Get the HSSI node device from the device tree node */
-	/* get hssi channel no from device tree */
-	if (of_property_read_u32(np, "chan",
-				 &priv->chan)) {
+	/* get hssi port no from device tree */
+	if (of_property_read_u32(np, "hssi_port",
+				 &priv->hssi_port)) {
 
-		dev_err(&pdev->dev, "cannot obtain chan\n");
+		dev_err(&pdev->dev, "cannot obtain hssi port info\n");
+		ret = -ENXIO;
+		goto err_free_netdev;
+	}
+
+	if (of_property_read_u32(np, "tile_chan",
+                                 &priv->tile_chan)) {
+
+		dev_err(&pdev->dev, "cannot obtain tile channel info\n");
 		ret = -ENXIO;
 		goto err_free_netdev;
 	}
@@ -1238,22 +1239,22 @@ static int intel_fpga_xtile_probe(struct platform_device *pdev)
                 dev_info(&pdev->dev, "\tTX FIFO  at 0x%08lx\n",
                          (unsigned long)tx_fifo->start);
 
-	if (dma_set_mask_and_coherent(priv->device, 
+	if (dma_set_mask_and_coherent(priv->device,
 				      DMA_BIT_MASK(priv->dmaops->dmamask))) {
-		if (dma_set_mask_and_coherent(priv->device, 
+		if (dma_set_mask_and_coherent(priv->device,
 					      DMA_BIT_MASK(32))) {
 			goto err_free_netdev;
 		}
 	}
 
-	if (of_property_read_u32(pdev->dev.of_node, 
+	if (of_property_read_u32(pdev->dev.of_node,
 				"rx-fifo-almost-full",
 				 &priv->rx_fifo_almost_full)) {
 		dev_err(&pdev->dev, "cannot obtain rx-fifo-almost-full\n");
 		priv->rx_fifo_almost_full = 0x4000;
 	}
 
-	if (of_property_read_u32(pdev->dev.of_node, 
+	if (of_property_read_u32(pdev->dev.of_node,
 				"rx-fifo-almost-empty",
 				 &priv->rx_fifo_almost_empty)) {
 		dev_err(&pdev->dev, "cannot obtain rx-fifo-almost-empty\n");
@@ -1437,22 +1438,31 @@ static int intel_fpga_xtile_remove(struct platform_device *pdev)
 	return 0;
 }
 
-static void 
+static void
 intel_fpga_xtile_qsfp_up(intel_fpga_xtile_eth_private *priv) {
 
-        if (netif_queue_stopped(priv->dev)) {
-        	netif_wake_queue(priv->dev);
-        }
+	napi_enable(&priv->napi);
+	if (netif_queue_stopped(priv->dev)) {
+	netif_wake_queue(priv->dev);
+	}
 
-        napi_enable(&priv->napi);
+	rtnl_lock();
+	if (priv->phylink)
+		phylink_start(priv->phylink);
+	rtnl_unlock();
 }
 
-static void 
+static void
 intel_fpga_xtile_qsfp_down(intel_fpga_xtile_eth_private *priv) {
 
-        netif_stop_queue(priv->dev);
-        napi_synchronize(&priv->napi);
-        napi_disable(&priv->napi);
+	netif_stop_queue(priv->dev);
+	napi_synchronize(&priv->napi);
+	napi_disable(&priv->napi);
+
+	rtnl_lock();
+	if (priv->phylink)
+		phylink_stop(priv->phylink);
+	rtnl_unlock();
 }
 
 static const struct qsfp_ops qsfp_api = {
@@ -1482,7 +1492,6 @@ static const struct altera_dmaops altera_dtype_prefetcher = {
 
 static const struct xtile_spec_ops xtile_data = {
 	.pma_digi_reset    = pma_digital_reset,
-	.pma_ana_reset     = pma_analog_reset,
 	.dma_ops           = &altera_dtype_prefetcher,
 	.qsfp_ops          = &qsfp_api,
 };	

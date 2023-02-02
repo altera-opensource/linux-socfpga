@@ -111,21 +111,21 @@ bool hssi_bit_is_clear(struct platform_device *pdev,
 		       u32 bit_mask);
 
 void hssi_reset_mac_stats(struct platform_device *pdev,
-			  u32 chan,
+			  u32 port,
 			  bool tx_rst,
 			  bool rx_rst);
 
 int hssi_en_serial_loopback(struct platform_device *pdev,
-			     u32 chan);
+			     u32 port);
 
 int hssi_dis_serial_loopback(struct platform_device *pdev,
-			      u32 chan);
+			      u32 port);
 
 bool hssi_ethport_is_stable(struct platform_device *pdev,
-			    u32 chan, bool);
+			    u32 port, bool);
 
 u64  hssi_read_mac_stats64(struct platform_device *pdev,
-			   u32 chan,
+			   u32 port,
 			   enum hssiss_mac_stat_counter_type stat_type);
 
 void hssi_disable_hotplug(struct platform_device *pdev);
