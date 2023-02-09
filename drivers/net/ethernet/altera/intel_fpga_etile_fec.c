@@ -144,18 +144,33 @@ void ui_adjustments(struct timer_list *t)
 	else
 		rx_tam_delta = rx_tam_nth - rx_tam_initial;
 
-	switch (priv->phy_iface) {
-	case PHY_INTERFACE_MODE_10GKR:
-	case PHY_INTERFACE_MODE_10GBASER:
-		ui_value = INTEL_FPGA_ETILE_UI_VALUE_10G;
-		ui_value_16bit_fns = ui_value >> 8;
-		break;
-	case PHY_INTERFACE_MODE_25GBASER:
-		ui_value = INTEL_FPGA_ETILE_UI_VALUE_25G;
-		ui_value_16bit_fns = ui_value >> 8;
-		break;
-	default:
-		ui_value = 0; //invalid value
+	if (dr_link_state == 1) {
+		switch (priv->link_speed) {
+		case SPEED_10000:
+			ui_value = INTEL_FPGA_ETILE_UI_VALUE_10G;
+			ui_value_16bit_fns = ui_value >> 8;
+			break;
+		case SPEED_25000:
+			ui_value = INTEL_FPGA_ETILE_UI_VALUE_25G;
+			ui_value_16bit_fns = ui_value >> 8;
+			break;
+		default:
+		ui_value = 0;
+		}
+	} else {
+		switch (priv->phy_iface) {
+		case PHY_INTERFACE_MODE_10GKR:
+		case PHY_INTERFACE_MODE_10GBASER:
+			ui_value = INTEL_FPGA_ETILE_UI_VALUE_10G;
+			ui_value_16bit_fns = ui_value >> 8;
+			break;
+		case PHY_INTERFACE_MODE_25GBASER:
+			ui_value = INTEL_FPGA_ETILE_UI_VALUE_25G;
+			ui_value_16bit_fns = ui_value >> 8;
+			break;
+		default:
+			ui_value = 0;
+		}
 	}
 
 	/* Calculate estimated count value */
@@ -226,6 +241,7 @@ void ui_adjustments(struct timer_list *t)
 				    "0x9EDC0 to 0x9EE42 range\n", __func__, rx_ui);
 			goto ui_restart;
 		}
+
 	} else {
 		if (tx_ui > 0x18D3A4 || tx_ui < 0x18D25F) {
 			netdev_warn(priv->dev,
@@ -233,6 +249,7 @@ void ui_adjustments(struct timer_list *t)
 				    "0x18D25F to 0x18D3A4 range\n", __func__, tx_ui);
 			goto ui_restart;
 		}
+
 		if (rx_ui > 0x18D3A4 || rx_ui < 0x18D25F) {
 			netdev_warn(priv->dev,
 				    "%s: RX UI value (0x%llx) is not within "
@@ -240,7 +257,6 @@ void ui_adjustments(struct timer_list *t)
 			goto ui_restart;
 		}
 	}
-
 	csrwr32(tx_ui, priv->mac_dev, eth_ptp_csroffs(tx_ui_reg));
 	csrwr32(rx_ui, priv->mac_dev, eth_ptp_csroffs(rx_ui_reg));
 

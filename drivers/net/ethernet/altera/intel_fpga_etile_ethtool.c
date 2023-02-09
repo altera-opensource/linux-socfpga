@@ -25,7 +25,9 @@
 #define ETILE_STATS_LEN	ARRAY_SIZE(stat_gstrings)
 #define ETILE_NUM_REGS	294
 
-static char const stat_gstrings[][ETH_GSTRING_LEN] = {
+int dr_link_state;
+
+static const char  stat_gstrings[][ETH_GSTRING_LEN] = {
 	"tx_fragments",
 	"tx_jabbers",
 	"tx_fcs_errors",
@@ -488,6 +490,7 @@ static void etile_set_msglevel(struct net_device *dev, uint32_t data)
 	struct intel_fpga_etile_eth_private *priv = netdev_priv(dev);
 
 	priv->msg_enable = data;
+	priv->dma_priv.msg_enable = data;
 }
 
 static int etile_reglen(struct net_device *dev)
@@ -651,7 +654,8 @@ static void etile_get_regs(struct net_device *dev, struct ethtool_regs *regs,
 	buf[121] = csrrd32(priv->mac_dev, eth_pause_and_priority_csroffs(pfc_holdoff_quanta_5));
 	buf[122] = csrrd32(priv->mac_dev, eth_pause_and_priority_csroffs(pfc_holdoff_quanta_6));
 	buf[123] = csrrd32(priv->mac_dev, eth_pause_and_priority_csroffs(pfc_holdoff_quanta_7));
-	buf[124] = csrrd32(priv->mac_dev, eth_pause_and_priority_csroffs(rxsfc_module_revision_id));
+	buf[124] = csrrd32(priv->mac_dev, eth_pause_and_priority_csroffs
+			  (rxsfc_module_revision_id));
 	buf[125] = csrrd32(priv->mac_dev, eth_pause_and_priority_csroffs(rxsfc_scratch_register));
 	buf[126] = csrrd32(priv->mac_dev,
 			   eth_pause_and_priority_csroffs(enable_rx_pause_frame_processing_fields));
@@ -919,24 +923,142 @@ static int etile_get_ts_info(struct net_device *dev,
 static int etile_set_link_ksettings(struct net_device *dev,
 				    const struct ethtool_link_ksettings *cmd)
 {
+	int ret;
 	struct intel_fpga_etile_eth_private *priv = netdev_priv(dev);
 
 	if (!priv)
 		return -ENODEV;
 
-	return phylink_ethtool_ksettings_set(priv->phylink, cmd);
+	if (cmd->base.speed == SPEED_25000 || cmd->base.speed == SPEED_10000) {
+		priv->link_speed = cmd->base.speed;
+		if (priv->link_speed == SPEED_10000)
+			priv->fec_type = "no-fec";
+
+		spin_lock(&priv->mac_cfg_lock);
+		ret = etile_dynamic_reconfiguration(priv, cmd);
+		spin_unlock(&priv->mac_cfg_lock);
+	} else {
+		return -EPERM;
+	}
+
+	if (ret)
+		netdev_dbg(dev, "Cannot configure dynamic reconfiguration(error: %d)\n", ret);
+
+	ret = phylink_ethtool_ksettings_set(priv->phylink, cmd);
+
+	return ret;
 }
 
 /* Get link ksettings (phy address, speed) for ethtools */
 static int etile_get_link_ksettings(struct net_device *dev,
 				    struct ethtool_link_ksettings *cmd)
 {
+	int ret;
 	struct intel_fpga_etile_eth_private *priv = netdev_priv(dev);
+
+	dr_link_state = 1;
+
+	if (!priv)
+		return -ENODEV;
+	ret = phylink_ethtool_ksettings_get(priv->phylink, cmd);
+
+	return ret;
+}
+
+static int etile_get_fec_param(struct net_device *netdev,
+			       struct ethtool_fecparam *fecparam)
+{
+	struct intel_fpga_etile_eth_private *priv = netdev_priv(netdev);
+
+	dr_link_state = 1;
 
 	if (!priv)
 		return -ENODEV;
 
-	return phylink_ethtool_ksettings_get(priv->phylink, cmd);
+	if (!(strcmp(priv->fec_type, "kr-fec"))) {
+		if (priv->link_speed == SPEED_25000) {
+			fecparam->fec |= ETHTOOL_FEC_RS;
+			fecparam->active_fec |= ETHTOOL_FEC_RS;
+		}
+		if (priv->link_speed == SPEED_10000) {
+			fecparam->fec |= ETHTOOL_FEC_RS;
+			fecparam->active_fec |= ETHTOOL_FEC_RS;
+		} } else if (!(strcmp(priv->fec_type, "no-fec"))) {
+			if (priv->link_speed == SPEED_25000) {
+				fecparam->fec |= ETHTOOL_FEC_OFF;
+				fecparam->active_fec |= ETHTOOL_FEC_OFF;
+		}
+			if (priv->link_speed == SPEED_10000) {
+				fecparam->fec |= ETHTOOL_FEC_OFF;
+				fecparam->active_fec |= ETHTOOL_FEC_OFF;
+		}
+	}
+	return 0;
+}
+
+static int etile_set_fec_param(struct net_device *netdev,
+			       struct ethtool_fecparam *fecparam)
+
+{
+	struct intel_fpga_etile_eth_private *priv = netdev_priv(netdev);
+	struct ethtool_link_ksettings *cmd;
+
+	int ret;
+
+	if (!priv)
+		return -ENODEV;
+
+	switch (fecparam->fec) {
+	case ETHTOOL_FEC_RS:
+		if (priv->link_speed == SPEED_25000  &&
+		    !(strcmp(priv->fec_type, "no-fec"))) {
+			priv->fec_type = "kr-fec";
+			fecparam->fec |= ETHTOOL_FEC_RS;
+			fecparam->active_fec |= ETHTOOL_FEC_RS;
+			spin_lock(&priv->mac_cfg_lock);
+			ret = etile_dynamic_reconfiguration(priv, cmd);
+			spin_unlock(&priv->mac_cfg_lock);
+			priv->prv_fec_type = priv->fec_type;
+			priv->prv_link_speed = priv->link_speed;
+		} else if (priv->link_speed == SPEED_10000  &&
+			   !(strcmp(priv->fec_type, "no-fec"))) {
+			return -EPERM;
+
+		} else if (priv->link_speed == SPEED_25000  &&
+			   !(strcmp(priv->fec_type, "kr-fec"))) {
+			netdev_warn(priv->dev, "E-tile already with %d/%s\n", priv->link_speed,
+				    priv->fec_type);
+			return 0;
+		}
+		break;
+	case ETHTOOL_FEC_OFF:
+		if (priv->link_speed == SPEED_25000  &&
+		    !(strcmp(priv->fec_type, "kr-fec"))) {
+			priv->fec_type = "no-fec";
+			fecparam->fec |= ETHTOOL_FEC_OFF;
+			fecparam->active_fec |= ETHTOOL_FEC_OFF;
+			spin_lock(&priv->mac_cfg_lock);
+			ret = etile_dynamic_reconfiguration(priv, cmd);
+			spin_unlock(&priv->mac_cfg_lock);
+			priv->prv_fec_type = priv->fec_type;
+			priv->prv_link_speed = priv->link_speed;
+		} else if (priv->link_speed == SPEED_25000  &&
+			   !(strcmp(priv->fec_type, "no-fec"))) {
+			netdev_warn(priv->dev, "E-tile already with %d/%s\n", priv->link_speed,
+				    priv->fec_type);
+			return 0;
+		} else if (priv->link_speed == SPEED_10000  &&
+			   !(strcmp(priv->fec_type, "no-fec"))) {
+			netdev_warn(priv->dev, "E-tile already with %d/%s\n", priv->link_speed,
+				    priv->fec_type);
+			return 0;
+		}
+		break;
+	default:
+		break;
+	}
+
+	return 0;
 }
 
 static const struct ethtool_ops etile_ethtool_ops = {
@@ -955,6 +1077,9 @@ static const struct ethtool_ops etile_ethtool_ops = {
 	.get_ts_info = etile_get_ts_info,
 	.get_link_ksettings = etile_get_link_ksettings,
 	.set_link_ksettings = etile_set_link_ksettings,
+	.get_fecparam = etile_get_fec_param,
+	.set_fecparam = etile_set_fec_param,
+
 };
 
 void intel_fpga_etile_set_ethtool_ops(struct net_device *netdev)

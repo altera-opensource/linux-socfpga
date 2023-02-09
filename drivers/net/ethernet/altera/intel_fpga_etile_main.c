@@ -48,10 +48,13 @@
 
 struct qsfp *qsfp_tmp;
 const char *phy_mode_etile;
+
 /* Module parameters */
 static int debug = -1;
 module_param(debug, int, 0644);
 MODULE_PARM_DESC(debug, "Message Level (-1: default, 0: no output, 16: all)");
+
+bool pma_enable;
 
 static const u32 default_msg_level = (NETIF_MSG_DRV | NETIF_MSG_PROBE |
 					NETIF_MSG_LINK | NETIF_MSG_IFUP |
@@ -289,7 +292,7 @@ static int etile_rx(struct intel_fpga_etile_eth_private *priv, int limit)
 		 * IP payload alignment. Status returned by get_rx_status()
 		 * contains DMA transfer length. Packet is 2 bytes shorter.
 		 */
-		//pktlength -= 2;
+		/* pktlength -= 2;*/
 
 		count++;
 		next_entry = (++priv->dma_priv.rx_cons)
@@ -650,7 +653,8 @@ static void etile_update_mac_addr(struct intel_fpga_etile_eth_private *priv, u8 
 	csrwr32(lsb, priv->mac_dev, eth_tx_mac_csroffs(tx_mac_source_addr_lower_bytes));
 	csrwr32(msb, priv->mac_dev, eth_tx_mac_csroffs(tx_mac_source_addr_higher_bytes));
 
-	tse_set_bit(priv->mac_dev, eth_tx_mac_csroffs(tx_mac_conf), ETH_TX_MAC_DISABLE_S_ADDR_EN);
+	tse_set_bit(priv->mac_dev, eth_tx_mac_csroffs(tx_mac_conf),
+		    ETH_TX_MAC_DISABLE_S_ADDR_EN);
 }
 
 static void etile_set_mac_flow_ctrl(struct intel_fpga_etile_eth_private *priv)
@@ -693,6 +697,10 @@ static void etile_set_mac_flow_ctrl(struct intel_fpga_etile_eth_private *priv)
 		      eth_pause_and_priority_csroffs(pause_quanta_0));
 	if (netif_msg_ifup(priv))
 		netdev_info(priv->dev, "E-tile: pause_quanta0: 0x%08x\n", reg);
+
+	if (dr_link_state == 1)
+		netdev_info(priv->dev, "E-tile with %d/%s\n", priv->link_speed,
+			    priv->fec_type);
 }
 
 static void etile_clear_mac_statistics(struct intel_fpga_etile_eth_private *priv)
@@ -731,16 +739,29 @@ static int eth_etile_tx_rx_user_flow(struct intel_fpga_etile_eth_private *priv)
 	int ret;
 	const char *kr_fec = "kr-fec";
 
-	switch (priv->phy_iface) {
-	case PHY_INTERFACE_MODE_10GKR:
-	case PHY_INTERFACE_MODE_10GBASER:
-		ui_value = INTEL_FPGA_ETILE_UI_VALUE_10G;
+	if (dr_link_state == 1) {
+		switch (priv->link_speed) {
+		case SPEED_10000:
+			ui_value = INTEL_FPGA_ETILE_UI_VALUE_10G;
 		break;
-	case PHY_INTERFACE_MODE_25GBASER:
-		ui_value = INTEL_FPGA_ETILE_UI_VALUE_25G;
+		case SPEED_25000:
+			ui_value = INTEL_FPGA_ETILE_UI_VALUE_25G;
 		break;
-	default:
+		default:
 		return -ENODEV;
+		}
+	} else {
+		switch (priv->phy_iface) {
+		case PHY_INTERFACE_MODE_10GKR:
+		case PHY_INTERFACE_MODE_10GBASER:
+			ui_value = INTEL_FPGA_ETILE_UI_VALUE_10G;
+		break;
+		case PHY_INTERFACE_MODE_25GBASER:
+			ui_value = INTEL_FPGA_ETILE_UI_VALUE_25G;
+		break;
+		default:
+		return -ENODEV;
+		}
 	}
 
 	/* TX User Flow */
@@ -779,8 +800,7 @@ static int eth_etile_tx_rx_user_flow(struct intel_fpga_etile_eth_private *priv)
 	}
 
 	/* Check for 25G FEC variants */
-	if (priv->link_speed == SPEED_25000 &&
-	    (!strcasecmp(kr_fec, priv->fec_type))) {
+	if (priv->link_speed == SPEED_25000 && (!strcasecmp(kr_fec, priv->fec_type))) {
 		/*  Step 2a Read RX FEC codeword position */
 		switch (priv->rsfec_cw_pos_rx) {
 		case 0:
@@ -797,9 +817,9 @@ static int eth_etile_tx_rx_user_flow(struct intel_fpga_etile_eth_private *priv)
 			break;
 		case 2:
 			rx_fec_cw_pos_b0 = csrrd8(priv->rsfec,
-						  eth_rsfec_csroffs(rsfec_cw_pos_rx_1_b0));
+						  eth_rsfec_csroffs(rsfec_cw_pos_rx_2_b0));
 			rx_fec_cw_pos_b8 = csrrd8(priv->rsfec,
-						  eth_rsfec_csroffs(rsfec_cw_pos_rx_1_b8));
+						  eth_rsfec_csroffs(rsfec_cw_pos_rx_2_b8));
 			break;
 		case 3:
 		default:
@@ -865,6 +885,1159 @@ static int eth_etile_tx_rx_user_flow(struct intel_fpga_etile_eth_private *priv)
 	return 0;
 }
 
+static void etile_rsfec_reconfiguration(struct intel_fpga_etile_eth_private *priv,
+					const struct ethtool_link_ksettings *cmd)
+{
+	u8 fec_lane_ena = 0;
+	u8 core_tx_in_sel = 0;
+	u8 core_rx_out_sel = 0;
+
+	/* Step 4b - Reconfigure RSFEC Reconfiguration Registers
+	 * rsfec_top_clk_cfg: Lane enable. One bit per lane
+	 * rsfec_top_tx_cfg: Select rsfec tx for Lane #
+	 *	3b'001 : Select EHIP Lane TX Data
+	 *	3b'110 : FEC Lane Disabled - tie inputs to 0
+	 *	Lane #3: Bit: [14:12]
+	 *	Lane #2: Bit: [10:8]
+	 * rsfec_top_rx_cfg: Select rsfec rx for Lane #
+	 * Offset	Bit		25Gptpfec-10Gptp	10Gptp-25Gptpfec
+	 * 0x4		11:8	4'b0xxx				4'b1xxx
+	 * 0x10		[XX:XX]	3b'110				3b'001
+	 *
+	 * 0x10		10:8
+	 */
+	/**
+	 *1 RSFEC Lane enable. One bit per lane i.e., bit0 = lane0.
+	 *	This design uses RSFEC lane 3.
+	 *2 RS-FEC TX Select for Lane 3
+	 *3 RS-FEC RX Output Select for Lane 3
+	 **/
+
+	/*25gptpfec-25gptpnofec and 25gptpfec – 10gptp*/
+
+	if ((priv->link_speed == SPEED_25000 || priv->link_speed == SPEED_10000) &&
+	    (!strcmp(priv->fec_type, "no-fec"))) {
+		switch (priv->rsfec_cw_pos_rx) {
+		case 0:
+		fec_lane_ena = csrrd8(priv->rsfec,
+				      eth_rsfec_csroffs(rsfec_top_clk_cfg_b8));
+		/* 0xE = enable lane 0 , bit[0] = lane0 */
+		fec_lane_ena &= 0xE;
+		csrwr8(fec_lane_ena, priv->rsfec,
+		       eth_rsfec_csroffs(rsfec_top_clk_cfg_b8));
+		core_tx_in_sel = csrrd8(priv->rsfec,
+					eth_rsfec_csroffs(rsfec_top_tx_cfg_b0));
+		core_tx_in_sel &= 0xF0;
+		/*make sure do not disturbed the RS-FEC TX Select For Lane1*/
+		core_tx_in_sel |= 0x1;
+		/*setting bit 2:0 to b01 RS-FEC TX Select For Lane0*/
+		csrwr8(core_tx_in_sel, priv->rsfec,
+		       eth_rsfec_csroffs(rsfec_top_tx_cfg_b0));
+		core_rx_out_sel = csrrd8(priv->rsfec,
+					 eth_rsfec_csroffs(rsfec_top_rx_cfg_b0));
+		core_rx_out_sel &= 0xF0;
+		core_rx_out_sel |= 0x1;
+		csrwr8(core_rx_out_sel, priv->rsfec,
+		       eth_rsfec_csroffs(rsfec_top_rx_cfg_b0));
+		break;
+		case 1:
+		fec_lane_ena = csrrd8(priv->rsfec,
+				      eth_rsfec_csroffs(rsfec_top_clk_cfg_b8));
+		/*0xE = enable lane 1 , bit[1] = lane1*/
+		fec_lane_ena &= 0xD;
+		csrwr8(fec_lane_ena, priv->rsfec,
+		       eth_rsfec_csroffs(rsfec_top_clk_cfg_b8));
+		core_tx_in_sel = csrrd8(priv->rsfec,
+					eth_rsfec_csroffs(rsfec_top_tx_cfg_b0));
+		core_tx_in_sel &= 0xF;
+		core_tx_in_sel |= (0x1 << 4);
+		csrwr8(core_tx_in_sel, priv->rsfec,
+		       eth_rsfec_csroffs(rsfec_top_tx_cfg_b0));
+		core_rx_out_sel = csrrd8(priv->rsfec,
+					 eth_rsfec_csroffs(rsfec_top_rx_cfg_b0));
+		core_rx_out_sel &= 0xF0;
+		core_rx_out_sel |= 0x1;
+		csrwr8(core_rx_out_sel, priv->rsfec,
+		       eth_rsfec_csroffs(rsfec_top_rx_cfg_b0));
+		break;
+		case 2:
+		fec_lane_ena = csrrd8(priv->rsfec,
+				      eth_rsfec_csroffs(rsfec_top_clk_cfg_b8));
+		/*0xE = enable lane 1 , bit[2] = 0, lane2*/
+		fec_lane_ena &= 0xB;
+		csrwr8(fec_lane_ena, priv->rsfec,
+		       eth_rsfec_csroffs(rsfec_top_clk_cfg_b8));
+		core_tx_in_sel = csrrd8(priv->rsfec,
+					eth_rsfec_csroffs(rsfec_top_tx_cfg_b8));
+		core_tx_in_sel &= 0xF0;
+		core_tx_in_sel |= 0x1;
+		csrwr8(core_tx_in_sel, priv->rsfec,
+		       eth_rsfec_csroffs(rsfec_top_tx_cfg_b8));
+		core_rx_out_sel = csrrd8(priv->rsfec,
+					 eth_rsfec_csroffs(rsfec_top_rx_cfg_b8));
+		core_rx_out_sel &= 0xF0;
+		core_rx_out_sel |= 0x1;
+		csrwr8(core_rx_out_sel, priv->rsfec,
+		       eth_rsfec_csroffs(rsfec_top_rx_cfg_b8));
+		break;
+		case 3:
+		fec_lane_ena = csrrd8(priv->rsfec,
+				      eth_rsfec_csroffs(rsfec_top_clk_cfg_b8));
+		fec_lane_ena &= 0xF7;
+		fec_lane_ena |= 0x0;
+		csrwr8(fec_lane_ena, priv->rsfec,
+		       eth_rsfec_csroffs(rsfec_top_clk_cfg_b8));
+		fec_lane_ena = csrrd8(priv->rsfec,
+				      eth_rsfec_csroffs(rsfec_top_clk_cfg_b8));
+		core_tx_in_sel = csrrd8(priv->rsfec,
+					eth_rsfec_csroffs(rsfec_top_tx_cfg_b8));
+		core_tx_in_sel &= 0x8F;
+		core_tx_in_sel |= 0x60;
+		csrwr8(core_tx_in_sel, priv->rsfec,
+		       eth_rsfec_csroffs(rsfec_top_tx_cfg_b8));
+		core_tx_in_sel = csrrd8(priv->rsfec,
+					eth_rsfec_csroffs(rsfec_top_tx_cfg_b8));
+		core_rx_out_sel = csrrd8(priv->rsfec,
+					 eth_rsfec_csroffs(rsfec_top_rx_cfg_b8));
+		core_rx_out_sel &= 0xCF;
+		core_rx_out_sel |= 0x0;
+		csrwr8(core_rx_out_sel, priv->rsfec,
+		       eth_rsfec_csroffs(rsfec_top_rx_cfg_b8));
+		core_rx_out_sel = csrrd8(priv->rsfec,
+					 eth_rsfec_csroffs(rsfec_top_rx_cfg_b8));
+		break;
+		}
+	}
+
+	if (priv->link_speed == SPEED_25000 &&  (!(strcmp(priv->fec_type, "kr-fec")))) {
+		csrwr8(0x0, priv->rsfec, eth_rsfec_csroffs(rsfec_top_clk_cfg_b8));
+		switch (priv->rsfec_cw_pos_rx) {
+		case 0:
+		fec_lane_ena = csrrd8(priv->rsfec,
+				      eth_rsfec_csroffs(rsfec_top_clk_cfg_b8));
+		/*0xE = enable lane 0 , bit[0] = lane0*/
+		fec_lane_ena &= 0xE;
+		csrwr8(fec_lane_ena, priv->rsfec,
+		       eth_rsfec_csroffs(rsfec_top_clk_cfg_b8));
+		core_tx_in_sel = csrrd8(priv->rsfec,
+					eth_rsfec_csroffs(rsfec_top_tx_cfg_b0));
+		core_tx_in_sel &= 0xF0;
+			/* make sure do not disturbed the RS-FEC TX Select For Lane 1 */
+		core_tx_in_sel |= 0x1;
+			/*setting bit2:0 to b01 RS-FEC TX Select For Lane0*/
+		csrwr8(core_tx_in_sel, priv->rsfec,
+		       eth_rsfec_csroffs(rsfec_top_tx_cfg_b0));
+		core_rx_out_sel = csrrd8(priv->rsfec,
+					 eth_rsfec_csroffs(rsfec_top_rx_cfg_b0));
+		core_rx_out_sel &= 0xF0;
+		core_rx_out_sel |= 0x1;
+		csrwr8(core_rx_out_sel, priv->rsfec,
+		       eth_rsfec_csroffs(rsfec_top_rx_cfg_b0));
+		break;
+		case 1:
+		fec_lane_ena = csrrd8(priv->rsfec,
+				      eth_rsfec_csroffs(rsfec_top_clk_cfg_b8));
+			/*0xE = enable lane 1 , bit[1] = lane1*/
+		fec_lane_ena &= 0xD;
+		csrwr8(fec_lane_ena, priv->rsfec,
+		       eth_rsfec_csroffs(rsfec_top_clk_cfg_b8));
+		core_tx_in_sel = csrrd8(priv->rsfec,
+					eth_rsfec_csroffs(rsfec_top_tx_cfg_b0));
+		core_tx_in_sel &= 0xF;
+		core_tx_in_sel |= (0x1 << 4);
+		csrwr8(core_tx_in_sel, priv->rsfec,
+		       eth_rsfec_csroffs(rsfec_top_tx_cfg_b0));
+		core_rx_out_sel = csrrd8(priv->rsfec,
+					 eth_rsfec_csroffs(rsfec_top_rx_cfg_b0));
+		core_rx_out_sel &= 0xF0;
+		core_rx_out_sel |= 0x1;
+		csrwr8(core_rx_out_sel, priv->rsfec,
+		       eth_rsfec_csroffs(rsfec_top_rx_cfg_b0));
+		break;
+		case 2:
+		fec_lane_ena = csrrd8(priv->rsfec,
+				      eth_rsfec_csroffs(rsfec_top_clk_cfg_b8));
+			/*0xE = enable lane 1 , bit[2] = 0, lane2*/
+		fec_lane_ena &= 0xB;
+		csrwr8(fec_lane_ena, priv->rsfec,
+		       eth_rsfec_csroffs(rsfec_top_clk_cfg_b8));
+		core_tx_in_sel = csrrd8(priv->rsfec,
+					eth_rsfec_csroffs(rsfec_top_tx_cfg_b8));
+		core_tx_in_sel &= 0xF0;
+		core_tx_in_sel |= 0x1;
+		csrwr8(core_tx_in_sel, priv->rsfec,
+		       eth_rsfec_csroffs(rsfec_top_tx_cfg_b8));
+		core_rx_out_sel = csrrd8(priv->rsfec,
+					 eth_rsfec_csroffs(rsfec_top_rx_cfg_b8));
+		core_rx_out_sel &= 0xF0;
+		core_rx_out_sel |= 0x1;
+		csrwr8(core_rx_out_sel, priv->rsfec,
+		       eth_rsfec_csroffs(rsfec_top_rx_cfg_b8));
+		break;
+		case 3:
+		fec_lane_ena = csrrd8(priv->rsfec,
+				      eth_rsfec_csroffs(rsfec_top_clk_cfg_b8));
+		/*0xE = enable lane 3 , bit[3] = 0, lane4*/
+		fec_lane_ena &= 0xF7;
+		fec_lane_ena |= 0x08;
+		csrwr8(fec_lane_ena, priv->rsfec,
+		       eth_rsfec_csroffs(rsfec_top_clk_cfg_b8));
+		fec_lane_ena = csrrd8(priv->rsfec,
+				      eth_rsfec_csroffs(rsfec_top_clk_cfg_b8));
+		core_tx_in_sel = csrrd8(priv->rsfec,
+					eth_rsfec_csroffs(rsfec_top_tx_cfg_b8));
+		core_tx_in_sel &= 0x8F;
+		core_tx_in_sel |= 0x10;
+		csrwr8(core_tx_in_sel, priv->rsfec,
+		       eth_rsfec_csroffs(rsfec_top_tx_cfg_b8));
+		core_tx_in_sel = csrrd8(priv->rsfec,
+					eth_rsfec_csroffs(rsfec_top_tx_cfg_b8));
+		core_rx_out_sel = csrrd8(priv->rsfec,
+					 eth_rsfec_csroffs(rsfec_top_rx_cfg_b8));
+		core_rx_out_sel &= 0xCF;
+		core_rx_out_sel |= 0x10;
+		csrwr8(core_rx_out_sel, priv->rsfec,
+		       eth_rsfec_csroffs(rsfec_top_rx_cfg_b8));
+		core_rx_out_sel = csrrd8(priv->rsfec,
+					 eth_rsfec_csroffs(rsfec_top_rx_cfg_b8));
+		break;
+		}
+	}
+}
+
+static void etile_transceiver_reconfiguration(struct intel_fpga_etile_eth_private *priv,
+					      const struct ethtool_link_ksettings *cmd)
+{
+	u8 transmit_data_input = 0;
+	u8 TX_PCS_FEC_div2_clock_input_enable = 0;
+	u8 RX_FIFO_Read_clock = 0;
+	u8 Async_latency_pulse_select = 0;
+	u8 rx_bit_counter = 0;
+	u8 Dynamic_rx_bitslip_enable = 0;
+
+	/* Step 4c - Reconfigure transceiver Reconfiguration Registers */
+	/* offset	Bit		25Gptpfec-10Gptp	10Gptp-25Gptpfec
+	 * 0x4		4:2			b00		b01
+	 * 0x5		5			b0		b1
+	 *		4			b1		b0
+	 * 0x7		6:5			b10		b00
+	 * 0x37		7			b1		b0
+	 * 0x34		7:0			0x03		0x03
+	 * 0x35		7:0			0x8A		0x48
+	 * 0x36		3:0			0x1		0x1
+	 * 0xA		5			0x1		0xb0
+	 */
+
+	if ((priv->link_speed == SPEED_25000 || priv->link_speed == SPEED_10000) &&
+	    (!strcmp(priv->fec_type, "no-fec"))) {
+		transmit_data_input = csrrd8(priv->xcvr,
+					     eth_pma_avmm_csroffs(reg_004));
+		transmit_data_input &= 0xE3;
+		transmit_data_input |= 0x0;
+		csrwr8(transmit_data_input, priv->xcvr,
+		       eth_pma_avmm_csroffs(reg_004));
+		transmit_data_input = csrrd8(priv->xcvr,
+					     eth_pma_avmm_csroffs(reg_004));
+		TX_PCS_FEC_div2_clock_input_enable = csrrd8(priv->xcvr,
+							    eth_pma_avmm_csroffs
+							    (reg_005));
+		TX_PCS_FEC_div2_clock_input_enable &= 0xCF;
+		TX_PCS_FEC_div2_clock_input_enable |= 0x10;
+		csrwr8(TX_PCS_FEC_div2_clock_input_enable, priv->xcvr,
+		       eth_pma_avmm_csroffs(reg_005));
+		RX_FIFO_Read_clock = csrrd8(priv->xcvr,
+					    eth_pma_avmm_csroffs(reg_007));
+		RX_FIFO_Read_clock &= 0x9F;
+		RX_FIFO_Read_clock |= 0x40;
+		csrwr8(RX_FIFO_Read_clock, priv->xcvr,
+		       eth_pma_avmm_csroffs(reg_007));
+		rx_bit_counter = csrrd8(priv->xcvr,
+					eth_pma_avmm_csroffs(reg_034));
+		rx_bit_counter &= 0x0F;
+		rx_bit_counter |= 0x3;
+		csrwr8(rx_bit_counter, priv->xcvr,
+		       eth_pma_avmm_csroffs(reg_034));
+		rx_bit_counter = csrrd8(priv->xcvr,
+					eth_pma_avmm_csroffs(reg_035));
+		rx_bit_counter &= 0x00;
+		rx_bit_counter |= 0x8A;
+		csrwr8(rx_bit_counter, priv->xcvr,
+		       eth_pma_avmm_csroffs(reg_035));
+		rx_bit_counter = csrrd8(priv->xcvr,
+					eth_pma_avmm_csroffs(reg_036));
+		rx_bit_counter &= 0xFE;
+		rx_bit_counter |= 0x1;
+		csrwr8(rx_bit_counter, priv->xcvr,
+		       eth_pma_avmm_csroffs(reg_036));
+		Async_latency_pulse_select = csrrd8(priv->xcvr,
+						    eth_pma_avmm_csroffs(reg_037));
+		Async_latency_pulse_select &= 0x7F;
+		Async_latency_pulse_select |= 0x80;
+		csrwr8(Async_latency_pulse_select, priv->xcvr,
+		       eth_pma_avmm_csroffs(reg_037));
+		Dynamic_rx_bitslip_enable = csrrd8(priv->xcvr,
+						   eth_pma_avmm_csroffs(reg_00a));
+		Dynamic_rx_bitslip_enable &= 0xDF;
+		Dynamic_rx_bitslip_enable |= 0x20;
+		csrwr8(Dynamic_rx_bitslip_enable, priv->xcvr,
+		       eth_pma_avmm_csroffs(reg_00a));
+	}
+
+	if (priv->link_speed == SPEED_25000 && (!(strcmp(priv->fec_type, "kr-fec")))) {
+		transmit_data_input = csrrd8(priv->xcvr,
+					     eth_pma_avmm_csroffs(reg_004));
+		transmit_data_input &= 0xE3;
+		transmit_data_input |= 0x4;
+		csrwr8(transmit_data_input, priv->xcvr,
+		       eth_pma_avmm_csroffs(reg_004));
+		TX_PCS_FEC_div2_clock_input_enable = csrrd8(priv->xcvr,
+							    eth_pma_avmm_csroffs
+							    (reg_005));
+		TX_PCS_FEC_div2_clock_input_enable &= 0xCF;
+		TX_PCS_FEC_div2_clock_input_enable |= (1 << 5);
+		csrwr8(TX_PCS_FEC_div2_clock_input_enable, priv->xcvr,
+		       eth_pma_avmm_csroffs(reg_005));
+		RX_FIFO_Read_clock = csrrd8(priv->xcvr,
+					    eth_pma_avmm_csroffs(reg_007));
+		RX_FIFO_Read_clock &= 0x9F;
+		RX_FIFO_Read_clock |= 0x0;
+		csrwr8(RX_FIFO_Read_clock, priv->xcvr,
+		       eth_pma_avmm_csroffs(reg_007));
+		Async_latency_pulse_select = csrrd8(priv->xcvr,
+						    eth_pma_avmm_csroffs(reg_037));
+		Async_latency_pulse_select &= 0x7F;
+		Async_latency_pulse_select |= 0x0;
+		csrwr8(Async_latency_pulse_select, priv->xcvr,
+		       eth_pma_avmm_csroffs(reg_037));
+		rx_bit_counter = csrrd8(priv->xcvr,
+					eth_pma_avmm_csroffs(reg_034));
+		rx_bit_counter &= 0x0F;
+		rx_bit_counter |= 0x3;
+		csrwr8(rx_bit_counter, priv->xcvr,
+		       eth_pma_avmm_csroffs(reg_034));
+		rx_bit_counter = csrrd8(priv->xcvr,
+					eth_pma_avmm_csroffs(reg_035));
+		rx_bit_counter &= 0x00;
+		rx_bit_counter = 0x48;
+		csrwr8(rx_bit_counter, priv->xcvr,
+		       eth_pma_avmm_csroffs(reg_035));
+		rx_bit_counter = csrrd8(priv->xcvr,
+					eth_pma_avmm_csroffs(reg_036));
+		rx_bit_counter &= 0xFE;
+		rx_bit_counter |= 0x1;
+		csrwr8(rx_bit_counter, priv->xcvr,
+		       eth_pma_avmm_csroffs(reg_036));
+		Dynamic_rx_bitslip_enable = csrrd8(priv->xcvr,
+						   eth_pma_avmm_csroffs(reg_00a));
+		Dynamic_rx_bitslip_enable &= 0xDF;
+		Dynamic_rx_bitslip_enable |= 0;
+		csrwr8(Dynamic_rx_bitslip_enable, priv->xcvr,
+		       eth_pma_avmm_csroffs(reg_00a));
+	}
+}
+
+static void etile_phy_ehip_reconfiguration(struct intel_fpga_etile_eth_private *priv,
+					   const struct ethtool_link_ksettings *cmd)
+{
+	u32 eth_tx_mac_ehip_reconfg = 0;
+	u32 eth_phy_rx_pcs_align = 0;
+	u32 phy_timer_window_hiber = 0;
+	u32 phy_hiber_frm_err_cnt = 0;
+
+	/* Step 4a - Reconfigure Ethernet Reconfiguration Registers
+	 * Offset	Bit		25Gptpfec-10Gptp	10Gptp-25Gptpfec
+	 * 0x40B	31:15	0x13FFF << 15		0x13FFC << 15
+	 * 0x40B	8:6		0x4 << 6			0x3 << 6
+	 * 0x40B	5:3		0x1 << 3			0x4 << 3
+	 * 0x30E	9		1					0
+	 * 0x30E	4		0					1
+	 * 0x30E	3		1					0
+	 * 0x37A	20:0		0x0C4E3				0xC4E33
+	 * 0x37B	6:0		0x10				0x61
+	 */
+
+	if (priv->link_speed == SPEED_25000 && (!(strcmp(priv->fec_type, "kr-fec")))) {
+		/* 0x40B */
+		eth_tx_mac_ehip_reconfg = csrrd32(priv->mac_dev, eth_tx_mac_csroffs
+						  (tx_mac_ehip_conf));
+		eth_tx_mac_ehip_reconfg = eth_tx_mac_ehip_reconfg & 0x7E07;
+		eth_tx_mac_ehip_reconfg =  0x9FFE00E0;
+		csrwr32(eth_tx_mac_ehip_reconfg, priv->mac_dev, eth_tx_mac_csroffs
+			(tx_mac_ehip_conf));
+		if (!pma_enable) {
+				/* 0x37A */
+			phy_timer_window_hiber = csrrd32(priv->mac_dev,
+							 eth_phy_csroffs
+							 (phy_timer_window_hiber_check));
+			phy_timer_window_hiber = phy_timer_window_hiber & 0xFFE00000;
+			phy_timer_window_hiber |= 0xC4E33;
+			csrwr32(phy_timer_window_hiber, priv->mac_dev,
+				eth_phy_csroffs(phy_timer_window_hiber_check));
+				/* 0x37B */
+			phy_hiber_frm_err_cnt = csrrd32(priv->mac_dev,
+							eth_phy_csroffs(phy_hiber_frm_err));
+			phy_hiber_frm_err_cnt &= 0xFFFFFF80;
+			phy_hiber_frm_err_cnt |= 0x61;
+			csrwr32(phy_hiber_frm_err_cnt, priv->mac_dev,
+				eth_phy_csroffs(phy_hiber_frm_err));
+		}
+				/* 0x30E */
+		eth_phy_rx_pcs_align = csrrd32(priv->mac_dev,
+					       eth_phy_csroffs(phy_rx_pcs_align));
+		eth_phy_rx_pcs_align &= 0xFFFFFDE7;
+		eth_phy_rx_pcs_align |= 0x10;
+		csrwr32(eth_phy_rx_pcs_align, priv->mac_dev,
+			eth_phy_csroffs(phy_rx_pcs_align));
+	}
+	if (priv->link_speed == SPEED_25000 && (!(strcmp(priv->fec_type, "no-fec")))) {
+		/* 0x40B */
+		eth_tx_mac_ehip_reconfg = csrrd32(priv->mac_dev, eth_tx_mac_csroffs
+						  (tx_mac_ehip_conf));
+		eth_tx_mac_ehip_reconfg = eth_tx_mac_ehip_reconfg & 0x7E07;
+		eth_tx_mac_ehip_reconfg |=  0x9FFF80C8;
+		csrwr32(eth_tx_mac_ehip_reconfg, priv->mac_dev, eth_tx_mac_csroffs
+			(tx_mac_ehip_conf));
+		if (!pma_enable) {
+				/* 0x37A */
+			phy_timer_window_hiber = csrrd32(priv->mac_dev,
+							 eth_phy_csroffs
+							 (phy_timer_window_hiber_check));
+			phy_timer_window_hiber &= 0xFFE00000;
+			phy_timer_window_hiber |= 0xC4E33;
+			csrwr32(phy_timer_window_hiber, priv->mac_dev,
+				eth_phy_csroffs(phy_timer_window_hiber_check));
+				/* 0x37B */
+			phy_hiber_frm_err_cnt = csrrd32(priv->mac_dev,
+							eth_phy_csroffs
+							(phy_hiber_frm_err));
+			phy_hiber_frm_err_cnt &= 0xFFFFFF80;
+			phy_hiber_frm_err_cnt |= 0x61;
+			csrwr32(phy_hiber_frm_err_cnt, priv->mac_dev,
+				eth_phy_csroffs(phy_hiber_frm_err));
+		}
+		/* 0x30E */
+		eth_phy_rx_pcs_align = csrrd32(priv->mac_dev,
+					       eth_phy_csroffs(phy_rx_pcs_align));
+		eth_phy_rx_pcs_align &=  0xFFFFFDE7;
+		eth_phy_rx_pcs_align |= 0x208;
+		csrwr32(eth_phy_rx_pcs_align, priv->mac_dev, eth_phy_csroffs
+			(phy_rx_pcs_align));
+	}
+	if (priv->link_speed == SPEED_10000 && (!(strcmp(priv->fec_type, "no-fec")))) {
+		/* 0x40B */
+		eth_tx_mac_ehip_reconfg = csrrd32(priv->mac_dev, eth_tx_mac_csroffs
+							 (tx_mac_ehip_conf));
+		eth_tx_mac_ehip_reconfg &= 0x00007E07;
+		eth_tx_mac_ehip_reconfg |= 0x9FFF8108;
+		csrwr32(eth_tx_mac_ehip_reconfg, priv->mac_dev,
+			eth_tx_mac_csroffs(tx_mac_ehip_conf));
+		if (!pma_enable) {
+			/* 0x37A */
+			phy_timer_window_hiber = csrrd32(priv->mac_dev,
+							 eth_phy_csroffs
+							 (phy_timer_window_hiber_check));
+			phy_timer_window_hiber &= 0xFFE00000;
+			phy_timer_window_hiber |= 0x0C4E3;
+			csrwr32(phy_timer_window_hiber, priv->mac_dev,
+				eth_phy_csroffs(phy_timer_window_hiber_check));
+				/* 0x37B */
+			phy_hiber_frm_err_cnt = csrrd32(priv->mac_dev,
+							eth_phy_csroffs(phy_hiber_frm_err));
+			phy_hiber_frm_err_cnt &= 0xFFFFFF80;
+			phy_hiber_frm_err_cnt |= 0x10;
+			csrwr32(phy_hiber_frm_err_cnt, priv->mac_dev,
+				eth_phy_csroffs(phy_hiber_frm_err));
+		}
+		/* 0x30E */
+		eth_phy_rx_pcs_align = csrrd32(priv->mac_dev,
+					       eth_phy_csroffs(phy_rx_pcs_align));
+		eth_phy_rx_pcs_align &=  0xFFFFFDE7;
+		eth_phy_rx_pcs_align |= 0x208;
+		csrwr32(eth_phy_rx_pcs_align, priv->mac_dev,
+			eth_phy_csroffs(phy_rx_pcs_align));
+	}
+}
+
+static int etile_TX_and_RX_digital_reset(struct intel_fpga_etile_eth_private *priv,
+					 const struct ethtool_link_ksettings *cmd)
+{
+	csrwr32(0x6, priv->mac_dev, eth_phy_csroffs(phy_config));
+	return 0;
+}
+
+static int etile_Disable_PMA(struct intel_fpga_etile_eth_private *priv,
+			     const struct ethtool_link_ksettings *cmd)
+{
+	/*	Step 2 - Disable PMA
+	 *	1.	PMA AWMM Write, Offset = 0x84, value = 0x0
+	 *	2.	PMA AWMM Write, Offset = 0x85, value = 0x0
+	 *	3.	PMA AWMM Write, Offset = 0x86, value = 0x1
+	 *	4.	PMA AWMM Write, Offset = 0x87, value = 0x0
+	 *	5.	PMA AWMM Write, Offset = 0x90, value = 0x1
+	 *	6.	PMA AWMM Read, Offset = 0x8A[7], expected value = 1
+	 *	7.	PMA AWMM Read, Offset = 0x8B[0], value = 0
+	 *	8.	PMA AWMM Read, Offset = 0x88, expected value = 0x1
+	 *	(same as 0x86 in step #3)
+	 *	9.	PMA AWMM Read, Offset = 0x89, expected value = 0x0
+	 *	(same as 0x87 in step #4)
+	 *	10.	PMA AWMM Write, Offset = 0x8A[7], value = 1
+	 */
+	u8 ret;
+
+	csrwr8(0x0, priv->xcvr, eth_pma_avmm_csroffs(reg_084));
+	csrwr8(0x0, priv->xcvr, eth_pma_avmm_csroffs(reg_085));
+	csrwr8(0x1, priv->xcvr, eth_pma_avmm_csroffs(reg_086));
+	csrwr8(0x0, priv->xcvr, eth_pma_avmm_csroffs(reg_087));
+	csrwr8(0x1, priv->xcvr, eth_pma_avmm_csroffs(reg_090));
+
+	if (etile_check_counter_complete(priv->xcvr, eth_pma_avmm_csroffs(reg_08A),
+					 XCVR_PMA_AVMM_08A_PMA_ATTR_SENT_SUCCESS,
+					 true, INTEL_FPGA_BYTE_ALIGN))
+		netdev_warn(priv->dev,
+			    "Internal loopback: PMA attribute sent failed\n");
+
+	if (etile_check_counter_complete(priv->xcvr, eth_pma_avmm_csroffs(reg_08B),
+					 XCVR_PMA_AVMM_08B_PMA_FINISH_ATTR,
+					 false, INTEL_FPGA_BYTE_ALIGN))
+		netdev_warn(priv->dev,
+			    "Internal loopback: PMA attribute not returned\n");
+
+	if (etile_check_counter_complete(priv->xcvr, eth_pma_avmm_csroffs(reg_088),
+					 XCVR_PMA_AVMM_088_PMA_READ_RECEIVER_TUNING,
+					 true, INTEL_FPGA_BYTE_ALIGN))
+		netdev_warn(priv->dev,
+			    "Internal loopback: PMA low byte failed\n");
+	if (etile_check_counter_complete(priv->xcvr, eth_pma_avmm_csroffs(reg_089),
+					 XCVR_PMA_AVMM_089_CORE_PMA_ATTR_CODE_RET_VAL_HI,
+					 false, INTEL_FPGA_BYTE_ALIGN))
+		netdev_warn(priv->dev,
+			    "Internal loopback: PMA high byte failed\n");
+	ret = csrrd8(priv->xcvr, eth_pma_avmm_csroffs(reg_08A));
+	ret |= 0x80;
+	csrwr8(ret, priv->xcvr, eth_pma_avmm_csroffs(reg_08A));
+
+	return 0;
+}
+
+static int etile_PMA_analog_reset(struct intel_fpga_etile_eth_private *priv,
+				  const struct ethtool_link_ksettings *cmd)
+{
+	/* Step 3 - Trigger PMA analog reset
+	 *	1.	PMA AVMM Write, Offset = 0x200, value = 0x0
+	 *	2.	PMA AVMM Write, Offset = 0x201, value = 0x0
+	 *	3.	PMA AVMM Write, Offset = 0x202, value = 0x0
+	 *	4.	PMA AVMM Write, Ofset = 0x203, value = 0x81
+	 *	5.	PMA AVMM Read, Offset = 0x207, expected value = 0x80
+	 *	6.	PMA AVMM Read, Offset = 0x204, expected value = 0x0 (channel #)
+	 */
+
+	u8 ret;
+
+	csrwr8(0x0, priv->xcvr, eth_pma_avmm_csroffs(reg_200));
+	csrwr8(0x0, priv->xcvr, eth_pma_avmm_csroffs(reg_201));
+	csrwr8(0x0, priv->xcvr, eth_pma_avmm_csroffs(reg_202));
+	csrwr8(0x81, priv->xcvr, eth_pma_avmm_csroffs(reg_203));
+
+	ret = csrrd8(priv->xcvr, eth_pma_avmm_csroffs(reg_207));
+
+	if (etile_check_counter_complete(priv->xcvr, eth_pma_avmm_csroffs(reg_207),
+					 XCVR_PMA_AVMM_207_LAST_OP_ON_200_203_SUCCESS,
+					 true, INTEL_FPGA_BYTE_ALIGN)) {
+		netdev_err(priv->dev, "Analog PMA reset failed, abort\n");
+		return -EINVAL;
+	}
+	ret = csrrd8(priv->xcvr, eth_pma_avmm_csroffs(reg_207));
+
+	if (etile_check_counter_complete(priv->xcvr, eth_pma_avmm_csroffs(reg_204),
+					 XCVR_PMA_AVMM_204_RET_PHYS_CHANNEL_NUMBER,
+					 false, INTEL_FPGA_BYTE_ALIGN))
+		netdev_warn(priv->dev, "Cannot read channel number\n");
+
+	return 0;
+}
+
+static int etile_Change_TX_reference_clock_ratio(struct intel_fpga_etile_eth_private *priv,
+						 const struct ethtool_link_ksettings *cmd)
+{
+	/* step 4d - Change TX reference clock ratio */
+	/**
+	 *	1.	PMA AVMM Write, Offset = 0x84, value = 0xA5(25G)/42(10G)
+	 *	2.	PMA AVMM Write, Offset = 0x85, value = 0x0
+	 *	3.	PMA AVMM Write, Offset = 0x86, value = 0x5
+	 *	4.	PMA AVMM Write, Offset = 0x87, value = 0x0
+	 *	5.	PMA AVMM Write, Offset = 0x90, value = 0x1
+	 *	6.	PMA AVMM Read, Offset = 0x8A[7], expected value = 0x1
+	 *	7.	PMA AVMM Read, Offset = 0x8B[0], expected value = 0x0
+	 *	8.	PMA AVMM Read, Offset = 0x88, expected value = 0x5
+	 *	(same as 0x86 in step #3)
+	 *	9.	PMA AVMM Read, Offset = 0x89, expected value = 0x0
+	 *	(same as 0x87 in step #4)
+	 *	10.	PMA AVMM Write, Offset = 0x8A[7], expected value = 0x1
+	 */
+
+	u8 ret;
+
+	if (priv->link_speed == SPEED_10000)
+		csrwr8(0x42, priv->xcvr, eth_pma_avmm_csroffs(reg_084));
+	if (priv->link_speed == SPEED_25000)
+		csrwr8(0xA5, priv->xcvr, eth_pma_avmm_csroffs(reg_084));
+
+	csrwr8(0x0, priv->xcvr, eth_pma_avmm_csroffs(reg_085));
+	csrwr8(0x5, priv->xcvr, eth_pma_avmm_csroffs(reg_086));
+	csrwr8(0x0, priv->xcvr, eth_pma_avmm_csroffs(reg_087));
+	csrwr8(0x1, priv->xcvr, eth_pma_avmm_csroffs(reg_090));
+
+	if (etile_check_counter_complete(priv->xcvr, eth_pma_avmm_csroffs(reg_08A),
+					 XCVR_PMA_AVMM_08A_PMA_ATTR_SENT_SUCCESS,
+					 true, INTEL_FPGA_BYTE_ALIGN))
+		netdev_warn(priv->dev,
+			    "Internal loopback: PMA attribute sent failed\n");
+
+	if (etile_check_counter_complete(priv->xcvr, eth_pma_avmm_csroffs(reg_08B),
+					 XCVR_PMA_AVMM_08B_PMA_FINISH_ATTR,
+					 false, INTEL_FPGA_BYTE_ALIGN))
+		netdev_warn(priv->dev,
+			    "Internal loopback: PMA attribute not returned\n");
+
+	if (etile_check_counter_complete(priv->xcvr, eth_pma_avmm_csroffs(reg_088),
+					 XCVR_TX_REF_PMA_CODE_RET_VAL_LO,
+					 true, INTEL_FPGA_BYTE_ALIGN))
+		netdev_warn(priv->dev,
+			    "Internal loopback: PMA low byte failed\n");
+
+	if (etile_check_counter_complete(priv->xcvr, eth_pma_avmm_csroffs(reg_089),
+					 XCVR_PMA_AVMM_089_CORE_PMA_ATTR_CODE_RET_VAL_HI,
+					 false, INTEL_FPGA_BYTE_ALIGN))
+		netdev_warn(priv->dev,
+			    "Internal loopback: PMA high byte failed\n");
+	ret = csrrd8(priv->xcvr, eth_pma_avmm_csroffs(reg_08A));
+	ret |= 0x80;
+	/* read modify */
+	csrwr8(ret, priv->xcvr, eth_pma_avmm_csroffs(reg_08A));
+
+	return 0;
+}
+
+static int etile_Change_RX_reference_clock_ratio(struct intel_fpga_etile_eth_private *priv,
+						 const struct ethtool_link_ksettings *cmd)
+{
+	/* step 4e - Change RX reference clock ratio */
+	/**
+	 *	1.	PMA AVMM Write, Offset = 0x84, value = 0xA5(25G)/42(10G)
+	 *	2.	PMA AVMM Write, Offset = 0x85, value = 0x0
+	 *	3.	PMA AVMM Write, Offset = 0x86, value = 0x6
+	 *	4.	PMA AVMM Write, Offset = 0x87, value = 0x0
+	 *	5.	PMA AVMM Write, Offset = 0x90, expected value = 0x1
+	 *	6.	PMA AVMM Read, Offset = 0x8A[7], expected value = 0x1
+	 *	7.	PMA AVMM Read, Offset = 0x8B[0], expected value = 0x0
+	 *	8.	PMA AVMM Read, Offset = 0x88, expected value = 0x6
+	 *	(same as 0x86 in step #3)
+	 *	9.	PMA AVMM Read, Offset = 0x89, expected value = 0x0
+	 *	(same as 0x87 in step #4)
+	 *	10.	PMA AVMM Write, Offset = 0x8A[7], expected value = 0x1
+	 */
+
+	u8 ret;
+
+	if (priv->link_speed == SPEED_10000)
+		csrwr8(0x42, priv->xcvr, eth_pma_avmm_csroffs(reg_084));
+	if (priv->link_speed == SPEED_25000)
+		csrwr8(0xA5, priv->xcvr, eth_pma_avmm_csroffs(reg_084));
+
+	csrwr8(0x0, priv->xcvr, eth_pma_avmm_csroffs(reg_085));
+	csrwr8(0x6, priv->xcvr, eth_pma_avmm_csroffs(reg_086));
+	csrwr8(0x0, priv->xcvr, eth_pma_avmm_csroffs(reg_087));
+	csrwr8(0x1, priv->xcvr, eth_pma_avmm_csroffs(reg_090));
+
+	if (etile_check_counter_complete(priv->xcvr, eth_pma_avmm_csroffs(reg_08A),
+					 XCVR_PMA_AVMM_08A_PMA_ATTR_SENT_SUCCESS,
+					 true, INTEL_FPGA_BYTE_ALIGN))
+		netdev_warn(priv->dev,
+			    "Internal loopback: PMA attribute sent failed\n");
+
+	if (etile_check_counter_complete(priv->xcvr, eth_pma_avmm_csroffs(reg_08B),
+					 XCVR_PMA_AVMM_08B_PMA_FINISH_ATTR,
+					 false, INTEL_FPGA_BYTE_ALIGN))
+		netdev_warn(priv->dev,
+			    "Internal loopback: PMA attribute not returned\n");
+
+	if (etile_check_counter_complete(priv->xcvr, eth_pma_avmm_csroffs(reg_088),
+					 XCVR_RX_REF_PMA_CODE_RET_VAL_LO,
+					 true, INTEL_FPGA_BYTE_ALIGN))
+		netdev_warn(priv->dev,
+			    "Internal loopback: PMA low byte failed\n");
+
+	if (etile_check_counter_complete(priv->xcvr, eth_pma_avmm_csroffs(reg_089),
+					 XCVR_PMA_AVMM_089_CORE_PMA_ATTR_CODE_RET_VAL_HI,
+					 false, INTEL_FPGA_BYTE_ALIGN))
+		netdev_warn(priv->dev,
+			    "Internal loopback: PMA high byte failed\n");
+	ret = csrrd8(priv->xcvr, eth_pma_avmm_csroffs(reg_08A));
+	ret |= 0x80;
+	/* read modify */
+	csrwr8(ret, priv->xcvr, eth_pma_avmm_csroffs(reg_08A));
+
+	return 0;
+}
+
+static int etile_PMA_RX_TX_Width(struct intel_fpga_etile_eth_private *priv,
+				 const struct ethtool_link_ksettings *cmd)
+{
+	/* step 4f - PMA RX/TX Width */
+	/**
+	 *	1.	PMA AVMM Write, Offset = 0x84, value = 0x55
+	 *	2.	PMA AVMM Write, Offset = 0x85, value = 0x0
+	 *	3.	PMA AVMM Write, Offset = 0x86, value = 0x14
+	 *	4.	PMA AVMM Write, Offset = 0x87, value = 0x0
+	 *	5.	PMA AVMM Write, Offset = 0x90, value = 0x1
+	 *	6.	PMA AVMM Read, Offset = 0x8A[7], expected value = 0x1
+	 *	7.	PMA AVMM Read, Offset = 0x8B[0], expected value = 0x0
+	 *	8.	PMA AVMM Read, Offset = 0x88, expected value = 0x14
+	 *	(same as 0x86 in step #3)
+	 *	9.	PMA AVMM Read, Offset = 0x89, expected value = 0x0
+	 *	(same as 0x87 in step #4)
+	 *	10.	PMA AVMM Write, Offset = 0x8A[7], expected value = 0x1
+	 */
+
+	u8 ret;
+
+	csrwr8(0x55, priv->xcvr, eth_pma_avmm_csroffs(reg_084));
+	csrwr8(0x0, priv->xcvr, eth_pma_avmm_csroffs(reg_085));
+	csrwr8(0x14, priv->xcvr, eth_pma_avmm_csroffs(reg_086));
+	csrwr8(0x0, priv->xcvr, eth_pma_avmm_csroffs(reg_087));
+	csrwr8(0x1, priv->xcvr, eth_pma_avmm_csroffs(reg_090));
+
+	if (etile_check_counter_complete(priv->xcvr, eth_pma_avmm_csroffs(reg_08A),
+					 XCVR_PMA_AVMM_08A_PMA_ATTR_SENT_SUCCESS,
+					 true, INTEL_FPGA_BYTE_ALIGN))
+		netdev_warn(priv->dev,
+			    "Internal loopback:(reg_08A), PMA attribute sent failed\n");
+
+	if (etile_check_counter_complete(priv->xcvr, eth_pma_avmm_csroffs(reg_08B),
+					 XCVR_PMA_AVMM_08B_PMA_FINISH_ATTR,
+					 false, INTEL_FPGA_BYTE_ALIGN))
+		netdev_warn(priv->dev,
+			    "Internal loopback:(reg_08B), PMA attribute not returned\n");
+
+	if (etile_check_counter_complete(priv->xcvr, eth_pma_avmm_csroffs(reg_088),
+					 XCVR_RX_TX_Width_PMA_CODE_RET_VAL_LO,
+					 true, INTEL_FPGA_BYTE_ALIGN))
+		netdev_warn(priv->dev,
+			    "Internal loopback: eth_pma_avmm_csroffs(reg_088)PMA low byte failed\n");
+
+	if (etile_check_counter_complete(priv->xcvr, eth_pma_avmm_csroffs(reg_089),
+					 XCVR_PMA_AVMM_089_CORE_PMA_ATTR_CODE_RET_VAL_HI,
+					 false, INTEL_FPGA_BYTE_ALIGN))
+		netdev_warn(priv->dev,
+			    "Internal loopback:(reg_089) PMA high byte failed\n");
+	ret = csrrd8(priv->xcvr, eth_pma_avmm_csroffs(reg_08A));
+	ret |= 0x80;
+	/* read modify */
+	csrwr8(ret, priv->xcvr, eth_pma_avmm_csroffs(reg_08A));
+
+	return 0;
+}
+
+static int etile_RX_Phase_slip(struct intel_fpga_etile_eth_private *priv,
+			       const struct ethtool_link_ksettings *cmd)
+{
+	/* step 4g - RX Phase slip */
+	/**
+	 *	1.	PMA AVMM Write, Offset = 0x84, value = 0x0
+	 *	2.	PMA AVMM Write, Offset = 0x85, value = 0x9C
+	 *	3.	PMA AVMM Write, Offset = 0x86, value = 0xE
+	 *	4.	PMA AVMM Write, Offset = 0x87, value = 0x0
+	 *	5.	PMA AVMM Write, Offset = 0x90, value = 0x1
+	 *	6.	PMA AVMM Read, Offset = 0x8A[7], expected value = 0x1
+	 *	7.	PMA AVMM Read, Offset = 0x8B[0], expected value = 0x0
+	 *	8.	PMA AVMM Read, Offset = 0x88, expected value = 0xE
+	 *	(same as 0x86 in step #3)
+	 *	9.	PMA AVMM Read, Offset = 0x89, expected value = 0x0
+	 *	(same as 0x87 in step #4)
+	 *	10.	PMA AVMM Write, Offset = 0x8A[7], expected value = 0x1
+	 */
+
+	u8 ret;
+
+	csrwr8(0x0, priv->xcvr, eth_pma_avmm_csroffs(reg_084));
+	csrwr8(0x9C, priv->xcvr, eth_pma_avmm_csroffs(reg_085));
+	csrwr8(0xE, priv->xcvr, eth_pma_avmm_csroffs(reg_086));
+	csrwr8(0x0, priv->xcvr, eth_pma_avmm_csroffs(reg_087));
+	csrwr8(0x1, priv->xcvr, eth_pma_avmm_csroffs(reg_090));
+
+	if (etile_check_counter_complete(priv->xcvr, eth_pma_avmm_csroffs(reg_08A),
+					 XCVR_PMA_AVMM_08A_PMA_ATTR_SENT_SUCCESS,
+					 true, INTEL_FPGA_BYTE_ALIGN))
+		netdev_warn(priv->dev,
+			    "Internal loopback:(reg_08A), PMA attribute sent failed\n");
+
+	if (etile_check_counter_complete(priv->xcvr, eth_pma_avmm_csroffs(reg_08B),
+					 XCVR_PMA_AVMM_08B_PMA_FINISH_ATTR,
+					 false, INTEL_FPGA_BYTE_ALIGN))
+		netdev_warn(priv->dev,
+			    "Internal loopback:(reg_08B), PMA attribute not returned\n");
+
+	if (etile_check_counter_complete(priv->xcvr, eth_pma_avmm_csroffs(reg_088),
+					 XCVR_RX_Phase_PMA_CODE_RET_VAL_LO,
+					 true, INTEL_FPGA_BYTE_ALIGN))
+		netdev_warn(priv->dev,
+			    "Internal loopback:(reg_088), PMA low byte failed\n");
+
+	if (etile_check_counter_complete(priv->xcvr, eth_pma_avmm_csroffs(reg_089),
+					 XCVR_PMA_AVMM_089_CORE_PMA_ATTR_CODE_RET_VAL_HI,
+					 false, INTEL_FPGA_BYTE_ALIGN))
+		netdev_warn(priv->dev,
+			    "Internal loopback:(reg_089), PMA high byte failed\n");
+
+	ret = csrrd8(priv->xcvr, eth_pma_avmm_csroffs(reg_08A));
+	ret |= 0x80;
+	 /* read modify */
+	csrwr8(ret, priv->xcvr, eth_pma_avmm_csroffs(reg_08A));
+
+	return 0;
+}
+
+static int etile_pma_enable(struct intel_fpga_etile_eth_private *priv,
+			    const struct ethtool_link_ksettings *cmd)
+{
+	/* step 5 - PMA Enable */
+	/**
+	 *	1.	PMA AVMM Write, Offset = 0x84, value = 0x7
+	 *	2.	PMA AVMM Write, Offset = 0x85, value = 0x0
+	 *	3.	PMA AVMM Write, Offset = 0x86, value = 0x1
+	 *	4.	PMA AVMM Write, Offset = 0x87, value = 0x0
+	 *	5.	PMA AVMM Write, Offset = 0x90, value = 0x1
+	 *	6.	PMA AVMM Read, Offset = 0x8A[7], expected value = 0x1
+	 *	7.	PMA AVMM Read, Offset = 0x8B[0], expected value = 0x0
+	 *	8.	PMA AVMM Read, Offset = 0x88, expected value = 0x1
+	 *	(same as 0x86 in step #3)
+	 *	9.	PMA AVMM Read, Offset = 0x89, expected value = 0x0
+	 *	(same as 0x87 in step #4)
+	 *	10.	PMA AVMM Write, Offset = 0x8A[7], expected value = 0x1
+	 */
+
+	u8 ret;
+	u32 eth_tx_mac_ehip_reconfg;
+
+	csrwr8(0x7, priv->xcvr, eth_pma_avmm_csroffs(reg_084));
+	csrwr8(0x0, priv->xcvr, eth_pma_avmm_csroffs(reg_085));
+	csrwr8(0x1, priv->xcvr, eth_pma_avmm_csroffs(reg_086));
+	csrwr8(0x0, priv->xcvr, eth_pma_avmm_csroffs(reg_087));
+	csrwr8(0x1, priv->xcvr, eth_pma_avmm_csroffs(reg_090));
+
+	if (etile_check_counter_complete(priv->xcvr, eth_pma_avmm_csroffs(reg_08A),
+					 XCVR_PMA_AVMM_08A_PMA_ATTR_SENT_SUCCESS,
+					 true, INTEL_FPGA_BYTE_ALIGN)){
+		netdev_warn(priv->dev,
+			    "Internal loopback: eth_pma_avmm_csroffs(reg_08A),PMA attribute sent failed\n");
+		}
+
+	if (etile_check_counter_complete(priv->xcvr, eth_pma_avmm_csroffs(reg_08B),
+					 XCVR_PMA_AVMM_08B_PMA_FINISH_ATTR,
+					 false, INTEL_FPGA_BYTE_ALIGN)){
+		netdev_warn(priv->dev,
+			    "Internal loopback:(reg_08B), PMA attribute not returned\n");
+		}
+	if (etile_check_counter_complete(priv->xcvr, eth_pma_avmm_csroffs(reg_088),
+					 XCVR_PMA_ENBL_CODE_RET_VAL_LO,
+					 true, INTEL_FPGA_BYTE_ALIGN)){
+		netdev_warn(priv->dev,
+			    "Internal loopback:(reg_088) PMA low byte failed\n");
+	}
+	if (etile_check_counter_complete(priv->xcvr, eth_pma_avmm_csroffs(reg_089),
+					 XCVR_PMA_AVMM_089_CORE_PMA_ATTR_CODE_RET_VAL_HI,
+					 false, INTEL_FPGA_BYTE_ALIGN)){
+		netdev_warn(priv->dev,
+			    "Internal loopback:(reg_089) PMA high byte failed\n");
+		}
+	ret = csrrd8(priv->xcvr, eth_pma_avmm_csroffs(reg_08A));
+	ret |= 0x80;
+	 /* read modify */
+	csrwr8(ret, priv->xcvr, eth_pma_avmm_csroffs(reg_08A));
+	eth_tx_mac_ehip_reconfg =  csrrd32(priv->mac_dev, eth_tx_mac_csroffs(tx_mac_ehip_conf));
+
+	return 0;
+}
+
+static int etile_Enable_Internal_Loopback(struct intel_fpga_etile_eth_private *priv,
+					  const struct ethtool_link_ksettings *cmd)
+{
+	/* step 6 - Enable Internal Loopback  */
+	/**
+	 *	1.	PMA AVMM Write, Offset = 0x84, value = 0x1
+	 *	2.	PMA AVMM Write, Offset = 0x85, value = 0x1
+	 *	3.	PMA AVMM Write, Offset = 0x86, value = 0x8
+	 *	4.	PMA AVMM Write, Offset = 0x87, value = 0x0
+	 *	5.	PMA AVMM Write, Offset = 0x90, value = 0x1
+	 *	6.	PMA AVMM Read, Offset = 0x8A[7], expected value = 0x1
+	 *	7.	PMA AVMM Read, Offset = 0x8B[0], expected value = 0x0
+	 *	8.	PMA AVMM Read, Offset = 0x88, expected value = 0x8
+	 *	(same as 0x86 in step #3)
+	 *	9.	PMA AVMM Read, Offset = 0x89, expected value = 0x0
+	 *	(same as 0x87 in step #4)
+	 *	10.	PMA AVMM Write, Offset = 0x8A[7], expected value = 0x1
+	 */
+
+	u8 ret;
+
+	csrwr8(0x1, priv->xcvr, eth_pma_avmm_csroffs(reg_084));
+	csrwr8(0x1, priv->xcvr, eth_pma_avmm_csroffs(reg_085));
+	csrwr8(0x8, priv->xcvr, eth_pma_avmm_csroffs(reg_086));
+	csrwr8(0x0, priv->xcvr, eth_pma_avmm_csroffs(reg_087));
+	csrwr8(0x1, priv->xcvr, eth_pma_avmm_csroffs(reg_090));
+
+	if (etile_check_counter_complete(priv->xcvr, eth_pma_avmm_csroffs(reg_08A),
+					 XCVR_PMA_AVMM_08A_PMA_ATTR_SENT_SUCCESS,
+					 true, INTEL_FPGA_BYTE_ALIGN)) {
+		netdev_warn(priv->dev,
+			    "Internal loopback: eth_pma_avmm_csroffs(reg_08A),PMA attribute sent failed\n");
+	}
+
+	if (etile_check_counter_complete(priv->xcvr, eth_pma_avmm_csroffs(reg_08B),
+					 XCVR_PMA_AVMM_08B_PMA_FINISH_ATTR,
+					 false, INTEL_FPGA_BYTE_ALIGN)){
+		netdev_warn(priv->dev,
+			    "Internal loopback:(reg_08B), PMA attribute not returned\n");
+	}
+
+	if (etile_check_counter_complete(priv->xcvr, eth_pma_avmm_csroffs(reg_088),
+					 XCVR_INTR_LOOP_PMA_CODE_RET_VAL_LO,
+					 true, INTEL_FPGA_BYTE_ALIGN)){
+		netdev_warn(priv->dev,
+			    "Internal loopback:(reg_088) PMA low byte failed\n");
+		}
+
+	if (etile_check_counter_complete(priv->xcvr, eth_pma_avmm_csroffs(reg_089),
+					 XCVR_PMA_AVMM_089_CORE_PMA_ATTR_CODE_RET_VAL_HI,
+					 false, INTEL_FPGA_BYTE_ALIGN)){
+		netdev_warn(priv->dev,
+			    "Internal loopback:(reg_089) PMA high byte failed\n");
+		}
+	ret = csrrd8(priv->xcvr, eth_pma_avmm_csroffs(reg_08A));
+	ret |= 0x80;
+	 /* read modify */
+	csrwr8(ret, priv->xcvr, eth_pma_avmm_csroffs(reg_08A));
+
+	return 0;
+}
+
+static int etile_De_assert_TX_digital_reset(struct intel_fpga_etile_eth_private *priv,
+					    const struct ethtool_link_ksettings *cmd)
+{
+	/* Step 7 - De-assert TX digital reset
+	 *	EHIP CSR Write, Offset = 0x310, value = 0x4
+	 */
+	csrwr32(0x4, priv->mac_dev, eth_phy_csroffs(phy_config));
+
+	return 0;
+}
+
+static int etile_general_calibration(struct intel_fpga_etile_eth_private *priv,
+				     const struct ethtool_link_ksettings *cmd)
+{
+	u8 ret;
+
+	csrwr8(0x18, priv->xcvr, eth_pma_avmm_csroffs(reg_084));
+	csrwr8(0x1, priv->xcvr, eth_pma_avmm_csroffs(reg_085));
+	csrwr8(0x2c, priv->xcvr, eth_pma_avmm_csroffs(reg_086));
+	csrwr8(0x0, priv->xcvr, eth_pma_avmm_csroffs(reg_087));
+	csrwr8(0x1, priv->xcvr, eth_pma_avmm_csroffs(reg_090));
+
+	if (etile_check_counter_complete(priv->xcvr, eth_pma_avmm_csroffs(reg_08A),
+					 XCVR_PMA_AVMM_08A_PMA_ATTR_SENT_SUCCESS,
+					 true, INTEL_FPGA_BYTE_ALIGN)) {
+		netdev_warn(priv->dev,
+			    "Internal loopback: eth_pma_avmm_csroffs(reg_08A),PMA attribute sent failed\n");
+	}
+	if (etile_check_counter_complete(priv->xcvr, eth_pma_avmm_csroffs(reg_08B),
+					 XCVR_PMA_AVMM_08B_PMA_FINISH_ATTR,
+					 false, INTEL_FPGA_BYTE_ALIGN)) {
+		netdev_warn(priv->dev,
+			    "Internal loopback:(reg_08B), PMA attribute not returned\n");
+	}
+
+	ret = csrrd8(priv->xcvr, eth_pma_avmm_csroffs(reg_08A));
+	ret |= 0x80;
+	 /* read modify */
+	csrwr8(ret, priv->xcvr, eth_pma_avmm_csroffs(reg_08A));
+	csrwr8(0x0, priv->xcvr, eth_pma_avmm_csroffs(reg_084));
+	csrwr8(0x0, priv->xcvr, eth_pma_avmm_csroffs(reg_085));
+	csrwr8(0x6c, priv->xcvr, eth_pma_avmm_csroffs(reg_086));
+	csrwr8(0x0, priv->xcvr, eth_pma_avmm_csroffs(reg_087));
+	csrwr8(0x1, priv->xcvr, eth_pma_avmm_csroffs(reg_090));
+
+	if (etile_check_counter_complete(priv->xcvr, eth_pma_avmm_csroffs(reg_08A),
+					 XCVR_PMA_AVMM_08A_PMA_ATTR_SENT_SUCCESS,
+					 true, INTEL_FPGA_BYTE_ALIGN)){
+		netdev_warn(priv->dev,
+			    "Internal loopback: eth_pma_avmm_csroffs(reg_08A),PMA attribute sent failed\n");
+	}
+
+	if (etile_check_counter_complete(priv->xcvr, eth_pma_avmm_csroffs(reg_08B),
+					 XCVR_PMA_AVMM_08B_PMA_FINISH_ATTR,
+					 false, INTEL_FPGA_BYTE_ALIGN)){
+		netdev_warn(priv->dev,
+			    "Internal loopback:(reg_08B), PMA attribute not returned\n");
+	}
+
+	if (etile_check_counter_complete(priv->xcvr, eth_pma_avmm_csroffs(reg_088),
+					 XCVR_GNRL_CALB_PMA_CODE_RET_VAL_LO,
+					 true, INTEL_FPGA_BYTE_ALIGN)){
+		netdev_warn(priv->dev,
+			    "Internal loopback:(reg_088) PMA low byte failed\n");
+	}
+	if (etile_check_counter_complete(priv->xcvr, eth_pma_avmm_csroffs(reg_089),
+					 XCVR_PMA_AVMM_089_CORE_PMA_ATTR_CODE_RET_VAL_HI,
+					 false, INTEL_FPGA_BYTE_ALIGN)){
+		netdev_warn(priv->dev,
+			    "Internal loopback:(reg_089) PMA high byte failed\n");
+		}
+	ret = csrrd8(priv->xcvr, eth_pma_avmm_csroffs(reg_08A));
+	ret |= 0x80;
+	 /* read modify */
+	csrwr8(ret, priv->xcvr, eth_pma_avmm_csroffs(reg_08A));
+
+	/* Step 7b - Initial Adaptation */
+	/**	1.	PMA AVMM Write, Offset = 0x84, value = 0x1
+	 *	2.	PMA AVMM Write, Offset = 0x85, value = 0x0
+	 *	3.	PMA AVMM Write, Offset = 0x86, value = 0xa
+	 *	4.	PMA AVMM Write, Offset = 0x87, value = 0x0
+	 *	5.	PMA AVMM Write, Offset = 0x90, value = 0x1
+	 *	6.	PMA AVMM Read, Offset = 0x8A[7], expected value = 0x1
+	 *	7.	PMA AVMM Read, Offset = 0x8B[0], expected value = 0x0
+	 *	8.	PMA AVMM Read, Offset = 0x88, expected value = 0xa
+	 *	(same as 0x86 in step #3)
+	 *	9.	PMA AVMM Read, Offset = 0x89, expected value = 0x0
+	 *	(same as 0x87 in step #4)
+	 *	10.	PMA AVMM Write, Offset = 0x8A[7], expected value = 0x1
+	 */
+
+	csrwr8(0x1, priv->xcvr, eth_pma_avmm_csroffs(reg_084));
+	csrwr8(0x0, priv->xcvr, eth_pma_avmm_csroffs(reg_085));
+	csrwr8(0xa, priv->xcvr, eth_pma_avmm_csroffs(reg_086));
+	csrwr8(0x0, priv->xcvr, eth_pma_avmm_csroffs(reg_087));
+	csrwr8(0x1, priv->xcvr, eth_pma_avmm_csroffs(reg_090));
+
+	if (etile_check_counter_complete(priv->xcvr, eth_pma_avmm_csroffs(reg_08A),
+					 XCVR_PMA_AVMM_08A_PMA_ATTR_SENT_SUCCESS,
+					 true, INTEL_FPGA_BYTE_ALIGN)){
+		netdev_warn(priv->dev,
+			    "Internal loopback: eth_pma_avmm_csroffs(reg_08A),PMA attribute sent failed\n");
+		}
+	if (etile_check_counter_complete(priv->xcvr, eth_pma_avmm_csroffs(reg_08B),
+					 XCVR_PMA_AVMM_08B_PMA_FINISH_ATTR,
+					 false, INTEL_FPGA_BYTE_ALIGN)){
+		netdev_warn(priv->dev,
+			    "Internal loopback:(reg_08B), PMA attribute not returned\n");
+		}
+	if (etile_check_counter_complete(priv->xcvr, eth_pma_avmm_csroffs(reg_088),
+					 XCVR_INIT_ADAPT_7B_PMA_CODE_RET_VAL_LO,
+					 true, INTEL_FPGA_BYTE_ALIGN)){
+		netdev_warn(priv->dev,
+			    "Internal loopback:(reg_088) PMA low byte failed\n");
+		}
+	if (etile_check_counter_complete(priv->xcvr, eth_pma_avmm_csroffs(reg_089),
+					 XCVR_PMA_AVMM_089_CORE_PMA_ATTR_CODE_RET_VAL_HI,
+					 false, INTEL_FPGA_BYTE_ALIGN)){
+		netdev_warn(priv->dev,
+			    "Internal loopback:(reg_089) PMA high byte failed\n");
+		}
+	ret = csrrd8(priv->xcvr, eth_pma_avmm_csroffs(reg_08A));
+	ret |= 0x80;
+	/* read modify */
+	csrwr8(ret, priv->xcvr, eth_pma_avmm_csroffs(reg_08A));
+
+	/* Step 7C - Initial Adaptation */
+	/*	1.	PMA AVMM Write, Offset = 0x84, value = 0x0
+	 *	2.	PMA AVMM Write, Offset = 0x85, value = 0xB
+	 *	3.	PMA AVMM Write, Offset = 0x86, value = 0x26
+	 *	4.	PMA AVMM Write, Offset = 0x87, value = 0x1
+	 *	5.	PMA AVMM Write, Offset = 0x90, value = 0x1
+	 *	6.	PMA AVMM Read, Offset = 0x8A[7], expected value = 0x1
+	 *	7.	PMA AVMM Read, Offset = 0x8B[0], expected value = 0x0
+	 *	8.	PMA AVMM Read, Offset = 0x88[0], expected value = 0x0
+	 *	(same as 0x86 in step #3)
+	 *	9.	PMA AVMM Read, Offset = 0x89, expected value = 0x0
+	 *	(same as 0x87 in step #4)
+	 *	10.	PMA AVMM Write, Offset = 0x8A[7], expected value = 0x1
+	 */
+
+	csrwr8(0x0, priv->xcvr, eth_pma_avmm_csroffs(reg_084));
+	csrwr8(0xb, priv->xcvr, eth_pma_avmm_csroffs(reg_085));
+	csrwr8(0x26, priv->xcvr, eth_pma_avmm_csroffs(reg_086));
+	csrwr8(0x1, priv->xcvr, eth_pma_avmm_csroffs(reg_087));
+	csrwr8(0x1, priv->xcvr, eth_pma_avmm_csroffs(reg_090));
+
+	if (etile_check_counter_complete(priv->xcvr, eth_pma_avmm_csroffs(reg_08A),
+					 XCVR_PMA_AVMM_08A_PMA_ATTR_SENT_SUCCESS,
+					 true, INTEL_FPGA_BYTE_ALIGN)){
+		netdev_warn(priv->dev,
+			    "Internal loopback:(reg_08A),PMA attribute sent failed\n");
+		}
+
+	if (etile_check_counter_complete(priv->xcvr, eth_pma_avmm_csroffs(reg_08B),
+					 XCVR_PMA_AVMM_08B_PMA_FINISH_ATTR,
+					 false, INTEL_FPGA_BYTE_ALIGN)){
+		netdev_warn(priv->dev,
+			    "Internal loopback:(reg_08B), PMA attribute not returned\n");
+		}
+	if (etile_check_counter_complete(priv->xcvr, eth_pma_avmm_csroffs(reg_088),
+					 XCVR_INIT_ADAPT_7C_PMA_CODE_RET_VAL_LO,
+					 true, INTEL_FPGA_BYTE_ALIGN)){
+		netdev_warn(priv->dev,
+			    "Internal loopback:(reg_088) PMA low byte failed\n");
+		}
+	if (etile_check_counter_complete(priv->xcvr, eth_pma_avmm_csroffs(reg_089),
+					 XCVR_PMA_AVMM_089_CORE_PMA_ATTR_CODE_RET_VAL_HI,
+					 false, INTEL_FPGA_BYTE_ALIGN)){
+		netdev_warn(priv->dev,
+			    "Internal loopback:(reg_089) PMA high byte failed\n");
+		}
+	ret = csrrd8(priv->xcvr, eth_pma_avmm_csroffs(reg_08A));
+	ret |= 0x80;
+	/* read modify */
+	csrwr8(ret, priv->xcvr, eth_pma_avmm_csroffs(reg_08A));
+
+	return 0;
+}
+
+static int etile_Enable_mission_mode_and_disable_internal_serial_loopback
+(struct intel_fpga_etile_eth_private *priv, const struct ethtool_link_ksettings *cmd)
+
+{
+	/* Step 8 - Enable mission mode and disable internal serial loopback
+	 *	1.	PMA AVMM Write, Offset = 0x200, value = 0xE6
+	 *	2.	PMA AVMM Write, Offset = 0x201, value = 0x01
+	 *	3.	PMA AVMM Write, Offset = 0x202, value = 0x03
+	 *	4.	PMA AVMM Write, Ofset = 0x203, value = 0x96
+	 *	5.	PMA AVMM Read, Offset = 0x207, expected value = 0x80
+	 */
+
+	csrwr8(0xE6, priv->xcvr, eth_pma_avmm_csroffs(reg_200));
+	csrwr8(0x01, priv->xcvr, eth_pma_avmm_csroffs(reg_201));
+	csrwr8(0x03, priv->xcvr, eth_pma_avmm_csroffs(reg_202));
+	csrwr8(0x96, priv->xcvr, eth_pma_avmm_csroffs(reg_203));
+
+	if (etile_check_counter_complete(priv->xcvr, eth_pma_avmm_csroffs(reg_207),
+					 XCVR_PMA_AVMM_207_LAST_OP_ON_200_203_SUCCESS,
+					 true, INTEL_FPGA_BYTE_ALIGN)) {
+		netdev_err(priv->dev, "Mission mode PMA reset failed, abort\n");
+		return -EINVAL;
+	}
+	return 0;
+}
+
+static int etile_De_assert_RX_digital_reset(struct intel_fpga_etile_eth_private *priv,
+					    const struct ethtool_link_ksettings *cmd)
+{
+	/* Step 9 - De-assert RX digital reset
+	 *	EHIP CSR Write, Offset = 0x310, value = 0x0
+	 */
+
+	csrwr32(0x0, priv->mac_dev, eth_phy_csroffs(phy_config));
+	return 0;
+}
+
 static int init_rst_mac(struct intel_fpga_etile_eth_private *priv)
 {
 	int ret;
@@ -876,6 +2049,7 @@ static int init_rst_mac(struct intel_fpga_etile_eth_private *priv)
 	/* Step 1 - Trigger TX and RX digital reset
 	 *	1.	EHIP CSR Write, Offset = 0x310, value = 0x6
 	 */
+
 	csrwr32(0x6, priv->mac_dev, eth_phy_csroffs(phy_config));
 
 	/* Step 2 - Trigger PMA analog reset
@@ -928,8 +2102,8 @@ static int init_rst_mac(struct intel_fpga_etile_eth_private *priv)
 	 *	5.	PMA AVMM Write, Offset = 0x90, value = 0x1
 	 *	6.	PMA AVMM Read, Offset = 0x8A[7], expected value = 1
 	 *	7.	PMA AVMM Read, Offset = 0x8B[0], expected value = 0
-	 *	8.	PMA AVMM Read, Offset = 0x88, expected value = 0x8 (same as 0x86 in step #3)
-	 *	9.	PMA AVMM Read, Offset = 0x89, expected value = 0x0 (same as 0x87 in step #4)
+	 *	8.	PMA AVMM Read, Offset = 0x88, expected value = 0x8(same as 0x86 in step #3)
+	 *	9.	PMA AVMM Read, Offset = 0x89, expected value = 0x0(same as 0x87 in step #4)
 	 *	10.	PMA AVMM Write, Offset = 0x8A[7], value = 1
 	 */
 	csrwr8(0x1, priv->xcvr, eth_pma_avmm_csroffs(reg_084));
@@ -972,8 +2146,8 @@ static int init_rst_mac(struct intel_fpga_etile_eth_private *priv)
 	 *	5.	PMA AVMM Write, Offset = 0x90, value = 0x1
 	 *	6.	PMA AVMM Read, Offset = 0x8A[7], expected value = 1
 	 *	7.	PMA AVMM Read, Offset = 0x8B[0], expected value = 0
-	 *	8.	PMA AVMM Read, Offset = 0x88, expected value = 0xA (same as 0x86 in step #3)
-	 *	9.	PMA AVMM Read, Offset = 0x89, expected value = 0x0 (same as 0x87 in step #4)
+	 *	8.	PMA AVMM Read, Offset = 0x88, expected value = 0xA(same as 0x86 in step #3)
+	 *	9.	PMA AVMM Read, Offset = 0x89, expected value = 0x0(same as 0x87 in step #4)
 	 *	10.	PMA AVMM Write, Offset = 0x8A[7], value = 1
 	 */
 	csrwr8(0x1, priv->xcvr, eth_pma_avmm_csroffs(reg_084));
@@ -1060,8 +2234,8 @@ static int init_rst_mac(struct intel_fpga_etile_eth_private *priv)
 	 *	5.	PMA AVMM Write, Offset = 0x90, value = 0x1
 	 *	6.	PMA AVMM Read, Offset = 0x8A[7], expected value = 1
 	 *	7.	PMA AVMM Read, Offset = 0x8B[0], expected value = 0
-	 *	8.	PMA AVMM Read, Offset = 0x88, expected value = 0x8 (same as 0x86 in step #3)
-	 *	9.	PMA AVMM Read, Offset = 0x89, expected value = 0x0 (same as 0x87 in step #4)
+	 *	8.	PMA AVMM Read, Offset = 0x88, expected value = 0x8(same as 0x86 in step #3)
+	 *	9.	PMA AVMM Read, Offset = 0x89, expected value = 0x0(same as 0x87 in step #4)
 	 *	10.	PMA AVMM Write, Offset = 0x8A[7], value = 1
 	 */
 	csrwr8(0x0, priv->xcvr, eth_pma_avmm_csroffs(reg_084));
@@ -1111,8 +2285,8 @@ static int init_rst_mac(struct intel_fpga_etile_eth_private *priv)
 	 *	5.	PMA AVMM Write, Offset = 0x90, value = 0x1
 	 *	6.	PMA AVMM Read, Offset = 0x8A[7], expected value = 1
 	 *	7.	PMA AVMM Read, Offset = 0x8B[0], expected value = 0
-	 *	8.	PMA AVMM Read, Offset = 0x88, expected value = 0xA (same as 0x86 in step #3)
-	 *	9.	PMA AVMM Read, Offset = 0x89, expected value = 0x0 (same as 0x87 in step #4)
+	 *	8.	PMA AVMM Read, Offset = 0x88, expected value = 0xA(same as 0x86 in step #3)
+	 *	9.	PMA AVMM Read, Offset = 0x89, expected value = 0x0(same as 0x87 in step #4)
 	 *	10.	PMA AVMM Write, Offset = 0x8A[7], value = 1
 	 */
 	csrwr8(0x1, priv->xcvr, eth_pma_avmm_csroffs(reg_084));
@@ -1335,6 +2509,129 @@ static int etile_do_ioctl(struct net_device *dev, struct ifreq *ifr, int cmd)
 	return ret;
 }
 
+/* Reconfigure E-Tile settings for different data rates */
+int etile_dynamic_reconfiguration(struct intel_fpga_etile_eth_private *priv,
+				  const struct ethtool_link_ksettings *cmd)
+{
+	u8 ret;
+	static u32 tod_read_value;
+
+	del_timer_sync(&priv->fec_timer);
+
+	/*step 1 TX_and_RX_digital_reset */
+	etile_TX_and_RX_digital_reset(priv, cmd);
+
+	/*Step 2 - Disable PMA */
+	etile_Disable_PMA(priv, cmd);
+
+	pma_enable = false;
+
+	/* Step 3 - Trigger PMA analog reset */
+	etile_PMA_analog_reset(priv, cmd);
+
+	tod_read_value = csrrd32(priv->tod_pio, eth_tod_pio_offs(etile_tod_pio_config));
+	if (priv->link_speed == SPEED_10000) {
+		tod_read_value = tod_read_value & 0xfffffffe;
+		tod_read_value = tod_read_value | 0x0;
+		csrwr32(tod_read_value, priv->tod_pio, eth_tod_pio_offs
+		       (etile_tod_pio_config));
+	}
+	if (priv->link_speed == SPEED_25000 && tod_read_value == 0) {
+		tod_read_value = tod_read_value & 0xfffffffe;
+		tod_read_value = tod_read_value | 0x1;
+		csrwr32(tod_read_value, priv->tod_pio, eth_tod_pio_offs
+		       (etile_tod_pio_config));
+	}
+	if (priv->link_speed == SPEED_25000) {
+		/* Step 4a - Reconfigure Ethernet Reconfiguration Registers*/
+		etile_phy_ehip_reconfiguration(priv, cmd);
+
+		/* step 4b - rsfec reconfiguration */
+		etile_rsfec_reconfiguration(priv, cmd);
+
+		/* step 4c - transceiver_reconfiguration */
+		etile_transceiver_reconfiguration(priv, cmd);
+	}
+	/* step 4d - Change TX reference clock ratio */
+	etile_Change_TX_reference_clock_ratio(priv, cmd);
+
+	/* step 4e - Change RX reference clock ratio */
+	etile_Change_RX_reference_clock_ratio(priv, cmd);
+
+	if (priv->link_speed == SPEED_10000) {
+		/* Step 4a - Reconfigure Ethernet Reconfiguration Registers*/
+		etile_phy_ehip_reconfiguration(priv, cmd);
+
+		/* step 4b - rsfec reconfiguration */
+		etile_rsfec_reconfiguration(priv, cmd);
+
+		/* step 4c - transceiver_reconfiguration */
+		etile_transceiver_reconfiguration(priv, cmd);
+	}
+
+	/* step 4f - PMA RX/TX Width */
+	etile_PMA_RX_TX_Width(priv, cmd);
+
+	/* step 4g - RX Phase slip */
+	etile_RX_Phase_slip(priv, cmd);
+
+	/* step 5 - PMA Enable */
+	etile_pma_enable(priv, cmd);
+
+	/* [WA]:When we try to perform PMA Serdes enabled step ( 0x84 = 7 and 0x86=1 ) ,
+	 * the 0x40b and 0x30e registers somehow have been reset to its hw reset value
+	 * due to that reconfiguration the MAC register
+	 */
+
+	/* Step 4a - Reconfigure Ethernet Reconfiguration Registers*/
+	pma_enable = true;
+
+	etile_phy_ehip_reconfiguration(priv, cmd);
+
+	/* step 6 - Enable Internal Loopback  */
+	etile_Enable_Internal_Loopback(priv, cmd);
+
+	/* Step 7 - De-assert TX digital reset
+	 *	EHIP CSR Write, Offset = 0x310, value = 0x4
+	 */
+	etile_De_assert_TX_digital_reset(priv, cmd);
+
+	/* genarale calibration */
+	etile_general_calibration(priv, cmd);
+
+	/* Step 8 - Enable mission mode and disable internal serial loopback */
+	etile_Enable_mission_mode_and_disable_internal_serial_loopback(priv, cmd);
+
+	/* Step 9 - De-assert RX digital reset
+	 *	EHIP CSR Write, Offset = 0x310, value = 0x0
+	 */
+	etile_De_assert_RX_digital_reset(priv, cmd);
+
+	/* Step 10 - Verify IP Readiness RX
+	 *	EHIP CSR Read, Offset = 0x326, expected value = 0x1
+	 */
+
+	if (etile_check_counter_complete(priv->mac_dev,
+					 eth_phy_csroffs(phy_pcs_stat_anlt),
+					 ETH_PHY_RX_PCS_ALIGNED, true,
+					 INTEL_FPGA_WORD_ALIGN)) {
+		netdev_err(priv->dev, "RX PCS is not aligned\n");
+		return -EINVAL;
+	}
+
+	/* Step 11 - IP Ready */
+	/* if the link goes down anytime, this whole process above needs to be repeated */
+
+	ret = eth_etile_tx_rx_user_flow(priv);
+	if (ret < 0) {
+		netdev_err(priv->dev, "Tx & Rx user flow failed\n");
+		return ret;
+	}
+	etile_clear_mac_statistics(priv);
+	etile_set_mac_flow_ctrl(priv);
+	return 0;
+}
+
 /* Open and initialize the interface
  */
 static int etile_open(struct net_device *dev)
@@ -1517,7 +2814,9 @@ static void etile_get_stats64(struct net_device *dev,
 
 	storage->rx_fifo_errors = 0;
 	storage->rx_missed_errors = 0;
-	//IP UG does not have total RX packets, total RX bad packets, total RX dropped packets
+	/* IP UG does not have total RX packets,
+	 * total RX bad packets, total RX dropped packets
+	 */
 	storage->rx_packets = 0;
 	storage->rx_errors = 0;
 	storage->rx_dropped = 0;
@@ -1545,7 +2844,7 @@ static void etile_get_stats64(struct net_device *dev,
 	storage->tx_window_errors = 0;
 	storage->rx_compressed = 0;
 	storage->tx_compressed = 0;
-	//IP UG does not have total TX packets
+	/* IP UG does not have total TX packets */
 	storage->tx_packets = 0;
 }
 
@@ -1611,8 +2910,8 @@ static void intel_fpga_etile_validate(struct phylink_config *config,
 		state->speed = SPEED_10000;
 		fallthrough;
 	case PHY_INTERFACE_MODE_25GBASER:
-		phylink_set(mask, 25000baseCR_Full);
 		phylink_set(mask, 25000baseKR_Full);
+		phylink_set(mask, 25000baseCR_Full);
 		phylink_set(mask, 25000baseSR_Full);
 		phylink_set(mac_supported, 25000baseCR_Full);
 		phylink_set(mac_supported, 25000baseKR_Full);
@@ -1635,10 +2934,24 @@ static void intel_fpga_etile_mac_pcs_get_state(struct phylink_config *config,
 					       struct phylink_link_state *state)
 {
 	struct intel_fpga_etile_eth_private *priv =
-		netdev_priv(to_net_dev(config->dev));
-		state->duplex = DUPLEX_FULL;
-		state->link = 1;
-		/*Based on phy mode in dtsi file will set the speed*/
+	netdev_priv(to_net_dev(config->dev));
+	u32 tod_read_value = 0;
+
+	state->duplex = DUPLEX_FULL;
+	state->link = 1;
+
+	if (dr_link_state == 1) {
+		tod_read_value = csrrd32(priv->tod_pio,
+					 eth_tod_pio_offs(etile_tod_pio_config));
+		if (tod_read_value == 0) {
+			state->speed = SPEED_10000;
+			priv->link_speed = state->speed;
+		} else if (tod_read_value == 1) {
+			state->speed = SPEED_25000;
+			priv->link_speed = state->speed;
+		}
+	} else {
+	/*Based on phy mode in dtsi file will set the speed*/
 		if (!strcmp(phy_mode_etile, "10gbase-r")) {
 			state->speed = SPEED_10000;
 			priv->link_speed = state->speed;
@@ -1648,6 +2961,7 @@ static void intel_fpga_etile_mac_pcs_get_state(struct phylink_config *config,
 		} else {
 			netdev_err(priv->dev, "%s: speed mode not supported\n", __func__);
 		}
+	}
 }
 
 static void intel_fpga_etile_mac_an_restart(struct phylink_config *config)
@@ -1704,6 +3018,7 @@ static int intel_fpga_etile_probe(struct platform_device *pdev)
 	struct resource *rx_fifo;
 	struct resource *xcvr;
 	struct resource *rsfec;
+	struct resource *tod_pio;
 	struct intel_fpga_etile_eth_private *priv;
 	struct device_node *np = pdev->dev.of_node;
 	const struct of_device_id *of_id = NULL;
@@ -1715,7 +3030,6 @@ static int intel_fpga_etile_probe(struct platform_device *pdev)
 	}
 
 	SET_NETDEV_DEV(ndev, &pdev->dev);
-
 	priv = netdev_priv(ndev);
 	priv->device = &pdev->dev;
 	priv->dma_priv.device = &pdev->dev;
@@ -1732,24 +3046,20 @@ static int intel_fpga_etile_probe(struct platform_device *pdev)
 	of_id = of_match_device(intel_fpga_etile_ll_ids, &pdev->dev);
 	if (of_id)
 		priv->dmaops = (struct altera_dmaops *)of_id->data;
-
 	/* PTP is only supported with a modified MSGDMA */
 	priv->ptp_enable = of_property_read_bool(pdev->dev.of_node,
 						 "altr,has-ptp");
-
 	if (priv->ptp_enable &&
 	    priv->dmaops->altera_dtype != ALTERA_DTYPE_MSGDMA_PREF) {
 		dev_err(&pdev->dev, "PTP requires modified dma\n");
 		ret = -ENODEV;
 		goto err_free_netdev;
 	}
-
 	/* MAC address space */
 	ret = request_and_map(pdev, "eth_reconfig", &eth_reconfig,
 			      (void __iomem **)&priv->mac_dev);
 	if (ret)
 		goto err_free_netdev;
-
 	if (netif_msg_probe(priv))
 		dev_info(&pdev->dev, "\tEth Reconfig  at 0x%08lx\n",
 			 (unsigned long)eth_reconfig->start);
@@ -1761,7 +3071,6 @@ static int intel_fpga_etile_probe(struct platform_device *pdev)
 		ret = -ENXIO;
 		goto err_free_netdev;
 	}
-
 	/* mSGDMA Rx IRQ */
 	priv->rx_irq = platform_get_irq_byname(pdev, "rx_irq");
 	if (priv->rx_irq == -ENXIO) {
@@ -1769,7 +3078,6 @@ static int intel_fpga_etile_probe(struct platform_device *pdev)
 		ret = -ENXIO;
 		goto err_free_netdev;
 	}
-
 	/* Map DMA */
 	ret = altera_eth_dma_probe(pdev, &priv->dma_priv,
 				   priv->dmaops->altera_dtype);
@@ -1783,21 +3091,25 @@ static int intel_fpga_etile_probe(struct platform_device *pdev)
 			      (void __iomem **)&priv->rx_fifo);
 	if (ret)
 		goto err_free_netdev;
-
 	if (netif_msg_probe(priv))
 		dev_info(&pdev->dev, "\tRX FIFO  at 0x%08lx\n",
 			 (unsigned long)rx_fifo->start);
-
 	/* XCVR address space */
 	ret = request_and_map(pdev, "xcvr", &xcvr,
 			      (void __iomem **)&priv->xcvr);
 	if (ret)
 		goto err_free_netdev;
-
 	if (netif_msg_probe(priv))
 		dev_info(&pdev->dev, "\tXCVR  at 0x%08lx\n",
 			 (unsigned long)xcvr->start);
-
+	/* TOD-PIO address space */
+	ret = request_and_map(pdev, "tod_pio", &tod_pio,
+			      (void __iomem **)&priv->tod_pio);
+	if (ret)
+		goto err_free_netdev;
+	if (netif_msg_probe(priv))
+		dev_info(&pdev->dev, "\tTOD-PIO  at 0x%08lx\n",
+			 (unsigned long)tod_pio->start);
 	/* RS-FEC address space */
 	ret = request_and_map(pdev, "rsfec", &rsfec,
 			      (void __iomem **)&priv->rsfec);
@@ -1807,7 +3119,6 @@ static int intel_fpga_etile_probe(struct platform_device *pdev)
 	if (netif_msg_probe(priv))
 		dev_info(&pdev->dev, "\tRS-FEC  at 0x%08lx\n",
 			 (unsigned long)rsfec->start);
-
 	/* we only support ptp with the msgdma */
 	if (priv->ptp_enable) {
 		/* MAP PTP */
