@@ -26,12 +26,16 @@
 #include <linux/timer.h>
 #include "intel_fpga_tod.h"
 
+/* DR link state gets updated after every switch*/
+extern int dr_link_state;
+
 #define INTEL_FPGA_ETILE_SW_RESET_WATCHDOG_CNTR		1000000
 #define INTEL_FPGA_ETILE_UI_VALUE_10G			0x0018D302
 #define INTEL_FPGA_ETILE_UI_VALUE_25G			0x0009EE01
 #define INTEL_FPGA_TX_PMA_DELAY_25G			105
 #define INTEL_FPGA_RX_PMA_DELAY_25G			89
-#define INTEL_FPGA_PMA_OFFSET_207_TIMEOUT		300	// in miliseconds
+/* in miliseconds */
+#define INTEL_FPGA_PMA_OFFSET_207_TIMEOUT		300
 
 /* Flow Control defines */
 #define FLOW_OFF	0
@@ -553,6 +557,7 @@
 #define ETH_TX_MAC_EHIP_CONF_AM_WIDTH_25G			(0x4 << 3)
 #define ETH_TX_MAC_EHIP_CONF_AM_WIDTH_10G			(0x1 << 3)
 #define ETH_TX_MAC_EHIP_CONF_FLOWREG_25G			(0x3 << 6)
+#define ETH_TX_MAC_EHIP_CONF_FLOWREG_8b_10G			(0x1 << 8)
 #define ETH_TX_MAC_EHIP_CONF_FLOWREG_10G			(0x4 << 6)
 #define ETH_TX_MAC_EHIP_CONF_CRC_EN				BIT(9)
 #define ETH_TX_MAC_EHIP_CONF_AM_PERIOD				(0x1FFF << 15)
@@ -1562,6 +1567,18 @@
 #define XCVR_PMA_CTRL_STAT_RCP_LOAD_TIMEOUT			BIT(1)
 #define XCVR_PMA_CTRL_STAT_RCP_LOAD_BUSY			BIT(2)
 
+/*PMA Low Byte  write Values*/
+
+#define XCVR_TX_REF_PMA_CODE_RET_VAL_LO				0x5
+#define XCVR_RX_REF_PMA_CODE_RET_VAL_LO				0x6
+#define XCVR_RX_TX_Width_PMA_CODE_RET_VAL_LO			0x14
+#define XCVR_RX_Phase_PMA_CODE_RET_VAL_LO			0xE
+#define XCVR_PMA_ENBL_CODE_RET_VAL_LO				0x1
+#define XCVR_INTR_LOOP_PMA_CODE_RET_VAL_LO			0x8
+#define XCVR_GNRL_CALB_PMA_CODE_RET_VAL_LO			0x2c
+#define XCVR_INIT_ADAPT_7B_PMA_CODE_RET_VAL_LO			0xa
+#define XCVR_INIT_ADAPT_7C_PMA_CODE_RET_VAL_LO			0x0
+
 #define INTEL_FPGA_BYTE_ALIGN	8
 #define INTEL_FPGA_WORD_ALIGN	32
 
@@ -2511,8 +2528,15 @@ struct intel_fpga_etile_xcvr {
 	struct intel_fpga_etile_xcvr_pma_avmm pma_avmm;			// 0x00000-0x00207
 	u8 reserved_208[261624];					// 0x00208-0x3FFFF
 	struct intel_fpga_etile_xcvr_pma_capability pma_capability;	// 0x40000-0x40012
-	struct intel_fpga_etile_xcvr_pma_ctrl_status pma_ctrl_status;	// 0x40080-0x40144
+	struct intel_fpga_etile_xcvr_pma_ctrl_status pma_ctrl_status;
 };
+
+struct intel_fpga_etile_tod_pio {
+	u32 etile_tod_pio_config;
+};
+
+#define eth_tod_pio_offs(a) \
+	(offsetof(struct intel_fpga_etile_tod_pio, a))
 
 #define eth_pma_avmm_csroffs(a) \
 	(offsetof(struct intel_fpga_etile_xcvr, pma_avmm.a))
@@ -2593,6 +2617,9 @@ struct intel_fpga_etile_eth_private {
 	/* RS-FEC address space */
 	struct intel_fpga_etile_rsfec __iomem *rsfec;
 
+	/* Tod-pio address space */
+	struct intel_fpga_etile_tod_pio __iomem *tod_pio;
+
 	/* Interrupts */
 	u32 tx_irq;
 	u32 rx_irq;
@@ -2636,15 +2663,20 @@ struct intel_fpga_etile_eth_private {
 
 	/* PHY */
 	void __iomem *mac_extra_control;
-	int phy_addr;		/* PHY's MDIO address, -1 for autodetection */
+	/* PHY's MDIO address, -1 for autodetection */
+	int phy_addr;
 	phy_interface_t phy_iface;
 	struct mii_bus *mdio;
 	u32 link_speed;
+	/* Will hold previous link speed during DR switching */
+	u32 prv_link_speed;
 	u8 duplex;
 	int oldlink;
 
 	/* FEC */
 	const char *fec_type;
+	/* Will hold previous fec type during DR switching */
+	const char *prv_fec_type;
 	u32 rsfec_cw_pos_rx;
 
 	/* ethtool msglvl option */
@@ -2659,7 +2691,10 @@ struct intel_fpga_etile_eth_private {
 
 /* Function prototypes
  */
+
 void intel_fpga_etile_set_ethtool_ops(struct net_device *dev);
+int etile_dynamic_reconfiguration(struct intel_fpga_etile_eth_private *priv,
+				  const struct ethtool_link_ksettings *cmd);
 int fec_init(struct platform_device *pdev, struct intel_fpga_etile_eth_private *priv);
 void ui_adjustments(struct timer_list *t);
 int etile_check_counter_complete(void __iomem *ioaddr, size_t offs, u32 bit_mask,
