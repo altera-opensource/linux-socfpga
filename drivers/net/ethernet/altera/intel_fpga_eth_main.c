@@ -391,9 +391,7 @@ static int xtile_poll(struct napi_struct *napi, int budget)
 {
 	intel_fpga_xtile_eth_private *priv =
 			container_of(napi, intel_fpga_xtile_eth_private, napi);
-	int rxcomplete = 0;
-	int txcomplete = 0;
-
+	int rxcomplete, txcomplete, work_done;
 	unsigned long flags;
 
 	spin_lock_irqsave(&priv->rxdma_irq_lock, flags);
@@ -409,27 +407,26 @@ static int xtile_poll(struct napi_struct *napi, int budget)
 	spin_unlock_irqrestore(&priv->rxdma_irq_lock, flags);
 
 	rxcomplete = xtile_rx(priv, budget);
+	work_done  = txcomplete ? budget : rxcomplete;
 
 	if (unlikely(netif_msg_intr(priv)))
 		netdev_info(priv->dev,
 		   	    "TX/RX complete: %d/%d of budget %d\n",
 		   	    txcomplete, rxcomplete, budget);
 
-	spin_lock_irqsave(&priv->rxdma_irq_lock, flags);
-
-	if (rxcomplete >= budget || !napi_complete_done(napi, rxcomplete)) {
+	if (work_done >= budget || !napi_complete_done(napi, work_done)) {
+		spin_lock_irqsave(&priv->rxdma_irq_lock, flags);
 		priv->dmaops->disable_txirq(&priv->dma_priv);
 		priv->dmaops->disable_rxirq(&priv->dma_priv);
 		priv->dmaops->clear_txirq(&priv->dma_priv);
 		priv->dmaops->clear_rxirq(&priv->dma_priv);
+		spin_unlock_irqrestore(&priv->rxdma_irq_lock, flags);
 	}
 
 	enable_irq(priv->tx_irq);
 	enable_irq(priv->rx_irq);
 
-	spin_unlock_irqrestore(&priv->rxdma_irq_lock, flags);
-
-	return rxcomplete;
+	return work_done;
 }
 
 /* DMA TX & RX FIFO interrupt routing
@@ -781,6 +778,7 @@ int xtile_start_xmit(struct sk_buff *skb, struct net_device *dev)
                                  nopaged_len,
                                  DMA_TO_DEVICE);
 
+		dev->stats.tx_dropped++;
 		dev_kfree_skb_any(skb);
 
 		goto allgood;
@@ -814,12 +812,12 @@ int xtile_start_xmit(struct sk_buff *skb, struct net_device *dev)
 	}
 	else {
 		priv->dma_priv.tx_prod++;
-		dev->stats.tx_bytes += skb->len;
+		dev->stats.tx_bytes += nopaged_len;
 	}
 
 	if (unlikely(xtile_tx_avail(priv) <= TXQUEUESTOP_THRESHOLD)) {
 		if (netif_msg_hw(priv))
-			netdev_info(priv->dev, " stop transmitted packets\n");
+			netdev_info(priv->dev, " stopped transmitting packets\n");
 		netif_stop_queue(dev);
 	}
 
@@ -829,10 +827,13 @@ allgood:
 
 err:
 	spin_unlock_bh(&priv->tx_lock);
+	dev_kfree_skb_any(skb);
 	netdev_err(priv->dev, "xmit NETDEV_TX_BUSY\n");
+
 	if (!netif_queue_stopped(dev))
 		netif_stop_queue(dev);
 
+	dev->stats.tx_errors++;
 	return NETDEV_TX_BUSY;
 }
 
@@ -1463,6 +1464,8 @@ intel_fpga_xtile_qsfp_down(intel_fpga_xtile_eth_private *priv) {
 	if (priv->phylink)
 		phylink_stop(priv->phylink);
 	rtnl_unlock();
+
+	priv->dev->stats.tx_carrier_errors++;
 }
 
 static const struct qsfp_ops qsfp_api = {
@@ -1511,7 +1514,7 @@ static struct platform_driver intel_fpga_xtile_driver = {
 	.suspend	= NULL,
 	.resume		= NULL,
 	.driver		= {
-		.name	= INTEL_FPGA_ETILE_ETH_RESOURCE_NAME,
+		.name	= INTEL_FPGA_XTILE_ETH_RESOURCE_NAME,
 		.owner	= THIS_MODULE,
 		.of_match_table = intel_fpga_xtile_ll_ids,
 #ifdef CONFIG_DEBUG_FS

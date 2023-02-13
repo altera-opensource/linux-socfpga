@@ -15,8 +15,6 @@
 #ifndef __INTEL_FPGA_ETILE_ETH_H__
 #define __INTEL_FPGA_ETILE_ETH_H__
 
-#define INTEL_FPGA_ETILE_ETH_RESOURCE_NAME "intel_fpga_etile"
-
 #include <linux/bitops.h>
 #include <linux/if_vlan.h>
 #include <linux/list.h>

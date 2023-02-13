@@ -290,6 +290,7 @@ int init_mac(struct intel_fpga_etile_eth_private *priv)
         return 0;
 }
 
+/* Ref: https://www.kernel.org/doc/html/latest/networking/statistics.html */
 static void etile_get_stats64(struct net_device *dev,
 		       struct rtnl_link_stats64 *storage)
 {
@@ -300,59 +301,66 @@ static void etile_get_stats64(struct net_device *dev,
 	u32 lsb;
 	u32 msb;
 
-
 	/* rx stats */
-	storage->rx_bytes  = hssi_read_mac_stats64(pdev, hssi_port, MACSTAT_RX_TOTAL_BYTES);
+	storage->rx_packets = hssi_read_mac_stats64(pdev,
+			hssi_port, MACSTAT_RX_TOTAL_PACKETS);
 
-	storage->multicast = hssi_read_mac_stats64(pdev, hssi_port, MACSTAT_RX_MULTICAST);
+	storage->rx_bytes = hssi_read_mac_stats64(pdev,
+			hssi_port, MACSTAT_RX_TOTAL_BYTES);
 
-	storage->collisions = 0;
+	storage->multicast = hssi_read_mac_stats64(pdev,
+			hssi_port, MACSTAT_RX_MULTICAST);
 
 	storage->rx_length_errors =
 		hssi_read_mac_stats64(pdev, hssi_port, MACSTAT_RX_UNDERSIZE) +
 		hssi_read_mac_stats64(pdev, hssi_port, MACSTAT_RX_OVERSIZE);
 
+	storage->rx_crc_errors = hssi_read_mac_stats64(pdev,
+			hssi_port, MACSTAT_RX_CRC_ERRORS);
+
+	storage->rx_dropped = dev->stats.rx_dropped + 
+		hssi_read_mac_stats64(pdev, hssi_port, MACSTAT_ETHER_DROPS);
+
+	storage->rx_errors = storage->rx_length_errors + 
+		storage->rx_crc_errors;
+
+	storage->collisions = 0;
 	storage->rx_over_errors = 0;
-
-	storage->rx_crc_errors = hssi_read_mac_stats64(pdev, hssi_port, MACSTAT_RX_CRC_ERRORS);
-
 	storage->rx_fifo_errors = 0;
 	storage->rx_missed_errors = 0;
-	//IP UG does not have total RX packets, total RX bad packets, total RX dropped packets
-	storage->rx_packets = 0;
-	storage->rx_errors = 0;
-	storage->rx_dropped = 0;
 
-	/* also count the packets dropped by this network driver */
-	storage->rx_dropped += dev->stats.rx_dropped;
 
 	/* tx stats */
-	storage->tx_bytes = hssi_read_mac_stats64(pdev, hssi_port, MACSTAT_TX_BYTES);
+	storage->tx_packets = hssi_read_mac_stats64(pdev,
+			hssi_port, MACSTAT_TX_PACKETS);
 
-	lsb = hssi_csrrd32_atomic(pdev,
-			          HSSI_ETH_RECONFIG, chan,
-				  eth_tx_stats_csroffs(tx_malformed_ctrl_lsb));
-	msb = hssi_csrrd32_atomic(pdev,
-			          HSSI_ETH_RECONFIG, chan,
-				  eth_tx_stats_csroffs(tx_malformed_ctrl_msb));
-	storage->tx_errors = ((u64)msb << 32) | lsb;
+	storage->tx_bytes = hssi_read_mac_stats64(pdev,
+			hssi_port, MACSTAT_TX_BYTES);
 
-	lsb = hssi_csrrd32_atomic(pdev,
-			          HSSI_ETH_RECONFIG, chan,
-				  eth_tx_stats_csroffs(tx_dropped_ctrl_lsb));
-	msb = hssi_csrrd32_atomic(pdev,
-			          HSSI_ETH_RECONFIG, chan,
-				  eth_tx_stats_csroffs(tx_dropped_ctrl_msb));
-	storage->tx_dropped = ((u64)msb << 32) | lsb;
+	lsb = hssi_csrrd32_atomic(pdev,HSSI_ETH_RECONFIG,
+			chan,eth_tx_stats_csroffs(tx_malformed_ctrl_lsb));
 
-	storage->tx_aborted_errors = 0;
-	storage->tx_fifo_errors = 0;
-	storage->tx_heartbeat_errors = 0;
-	storage->tx_window_errors = 0;
+	msb = hssi_csrrd32_atomic(pdev,HSSI_ETH_RECONFIG,
+			chan,eth_tx_stats_csroffs(tx_malformed_ctrl_msb));
+
+	storage->tx_errors = ( ((u64)msb << 32) | lsb ) +
+	       dev->stats.tx_errors;
+
+	lsb = hssi_csrrd32_atomic(pdev,HSSI_ETH_RECONFIG,
+			chan,eth_tx_stats_csroffs(tx_dropped_ctrl_lsb));
+
+	msb = hssi_csrrd32_atomic(pdev,HSSI_ETH_RECONFIG,
+			chan,eth_tx_stats_csroffs(tx_dropped_ctrl_msb));
+	
+	storage->tx_dropped = ( ((u64)msb << 32) | lsb ) +
+		dev->stats.tx_dropped;
+
 	storage->rx_compressed = 0;
 	storage->tx_compressed = 0;
-	//IP UG does not have total TX packets
-	storage->tx_packets = 0;
+	storage->tx_fifo_errors = 0;
+	storage->tx_window_errors = 0;
+	storage->tx_aborted_errors = 0;
+	storage->tx_heartbeat_errors = 0;
 }
 
 
