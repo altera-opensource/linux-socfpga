@@ -11,7 +11,7 @@
 
 /* To be changed */
 
-#define INTEL_FPGA_ETILE_ETH_RESOURCE_NAME "intel_fpga_etile"
+#define INTEL_FPGA_XTILE_ETH_RESOURCE_NAME "intel_fpga_eth"
 
 /* To be changed */
 
