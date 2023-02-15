@@ -74,46 +74,46 @@ void ui_adjustments(struct timer_list *t)
 	/* Set tam_snapshot to 1 to take the first snapshot of the Time of
 	 * Alignment marker (TAM)
 	 */
-	hssi_set_bit(pdev, HSSI_ETH_RECONFIG, chan, eth_ptp_csroffs(tam_snapshot),
+	hssi_set_bit_atomic(pdev, HSSI_ETH_RECONFIG, chan, eth_ptp_csroffs(tam_snapshot),
 		    ETH_TAM_SNAPSHOT);
 
 	/* Read snapshotted initial TX TAM and counter values */
-	tx_tam_l_initial = hssi_csrrd32(pdev, HSSI_ETH_RECONFIG, chan, eth_ptp_csroffs(tx_tam_l));
-	tx_tam_h_initial = hssi_csrrd32(pdev, HSSI_ETH_RECONFIG, chan, eth_ptp_csroffs(tx_tam_h));
+	tx_tam_l_initial = hssi_csrrd32_atomic(pdev, HSSI_ETH_RECONFIG, chan, eth_ptp_csroffs(tx_tam_l));
+	tx_tam_h_initial = hssi_csrrd32_atomic(pdev, HSSI_ETH_RECONFIG, chan, eth_ptp_csroffs(tx_tam_h));
 	tx_tam_initial = ((u64)tx_tam_h_initial << 32) | tx_tam_l_initial;
-	tx_tam_count_initial = hssi_csrrd32(pdev, HSSI_ETH_RECONFIG, chan, eth_ptp_csroffs(tx_count));
+	tx_tam_count_initial = hssi_csrrd32_atomic(pdev, HSSI_ETH_RECONFIG, chan, eth_ptp_csroffs(tx_count));
 
 	/* Read snapshotted initial RX TAM and counter values */
-	rx_tam_l_initial = hssi_csrrd32(pdev, HSSI_ETH_RECONFIG, chan, eth_ptp_csroffs(rx_tam_l));
-	rx_tam_h_initial = hssi_csrrd32(pdev, HSSI_ETH_RECONFIG, chan, eth_ptp_csroffs(rx_tam_h));
+	rx_tam_l_initial = hssi_csrrd32_atomic(pdev, HSSI_ETH_RECONFIG, chan, eth_ptp_csroffs(rx_tam_l));
+	rx_tam_h_initial = hssi_csrrd32_atomic(pdev, HSSI_ETH_RECONFIG, chan, eth_ptp_csroffs(rx_tam_h));
 	rx_tam_initial = ((u64)rx_tam_h_initial << 32) | rx_tam_l_initial;
-	rx_tam_count_initial = hssi_csrrd32(pdev, HSSI_ETH_RECONFIG, chan, eth_ptp_csroffs(rx_count));
+	rx_tam_count_initial = hssi_csrrd32_atomic(pdev, HSSI_ETH_RECONFIG, chan, eth_ptp_csroffs(rx_count));
 
 	/* Clear snapshot */
-	hssi_clear_bit(pdev, HSSI_ETH_RECONFIG, chan, eth_ptp_csroffs(tam_snapshot),
+	hssi_clear_bit_atomic(pdev, HSSI_ETH_RECONFIG, chan, eth_ptp_csroffs(tam_snapshot),
 		      ETH_TAM_SNAPSHOT);
 
 	/* Wait for a few TAM interval */
 	udelay(5300);
 
 	/* Request snapshot of Nth TX TAM and RX TAM */
-	hssi_set_bit(pdev, HSSI_ETH_RECONFIG, chan, eth_ptp_csroffs(tam_snapshot),
+	hssi_set_bit_atomic(pdev, HSSI_ETH_RECONFIG, chan, eth_ptp_csroffs(tam_snapshot),
 		    ETH_TAM_SNAPSHOT);
 
 	/* Read snapshotted of Nth TX TAM and counter values */
-	tx_tam_l_nth = hssi_csrrd32(pdev, HSSI_ETH_RECONFIG, chan, eth_ptp_csroffs(tx_tam_l));
-	tx_tam_h_nth = hssi_csrrd32(pdev, HSSI_ETH_RECONFIG, chan, eth_ptp_csroffs(tx_tam_h));
+	tx_tam_l_nth = hssi_csrrd32_atomic(pdev, HSSI_ETH_RECONFIG, chan, eth_ptp_csroffs(tx_tam_l));
+	tx_tam_h_nth = hssi_csrrd32_atomic(pdev, HSSI_ETH_RECONFIG, chan, eth_ptp_csroffs(tx_tam_h));
 	tx_tam_nth = ((u64)tx_tam_h_nth << 32) | tx_tam_l_nth;
-	tx_tam_count_nth = hssi_csrrd32(pdev, HSSI_ETH_RECONFIG, chan, eth_ptp_csroffs(tx_count));
+	tx_tam_count_nth = hssi_csrrd32_atomic(pdev, HSSI_ETH_RECONFIG, chan, eth_ptp_csroffs(tx_count));
 
 	/* Read snapshotted of Nth RX TAM and counter values */
-	rx_tam_l_nth = hssi_csrrd32(pdev, HSSI_ETH_RECONFIG, chan, eth_ptp_csroffs(rx_tam_l));
-	rx_tam_h_nth = hssi_csrrd32(pdev, HSSI_ETH_RECONFIG, chan, eth_ptp_csroffs(rx_tam_h));
+	rx_tam_l_nth = hssi_csrrd32_atomic(pdev, HSSI_ETH_RECONFIG, chan, eth_ptp_csroffs(rx_tam_l));
+	rx_tam_h_nth = hssi_csrrd32_atomic(pdev, HSSI_ETH_RECONFIG, chan, eth_ptp_csroffs(rx_tam_h));
 	rx_tam_nth = ((u64)rx_tam_h_nth << 32) | rx_tam_l_nth;
-	rx_tam_count_nth = hssi_csrrd32(pdev, HSSI_ETH_RECONFIG, chan, eth_ptp_csroffs(rx_count));
+	rx_tam_count_nth = hssi_csrrd32_atomic(pdev, HSSI_ETH_RECONFIG, chan, eth_ptp_csroffs(rx_count));
 
 	/* Clear snapshot */
-	hssi_clear_bit(pdev, HSSI_ETH_RECONFIG, chan, eth_ptp_csroffs(tam_snapshot),
+	hssi_clear_bit_atomic(pdev, HSSI_ETH_RECONFIG, chan, eth_ptp_csroffs(tam_snapshot),
 		      ETH_TAM_SNAPSHOT);
 
 	if ((get_jiffies_64() - start_jiffies) > HZ) {
@@ -243,8 +243,8 @@ void ui_adjustments(struct timer_list *t)
 		}
 	}
 
-	hssi_csrwr32(pdev, HSSI_ETH_RECONFIG, chan, eth_ptp_csroffs(tx_ui_reg), tx_ui);
-	hssi_csrwr32(pdev, HSSI_ETH_RECONFIG, chan, eth_ptp_csroffs(rx_ui_reg), rx_ui);
+	hssi_csrwr32_atomic(pdev, HSSI_ETH_RECONFIG, chan, eth_ptp_csroffs(tx_ui_reg), tx_ui);
+	hssi_csrwr32_atomic(pdev, HSSI_ETH_RECONFIG, chan, eth_ptp_csroffs(rx_ui_reg), rx_ui);
 
 ui_restart:
 	mod_timer(&priv->fec_timer, jiffies + msecs_to_jiffies(1000));
