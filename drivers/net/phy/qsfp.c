@@ -972,11 +972,7 @@ static int qsfp_sm_mod_probe(struct qsfp *qsfp, bool report)
 	if (ret < 0)
 		return ret;
 
-	if (!memcmp(id.base.etile_qsfp_vendor_name, "YAMAICHI   ", 16) &&
-	    !memcmp(id.base.etile_qsfp_vendor_pn, "3FE46541AA      ", 16))
-		qsfp->module_t_start_up = T_START_UP_BAD_GPON;
-	else
-		qsfp->module_t_start_up = T_START_UP;
+	qsfp->module_t_start_up = T_START_UP;
 
 	return 0;
 }
