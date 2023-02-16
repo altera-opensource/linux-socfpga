@@ -495,7 +495,8 @@ static int qsfp_register_bus(struct qsfp_bus *bus)
 	bus->socket_ops->attach(bus->qsfp);
 	if (bus->started)
 		bus->socket_ops->start(bus->qsfp);
-	bus->upstream_ops->attach(bus->upstream, bus);
+	if (ops)
+		bus->upstream_ops->attach(bus->upstream, bus);
 	return 0;
 }
 
