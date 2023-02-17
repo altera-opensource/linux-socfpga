@@ -100,22 +100,23 @@ static int hssiss_sal_execute(struct platform_device *pdev, u32 ctrl_addr,
 	else
 		mutex_lock(&priv->sal_mutex);
 
-	/* clear */
-	ret = hssiss_mailbox_reg_set(base, csr_addroff, HSSISS_CSR_CTRLADDR, 0, atomic);
-	if (ret < 0)
-		goto unlock;
-
-	ret = hssiss_mailbox_reg_set(base, csr_addroff, HSSISS_CSR_CMDSTS, 0, atomic);
-	if (ret < 0)
-		goto unlock;
-
-
 	csrwr32_withoffset(ctrl_addr, base, csr_addroff, HSSISS_CSR_CTRLADDR);
 	csrwr32_withoffset(cmd_sts, base, csr_addroff, HSSISS_CSR_CMDSTS);
 	ret = read_poll_timeout(base, csr_addroff,
 			HSSISS_CSR_CMDSTS, HSSI_SAL_CMDSTS_ACK, atomic);
 
+	/*
+	 * WA: f-tile loopback enable sets the error bit.
+	 * Ignore for now if both ack and error set.
+	 */
+	if (priv->hssi_err_wa && (ret & HSSI_SAL_CMDSTS_ACK) &&
+			(ret & HSSI_SAL_CMDSTS_ERR)) {
+		ret = 0;
+		goto unlock;
+	}
+
 	if (ret > 0) {
+
 		if (ret & HSSI_SAL_CMDSTS_BUSY) {
 			dev_err(&pdev->dev, "FW hung. Reset required. ret: %x\n", ret);
 			ret = -EBUSY;
@@ -174,16 +175,14 @@ static int get_set_csr(struct platform_device *pdev, u32 cmd, void *csr_data,
 	int ret;
 	u32 addr;
 	struct get_set_csr_data *data = (struct get_set_csr_data *)csr_data;
-
 	u32 base;
-	if (priv->ver == HSSISS_ETILE) {
-		base = (data->ch * ADDR_OFFSET_INCR) +
-				etile_addrmap[data->reg_type];
-	} else if (priv->ver == HSSISS_FTILE) {
+
+	if (priv->ver == HSSISS_FTILE) {
 		base = (data->ch * ADDR_OFFSET_INCR) +
 				ftile_addrmap[data->reg_type];
 	} else {
-		return -EIO;
+		base = (data->ch * ADDR_OFFSET_INCR) +
+				etile_addrmap[data->reg_type];
 	}
 
 	addr = hssiss_make_get_set_csr_addr(base, data->offs, data->word);
@@ -454,8 +453,15 @@ hssi_eth_port_sts hssiss_get_ethport_status(struct platform_device *pdev, int po
 	struct hssiss_private *priv = platform_get_drvdata(pdev);
 	hssi_eth_port_sts port_sts;
 
-	port_sts.full = csrrd32_withoffset(priv->sscsr, priv->csr_addroff,
-			(HSSISS_CSR_ETH_PORT_STS + port * 4));
+	if (priv->ver == HSSISS_FTILE) {
+		port_sts.full = csrrd32_withoffset(priv->sscsr,
+				priv->csr_addroff,
+				(HSSISS_CSR_ETH_PORT_STS_FTILE + port * 4));
+	} else {
+		port_sts.full = csrrd32_withoffset(priv->sscsr,
+				priv->csr_addroff,
+				(HSSISS_CSR_ETH_PORT_STS + port * 4));
+	}
 	return port_sts;
 }
 
@@ -477,7 +483,7 @@ void hssiss_hotplug_enable(struct platform_device *pdev, bool enable)
 				HSSISS_CSR_HOTPLUG_DBG_CTRL);
 }
 
-int hssi_cold_rst(struct platform_device *pdev)
+int hssiss_cold_rst(struct platform_device *pdev)
 {
 	struct hssiss_private *priv = platform_get_drvdata(pdev);
 	void __iomem *base = priv->sscsr;
@@ -497,6 +503,15 @@ int hssi_cold_rst(struct platform_device *pdev)
 	mutex_unlock(&priv->coldrst_mutex);
 
 	return 0;
+}
+
+enum hssiss_hip_type hssiss_get_hip_type(struct platform_device *pdev)
+{
+	struct hssiss_private *priv = platform_get_drvdata(pdev);
+	if (!priv)
+		return -EINVAL;
+
+	return priv->ver;
 }
 
 /* Utility functions for hssi driver */
@@ -521,57 +536,6 @@ static unsigned int get_csr_addroff(void __iomem *base,
 		return (((val & HSSISS_FEATURE_CSR_ADDR_MASK) >>
 				HSSISS_FEATURE_CSR_ADDR_SHIFT) - 0x8);
 	}
-}
-
-static ssize_t hssiss_reg_show(struct device *dev,
-		struct device_attribute *attr, char *buf)
-{
-	struct platform_device *pdev = to_platform_device(dev);
-	struct hssiss_private *priv = platform_get_drvdata(pdev);
-
-	return sprintf(buf, "%x", priv->sysfs.regdata);
-}
-
-/*
- * word: 1 for word read/write, 0 for byte read/write
- * for read:
- * 	echo "ch type offset word" > hssi_reg
- * for write:
- * 	echo "ch type offset word data" > hssi_reg
- */
-static ssize_t hssiss_reg_store(struct device *dev,
-		struct device_attribute *attr, const char *buf, size_t len)
-{
-	struct platform_device *pdev = to_platform_device(dev);
-	struct hssiss_private *priv = platform_get_drvdata(pdev);
-	struct get_set_csr_data data;
-	int word, type, ch;
-	u32 offset, val;
-	int ret;
-
-	ret = sscanf(buf, "%d %d %x %d %x", &ch, &type, &offset, &word, &val);
-	if (ret < 4)
-		return -EINVAL;
-
-	data.ch = ch;
-	data.reg_type = type;
-	data.offs = offset;
-	data.word = word ? true:false;
-	data.data = val;
-
-	if (ret == 4) {
-		ret = get_set_csr(pdev, salcmd_name[SAL_GET_CSR].cmdid, &data, true, false);
-		if (ret == 0)
-			priv->sysfs.regdata = data.data;
-	} else {
-		ret = get_set_csr(pdev, salcmd_name[SAL_SET_CSR].cmdid, &data, false, false);
-	}
-
-
-	if (ret < 0)
-		return ret;
-	else
-		return len;
 }
 
 static ssize_t hssiss_hotplug_disable_show(struct device *dev,
@@ -600,12 +564,32 @@ static ssize_t hssiss_hotplug_disable_store(struct device *dev,
 	return len;
 }
 
+static ssize_t hssiss_err_wa_show(struct device *dev,
+		struct device_attribute *attr, char *buf)
+{
+	struct platform_device *pdev = to_platform_device(dev);
+	struct hssiss_private *priv = platform_get_drvdata(pdev);
+
+	return sprintf(buf, "%d\n", priv->hssi_err_wa);
+}
+
+static ssize_t hssiss_err_wa_store(struct device *dev,
+		struct device_attribute *attr, const char *buf, size_t len)
+{
+	struct platform_device *pdev = to_platform_device(dev);
+	struct hssiss_private *priv = platform_get_drvdata(pdev);
+
+	sscanf(buf, "%d", &(priv->hssi_err_wa));
+
+	return len;
+}
+
 static DEVICE_ATTR(hssi_hotplug_disable, 0644, hssiss_hotplug_disable_show, hssiss_hotplug_disable_store);
-static DEVICE_ATTR(hssi_reg, 0644, hssiss_reg_show, hssiss_reg_store);
+static DEVICE_ATTR(hssi_err_wa, 0644, hssiss_err_wa_show, hssiss_err_wa_store);
 
 static struct attribute *hssiss_sysfs_attrs[] = {
-	&dev_attr_hssi_reg.attr,
 	&dev_attr_hssi_hotplug_disable.attr,
+	&dev_attr_hssi_err_wa.attr,
 	NULL
 };
 
@@ -694,7 +678,6 @@ static int hssiss_probe(struct platform_device *pdev)
 
 static int hssiss_remove(struct platform_device *pdev)
 {
-	sysfs_remove_file(&pdev->dev.kobj, &dev_attr_hssi_reg.attr);
 	platform_set_drvdata(pdev, NULL);
 
 	/* TODO: REMOVE dbgfs */
