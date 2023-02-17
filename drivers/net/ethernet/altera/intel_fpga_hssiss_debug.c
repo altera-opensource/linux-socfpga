@@ -149,7 +149,7 @@ static ssize_t hssiss_dbgfs_sal_write(struct file *filep, const char __user *ubu
 	struct hssiss_dbg *d = filep->private_data;
 	struct platform_device *pdev = d->pdev;
 	char *buf;
-	enum hssiss_salcmd cmd;
+	u32 cmd;
 	int ret;
 
 	/* Copy data from User-space */
@@ -273,7 +273,7 @@ static ssize_t hssiss_dbgfs_sal_write(struct file *filep, const char __user *ubu
 	case SAL_ENABLE_LOOPBACK:
 	{
 		u32 data = 0;
-		ret = sscanf(buf, "%x %x", &cmd, &data);
+		sscanf(buf, "%x %x", &cmd, &data);
 		ret = hssiss_execute_sal_cmd(pdev, cmd, &data);
 		break;
 
@@ -317,6 +317,16 @@ static ssize_t hssiss_dbgfs_readme_read(struct file *filep, char __user *ubuf,
 	ret += scnprintf(buf + ret, BUF_SIZE - ret, "\tcmd: SAL command\n");
 	ret += scnprintf(buf + ret, BUF_SIZE - ret, "\tx, y, z: SAL command specific data\n");
 	ret += scnprintf(buf + ret, BUF_SIZE - ret, "\tcat sal\n");
+	ret += scnprintf(buf + ret, BUF_SIZE - ret, "Execute direct SAL command:\n");
+	ret += scnprintf(buf + ret, BUF_SIZE - ret, "\techo <ctrladdr reg_data> > ctrladdr\n");
+	ret += scnprintf(buf + ret, BUF_SIZE - ret, "\tfor write: echo <wr reg_data> > wr\n");
+	ret += scnprintf(buf + ret, BUF_SIZE - ret, "\techo <cmdsts reg_data> > cmdsts\n");
+	ret += scnprintf(buf + ret, BUF_SIZE - ret, "\tto check ack or err: cat cmdsts\n");
+	ret += scnprintf(buf + ret, BUF_SIZE - ret, "\tto read data: cat rd\n");
+	ret += scnprintf(buf + ret, BUF_SIZE - ret, "Execute direct register access:\n");
+	ret += scnprintf(buf + ret, BUF_SIZE - ret, "\tfor wr: echo <baseaddr offset direct val> > direct_reg\n");
+	ret += scnprintf(buf + ret, BUF_SIZE - ret, "\tfor rd: echo <baseaddr offset direct> > direct_reg\n");
+	ret += scnprintf(buf + ret, BUF_SIZE - ret, "\tcat direct_reg\n");
 
 	ret = simple_read_from_buffer(ubuf, count, offp, buf, ret);
 
@@ -359,8 +369,12 @@ static ssize_t hssiss_dbgfs_dumpcsr_read(struct file *filep, char __user *ubuf,
 
 	ret += scnprintf(buf + ret, BUF_SIZE - ret, "Dumping port attributes\n");
 	for (i = 0; i < 15; i++) {
-		val = csrrd32_withoffset(base, csr_addroff,
+		if (priv->ver == HSSISS_FTILE) {
+			val = csrrd32(base, HSSISS_CSR_INTER_ATTRIB_PORT_FTILE + (i * 4));
+		} else {
+			val = csrrd32_withoffset(base, csr_addroff,
 				HSSISS_CSR_INTER_ATTRIB_PORT + (i * 4));
+		}
 		ret += scnprintf(buf + ret, BUF_SIZE - ret, "\t%x: %x\n", i, val);
 	}
 
@@ -382,10 +396,14 @@ static ssize_t hssiss_dbgfs_dumpcsr_read(struct file *filep, char __user *ubuf,
 	val = csrrd32_withoffset(base, csr_addroff, HSSISS_CSR_GMII_RX_LATENCY);
 	ret += scnprintf(buf + ret, BUF_SIZE - ret, "HSSISS_CSR_GMII_RX_LATENCY: %x\n", val);
 
-	ret += scnprintf(buf + ret, BUF_SIZE - ret, "Dumping port attributes\n");
+	ret += scnprintf(buf + ret, BUF_SIZE - ret, "Dumping port status\n");
 	for (i = 0; i < 15; i++) {
-		val = csrrd32_withoffset(base, csr_addroff,
+		if (priv->ver == HSSISS_FTILE) {
+			val = csrrd32(base, HSSISS_CSR_ETH_PORT_STS_FTILE + (i * 4));
+		} else {
+			val = csrrd32_withoffset(base, csr_addroff,
 				HSSISS_CSR_ETH_PORT_STS + (i * 4));
+		}
 		ret += scnprintf(buf + ret, BUF_SIZE - ret, "\t%x: %x\n", i, val);
 	}
 
@@ -407,11 +425,327 @@ static ssize_t hssiss_dbgfs_dumpcsr_read(struct file *filep, char __user *ubuf,
 	return ret;
 }
 
+static ssize_t hssiss_dbgfs_ctrladdr_read(struct file *filep, char __user *ubuf,
+				   size_t count, loff_t *offp)
+{
+	struct hssiss_dbg *d = filep->private_data;
+	struct platform_device *pdev = d->pdev;
+	struct hssiss_private *priv = platform_get_drvdata(pdev);
+	char buf[sizeof(u32)];
+	u32 val;
+	int size;
+
+	val = csrrd32_withoffset(priv->sscsr, priv->csr_addroff,
+					HSSISS_CSR_CTRLADDR);
+
+	size = snprintf(buf, sizeof(u32), "%x", val);
+
+	dev_info(&pdev->dev, "val: %x\n", val);
+	return simple_read_from_buffer(ubuf, count, offp, buf, size);
+
+}
+
+static ssize_t hssiss_dbgfs_ctrladdr_write(struct file *filep, const char __user *ubuf,
+				   size_t count, loff_t *offp)
+{
+	struct hssiss_dbg *d = filep->private_data;
+	struct platform_device *pdev = d->pdev;
+	struct hssiss_private *priv = platform_get_drvdata(pdev);
+	u32 val;
+	char *buf;
+	int ret;
+
+	/* Copy data from User-space */
+	buf = kmalloc(count + 1, GFP_KERNEL);
+	if (!buf)
+		return -ENOMEM;
+
+	ret = simple_write_to_buffer(buf, count, offp, ubuf, count);
+	if (ret < 0) {
+		kfree(buf);
+		return -EIO;
+	}
+	buf[count] = 0;
+
+	/* Parse the values */
+	ret = sscanf(buf, "%x", &val);
+	kfree(buf);
+	if (ret < 1)
+		return -EINVAL;
+
+	csrwr32_withoffset(val, priv->sscsr, priv->csr_addroff,
+					HSSISS_CSR_CTRLADDR);
+	dev_info(&pdev->dev, "val: %x\n", val);
+
+	return count;
+}
+
+static ssize_t hssiss_dbgfs_cmdsts_read(struct file *filep, char __user *ubuf,
+				   size_t count, loff_t *offp)
+{
+	struct hssiss_dbg *d = filep->private_data;
+	struct platform_device *pdev = d->pdev;
+	struct hssiss_private *priv = platform_get_drvdata(pdev);
+	char buf[sizeof(u32)];
+	u32 val;
+	int size;
+
+	val = csrrd32_withoffset(priv->sscsr, priv->csr_addroff,
+					HSSISS_CSR_CMDSTS);
+
+	size = snprintf(buf, sizeof(u32), "%x", val);
+
+	dev_info(&pdev->dev, "val: %x\n", val);
+	return simple_read_from_buffer(ubuf, count, offp, buf, size);
+
+}
+
+static ssize_t hssiss_dbgfs_cmdsts_write(struct file *filep, const char __user *ubuf,
+				   size_t count, loff_t *offp)
+{
+	struct hssiss_dbg *d = filep->private_data;
+	struct platform_device *pdev = d->pdev;
+	struct hssiss_private *priv = platform_get_drvdata(pdev);
+	u32 val;
+	char *buf;
+	int ret;
+
+	/* Copy data from User-space */
+	buf = kmalloc(count + 1, GFP_KERNEL);
+	if (!buf)
+		return -ENOMEM;
+
+	ret = simple_write_to_buffer(buf, count, offp, ubuf, count);
+	if (ret < 0) {
+		kfree(buf);
+		return -EIO;
+	}
+	buf[count] = 0;
+
+	/* Parse the values */
+	ret = sscanf(buf, "%x", &val);
+	kfree(buf);
+	if (ret < 1)
+		return -EINVAL;
+
+	csrwr32_withoffset(val, priv->sscsr, priv->csr_addroff,
+					HSSISS_CSR_CMDSTS);
+	dev_info(&pdev->dev, "val: %x\n", val);
+
+	return count;
+}
+
+static ssize_t hssiss_dbgfs_wr_read(struct file *filep, char __user *ubuf,
+				   size_t count, loff_t *offp)
+{
+	struct hssiss_dbg *d = filep->private_data;
+	struct platform_device *pdev = d->pdev;
+	struct hssiss_private *priv = platform_get_drvdata(pdev);
+	char buf[sizeof(u32)];
+	u32 val;
+	int size;
+
+	val = csrrd32_withoffset(priv->sscsr, priv->csr_addroff,
+					HSSISS_CSR_WR_DATA);
+
+	size = snprintf(buf, sizeof(u32), "%x", val);
+
+	dev_info(&pdev->dev, "val: %x\n", val);
+	return simple_read_from_buffer(ubuf, count, offp, buf, size);
+
+}
+
+static ssize_t hssiss_dbgfs_wr_write(struct file *filep, const char __user *ubuf,
+				   size_t count, loff_t *offp)
+{
+	struct hssiss_dbg *d = filep->private_data;
+	struct platform_device *pdev = d->pdev;
+	struct hssiss_private *priv = platform_get_drvdata(pdev);
+	u32 val;
+	char *buf;
+	int ret;
+
+	/* Copy data from User-space */
+	buf = kmalloc(count + 1, GFP_KERNEL);
+	if (!buf)
+		return -ENOMEM;
+
+	ret = simple_write_to_buffer(buf, count, offp, ubuf, count);
+	if (ret < 0) {
+		kfree(buf);
+		return -EIO;
+	}
+	buf[count] = 0;
+
+	/* Parse the values */
+	ret = sscanf(buf, "%x", &val);
+	kfree(buf);
+	if (ret < 1)
+		return -EINVAL;
+
+	csrwr32_withoffset(val, priv->sscsr, priv->csr_addroff,
+					HSSISS_CSR_WR_DATA);
+	dev_info(&pdev->dev, "val: %x\n", val);
+
+	return count;
+}
+
+static ssize_t hssiss_dbgfs_rd_read(struct file *filep, char __user *ubuf,
+				   size_t count, loff_t *offp)
+{
+	struct hssiss_dbg *d = filep->private_data;
+	struct platform_device *pdev = d->pdev;
+	struct hssiss_private *priv = platform_get_drvdata(pdev);
+	char buf[sizeof(u32)];
+	u32 val;
+	int size;
+
+	val = csrrd32_withoffset(priv->sscsr, priv->csr_addroff,
+					HSSISS_CSR_RD_DATA);
+
+	size = snprintf(buf, sizeof(u32), "%x", val);
+
+	dev_info(&pdev->dev, "val: %x\n", val);
+	return simple_read_from_buffer(ubuf, count, offp, buf, size);
+
+}
+
+static ssize_t hssiss_dbgfs_rd_write(struct file *filep, const char __user *ubuf,
+				   size_t count, loff_t *offp)
+{
+	struct hssiss_dbg *d = filep->private_data;
+	struct platform_device *pdev = d->pdev;
+	struct hssiss_private *priv = platform_get_drvdata(pdev);
+	u32 val;
+	char *buf;
+	int ret;
+
+	/* Copy data from User-space */
+	buf = kmalloc(count + 1, GFP_KERNEL);
+	if (!buf)
+		return -ENOMEM;
+
+	ret = simple_write_to_buffer(buf, count, offp, ubuf, count);
+	if (ret < 0) {
+		kfree(buf);
+		return -EIO;
+	}
+	buf[count] = 0;
+
+	/* Parse the values */
+	ret = sscanf(buf, "%x", &val);
+	kfree(buf);
+	if (ret < 1)
+		return -EINVAL;
+
+	csrwr32_withoffset(val, priv->sscsr, priv->csr_addroff,
+					HSSISS_CSR_RD_DATA);
+	dev_info(&pdev->dev, "val: %x\n", val);
+
+	return count;
+}
+
+static ssize_t hssiss_dbgfs_direct_reg_read(struct file *filep, char __user *ubuf,
+				   size_t count, loff_t *offp)
+{
+	struct hssiss_dbg *d = filep->private_data;
+	char buf[sizeof(u32)];
+	int size;
+
+	size = snprintf(buf, sizeof(u32), "%x", d->read.data);
+
+	return simple_read_from_buffer(ubuf, count, offp, buf, size);
+
+}
+
+static ssize_t hssiss_dbgfs_direct_reg_write(struct file *filep, const char __user *ubuf,
+				   size_t count, loff_t *offp)
+{
+	struct hssiss_dbg *d = filep->private_data;
+	struct platform_device *pdev = d->pdev;
+	struct hssiss_private *priv = platform_get_drvdata(pdev);
+	u32 base, offset, val;
+	char *buf;
+	int ret, direct;
+
+	/* Copy data from User-space */
+	buf = kmalloc(count + 1, GFP_KERNEL);
+	if (!buf)
+		return -ENOMEM;
+
+	ret = simple_write_to_buffer(buf, count, offp, ubuf, count);
+	if (ret < 0) {
+		kfree(buf);
+		return -EIO;
+	}
+	buf[count] = 0;
+
+	/* Parse the values */
+	ret = sscanf(buf, "%x %x %d %x", &base, &offset, &direct, &val);
+	kfree(buf);
+	if (ret < 3)
+		return -EINVAL;
+
+	if (ret == 4) {
+		if (direct) {
+			csrwr32_withoffset(val, priv->sscsr + base,
+						0, offset);
+		} else {
+			csrwr32_withoffset(val, priv->sscsr + base,
+					priv->csr_addroff, offset);
+
+		}
+	}
+	else {
+		if (direct) {
+			d->read.data = csrrd32_withoffset(priv->sscsr + base,
+							0, offset);
+		} else {
+			d->read.data = csrrd32_withoffset(priv->sscsr + base,
+					priv->csr_addroff, offset);
+		}
+	}
+
+	dev_info(&pdev->dev,
+			"readdata: %x, base: %x, offset: %x, direct: %d val: %x\n",
+			d->read.data, base, offset, direct, val);
+
+	return count;
+}
+
+static const struct file_operations ctrladdr_dbgfs_ops = {
+	.owner = THIS_MODULE,
+	.open = simple_open,
+	.write = hssiss_dbgfs_ctrladdr_write,
+	.read = hssiss_dbgfs_ctrladdr_read
+};
+
+static const struct file_operations cmdsts_dbgfs_ops = {
+	.owner = THIS_MODULE,
+	.open = simple_open,
+	.write = hssiss_dbgfs_cmdsts_write,
+	.read = hssiss_dbgfs_cmdsts_read
+};
+
 static const struct file_operations csr_dbgfs_ops = {
 	.owner = THIS_MODULE,
 	.open = simple_open,
 	.write = hssiss_dbgfs_csr_write,
 	.read = hssiss_dbgfs_csr_read
+};
+
+static const struct file_operations wr_dbgfs_ops = {
+	.owner = THIS_MODULE,
+	.open = simple_open,
+	.write = hssiss_dbgfs_wr_write,
+	.read = hssiss_dbgfs_wr_read
+};
+
+static const struct file_operations rd_dbgfs_ops = {
+	.owner = THIS_MODULE,
+	.open = simple_open,
+	.write = hssiss_dbgfs_rd_write,
+	.read = hssiss_dbgfs_rd_read
 };
 
 static const struct file_operations sal_dbgfs_ops = {
@@ -433,6 +767,13 @@ static const struct file_operations dumpcsr_dbgfs_ops = {
 	.read = hssiss_dbgfs_dumpcsr_read
 };
 
+static const struct file_operations direct_reg_dbgfs_ops = {
+	.owner = THIS_MODULE,
+	.open = simple_open,
+	.write = hssiss_dbgfs_direct_reg_write,
+	.read = hssiss_dbgfs_direct_reg_read
+};
+
 struct hssiss_dbg *hssiss_dbgfs_init(struct platform_device *pdev)
 {
 	struct hssiss_dbg *d;
@@ -446,9 +787,14 @@ struct hssiss_dbg *hssiss_dbgfs_init(struct platform_device *pdev)
 	d->dbgfs = debugfs_create_dir("hssiss_dbg", NULL);
 
 	debugfs_create_file("csr", S_IRUGO | S_IWUGO, d->dbgfs, d, &csr_dbgfs_ops);
+	debugfs_create_file("ctrladdr", S_IRUGO | S_IWUGO, d->dbgfs, d, &ctrladdr_dbgfs_ops);
+	debugfs_create_file("cmdsts", S_IRUGO | S_IWUGO, d->dbgfs, d, &cmdsts_dbgfs_ops);
+	debugfs_create_file("wr", S_IRUGO | S_IWUGO, d->dbgfs, d, &wr_dbgfs_ops);
+	debugfs_create_file("rd", S_IRUGO | S_IWUGO, d->dbgfs, d, &rd_dbgfs_ops);
 	debugfs_create_file("sal", S_IRUGO | S_IWUGO, d->dbgfs, d, &sal_dbgfs_ops);
 	debugfs_create_file("dumpcsr", 0444, d->dbgfs, d, &dumpcsr_dbgfs_ops);
 	debugfs_create_file("readme", 0444, d->dbgfs, d, &readme_dbgfs_ops);
+	debugfs_create_file("direct_reg", S_IRUGO | S_IWUGO, d->dbgfs, d, &direct_reg_dbgfs_ops);
 
 	return d;
 }

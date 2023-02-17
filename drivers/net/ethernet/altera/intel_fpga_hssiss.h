@@ -19,11 +19,11 @@
  *    v0: csr addr offset = 0
  *    v5: read from feature_csr_addr register
  *
- * inter_attrib_port = 0x10 + X * 4 + CSR_ADDROFF
  * eth_port_sts = 0x68 + X (0x00 .. 0x0F)*4 + CSR_ADDROFF
  */
 #define HSSISS_CSR_VER				0x8
 #define HSSISS_CSR_COMMON_FEATURE_LIST		0xc
+/*Port attr For E-tile: 0x10 + x * 4 + CSR_ADDROFF */
 #define HSSISS_CSR_INTER_ATTRIB_PORT		0x10
 #define HSSISS_CSR_CMDSTS			0x50
 #define HSSISS_CSR_CTRLADDR			0x54
@@ -36,6 +36,26 @@
 #define HSSISS_CSR_DBG_CTRL			0xb0
 #define HSSISS_CSR_HOTPLUG_DBG_CTRL		0xb4
 #define HSSISS_CSR_HOTPLUG_DBG_STS		0xb8
+#define HSSISS_CSR_GENERAL_STATUS		0xbc
+
+/*F-tile specific */
+#define HSSISS_CSR_INTER_ATTRIB_PORT_FTILE	0x300 /* + x * 4 */
+#define HSSISS_CSR_ETH_PORT_STS_FTILE		0x200 /* + x * 4 */
+
+/* Ftile only: PFC offset + x * 4, read returns 0 if port doesn't exit */
+#define HSSISS_CSR_PFC_CTRL			0x400
+#define HSSISS_CSR_PFC_ERR_STS			0x450
+#define HSSISS_CSR_PFC_RX_PARSE_CFG		0x4A0
+
+/* Ftile only: ANLT: ANLTx = ANLT_BASE + x * RANGE */
+#define HSSISS_CSR_ANLT_BASE			0x10000
+#define HSSISS_CSR_ANLT_RANGE			0x400
+
+/* Ftile only: PTP tile adaptor */
+#define HSSISS_CSR_PTP_ASYMMETRY_BASE		0x20000
+#define HSSISS_CSR_PTP_ASYMMETRY_RANGE		0x20000
+#define HSSISS_CSR_PTP_PEER_TO_PEER_MPD		0x40000
+#define HSSISS_CSR_PTP_PEER_TO_PEER_MPD_RANGE	0x20000
 
 /* DFH */
 #define HSSISS_DFHLO_DFHV0_FEA_REV_MASK		GENMASK(15, 12)
@@ -229,12 +249,12 @@ typedef union eth_port_status {
 	u32 full;
 } hssi_eth_port_sts;
 
-enum hssiss_tile {
-	HSSISS_ETILE = 0x1,
-	HSSISS_FTILE = 0x2,
+enum hssiss_hip_type {
+	HSSISS_ETILE = 1,
+	HSSISS_FTILE = 2,
 };
 
-enum hssiss_tile_reg_type {
+enum hssiss_tile_regbank {
 	HSSI_ETH_RECONFIG,
 	HSSI_RSFEC,
 	HSSI_PHY_XCVR_PMACAP,
@@ -252,7 +272,7 @@ struct get_set_csr_data {
 	u32 offs;
 	u32 data;	/* wr for set_csr, read for get_csr */
 	unsigned int ch;
-	enum hssiss_tile_reg_type reg_type;
+	enum hssiss_tile_regbank reg_type;
 	bool word;
 };
 
@@ -308,25 +328,6 @@ union hssiss_ctrl_addr {
 	u32 full;
 };
 
-struct hssiss_csr_common {
-	u32 version;				//0x8 + csr_offset
-	union hssiss_feature_list feature_list;	//0xc + csr_offset
-	u32 inter_attrib_port;			//0x10 + csr_offset
-	union hssiss_cmd_sts cmd;		//0x50 + csr_offset
-	union hssiss_ctrl_addr ctrl;		//ctrl and addr:
-						//0x54 + csr_offset
-	u32 rd_data;				//0x58 + csr_offset
-	u32 wr_data;				//0x5c + csr_offset
-	u32 gmii_tx_latency;			//0x60 + csr_offset
-	u32 gmii_rx_latency;			//0x64 + csr_offset
-	u32 eth_port_sts;			//0x68 + csr_offset
-	u32 tse_ctrl;				//0xa8 + csr_offset
-	u32 dbg_ctrl;				//0xb0 + csr_offset
-	u32 hotplug_dbg_ctrl;			//0xb4 + csr_offset
-	u32 hotplug_dbg_sts;			//0xb8 + csr_offset
-};
-#define csr_offs(x) (offsetof(struct hssiss_csr_common, x))
-
 struct hssiss_csr_v5_only {
 	u32 dfh_lo;				//0x0
 	u32 dfh_hi;				//0x4
@@ -370,6 +371,7 @@ struct hssiss_private {
 	spinlock_t sal_spinlock;
 	struct hssiss_sysfs_data sysfs;
 	struct cold_reset_register cold_rst_reg;
+	int hssi_err_wa;
 #ifdef CONFIG_DEBUG_FS
 	struct hssiss_dbg *dbgfs;
 #endif
@@ -380,8 +382,9 @@ int hssiss_execute_sal_cmd(struct platform_device *pdev,
 int hssiss_execute_sal_cmd_atomic(struct platform_device *pdev,
 		enum hssiss_salcmd cmd, void *data);
 hssi_eth_port_sts hssiss_get_ethport_status(struct platform_device *pdev, int port);
-int hssi_cold_rst(struct platform_device *pdev);
+int hssiss_cold_rst(struct platform_device *pdev);
 void hssiss_hotplug_enable(struct platform_device *pdev, bool enable);
+enum hssiss_hip_type hssiss_get_hip_type(struct platform_device *pdev);
 
 #ifdef CONFIG_DEBUG_FS
 struct hssiss_dbg *hssiss_dbgfs_init(struct platform_device *pdev);
