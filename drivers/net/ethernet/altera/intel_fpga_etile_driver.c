@@ -240,11 +240,13 @@ static int eth_etile_tx_rx_user_flow(struct intel_fpga_etile_eth_private *priv)
 	netdev_info(priv->dev, "tx_extra_latency:0x%x , rx_extra_latency:0x%x\n",
 		    tx_extra_latency, rx_extra_latency);
 
+#if 0
 	/* Adjust UI value */
 	timer_setup(&priv->fec_timer, ui_adjustments, 0);
 	ret = mod_timer(&priv->fec_timer, jiffies + msecs_to_jiffies(5000));
 	if (ret)
 		netdev_err(priv->dev, "Timer failed to start UI adjustment\n");
+#endif
 	return 0;
 }
 
