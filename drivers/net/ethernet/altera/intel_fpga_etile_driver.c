@@ -292,7 +292,7 @@ int etile_init_mac(intel_fpga_xtile_eth_private *priv)
 }
 
 /* Ref: https://www.kernel.org/doc/html/latest/networking/statistics.html */
-static void etile_get_stats64(struct net_device *dev,
+void etile_get_stats64(struct net_device *dev,
 		       struct rtnl_link_stats64 *storage)
 {
 	intel_fpga_xtile_eth_private *priv = netdev_priv(dev);
