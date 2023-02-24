@@ -2,41 +2,95 @@
 #ifndef __INTEL_FPGA_ETH_MAIN_H__
 #define __INTEL_FPGA_ETH_MAIN_H__
 
+#include <linux/bitops.h>
+#include <linux/if_vlan.h>
+#include <linux/list.h>
+#include <linux/netdevice.h>
+#include <linux/phy.h>
+#include <linux/ptp_clock_kernel.h>
+#include <linux/timer.h>
+#include <linux/phylink.h>
+#include "intel_fpga_tod.h"
 #include "altera_eth_dma.h"
+#include "altera_msgdma.h"
+#include "altera_msgdmahw.h"
+#include "altera_utils.h"
 #include "altera_msgdma_prefetcher.h"
-
-#ifdef CONFIG_INTEL_FPGA_HSSI_ETILE
-#include "intel_fpga_eth_etile.h"
-#endif
-
-/* To be changed */
+#include "altera_msgdmahw_prefetcher.h"
+#include "altera_sgdma.h"
+#include "intel_fpga_eth_qsfp.h"
 
 #define INTEL_FPGA_XTILE_ETH_RESOURCE_NAME "intel_fpga_eth"
 
-/* To be changed */
+#define INTEL_FPGA_RET_SUCCESS                          0
+/* Flow Control defines */
+#define FLOW_OFF        0
+#define FLOW_RX         1
+#define FLOW_TX         2
+#define FLOW_ON         (FLOW_TX | FLOW_RX)
 
 #define INTEL_FPGA_XTILE_SW_RESET_WATCHDOG_CNTR              1000000
+#define INTEL_FPGA_XTILE_ETH_RESOURCE_NAME "intel_fpga_eth"
 
-typedef struct intel_fpga_etile_eth_private intel_fpga_xtile_eth_private;
+#define INTEL_FPGA_BYTE_ALIGN   8
+#define INTEL_FPGA_WORD_ALIGN   32
 
-int xtile_start_xmit(struct sk_buff *skb, struct net_device *dev);
+#define MOD_PARAM_PERM  0644
 
-int fec_init(struct platform_device *pdev, struct intel_fpga_etile_eth_private *priv);
-void intel_fpga_xtile_set_ethtool_ops(struct net_device *dev);
+typedef struct {
 
-void init_qsfp_ctrl_space(intel_fpga_xtile_eth_private *priv);
-void deinit_qsfp_ctrl_space(intel_fpga_xtile_eth_private *priv);
+        const char *fec_type;
+        struct net_device *dev;
+        struct device     *device;
+        struct phylink    *phylink;
+        struct xtile_spec_ops *spec_ops;
+        struct platform_device *pdev_hssi;
+        struct qsfp_reg_space __iomem *qsfp_reg;
+        struct intel_fpga_rx_fifo __iomem *rx_fifo;
+        struct intel_fpga_rx_fifo __iomem *tx_fifo;
 
-struct qsfp_ops {
-        void (*qsfp_link_up)(intel_fpga_xtile_eth_private*);
-        void (*qsfp_link_down)(intel_fpga_xtile_eth_private*);
-};
+        u32 tile_chan;
+        u32 hssi_port;
+        u32 tx_irq;
+        u32 rx_irq;
+        u32 max_mtu;
+        u32 tx_fifo_depth;
+        u32 rx_fifo_depth;
+        u32 rx_fifo_almost_full;
+        u32 rx_fifo_almost_empty;
+        u32 rxdma_buffer_size;
+        u32 flow_ctrl;
+        u32 pause;
+        u32 msg_enable;
+        u32 link_speed;
+        u32 tx_pma_delay_ns;
+        u32 rx_pma_delay_ns;
+        u32 tx_pma_delay_fns;
+        u32 rx_pma_delay_fns;
+        u32 rsfec_cw_pos_rx;
+        u32 tx_external_phy_delay_ns;
+        u32 rx_external_phy_delay_ns;
 
-struct xtile_spec_ops {
-	const struct qsfp_ops *qsfp_ops;
-	const struct altera_dmaops *dma_ops;
-	void (*pma_digi_reset)(intel_fpga_xtile_eth_private*, bool, bool);
-	void (*pma_ana_reset)(intel_fpga_xtile_eth_private*);
-};
+        u8 duplex;
+        u8 qsfp_lane;
+        bool autoneg;
+        bool ptp_enable;
+        bool prev_link_state;
+        bool cable_unplugged;
+
+        spinlock_t tx_lock;
+        spinlock_t mac_cfg_lock;
+        spinlock_t rxdma_irq_lock;
+
+        struct napi_struct napi;
+        struct delayed_work dwork;
+        struct timer_list fec_timer;
+        struct altera_dma_private dma_priv;
+        struct phylink_config phylink_config;
+        struct intel_fpga_tod_private *ptp_priv;
+
+        phy_interface_t phy_iface;
+
+} intel_fpga_xtile_eth_private;
 
 #endif

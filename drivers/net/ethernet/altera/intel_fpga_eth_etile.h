@@ -15,34 +15,14 @@
 #ifndef __INTEL_FPGA_ETILE_ETH_H__
 #define __INTEL_FPGA_ETILE_ETH_H__
 
-#include <linux/bitops.h>
-#include <linux/if_vlan.h>
-#include <linux/list.h>
-#include <linux/netdevice.h>
-#include <linux/phy.h>
-#include <linux/ptp_clock_kernel.h>
-#include <linux/timer.h>
-#include <linux/phylink.h>
-#include "intel_fpga_tod.h"
-#include "altera_eth_dma.h"
-#include "altera_msgdma.h"
-#include "altera_msgdma_prefetcher.h"
-#include "altera_sgdma.h"
-#include "intel_fpga_eth_qsfp.h"
+#include "intel_fpga_eth_main.h"
 
-#define INTEL_FPGA_RET_SUCCESS                          0
 
 #define INTEL_FPGA_ETILE_UI_VALUE_10G			0x0018D302
 #define INTEL_FPGA_ETILE_UI_VALUE_25G			0x0009EE01
 #define INTEL_FPGA_TX_PMA_DELAY				105
 #define INTEL_FPGA_RX_PMA_DELAY				89
 #define INTEL_FPGA_PMA_OFFSET_207_TIMEOUT		300	// in miliseconds
-
-/* Flow Control defines */
-#define FLOW_OFF	0
-#define FLOW_RX		1
-#define FLOW_TX		2
-#define FLOW_ON		(FLOW_TX | FLOW_RX)
 
 /* Ethernet Reconfiguration Interface
  * Auto Negotiation and Link Training
@@ -1567,11 +1547,6 @@
 #define XCVR_PMA_CTRL_STAT_RCP_LOAD_TIMEOUT			BIT(1)
 #define XCVR_PMA_CTRL_STAT_RCP_LOAD_BUSY			BIT(2)
 
-#define INTEL_FPGA_BYTE_ALIGN	8
-#define INTEL_FPGA_WORD_ALIGN	32
-
-#define MOD_PARAM_PERM  0644
-
 /* Ethernet Reconfiguration Interface Register Base Addresses
  * Word Offset	Register Type
  * 0x0B0-0x0E8	Auto Negotiation and Link Training registers
@@ -2563,78 +2538,27 @@ struct intel_fpga_rx_fifo {
 #define rx_fifo_csroffs(a)	(offsetof(struct intel_fpga_rx_fifo, a))
 #define tx_fifo_csroffs(a)	(offsetof(struct intel_fpga_rx_fifo, a))
 
-struct intel_fpga_etile_eth_private {
-	
-	const char *fec_type;
-	struct net_device *dev;
-	struct device     *device;
-	struct phylink    *phylink;
-	struct qsfp_ops   *qsfp_ops;
-	struct altera_dmaops *dmaops;
-	struct platform_device *pdev_hssi;
-	struct qsfp_reg_space __iomem *qsfp_reg;
-	struct intel_fpga_rx_fifo __iomem *rx_fifo;
-	struct intel_fpga_rx_fifo __iomem *tx_fifo;
-	
-	u32 tile_chan;
-	u32 hssi_port;
-	u32 tx_irq;
-	u32 rx_irq;
-	u32 max_mtu;
-	u32 tx_fifo_depth;
-	u32 rx_fifo_depth;
-	u32 rx_fifo_almost_full;
-	u32 rx_fifo_almost_empty;
-	u32 rxdma_buffer_size;
-	u32 flow_ctrl;
-	u32 pause;
-	u32 msg_enable;
-	u32 link_speed;
-	
-	u32 tx_pma_delay_ns;
-	u32 rx_pma_delay_ns;
-	u32 tx_pma_delay_fns;
-	u32 rx_pma_delay_fns;
-	u32 rsfec_cw_pos_rx;
-	u32 tx_external_phy_delay_ns;
-	u32 rx_external_phy_delay_ns;
-	
-	u8 duplex;
-	u8 qsfp_lane;
-	bool autoneg;
-	bool ptp_enable;
-	bool prev_link_state;
-	bool cable_unplugged;
-	
-	spinlock_t tx_lock;
-	spinlock_t mac_cfg_lock;
-	spinlock_t rxdma_irq_lock;
-	
-	struct napi_struct napi;
-	struct delayed_work dwork;
-	struct timer_list fec_timer;
-	struct altera_dma_private dma_priv;
-	struct phylink_config phylink_config;
-	struct intel_fpga_tod_private *ptp_priv;
-
-	phy_interface_t phy_iface;
-};
-
 /* Function prototypes */
 void ui_adjustments(struct timer_list *t);
-int init_mac(struct intel_fpga_etile_eth_private *priv);
-void xtile_get_stats64(struct net_device *dev,
+int etile_init_mac(intel_fpga_xtile_eth_private *priv);
+void etile_get_stats64(struct net_device *dev,
 		       struct rtnl_link_stats64 *storage);
-void pma_digital_reset(struct intel_fpga_etile_eth_private *priv, 
+void etile_pma_digital_reset(intel_fpga_xtile_eth_private *priv, 
 		       bool tx_reset, 
 		       bool rx_reset);
-int xtile_check_counter_complete(struct intel_fpga_etile_eth_private *priv, 
+int xtile_check_counter_complete(intel_fpga_xtile_eth_private *priv, 
 				 u32 regbank,
 				 size_t offs, 
 				 u8 bit_mask, 
 				 bool set_bit,
 				 int align);
-void etile_update_mac_addr(struct intel_fpga_etile_eth_private *priv, u8 *addr);
+void etile_update_mac_addr(intel_fpga_xtile_eth_private *priv);
+void intel_fpga_etile_set_ethtool_ops(struct net_device *netdev);
+
+void init_qsfp_ctrl_space(intel_fpga_xtile_eth_private *priv);
+void deinit_qsfp_ctrl_space(intel_fpga_xtile_eth_private *priv);
+
+int fec_init(struct platform_device *pdev, intel_fpga_xtile_eth_private *priv);
 
 #ifdef CONFIG_INTEL_FPGA_ETILE_DEBUG_FS
 int intel_fpga_etile_init_fs(struct net_device *dev);

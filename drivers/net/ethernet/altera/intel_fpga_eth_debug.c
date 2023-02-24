@@ -1,9 +1,20 @@
+
+// SPDX-License-Identifier: GPL
+/* Intel FPGA Network debug interface API
+ * Copyright (C) 2022,2023 Intel Corporation. All rights reserved
+ *
+    * Contributors:
+    *   Preetam Narayan
+ *
+ */
+//#include "intel_fpga_eth_etile.h"
 #include "altera_eth_dma.h"
 #include "altera_msgdma.h"
 #include "altera_msgdmahw.h"
+#include "altera_utils.h"
 #include "altera_msgdma_prefetcher.h"
 #include "altera_msgdmahw_prefetcher.h"
-#include "altera_utils.h"
+#include "altera_sgdma.h"
 #include "intel_fpga_eth_main.h"
 
 static void xtile_prefetcher_reg_dump_tx(struct altera_dma_private *priv) {
@@ -107,6 +118,11 @@ static void xtile_process_seq_no_tx(struct altera_dma_private *priv) {
 	netdev_info(priv->dev, "Tx PROD/CONS     | 0x%x/0x%x\n", priv->tx_prod, priv->tx_cons);
 }
 
+static void xtile_process_seq_no_rx(struct altera_dma_private *priv) {
+	
+	netdev_info(priv->dev, "Rx PROD/CONS     | 0x%x/0x%x\n", priv->rx_prod, priv->rx_cons);
+}
+
 static void xtile_seq_no_dump_tx(struct altera_dma_private *priv) {
 
 	s32 ret;
@@ -190,6 +206,7 @@ static void xtile_dma_regs(struct altera_dma_private *priv)
 	
 	xtile_comp_version_rx(priv);
 	xtile_seq_no_dump_rx(priv);
+	xtile_process_seq_no_rx(priv);
 	xtile_dispatcher_reg_dump_rx(priv);
 	xtile_prefetcher_reg_dump_rx(priv);
 	xtile_fifo_fill_level_rx(priv);
@@ -201,7 +218,7 @@ static ssize_t show_msgdma_reg_dump(struct device *dev,
 
         struct platform_device *pdev = to_platform_device(dev);
         struct net_device *ndev = platform_get_drvdata(pdev);
-        struct intel_fpga_etile_eth_private *priv=  netdev_priv(ndev);
+        intel_fpga_xtile_eth_private *priv=  netdev_priv(ndev);
 
         xtile_dma_regs(&priv->dma_priv);
 
@@ -213,19 +230,39 @@ static ssize_t show_msgdma_tx_desc_dump(struct device *dev,
 {
 	struct platform_device *pdev = to_platform_device(dev);
         struct net_device *ndev = platform_get_drvdata(pdev);
-        struct intel_fpga_etile_eth_private *priv=  netdev_priv(ndev);
+        intel_fpga_xtile_eth_private *priv=  netdev_priv(ndev);
 
 	xtile_unprocess_desc_tx(&priv->dma_priv);
 	
 	return sprintf(buf, "%x", 1);
 }
 
+static ssize_t show_link_state(struct device *dev,
+                struct device_attribute *attr, char *buf)
+{
+        struct platform_device *pdev = to_platform_device(dev);
+        struct net_device *ndev = platform_get_drvdata(pdev);
+        intel_fpga_xtile_eth_private *priv=  netdev_priv(ndev);
+
+	netdev_info(priv->dev,
+			"Cable is %s\n", priv->cable_unplugged ?
+			"not connected":"connected");
+
+	netdev_info(priv->dev,
+			"Eth link %s\n", priv->prev_link_state ?
+			"stable" : "not stable");
+
+        return sprintf(buf, "%x", 1);
+}
+
 static DEVICE_ATTR(msgdma_reg_dump, 0644, show_msgdma_reg_dump, NULL);
 static DEVICE_ATTR(msgdma_tx_desc_dump, 0644, show_msgdma_tx_desc_dump, NULL);
+static DEVICE_ATTR(link_state, 0644, show_link_state, NULL);
 
 static struct attribute *msgdma_sysfs_attrs[] = {
         &dev_attr_msgdma_reg_dump.attr,
 	&dev_attr_msgdma_tx_desc_dump.attr,
+	&dev_attr_link_state.attr,
         NULL
 };
 

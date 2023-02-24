@@ -82,7 +82,7 @@ static void etile_fill_stats(struct net_device *dev,
 			     struct ethtool_stats *dummy,
 			     u64 *buf) {
 
-	struct intel_fpga_etile_eth_private *priv = netdev_priv(dev);
+	intel_fpga_xtile_eth_private *priv = netdev_priv(dev);
 
 	struct platform_device *pdev = priv->pdev_hssi;
 	u32 hssi_port = priv->hssi_port;
@@ -192,14 +192,14 @@ static int etile_sset_count(struct net_device *dev, int sset) {
 
 static u32 etile_get_msglevel(struct net_device *dev) {
 
-	struct intel_fpga_etile_eth_private *priv = netdev_priv(dev);
+	intel_fpga_xtile_eth_private *priv = netdev_priv(dev);
 
 	return priv->msg_enable;
 }
 
 static void etile_set_msglevel(struct net_device *dev, uint32_t data) {
 
-	struct intel_fpga_etile_eth_private *priv = netdev_priv(dev);
+	intel_fpga_xtile_eth_private *priv = netdev_priv(dev);
 
 	priv->msg_enable = data;
 }
@@ -213,7 +213,7 @@ static void etile_get_regs(struct net_device *dev,
 			   struct ethtool_regs *regs,
 			   void *regbuf) {
 
-	struct intel_fpga_etile_eth_private *priv = netdev_priv(dev);
+	intel_fpga_xtile_eth_private *priv = netdev_priv(dev);
 
 	struct platform_device *pdev  = priv->pdev_hssi;
 	u32 chan = priv->tile_chan;
@@ -1064,7 +1064,7 @@ static void etile_get_regs(struct net_device *dev,
 static void etile_get_pauseparam(struct net_device *dev,
 				 struct ethtool_pauseparam *pauseparam) {
 	
-	struct intel_fpga_etile_eth_private *priv = netdev_priv(dev);
+	intel_fpga_xtile_eth_private *priv = netdev_priv(dev);
 
 	pauseparam->rx_pause = 0;
 	pauseparam->tx_pause = 0;
@@ -1079,7 +1079,7 @@ static void etile_get_pauseparam(struct net_device *dev,
 static int etile_set_pauseparam(struct net_device *dev,
 				struct ethtool_pauseparam *pauseparam) {
 
-	struct intel_fpga_etile_eth_private *priv = netdev_priv(dev);
+	intel_fpga_xtile_eth_private *priv = netdev_priv(dev);
 	struct platform_device *pdev = priv->pdev_hssi;
 	u32 chan = priv->tile_chan;
 
@@ -1095,34 +1095,30 @@ static int etile_set_pauseparam(struct net_device *dev,
 
 	if (pauseparam->rx_pause) {
 		new_pause |= FLOW_RX;
-		hssi_set_bit_atomic(pdev,
-				    HSSI_ETH_RECONFIG, chan,
-			    	    eth_pause_and_priority_csroffs(rx_flow_control_feature_cfg),
-			    	    ETH_RX_EN_STD_FLOW_CTRL);
+		hssi_set_bit(pdev,HSSI_ETH_RECONFIG, chan,
+			eth_pause_and_priority_csroffs(rx_flow_control_feature_cfg),
+			ETH_RX_EN_STD_FLOW_CTRL);
 	}
 	else {
-		hssi_clear_bit_atomic(pdev,
-			       	      HSSI_ETH_RECONFIG, chan,
-			              eth_pause_and_priority_csroffs(rx_flow_control_feature_cfg),
-			              ETH_RX_EN_STD_FLOW_CTRL);
+		hssi_clear_bit(pdev, HSSI_ETH_RECONFIG, chan,
+			eth_pause_and_priority_csroffs(rx_flow_control_feature_cfg),
+			ETH_RX_EN_STD_FLOW_CTRL);
 	}
 
 	if (pauseparam->tx_pause) {
 		new_pause |= FLOW_TX;
-		hssi_set_bit_atomic(pdev,
-			     	    HSSI_ETH_RECONFIG, chan,
-			            eth_pause_and_priority_csroffs(tx_flow_control_feature_cfg),
-			            ETH_TX_EN_STD_FLOW_CTRL);
+		hssi_set_bit(pdev, HSSI_ETH_RECONFIG, chan,
+			eth_pause_and_priority_csroffs(tx_flow_control_feature_cfg),
+			ETH_TX_EN_STD_FLOW_CTRL);
 	}
 	else {
-		hssi_clear_bit_atomic(pdev,
-				      HSSI_ETH_RECONFIG, chan,
-			      	      eth_pause_and_priority_csroffs(tx_flow_control_feature_cfg),
-			      	      ETH_TX_EN_STD_FLOW_CTRL);
+		hssi_clear_bit(pdev, HSSI_ETH_RECONFIG, chan,
+			eth_pause_and_priority_csroffs(tx_flow_control_feature_cfg),
+			ETH_TX_EN_STD_FLOW_CTRL);
 	}
 
-	hssi_csrwr32_atomic(pdev, HSSI_ETH_RECONFIG, chan,
-			    eth_pause_and_priority_csroffs(pause_quanta_0), priv->pause);
+	hssi_csrwr32(pdev, HSSI_ETH_RECONFIG, chan,
+		eth_pause_and_priority_csroffs(pause_quanta_0), priv->pause);
 	
 	priv->flow_ctrl = new_pause;
 out:
@@ -1134,7 +1130,7 @@ static int etile_get_ts_info(struct net_device *dev,
 			     struct ethtool_ts_info *info)
 {
 
-	struct intel_fpga_etile_eth_private *priv = netdev_priv(dev);
+	intel_fpga_xtile_eth_private *priv = netdev_priv(dev);
 
 	if (priv->ptp_priv->ptp_clock)
 		info->phc_index = ptp_clock_index(priv->ptp_priv->ptp_clock);
@@ -1159,7 +1155,7 @@ static int etile_get_ts_info(struct net_device *dev,
 static int etile_set_link_ksettings(struct net_device *dev,
 				    const struct ethtool_link_ksettings *cmd)
 {
-	struct intel_fpga_etile_eth_private *priv = netdev_priv(dev);
+	intel_fpga_xtile_eth_private *priv = netdev_priv(dev);
 
 	if (!priv)
 		return -ENODEV;
@@ -1182,7 +1178,7 @@ static int etile_set_link_ksettings(struct net_device *dev,
 static int etile_get_link_ksettings(struct net_device *dev,
 				    struct ethtool_link_ksettings *cmd)
 {
-	struct intel_fpga_etile_eth_private *priv = netdev_priv(dev);
+	intel_fpga_xtile_eth_private *priv = netdev_priv(dev);
 	int ret;
 
 	if (!priv)
@@ -1201,7 +1197,7 @@ static int etile_get_link_ksettings(struct net_device *dev,
 static int etile_get_link_ext_state(struct net_device *net_dev,
                         	    struct ethtool_link_ext_state_info *link_ext_state_info)
 {
-	struct intel_fpga_etile_eth_private *priv = netdev_priv(net_dev);
+	intel_fpga_xtile_eth_private *priv = netdev_priv(net_dev);
 
 	if (netif_carrier_ok(net_dev))
 		return -ENODATA;
@@ -1216,7 +1212,7 @@ static int etile_get_link_ext_state(struct net_device *net_dev,
 #ifdef TO_BE_IMPLEMENTED
 static int etile_map_reset_flags(struct net_device *net_dev, u32 *flags) {
 
-        struct intel_fpga_etile_eth_private *priv = netdev_priv(net_dev);
+        intel_fpga_xtile_eth_private *priv = netdev_priv(net_dev);
 	struct platform_device *pdev = priv->pdev_hssi;
 
 	u32 ethflag = *flags;
@@ -1229,8 +1225,7 @@ static int etile_map_reset_flags(struct net_device *net_dev, u32 *flags) {
 		switch(ethflag & 1) {
 
 		case ETH_RESET_PHY:
-			pma_digital_reset(priv, true, true);
-			pma_analog_reset(priv);
+			etile_pma_digital_reset(priv, true, true);
 			ethflag &= ~ETH_RESET_PHY;
 			break;
 
@@ -1259,7 +1254,7 @@ static int etile_map_reset_flags(struct net_device *net_dev, u32 *flags) {
 }
 #endif
 
-static const struct ethtool_ops xtile_ethtool_ops = {
+static const struct ethtool_ops etile_ethtool_ops = {
 	.get_drvinfo = etile_get_drvinfo,
 	.get_regs_len = etile_reglen,
 	.get_regs = etile_get_regs,
@@ -1277,9 +1272,9 @@ static const struct ethtool_ops xtile_ethtool_ops = {
 	.get_link_ext_state = etile_get_link_ext_state,
 };
 
-void intel_fpga_xtile_set_ethtool_ops(struct net_device *netdev)
+void intel_fpga_etile_set_ethtool_ops(struct net_device *netdev)
 {
-	netdev->ethtool_ops = &xtile_ethtool_ops;
+	netdev->ethtool_ops = &etile_ethtool_ops;
 }
 
 

@@ -9,6 +9,7 @@
  */
 
 #include "intel_fpga_eth_main.h"
+#include "intel_fpga_eth_tile_ops.h"
 #include <linux/platform_device.h>
 #include <linux/of_platform.h>
 
@@ -77,12 +78,12 @@ void qsfp_link_status(struct work_struct *work) {
 		goto reshed;
 
 	else if (is_next_iter_fine == true) {
-		if ( priv->qsfp_ops->qsfp_link_up )
-			priv->qsfp_ops->qsfp_link_up(priv);
+		if ( priv->spec_ops->qsfp_ops.qsfp_link_up )
+			priv->spec_ops->qsfp_ops.qsfp_link_up(priv);
         }
         else {
-		if ( priv->qsfp_ops->qsfp_link_down )
-			priv->qsfp_ops->qsfp_link_down(priv);
+		if ( priv->spec_ops->qsfp_ops.qsfp_link_down )
+			priv->spec_ops->qsfp_ops.qsfp_link_down(priv);
         }
 	
 	priv->prev_link_state = is_next_iter_fine;
