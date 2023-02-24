@@ -49,6 +49,7 @@
 #define FPGA_CONFIG_POLL_COUNT_FAST		50
 #define FPGA_CONFIG_POLL_COUNT_SLOW		58
 #define BYTE_TO_WORD_SIZE				4
+#define SVC_BUFFER_RECLAIM_SIZE			4
 
 /* stratix10 service layer clients */
 #define STRATIX10_RSU				"stratix10-rsu"
@@ -218,7 +219,7 @@ static void svc_thread_cmd_data_claim(struct stratix10_svc_controller *ctrl,
 {
 	struct arm_smccc_res res;
 	unsigned long timeout;
-	void *buf_claim_addr[4] = {NULL};
+	void *buf_claim_addr[SVC_BUFFER_RECLAIM_SIZE] = {NULL};
 	int buf_claim_count = 0;
 
 	reinit_completion(&ctrl->complete_status);
@@ -243,23 +244,24 @@ static void svc_thread_cmd_data_claim(struct stratix10_svc_controller *ctrl,
 				break;
 			}
 
-			if (buf_claim_count >= 4) {
-				/* Maximum buffer to reclaim */
+			if (buf_claim_count >= SVC_BUFFER_RECLAIM_SIZE) {
+				/* Expecting no more than defined size */
 				pr_err("%s Buffer re-claim error", __func__);
 				break;
 			}
 
-			buf_claim_addr[buf_claim_count++]
-			= svc_pa_to_va(res.a1);
-			if (res.a2) {
-				buf_claim_addr[buf_claim_count++]
-				= svc_pa_to_va(res.a2);
-			}
-			if (res.a3) {
-				buf_claim_addr[buf_claim_count++]
-				= svc_pa_to_va(res.a3);
+			buf_claim_addr[buf_claim_count] = svc_pa_to_va(res.a1);
+			buf_claim_count++;
+
+			if (res.a2 && buf_claim_count < SVC_BUFFER_RECLAIM_SIZE) {
+				buf_claim_addr[buf_claim_count] = svc_pa_to_va(res.a2);
+				buf_claim_count++;
 			}
 
+			if (res.a3 && buf_claim_count < SVC_BUFFER_RECLAIM_SIZE) {
+				buf_claim_addr[buf_claim_count] = svc_pa_to_va(res.a3);
+				buf_claim_count++;
+			}
 		}
 	} while (res.a0 == INTEL_SIP_SMC_STATUS_OK ||
 		 res.a0 == INTEL_SIP_SMC_STATUS_BUSY ||
