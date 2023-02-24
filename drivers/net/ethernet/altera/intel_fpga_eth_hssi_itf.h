@@ -128,6 +128,10 @@ u64  hssi_read_mac_stats64(struct platform_device *pdev,
 			   u32 port,
 			   enum hssiss_mac_stat_counter_type stat_type);
 
+u64  hssi_read_mac_stats64_atomic(struct platform_device *pdev,
+			   u32 port,
+			   enum hssiss_mac_stat_counter_type stat_type);
+
 void hssi_disable_hotplug(struct platform_device *pdev);
 
 void hssi_enable_hotplug(struct platform_device *pdev);

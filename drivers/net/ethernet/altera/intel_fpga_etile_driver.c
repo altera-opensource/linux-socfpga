@@ -12,7 +12,7 @@
 #include "intel_fpga_eth_hssi_itf.h"
 #include <linux/interrupt.h>
 
-static void etile_set_mac(struct intel_fpga_etile_eth_private *priv,
+static void etile_set_mac(intel_fpga_xtile_eth_private *priv,
 			  bool enable)
 {
 	struct platform_device *pdev = priv->pdev_hssi;
@@ -41,12 +41,13 @@ static void etile_set_mac(struct intel_fpga_etile_eth_private *priv,
 	}
 }
 
-void etile_update_mac_addr(struct intel_fpga_etile_eth_private *priv,
-			   u8 *addr)
+void etile_update_mac_addr(intel_fpga_xtile_eth_private *priv)
 {
 	u32 msb;
 	u32 lsb;
 	u32 chan = priv->tile_chan;
+	u8 *addr = priv->dev->dev_addr;
+
 	struct platform_device *pdev = priv->pdev_hssi;
 
 	lsb = (addr[2] << 24) | (addr[3] << 16) | (addr[4] << 8) | addr[5];
@@ -62,7 +63,7 @@ void etile_update_mac_addr(struct intel_fpga_etile_eth_private *priv,
 		     eth_tx_mac_csroffs(tx_mac_conf), ETH_TX_MAC_DISABLE_S_ADDR_EN);
 }
 
-static void etile_set_mac_flow_ctrl(struct intel_fpga_etile_eth_private *priv)
+static void etile_set_mac_flow_ctrl(intel_fpga_xtile_eth_private *priv)
 {
 	u32 reg;
 	struct platform_device *pdev = priv->pdev_hssi;
@@ -111,7 +112,7 @@ static void etile_set_mac_flow_ctrl(struct intel_fpga_etile_eth_private *priv)
 		netdev_info(priv->dev, "E-tile: pause_quanta0: 0x%08x\n", reg);
 }
 
-static int eth_etile_tx_rx_user_flow(struct intel_fpga_etile_eth_private *priv)
+static int eth_etile_tx_rx_user_flow(intel_fpga_xtile_eth_private *priv)
 {
 	int ret;
 	u32 ui_value;
@@ -250,9 +251,9 @@ static int eth_etile_tx_rx_user_flow(struct intel_fpga_etile_eth_private *priv)
 	return 0;
 }
 
-void pma_digital_reset(struct intel_fpga_etile_eth_private *priv,
-		       bool tx_reset,
-		       bool rx_reset)
+void etile_pma_digital_reset(intel_fpga_xtile_eth_private *priv,
+				bool tx_reset,
+				bool rx_reset)
 {
 	struct platform_device *pdev = priv->pdev_hssi;
 	u32 chan = priv->tile_chan;
@@ -271,13 +272,13 @@ void pma_digital_reset(struct intel_fpga_etile_eth_private *priv,
 			    chan, eth_phy_csroffs(phy_config), 0x2);
 }
 
-int init_mac(struct intel_fpga_etile_eth_private *priv)
+int etile_init_mac(intel_fpga_xtile_eth_private *priv)
 {
         int ret;
 
         /* Enable in E-tile Tx datapath */
         etile_set_mac(priv, true);
-        etile_update_mac_addr(priv, priv->dev->dev_addr);
+        etile_update_mac_addr(priv);
 
         ret = eth_etile_tx_rx_user_flow(priv);
         if (ret < 0) {
@@ -294,7 +295,7 @@ int init_mac(struct intel_fpga_etile_eth_private *priv)
 static void etile_get_stats64(struct net_device *dev,
 		       struct rtnl_link_stats64 *storage)
 {
-	struct intel_fpga_etile_eth_private *priv = netdev_priv(dev);
+	intel_fpga_xtile_eth_private *priv = netdev_priv(dev);
 	struct platform_device *pdev = priv->pdev_hssi;
 	u32 hssi_port = priv->hssi_port;
 	u32 chan = priv->tile_chan;
@@ -312,8 +313,8 @@ static void etile_get_stats64(struct net_device *dev,
 			hssi_port, MACSTAT_RX_MULTICAST);
 
 	storage->rx_length_errors =
-		hssi_read_mac_stats64(pdev, hssi_port, MACSTAT_RX_UNDERSIZE) +
-		hssi_read_mac_stats64(pdev, hssi_port, MACSTAT_RX_OVERSIZE);
+		hssi_read_mac_stats64_atomic(pdev, hssi_port, MACSTAT_RX_UNDERSIZE) +
+		hssi_read_mac_stats64_atomic(pdev, hssi_port, MACSTAT_RX_OVERSIZE);
 
 	storage->rx_crc_errors = hssi_read_mac_stats64(pdev,
 			hssi_port, MACSTAT_RX_CRC_ERRORS);
@@ -361,11 +362,4 @@ static void etile_get_stats64(struct net_device *dev,
 	storage->tx_window_errors = 0;
 	storage->tx_aborted_errors = 0;
 	storage->tx_heartbeat_errors = 0;
-}
-
-
-void xtile_get_stats64(struct net_device *dev,
-		       struct rtnl_link_stats64 *storage)
-{
-  etile_get_stats64(dev, storage);
 }

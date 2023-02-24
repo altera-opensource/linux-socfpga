@@ -26,7 +26,7 @@
 #define MAX_COUNT_OFFSET		64000
 
 /* Init FEC */
-int fec_init(struct platform_device *pdev, struct intel_fpga_etile_eth_private *priv)
+int fec_init(struct platform_device *pdev, intel_fpga_xtile_eth_private *priv)
 {
 	int ret;
 
@@ -54,7 +54,7 @@ int fec_init(struct platform_device *pdev, struct intel_fpga_etile_eth_private *
 /* Calculate Unit Interval Adjustments */
 void ui_adjustments(struct timer_list *t)
 {
-	struct intel_fpga_etile_eth_private *priv = from_timer(priv, t, fec_timer);
+	intel_fpga_xtile_eth_private *priv = from_timer(priv, t, fec_timer);
 	struct platform_device *pdev = priv->pdev_hssi;
 	u32 chan = priv->tile_chan;
 

@@ -27,7 +27,7 @@ u32 hssi_csrrd32(struct platform_device *pdev,
 
 	if (ret_status != INTEL_FPGA_RET_SUCCESS) {
 		dev_err(&pdev->dev,
-			"Error reading the 32 bit regbank %d offset %x rc %x\n",
+			"Error reading the 32 bit regbank %d offset 0x%x rc %d\n",
 			regbank, offset, ret_status);
 	}
 	return ret_value;
@@ -49,7 +49,7 @@ u32 hssi_csrrd32_atomic(struct platform_device *pdev,
 
 	if (ret_status != INTEL_FPGA_RET_SUCCESS) {
 		dev_err(&pdev->dev,
-			"Error reading the 32 bit regbank %d offset %x rc %x\n",
+			"Error reading the 32 bit regbank %d offset 0x%x rc %d\n",
 			regbank, offset, ret_status);
 	}
 
@@ -108,7 +108,7 @@ static void hssi_csrwr32_local(struct platform_device *pdev,
 
 	if (ret_status != INTEL_FPGA_RET_SUCCESS) {
 		dev_err(&pdev->dev,
-			"Error writing 32 bit regbank %d offset %x rc %x\n",
+			"Error writing 32 bit regbank %d offset 0x%x rc %d\n",
 			regbank, offset, ret_status);
 	}
 }
@@ -179,7 +179,7 @@ int hssi_csrrd8_errcheck(struct platform_device *pdev,
   	}
 	else {
 		dev_err(&pdev->dev,
-			"csr read access error 8 bit regbank %d offset %x rc %x\n",
+			"csr read access error 8 bit regbank %d offset 0x%x rc %d\n",
 			regbank, offset, ret_status);
 	}
 
@@ -205,7 +205,7 @@ void hssi_csrwr8(struct platform_device *pdev,
 
 	if (ret_status != INTEL_FPGA_RET_SUCCESS) {
 		dev_err(&pdev->dev,
-			"Error reading access 8 bit, regbank %d offset %x rc %d\n",
+			"Error reading access 8 bit, regbank %d offset 0x%x rc %d\n",
 			regbank, offset, ret_status);
 	}
 }
@@ -317,7 +317,8 @@ void hssi_reset_mac_stats(struct platform_device *pdev,
 static u64  hssi_read_mac_stats(struct platform_device *pdev,
 				u32 port,
 			  	enum hssiss_mac_stat_counter_type stat_type,
-			       	bool is_lsb) {
+			       	bool is_lsb,
+				bool atomicity) {
 
 	struct read_mac_stat_data mac_stat_data = {
 						    .port_data = port,
@@ -326,13 +327,17 @@ static u64  hssi_read_mac_stats(struct platform_device *pdev,
 						  };
 	int ret_status;
 
-	 ret_status = hssiss_execute_sal_cmd_atomic(pdev,
-			 			    SAL_READ_MAC_STAT,
-						    (void *)&mac_stat_data);
+	if ( atomicity == true ) {
+		ret_status = hssiss_execute_sal_cmd_atomic(pdev,
+				SAL_READ_MAC_STAT,(void *)&mac_stat_data);
+	} else {
+		ret_status = hssiss_execute_sal_cmd(pdev,
+				SAL_READ_MAC_STAT,(void *)&mac_stat_data);
+	}
 
-	 if (ret_status != INTEL_FPGA_RET_SUCCESS) {
+	if (ret_status != INTEL_FPGA_RET_SUCCESS) {
 		dev_err(&pdev->dev,
-			"Error on reading mac statistics %x\n", ret_status);
+			"Error on reading mac statistics %d\n", ret_status);
 	}
 
 	return mac_stat_data.port_data;
@@ -341,8 +346,15 @@ static u64  hssi_read_mac_stats(struct platform_device *pdev,
 u64 hssi_read_mac_stats64(struct platform_device *pdev, u32 port,
 			  enum hssiss_mac_stat_counter_type stat_type) {
 
-	return (u64)(hssi_read_mac_stats(pdev, port, stat_type, false) << 32) |
-		     hssi_read_mac_stats(pdev, port, stat_type, true);
+	return (u64)(hssi_read_mac_stats(pdev, port, stat_type, false, false) << 32) |
+		     hssi_read_mac_stats(pdev, port, stat_type, true, false);
+}
+
+u64 hssi_read_mac_stats64_atomic(struct platform_device *pdev, u32 port,
+				enum hssiss_mac_stat_counter_type stat_type) {
+
+        return (u64)(hssi_read_mac_stats(pdev, port, stat_type, false, true) << 32) |
+		hssi_read_mac_stats(pdev, port, stat_type, true, true);
 }
 
 int hssi_en_serial_loopback(struct platform_device *pdev, u32 port)
@@ -356,7 +368,7 @@ int hssi_en_serial_loopback(struct platform_device *pdev, u32 port)
 	if (ret_status != INTEL_FPGA_RET_SUCCESS)
 	{
 		dev_err(&pdev->dev,
-			"Error enabling loopback rc: %x\n", ret_status);
+			"Error enabling loopback rc: %d\n", ret_status);
 	}
 
 	return ret_status;
@@ -373,7 +385,7 @@ int hssi_dis_serial_loopback(struct platform_device *pdev, u32 port)
 	if (ret_status != INTEL_FPGA_RET_SUCCESS)
 	{
 		dev_err(&pdev->dev,
-			"Error disabling loopback rc: %x\n", ret_status);
+			"Error disabling loopback rc: %d\n", ret_status);
 	}
 
 	return ret_status;
