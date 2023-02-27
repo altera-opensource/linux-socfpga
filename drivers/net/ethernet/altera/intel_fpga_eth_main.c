@@ -1401,8 +1401,9 @@ static int intel_fpga_xtile_probe(struct platform_device *pdev)
 	if (priv->ptp_enable) {
 		dev_tod  = of_parse_phandle(pdev->dev.of_node, "tod", 0);
 		pdev_tod = of_find_device_by_node(dev_tod);
-		priv->ptp_priv = dev_get_drvdata(&pdev_tod->dev);
-		if (!priv->ptp_priv) {
+		if(pdev_tod)
+			priv->ptp_priv = dev_get_drvdata(&pdev_tod->dev);
+		if (!pdev_tod || !priv->ptp_priv) {
 			dev_err(&pdev->dev, "PTP clock not available\n");
 			ret = -ENXIO;
 			goto err_free_netdev;
