@@ -291,7 +291,7 @@ static int intel_fpga_tod_register(struct intel_fpga_tod_private *priv,
 	if (IS_ERR(priv->ptp_clock)) {
 		dev_err_probe(device, PTR_ERR(priv->ptp_clock), "cannot obtain ToD period clock\n");
 		priv->ptp_clock = NULL;
-		ret = PTR_ERR(priv->ptp_clock);
+		ret = -ENODEV;
 		goto err;
 	}
 
@@ -335,18 +335,22 @@ static int intel_fpga_tod_probe(struct platform_device *pdev)
 		ret = -ENOMEM;
 		goto err;
 	}
+
 	/* Time-of-Day (ToD) Clock address space */
 	ret = request_and_map(pdev, "tod_ctrl", &ptp_res,
 			      (void __iomem **)&priv->tod_ctrl);
 	if (ret)
 		goto err;
 
+	dev_info(&pdev->dev, "\tTOD Ctrl at 0x%08lx\n",
+		 (unsigned long)ptp_res->start);
+
 	priv->dev = dev;
 
 	/* Time-of-Day (ToD) Clock period clock */
-	priv->tod_clk = devm_clk_get(&pdev->dev, "tod_in_clock");
+	priv->tod_clk = devm_clk_get(&pdev->dev, "tod_clk");
 	if (IS_ERR(priv->tod_clk)) {
-		ret = PTR_ERR(priv->tod_clk);
+		ret = -ENXIO;
 		dev_err_probe(&pdev->dev, PTR_ERR(priv->tod_clk),
 			      "cannot obtain ToD period clock\n");
 		goto err;
