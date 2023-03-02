@@ -291,75 +291,39 @@ int etile_init_mac(intel_fpga_xtile_eth_private *priv)
         return 0;
 }
 
-/* Ref: https://www.kernel.org/doc/html/latest/networking/statistics.html */
 void etile_get_stats64(struct net_device *dev,
 		       struct rtnl_link_stats64 *storage)
 {
-	intel_fpga_xtile_eth_private *priv = netdev_priv(dev);
-	struct platform_device *pdev = priv->pdev_hssi;
-	u32 hssi_port = priv->hssi_port;
-	u32 chan = priv->tile_chan;
-	u32 lsb;
-	u32 msb;
+	/* a. All the blocking calls are avoided and only driver 
+	 * gathered statistics are populated. This is to avoid 
+	 * long spin locks
+	 * b. Run time statistics can be dumped via ethtool 
+	 */
+
+	storage->multicast  = 0;
+	storage->collisions = 0;
 
 	/* rx stats */
-	storage->rx_packets = hssi_read_mac_stats64(pdev,
-			hssi_port, MACSTAT_RX_TOTAL_PACKETS);
-
-	storage->rx_bytes = hssi_read_mac_stats64(pdev,
-			hssi_port, MACSTAT_RX_TOTAL_BYTES);
-
-	storage->multicast = hssi_read_mac_stats64(pdev,
-			hssi_port, MACSTAT_RX_MULTICAST);
-
-	storage->rx_length_errors =
-		hssi_read_mac_stats64_atomic(pdev, hssi_port, MACSTAT_RX_UNDERSIZE) +
-		hssi_read_mac_stats64_atomic(pdev, hssi_port, MACSTAT_RX_OVERSIZE);
-
-	storage->rx_crc_errors = hssi_read_mac_stats64(pdev,
-			hssi_port, MACSTAT_RX_CRC_ERRORS);
-
-	storage->rx_dropped = dev->stats.rx_dropped + 
-		hssi_read_mac_stats64(pdev, hssi_port, MACSTAT_ETHER_DROPS);
-
-	storage->rx_errors = storage->rx_length_errors + 
-		storage->rx_crc_errors;
-
-	storage->collisions = 0;
-	storage->rx_over_errors = 0;
-	storage->rx_fifo_errors = 0;
+	storage->rx_crc_errors    = 0;
+	storage->rx_over_errors   = 0;
+	storage->rx_fifo_errors   = 0;
 	storage->rx_missed_errors = 0;
-
-
-	/* tx stats */
-	storage->tx_packets = hssi_read_mac_stats64(pdev,
-			hssi_port, MACSTAT_TX_PACKETS);
-
-	storage->tx_bytes = hssi_read_mac_stats64(pdev,
-			hssi_port, MACSTAT_TX_BYTES);
-
-	lsb = hssi_csrrd32_atomic(pdev,HSSI_ETH_RECONFIG,
-			chan,eth_tx_stats_csroffs(tx_malformed_ctrl_lsb));
-
-	msb = hssi_csrrd32_atomic(pdev,HSSI_ETH_RECONFIG,
-			chan,eth_tx_stats_csroffs(tx_malformed_ctrl_msb));
-
-	storage->tx_errors = ( ((u64)msb << 32) | lsb ) +
-	       dev->stats.tx_errors;
-
-	lsb = hssi_csrrd32_atomic(pdev,HSSI_ETH_RECONFIG,
-			chan,eth_tx_stats_csroffs(tx_dropped_ctrl_lsb));
-
-	msb = hssi_csrrd32_atomic(pdev,HSSI_ETH_RECONFIG,
-			chan,eth_tx_stats_csroffs(tx_dropped_ctrl_msb));
+	storage->rx_length_errors = 0;
+	storage->rx_bytes   = dev->stats.rx_bytes;
+	storage->rx_packets = dev->stats.rx_packets;
+	storage->rx_dropped = dev->stats.rx_dropped;
+	storage->rx_errors  = storage->rx_length_errors +
+		storage->rx_crc_errors;
 	
-	storage->tx_dropped = ( ((u64)msb << 32) | lsb ) +
-		dev->stats.tx_dropped;
-
-	storage->rx_compressed = 0;
-	storage->tx_compressed = 0;
-	storage->tx_fifo_errors = 0;
-	storage->tx_window_errors = 0;
-	storage->tx_aborted_errors = 0;
+	/* tx stats */
+	storage->tx_errors 	         = 0;
+	storage->tx_dropped          = 0;
+	storage->rx_compressed 	     = 0;
+	storage->tx_compressed 	     = 0;
+	storage->tx_fifo_errors      = 0;
+	storage->tx_window_errors    = 0;
+	storage->tx_aborted_errors   = 0;
 	storage->tx_heartbeat_errors = 0;
+	storage->tx_bytes = dev->stats.tx_bytes;
+	storage->tx_packets = dev->stats.tx_packets;
 }
