@@ -1,9 +1,9 @@
 # SPDX-License-Identifier: GPL-2.0-only
 dtb-$(CONFIG_ARCH_INTEL_SOCFPGA) += socfpga_n6000_10G_ptp.dtb \
 				socfpga_n6000_25G_ptp.dtb \
-				socfpga_agilex_ftile_25g.dtb \
 				socfpga_agilex_n6000.dtb \
 				socfpga_agilex_socdk.dtb \
+				socfpga_fm87_ftile_25g_ptp.dtb \
 				socfpga_agilex_socdk_nand.dtb \
 				socfpga_n5x_socdk.dtb
 dtb-$(CONFIG_ARCH_KEEMBAY) += keembay-evm.dtb
