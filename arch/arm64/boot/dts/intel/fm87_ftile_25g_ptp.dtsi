@@ -1,0 +1,66 @@
+// SPDX-License-Identifier: GPL-2.0
+/*
+ * Copyright(C) 2022, Intel Corporation
+ */
+
+/* Add this piece of dtsi fragment as #include "fm87_ftile_25g_ptp.dtsi"
+ * in the file socfpga_fm87_ftile_25g_ptp.dts. Compile it in the kernel along with
+ * socfpga_agilex.dtsi
+ */
+
+/{
+	soc {
+		agilex_hps_bridges: bus@80000000 {
+                        compatible = "simple-bus";
+                        reg = <0x80000000 0x60000000>,
+                              <0xf9000000 0x00100000>;
+                        reg-names = "axi_h2f", "axi_h2f_lw";
+                        #address-cells = <2>;
+                        #size-cells = <1>;
+                        ranges =        <0x00000000 0x00000000 0xf9000000 0x00001000>,
+                                        <0x00000001 0x00000000 0x80000000 0x00040000>,
+                                        <0x00000001 0x04400100 0x84400100 0x00000010>,
+                                        <0x00000001 0x04400120 0x84400120 0x00000010>;
+
+
+                        qsfp_eth0: qsfp-eth0 {
+                                compatible = "sff,qsfp";
+                                i2c-bus = <&i2c0>;
+                                qsfpdd_initmode-gpio = <&qsfpdd_ctrl_pio 1 GPIO_ACTIVE_HIGH>;
+                                qsfpdd_modseln-gpio = <&qsfpdd_ctrl_pio 2 GPIO_ACTIVE_LOW>;
+                                qsfpdd_modprsn-gpio = <&qsfpdd_status_pio 0 GPIO_ACTIVE_LOW>;
+                                qsfpdd_resetn-gpio = <&qsfpdd_ctrl_pio 0 GPIO_ACTIVE_LOW>;
+                                qsfpdd_intn-gpio = <&qsfpdd_status_pio 1 GPIO_ACTIVE_LOW>;
+                                maximum-power-milliwatt = <1000>;
+                                status = "okay";
+                        };
+
+                        qsfpdd_status_pio: gpio@4400100 {
+                                compatible = "altr,pio-1.0";
+                                reg = <0x00000001 0x04400100 0x10>;
+                                interrupt-parent = <&intc>;
+                                interrupts = <0 22 4>;
+                                altr,gpio-bank-width = <4>;
+                                altr,interrupt-type = <2>;
+
+                                altr,interrupt_type = <2>;
+                                #gpio-cells = <2>;
+                                gpio-controller;
+                                status = "okay";
+                        };
+
+                        qsfpdd_ctrl_pio: gpio@4400120 {
+                                compatible = "altr,pio-1.0";
+                                reg = <0x00000001 0x04400120 0x10>;
+                                interrupt-parent = <&intc>;
+                                interrupts = <0 23 4>;
+                                altr,gpio-bank-width = <4>;
+                                altr,interrupt-type = <2>;
+                                altr,interrupt_type = <2>;
+                                #gpio-cells = <2>;
+                                gpio-controller;
+                                status = "okay";
+                        };
+		};
+	};
+};
