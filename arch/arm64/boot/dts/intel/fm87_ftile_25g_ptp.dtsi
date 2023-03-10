@@ -19,8 +19,8 @@
                         #size-cells = <1>;
                         ranges =        <0x00000000 0x00000000 0xf9000000 0x00001000>,
                                         <0x00000001 0x00000000 0x80000000 0x00040000>,
-                                        <0x00000001 0x04400100 0x84400100 0x00000010>,
-                                        <0x00000001 0x04400120 0x84400120 0x00000010>;
+                                        <0x00000001 0x04040050 0x84040050 0x00000010>,
+                                        <0x00000001 0x04040040 0x84040040 0x00000010>;
 
 
                         qsfp_eth0: qsfp-eth0 {
@@ -29,15 +29,16 @@
                                 qsfpdd_initmode-gpio = <&qsfpdd_ctrl_pio 1 GPIO_ACTIVE_HIGH>;
                                 qsfpdd_modseln-gpio = <&qsfpdd_ctrl_pio 2 GPIO_ACTIVE_LOW>;
                                 qsfpdd_modprsn-gpio = <&qsfpdd_status_pio 0 GPIO_ACTIVE_LOW>;
-                                qsfpdd_resetn-gpio = <&qsfpdd_ctrl_pio 0 GPIO_ACTIVE_LOW>;
+                                qsfpdd_resetn-gpio = <&qsfpdd_ctrl_pio 0 GPIO_ACTIVE_HIGH>;
                                 qsfpdd_intn-gpio = <&qsfpdd_status_pio 1 GPIO_ACTIVE_LOW>;
+				agilex_hps_spim = <&qsfpdd_ctrl_pio 3 GPIO_ACTIVE_HIGH>;
                                 maximum-power-milliwatt = <1000>;
                                 status = "okay";
                         };
 
-                        qsfpdd_status_pio: gpio@4400100 {
+                        qsfpdd_status_pio: gpio@4040050 {
                                 compatible = "altr,pio-1.0";
-                                reg = <0x00000001 0x04400100 0x10>;
+                                reg = <0x00000001 0x04040050 0x10>;
                                 interrupt-parent = <&intc>;
                                 interrupts = <0 22 4>;
                                 altr,gpio-bank-width = <4>;
@@ -49,9 +50,9 @@
                                 status = "okay";
                         };
 
-                        qsfpdd_ctrl_pio: gpio@4400120 {
+                        qsfpdd_ctrl_pio: gpio@4040040 {
                                 compatible = "altr,pio-1.0";
-                                reg = <0x00000001 0x04400120 0x10>;
+                                reg = <0x00000001 0x04040040 0x10>;
                                 interrupt-parent = <&intc>;
                                 interrupts = <0 23 4>;
                                 altr,gpio-bank-width = <4>;
