@@ -454,8 +454,7 @@ hssi_eth_port_sts hssiss_get_ethport_status(struct platform_device *pdev, int po
 	hssi_eth_port_sts port_sts;
 
 	if (priv->ver == HSSISS_FTILE) {
-		port_sts.full = csrrd32_withoffset(priv->sscsr,
-				priv->csr_addroff,
+		port_sts.full = csrrd32(priv->sscsr,
 				(HSSISS_CSR_ETH_PORT_STS_FTILE + port * 4));
 	} else {
 		port_sts.full = csrrd32_withoffset(priv->sscsr,
