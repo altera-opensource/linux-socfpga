@@ -152,6 +152,8 @@ typedef enum {
 	PHY_INTERFACE_MODE_USXGMII,
 	/* 10GBASE-KR - with Clause 73 AN */
 	PHY_INTERFACE_MODE_10GKR,
+	/* 25GBASE-KR */
+	PHY_INTERFACE_MODE_25GKR,
 	PHY_INTERFACE_MODE_MAX,
 } phy_interface_t;
 
@@ -233,6 +235,8 @@ static inline const char *phy_modes(phy_interface_t interface)
 		return "10gbase-kr";
 	case PHY_INTERFACE_MODE_100BASEX:
 		return "100base-x";
+	case PHY_INTERFACE_MODE_25GKR:
+		return "25gbase-kr";
 	default:
 		return "unknown";
 	}
