@@ -75,7 +75,7 @@ void ui_adjustments(struct timer_list *t)
 	 * Alignment marker (TAM)
 	 */
 	hssi_set_bit_atomic(pdev, HSSI_ETH_RECONFIG, chan, eth_ptp_csroffs(tam_snapshot),
-		    ETH_TAM_SNAPSHOT);
+		    ETH_TAM_SNAPSHOT,false);
 
 	/* Read snapshotted initial TX TAM and counter values */
 	tx_tam_l_initial = hssi_csrrd32_atomic(pdev, HSSI_ETH_RECONFIG, chan, eth_ptp_csroffs(tx_tam_l));
@@ -91,14 +91,14 @@ void ui_adjustments(struct timer_list *t)
 
 	/* Clear snapshot */
 	hssi_clear_bit_atomic(pdev, HSSI_ETH_RECONFIG, chan, eth_ptp_csroffs(tam_snapshot),
-		      ETH_TAM_SNAPSHOT);
+		      ETH_TAM_SNAPSHOT,false);
 
 	/* Wait for a few TAM interval */
 	udelay(5300);
 
 	/* Request snapshot of Nth TX TAM and RX TAM */
 	hssi_set_bit_atomic(pdev, HSSI_ETH_RECONFIG, chan, eth_ptp_csroffs(tam_snapshot),
-		    ETH_TAM_SNAPSHOT);
+		    ETH_TAM_SNAPSHOT,false);
 
 	/* Read snapshotted of Nth TX TAM and counter values */
 	tx_tam_l_nth = hssi_csrrd32_atomic(pdev, HSSI_ETH_RECONFIG, chan, eth_ptp_csroffs(tx_tam_l));
@@ -114,7 +114,7 @@ void ui_adjustments(struct timer_list *t)
 
 	/* Clear snapshot */
 	hssi_clear_bit_atomic(pdev, HSSI_ETH_RECONFIG, chan, eth_ptp_csroffs(tam_snapshot),
-		      ETH_TAM_SNAPSHOT);
+		      ETH_TAM_SNAPSHOT,false);
 
 	if ((get_jiffies_64() - start_jiffies) > HZ) {
 		netdev_warn(priv->dev,

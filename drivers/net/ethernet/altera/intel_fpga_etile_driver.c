@@ -22,20 +22,24 @@ static void etile_set_mac(intel_fpga_xtile_eth_private *priv,
 		/* Enable Tx datapath */
 		hssi_clear_bit(pdev, HSSI_ETH_RECONFIG, chan,
 			      eth_tx_mac_csroffs(tx_mac_conf),
-			      ETH_TX_MAC_DISABLE_TXVMAC);
+			      ETH_TX_MAC_DISABLE_TXVMAC,
+			      false);
 
 		hssi_clear_bit(pdev, HSSI_ETH_RECONFIG, chan,
 			       eth_rx_mac_csroffs(rx_mac_frwd_rx_crc),
-			       ETH_RX_MAC_CRC_FORWARD);
+			       ETH_RX_MAC_CRC_FORWARD,
+			       false);
 	} else {
 		/* Disable Tx datapath */
 		hssi_set_bit(pdev, HSSI_ETH_RECONFIG, chan,
 			    eth_tx_mac_csroffs(tx_mac_conf),
-			    ETH_TX_MAC_DISABLE_TXVMAC);
+			    ETH_TX_MAC_DISABLE_TXVMAC,
+			    false);
 
 		hssi_clear_bit(pdev, HSSI_ETH_RECONFIG, chan,
 			      eth_tx_mac_csroffs(tx_mac_conf),
-			      ETH_TX_MAC_DISABLE_S_ADDR_EN);
+			      ETH_TX_MAC_DISABLE_S_ADDR_EN,
+			      false);
 
 		netif_warn(priv, drv, priv->dev, "Tx and Rx datapath stop done\n");
 	}
@@ -60,7 +64,7 @@ void etile_update_mac_addr(intel_fpga_xtile_eth_private *priv)
 		     eth_tx_mac_csroffs(tx_mac_source_addr_higher_bytes), msb);
 
 	hssi_set_bit(pdev, HSSI_ETH_RECONFIG, chan,
-		     eth_tx_mac_csroffs(tx_mac_conf), ETH_TX_MAC_DISABLE_S_ADDR_EN);
+		     eth_tx_mac_csroffs(tx_mac_conf), ETH_TX_MAC_DISABLE_S_ADDR_EN,false);
 }
 
 static void etile_set_mac_flow_ctrl(intel_fpga_xtile_eth_private *priv)
@@ -73,11 +77,11 @@ static void etile_set_mac_flow_ctrl(intel_fpga_xtile_eth_private *priv)
 
 		hssi_set_bit(pdev, HSSI_ETH_RECONFIG, chan,
 			    eth_pause_and_priority_csroffs(rx_flow_control_feature_cfg),
-			    ETH_RX_EN_STD_FLOW_CTRL);
+			    ETH_RX_EN_STD_FLOW_CTRL,false);
 	else
 		hssi_clear_bit(pdev, HSSI_ETH_RECONFIG, chan,
 			      eth_pause_and_priority_csroffs(rx_flow_control_feature_cfg),
-			      ETH_RX_EN_STD_FLOW_CTRL);
+			      ETH_RX_EN_STD_FLOW_CTRL,false);
 
 	reg = hssi_csrrd32(pdev, HSSI_ETH_RECONFIG, chan,
 		      eth_pause_and_priority_csroffs(rx_flow_control_feature_cfg));
@@ -89,11 +93,11 @@ static void etile_set_mac_flow_ctrl(intel_fpga_xtile_eth_private *priv)
 
 		hssi_set_bit(pdev, HSSI_ETH_RECONFIG, chan,
 			    eth_pause_and_priority_csroffs(tx_flow_control_feature_cfg),
-			    ETH_TX_EN_PRIORITY_FLOW_CTRL);
+			    ETH_TX_EN_PRIORITY_FLOW_CTRL,false);
 	} else {
 		hssi_clear_bit(pdev, HSSI_ETH_RECONFIG, chan,
 			      eth_pause_and_priority_csroffs(tx_flow_control_feature_cfg),
-			      ETH_TX_EN_PRIORITY_FLOW_CTRL);
+			      ETH_TX_EN_PRIORITY_FLOW_CTRL,false);
 	}
 
 	reg = hssi_csrrd32(pdev, HSSI_ETH_RECONFIG, chan,

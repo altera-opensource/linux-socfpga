@@ -475,6 +475,7 @@ int xtile_check_counter_complete(intel_fpga_xtile_eth_private *priv, u32 regbank
 	int counter;
 	u32 chan = priv->tile_chan;
 	struct platform_device *pdev = priv->pdev_hssi;
+	struct hssiss_private *priv_hssi = platform_get_drvdata(pdev);
 
 	counter = 0;
 	switch (align) {
@@ -499,14 +500,17 @@ int xtile_check_counter_complete(intel_fpga_xtile_eth_private *priv, u32 regbank
 		}
 		break;
 	default: /* default is word aligned */
+
+	if(priv_hssi->ver == HSSISS_ETILE)
+	{
 		while (counter++ < INTEL_FPGA_XTILE_SW_RESET_WATCHDOG_CNTR) {
 			if (set_bit) {
 				if (hssi_bit_is_set(pdev, regbank, chan,
-						   offs, bit_mask))
+						   offs, bit_mask,false))
 					break;
 			} else {
 				if (hssi_bit_is_clear(pdev, regbank, chan,
-						     offs, bit_mask))
+						     offs, bit_mask,false))
 					break;
 			}
 			udelay(1);
@@ -514,14 +518,42 @@ int xtile_check_counter_complete(intel_fpga_xtile_eth_private *priv, u32 regbank
 		if (counter >= INTEL_FPGA_XTILE_SW_RESET_WATCHDOG_CNTR) {
 			if (set_bit) {
 				if (hssi_bit_is_clear(pdev, regbank, chan,
-						     offs, bit_mask))
+						     offs, bit_mask,false))
 					return -EINVAL;
 			} else {
 				if (hssi_bit_is_set(pdev, regbank, chan,
-						   offs, bit_mask))
+						   offs, bit_mask,false))
 					return -EINVAL;
 			}
 		}
+	}
+	else
+	{
+		 while (counter++ < INTEL_FPGA_XTILE_SW_RESET_WATCHDOG_CNTR) {
+                        if (set_bit) {
+                                if (hssi_bit_is_set(pdev, regbank, chan,
+                                                   offs, bit_mask,true))
+                                        break;
+                        } else {
+                                if (hssi_bit_is_clear(pdev, regbank, chan,
+                                                     offs, bit_mask,true))
+                                        break;
+                        }
+                        udelay(1);
+                }
+                if (counter >= INTEL_FPGA_XTILE_SW_RESET_WATCHDOG_CNTR) {
+                        if (set_bit) {
+                                if (hssi_bit_is_clear(pdev, regbank, chan,
+                                                     offs, bit_mask,true))
+                                        return -EINVAL;
+                        } else {
+                                if (hssi_bit_is_set(pdev, regbank, chan,
+                                                   offs, bit_mask,true))
+                                        return -EINVAL;
+                        }
+                }
+
+	}
 		break;
 	}
 	return 0;
