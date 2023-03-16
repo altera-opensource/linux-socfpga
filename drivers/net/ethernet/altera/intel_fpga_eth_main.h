@@ -93,4 +93,19 @@ typedef struct {
 
 } intel_fpga_xtile_eth_private;
 
+/* RX FIFO Address Space
+ */
+struct intel_fpga_rx_fifo {
+	u32 fill_level;					//0x00
+	u32 reserved;					//0x04
+	u32 almost_full_threshold;			//0x08
+	u32 almost_empty_threshold;			//0x0C
+	u32 cut_through_threshold;			//0x10
+	u32 drop_on_error;				//0x14
+};
+
+#define rx_fifo_csroffs(a)	(offsetof(struct intel_fpga_rx_fifo, a))
+
+#define tx_fifo_csroffs(a)	(offsetof(struct intel_fpga_rx_fifo, a))
+
 #endif

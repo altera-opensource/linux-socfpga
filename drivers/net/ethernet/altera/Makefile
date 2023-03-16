@@ -38,17 +38,17 @@ ifeq ($(CONFIG_INTEL_FPGA_HSSISS),y)
         endif
 endif
 
-ifeq ($(CONFIG_INTEL_FPGA_HSSI_ETILE),y)
-	obj-$(CONFIG_INTEL_FPGA_HSSI_ETILE) += intel_fpga_hssi_etile.o
+ifeq ($(CONFIG_INTEL_FPGA_HSSI_XTILE),y)
+	obj-$(CONFIG_INTEL_FPGA_HSSI_XTILE) += intel_fpga_hssi_xtile.o
         ifeq ($(CONFIG_DEBUG_FS),y)
-                intel_fpga_hssi_etile-objs := intel_fpga_eth_debug.o
+                intel_fpga_hssi_xtile-objs := intel_fpga_eth_debug.o
 	endif
-        intel_fpga_hssi_etile-objs += intel_fpga_eth_main.o           \
+        intel_fpga_hssi_xtile-objs += intel_fpga_eth_main.o           \
 				      intel_fpga_hssi_etile_fec.o     \
 				      intel_fpga_etile_driver.o       \
                                       intel_fpga_hssi_etile_ethtool.o \
+				      intel_fpga_ftile_driver.o		\
+				      intel_fpga_hssi_ftile_fec.o	\
+				      intel_fpga_hssi_ftile_ethtool.o	\
 				      intel_fpga_eth_qsfp.o	    
 endif
-
-
-

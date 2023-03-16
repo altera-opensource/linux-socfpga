@@ -1,4 +1,4 @@
-
+#include "intel_fpga_eth_main.h"
 
 struct xtile_spec_ops {
 	const struct altera_dmaops *dma_ops;
@@ -30,3 +30,5 @@ struct xtile_spec_ops {
 		void (*eth_reg_callback) (struct net_device *netdev);
 	} eth_ops;
 };
+
+

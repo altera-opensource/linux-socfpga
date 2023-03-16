@@ -44,7 +44,8 @@ static int hssi_csrrd32_errcheck(struct platform_device *pdev,
 static u32 hssi_csrrd32_local(struct platform_device *pdev,
                  enum hssiss_tile_regbank regbank,
                  u32 chan,
-                 u32 offset) {
+                 u32 offset,
+		 bool is_byte_addressing) {
         u32 ret_value;
 
         int ret_status = !INTEL_FPGA_RET_SUCCESS;
@@ -55,7 +56,7 @@ static u32 hssi_csrrd32_local(struct platform_device *pdev,
                                            offset,
                                            false,
                                            &ret_value,
-                                           false);
+                                           is_byte_addressing);
 
         if (ret_status != INTEL_FPGA_RET_SUCCESS) {
                 dev_err(&pdev->dev,
@@ -71,7 +72,7 @@ u32 hssi_csrrd32(struct platform_device *pdev,
 		 u32 chan, 
 		 u32 offset) {
 
-	return hssi_csrrd32_local(pdev,regbank,chan,offset);
+	return hssi_csrrd32_local(pdev,regbank,chan,offset,false);
 }
 
 u32 hssi_csrrd32_atomic(struct platform_device *pdev, 
@@ -79,7 +80,7 @@ u32 hssi_csrrd32_atomic(struct platform_device *pdev,
 			u32 chan, 
 			u32 offset) {
 
-	return hssi_csrrd32_local(pdev,regbank,chan,offset);
+	return hssi_csrrd32_local(pdev,regbank,chan,offset,false);
 }
 
 u32 hssi_csrrd32_ba(struct platform_device *pdev,
@@ -87,7 +88,7 @@ u32 hssi_csrrd32_ba(struct platform_device *pdev,
                  u32 chan,
                  u32 offset) {
       
-        return hssi_csrrd32_local(pdev,regbank,chan,offset);
+        return hssi_csrrd32_local(pdev,regbank,chan,offset,true);
 }
 
 u32 hssi_csrrd32_ba_atomic(struct platform_device *pdev,
@@ -95,7 +96,7 @@ u32 hssi_csrrd32_ba_atomic(struct platform_device *pdev,
                         u32 chan,
                         u32 offset) {
 
-        return hssi_csrrd32_local(pdev,regbank,chan,offset);
+        return hssi_csrrd32_local(pdev,regbank,chan,offset,true);
 }
 
 
