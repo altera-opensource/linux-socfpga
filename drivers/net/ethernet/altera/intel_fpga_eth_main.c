@@ -25,10 +25,11 @@
 
 #include "altera_utils.h"
 #include "intel_fpga_tod.h"
+#include "intel_fpga_eth_ftile.h"
+#include "intel_fpga_eth_main.h"
 #include "intel_fpga_eth_etile.h"
 #include "intel_fpga_eth_hssi_itf.h"
 #include "intel_fpga_eth_tile_ops.h"
-
 #define MAX_STABILITY_CHECK  9
 
 /* Module parameters */
@@ -85,6 +86,34 @@ MODULE_PARM_DESC(dma_tx_num, "Number of descriptors in the TX list");
 #define TXQUEUESTOP_THRESHOLD	2
 
 static const struct of_device_id intel_fpga_xtile_ll_ids[];
+
+
+static int xtile_fec_init(struct platform_device *pdev, intel_fpga_xtile_eth_private *priv)
+{
+	int ret;
+
+	/* get FEC type from device tree */
+	ret  = of_property_read_string(pdev->dev.of_node, "fec-type",
+				       &priv->fec_type);
+	if (ret < 0) {
+		dev_err(&pdev->dev, "cannot obtain fec-type\n");
+		return ret;
+	}
+	dev_info(&pdev->dev, "\tFEC type is %s\n", priv->fec_type);
+
+	/* get FEC channel from device tree */
+	if (of_property_read_u32(pdev->dev.of_node, "fec-cw-pos-rx",
+				 &priv->rsfec_cw_pos_rx)) {
+		dev_err(&pdev->dev, "cannot obtain fec codeword bit position!\n");
+		return -ENXIO;
+	}
+	dev_info(&pdev->dev, "\trsfec rx codeword bit position is 0x%x\n",
+		 priv->rsfec_cw_pos_rx);
+
+	return 0;
+}
+
+
 
 static inline u32 xtile_tx_avail(intel_fpga_xtile_eth_private *priv)
 {
@@ -1286,7 +1315,7 @@ static int intel_fpga_xtile_probe(struct platform_device *pdev)
 
         if (netif_msg_probe(priv))
                 dev_info(&pdev->dev, "\tTX FIFO  at 0x%08lx\n",
-                         (unsigned long)tx_fifo->start);
+	 			(unsigned long)tx_fifo->start);
 
 	if (dma_set_mask_and_coherent(priv->device,
 				      DMA_BIT_MASK(priv->spec_ops->dma_ops->dmamask))) {
@@ -1365,11 +1394,14 @@ static int intel_fpga_xtile_probe(struct platform_device *pdev)
 	}
 
 	/* get default MAC address from device tree */
-	macaddr = of_get_mac_address(pdev->dev.of_node);
-	if (!IS_ERR(macaddr))
-		ether_addr_copy(ndev->dev_addr, macaddr);
-	else
+	if(of_get_mac_address(pdev->dev.of_node,macaddr))
+	{
+		dev_info(&pdev->dev, "cannot obtain MAC address using random HW addresss\n");
 		eth_hw_addr_random(ndev);
+
+	}
+	else
+		ether_addr_copy(ndev->dev_addr, macaddr);
 
 	/* initialize netdev */
 	ndev->netdev_ops = &intel_fpga_xtile_netdev_ops;
@@ -1429,7 +1461,6 @@ static int intel_fpga_xtile_probe(struct platform_device *pdev)
 		dev_err(&pdev->dev, "fixed link property undefined\n");
 		goto err_free_netdev;
 	}
-
 	if (priv->ptp_enable) {
 		dev_tod  = of_parse_phandle(pdev->dev.of_node, "tod", 0);
 		pdev_tod = of_find_device_by_node(dev_tod);
@@ -1451,7 +1482,7 @@ static int intel_fpga_xtile_probe(struct platform_device *pdev)
 
 	platform_set_drvdata(pdev, ndev);
 
-	ret = fec_init(pdev, priv);
+	ret = xtile_fec_init(pdev, priv);
 	if (ret < 0) {
 		dev_err(&pdev->dev, "Unable to init FEC\n");
 		ret = -ENXIO;
@@ -1566,13 +1597,34 @@ static const struct xtile_spec_ops etile_data = {
 		.eth_reg_callback =
 			intel_fpga_etile_set_ethtool_ops,
 	},
-};	
+};
+
+static const struct xtile_spec_ops ftile_data = {
+        .dma_ops   = &altera_dtype_prefetcher,
+        .reset_ops = {
+                .pma_digi_reset = ftile_pma_digital_reset,
+        },
+        .mac_ops = {
+                .init_mac = ftile_init_mac,
+                .update_mac = ftile_update_mac_addr,
+        },
+        .stat_ops = {
+                .net_stats = ftile_get_stats64,
+        },
+        .eth_ops = {
+                .eth_reg_callback =
+                        intel_fpga_ftile_set_ethtool_ops,
+        },
+};
 
 static const struct of_device_id intel_fpga_xtile_ll_ids[] = {
-	{ .compatible = "altr,hssi-etile-1.0",
-	  .data = &etile_data,
+	{.compatible = "altr,hssi-etile-1.0",
+	 .data = &etile_data,	
 	},
-	{},
+	{.compatible = "altr,hssi-ftile-1.0",
+         .data = &ftile_data,
+        },
+
 };
 
 MODULE_DEVICE_TABLE(of, intel_fpga_xtile_ll_ids);

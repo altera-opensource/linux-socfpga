@@ -62,6 +62,57 @@
                                 gpio-controller;
                                 status = "okay";
                         };
-		};
+
+			};
+			hssiss_0_hssiss: hssiss_0_hssiss {
+				compatible = "intel, hssiss-1.0";
+				reg-names = "sscsr";
+				reg = <0x80000000 0x04000000>;
+				reset-mode ="reg";
+        	        };
+			hssi_0_eth: hssi_0_eth {
+
+                                reg-names = "tx_pref"  ,
+                                            "tx_csr"   ,
+					    "tx_fifo",
+                                            "rx_pref"  ,
+                                            "rx_csr"   ,
+                                            "rx_fifo"  ;
+
+                                reg =   <0x84400000 0x00000020>,
+                                        <0x84400020 0x00000020>,
+                                        <0x84400040 0x00000020>,
+                                        <0x84400080 0x00000020>,
+                                        <0x844000A0 0x00000020>,
+                                        <0x844000C0 0x00000010>;
+
+                                compatible = "altr,hssi-ftile-1.0";
+                                tile_chan = <0x0>;
+                                hssi_port = <0x0>;
+                                phy-mode = "25gbase-kr";
+                                hssiss = <&hssiss_0_hssiss>;
+                                altr,tx-pma-delay-ns = <0xD>;
+                                altr,rx-pma-delay-ns = <0x8>;
+                                altr,tx-pma-delay-fns = <0x24D>;
+                                altr,rx-pma-delay-fns = <0x3E97>;
+                                altr,tx-external-phy-delay-ns = <0x0>;
+                                altr,rx-external-phy-delay-ns = <0x0>;
+                                fec-cw-pos-rx = <0x3>;
+                                fec-type="no-fec";
+                                interrupt-parent = <&intc>;
+                                interrupt-names = "tx_irq", "rx_irq";
+                                interrupts = <0 24 4>, <0 25 4>;
+                                qsfp-lane = <0x0>;
+                                rx-fifo-depth = <0x4000>;
+                                tx-fifo-depth = <0x1000>;
+                                rx-fifo-almost-full = <0x2000>;
+                                rx-fifo-almost-empty = <0x1000>;
+                                status = "okay";
+                                fixed-link {
+                                        speed =<25000>;
+                                        full-duplex;
+                        };
+                };
+		
 	};
 };
