@@ -32,12 +32,6 @@ u32  hssi_csrrd32_atomic(struct platform_device *pdev,
 			 u32 chan,
 			 u32 offset);
 
-int  hssi_csrrd32_errcheck(struct platform_device *pdev,
-			   enum hssiss_tile_regbank regbank,
-			   u32 chan,
-			   u32 offset,
-			   bool atomocity,
-			   u32 *ret_value);
 
 void hssi_csrwr32(struct platform_device *pdev,
 		  enum hssiss_tile_regbank regbank,
@@ -50,6 +44,30 @@ void hssi_csrwr32_atomic(struct platform_device *pdev,
 		  	 u32 chan,
 		  	 u32 offset,
 		  	 u32 reg_value);
+
+u32  hssi_csrrd32_ba(struct platform_device *pdev,
+                  enum hssiss_tile_regbank regbank,
+                  u32 chan,
+                  u32 offset);
+
+u32  hssi_csrrd32_ba_atomic(struct platform_device *pdev,
+                         enum hssiss_tile_regbank regbank,
+                         u32 chan,
+                         u32 offset);
+
+
+void hssi_csrwr32_ba(struct platform_device *pdev,
+                  enum hssiss_tile_regbank regbank,
+                  u32 chan,
+                  u32 offset,
+                  u32 reg_value);
+
+void hssi_csrwr32_ba_atomic(struct platform_device *pdev,
+                         enum hssiss_tile_regbank regbank,
+                         u32 chan,
+                         u32 offset,
+                         u32 reg_value);
+
 
 u8   hssi_csrrd8(struct platform_device *pdev,
 		 enum hssiss_tile_regbank regbank,
@@ -78,37 +96,43 @@ void hssi_set_bit(struct platform_device *pdev,
 		  enum hssiss_tile_regbank regbank,
 		  u32 chan,
 		  u32 offset,
-		  u32 bit_mask);
+		  u32 bit_mask,
+		  bool is_byte_addressing);
 
 void hssi_clear_bit(struct platform_device *pdev,
 		    enum hssiss_tile_regbank regbank,
 		    u32 chan,
 		    u32 offset,
-		    u32 bit_mask);
+		    u32 bit_mask,
+		    bool is_byte_addressing);
 
 void hssi_set_bit_atomic(struct platform_device *pdev,
                   	  enum hssiss_tile_regbank regbank,
                   	  u32 chan,
                   	  u32 offset,
-                  	  u32 bit_mask);
+                  	  u32 bit_mask,
+			  bool is_byte_addressing);
 
 void hssi_clear_bit_atomic(struct platform_device *pdev,
                     	   enum hssiss_tile_regbank regbank,
                     	   u32 chan,
                     	   u32 offset,
-                    	   u32 bit_mask);
+                    	   u32 bit_mask,
+			   bool is_byte_addressing);
 
 bool hssi_bit_is_set(struct platform_device *pdev,
 		     enum hssiss_tile_regbank regbank,
 		     u32 chan,
 		     u32 offset,
-		     u32 bit_mask);
+		     u32 bit_mask,
+		     bool is_byte_addressing);
 
 bool hssi_bit_is_clear(struct platform_device *pdev,
 		       enum hssiss_tile_regbank regbank,
 		       u32 chan,
 		       u32 offset,
-		       u32 bit_mask);
+		       u32 bit_mask,
+		       bool is_byte_addressing);
 
 void hssi_reset_mac_stats(struct platform_device *pdev,
 			  u32 port,

@@ -1097,24 +1097,28 @@ static int etile_set_pauseparam(struct net_device *dev,
 		new_pause |= FLOW_RX;
 		hssi_set_bit(pdev,HSSI_ETH_RECONFIG, chan,
 			eth_pause_and_priority_csroffs(rx_flow_control_feature_cfg),
-			ETH_RX_EN_STD_FLOW_CTRL);
+			ETH_RX_EN_STD_FLOW_CTRL,
+			false);
 	}
 	else {
 		hssi_clear_bit(pdev, HSSI_ETH_RECONFIG, chan,
 			eth_pause_and_priority_csroffs(rx_flow_control_feature_cfg),
-			ETH_RX_EN_STD_FLOW_CTRL);
+			ETH_RX_EN_STD_FLOW_CTRL,
+			false);
 	}
 
 	if (pauseparam->tx_pause) {
 		new_pause |= FLOW_TX;
 		hssi_set_bit(pdev, HSSI_ETH_RECONFIG, chan,
 			eth_pause_and_priority_csroffs(tx_flow_control_feature_cfg),
-			ETH_TX_EN_STD_FLOW_CTRL);
+			ETH_TX_EN_STD_FLOW_CTRL,
+			false);
 	}
 	else {
 		hssi_clear_bit(pdev, HSSI_ETH_RECONFIG, chan,
 			eth_pause_and_priority_csroffs(tx_flow_control_feature_cfg),
-			ETH_TX_EN_STD_FLOW_CTRL);
+			ETH_TX_EN_STD_FLOW_CTRL,
+			false);
 	}
 
 	hssi_csrwr32(pdev, HSSI_ETH_RECONFIG, chan,

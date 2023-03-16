@@ -9,78 +9,93 @@
 
 #include "intel_fpga_eth_hssi_itf.h"
 
+static int hssi_csrrd32_errcheck(struct platform_device *pdev,
+                          enum hssiss_tile_regbank regbank,
+                          u32 chan,
+                          u32 offset,
+                          bool atomicity,
+                          u32 *ret_value,
+                          bool is_byte_addressing) {
+
+        struct get_set_csr_data csr_access;
+        int ret_status = !INTEL_FPGA_RET_SUCCESS;
+
+        csr_access.offs      = offset;
+        csr_access.ch        = chan;
+        if(is_byte_addressing)
+                csr_access.word      = BYTE_ACCESS;
+        else
+                csr_access.word      = WORD_ACCESS;
+        csr_access.reg_type  = regbank;
+
+        if (atomicity)
+                ret_status = hssiss_execute_sal_cmd_atomic(pdev,
+                                                           SAL_GET_CSR,
+                                                           &csr_access);
+        else
+                ret_status = hssiss_execute_sal_cmd(pdev, SAL_GET_CSR,  &csr_access);
+
+        *ret_value  = csr_access.data;
+
+         return ret_status;
+}
+
+
+static u32 hssi_csrrd32_local(struct platform_device *pdev,
+                 enum hssiss_tile_regbank regbank,
+                 u32 chan,
+                 u32 offset) {
+        u32 ret_value;
+
+        int ret_status = !INTEL_FPGA_RET_SUCCESS;
+
+        ret_status = hssi_csrrd32_errcheck(pdev,
+                                           regbank,
+                                           chan,
+                                           offset,
+                                           false,
+                                           &ret_value,
+                                           false);
+
+        if (ret_status != INTEL_FPGA_RET_SUCCESS) {
+                dev_err(&pdev->dev,
+                        "Error reading the 32 bit regbank %d offset 0x%x rc %d\n",
+                        regbank, offset, ret_status);
+        }
+        return ret_value;
+}
+
 
 u32 hssi_csrrd32(struct platform_device *pdev, 
 		 enum hssiss_tile_regbank regbank,
 		 u32 chan, 
 		 u32 offset) {
-	u32 ret_value;
 
-	int ret_status = !INTEL_FPGA_RET_SUCCESS;
-
-	ret_status = hssi_csrrd32_errcheck(pdev,
-					   regbank,
-					   chan,
-					   offset,
-					   false,
-					   &ret_value);
-
-	if (ret_status != INTEL_FPGA_RET_SUCCESS) {
-		dev_err(&pdev->dev,
-			"Error reading the 32 bit regbank %d offset 0x%x rc %d\n",
-			regbank, offset, ret_status);
-	}
-	return ret_value;
+	return hssi_csrrd32_local(pdev,regbank,chan,offset);
 }
 
 u32 hssi_csrrd32_atomic(struct platform_device *pdev, 
 			enum hssiss_tile_regbank regbank, 
 			u32 chan, 
 			u32 offset) {
-	u32 ret_value;
-	int ret_status = !INTEL_FPGA_RET_SUCCESS;
 
-	ret_status = hssi_csrrd32_errcheck(pdev,
-					   regbank,
-					   chan,
-					   offset,
-					   true,
-					   &ret_value);
-
-	if (ret_status != INTEL_FPGA_RET_SUCCESS) {
-		dev_err(&pdev->dev,
-			"Error reading the 32 bit regbank %d offset 0x%x rc %d\n",
-			regbank, offset, ret_status);
-	}
-
-	return ret_value;
+	return hssi_csrrd32_local(pdev,regbank,chan,offset);
 }
 
-int hssi_csrrd32_errcheck(struct platform_device *pdev,
-			  enum hssiss_tile_regbank regbank,
-			  u32 chan,
-			  u32 offset,
-			  bool atomicity,
-			  u32 *ret_value) {
+u32 hssi_csrrd32_ba(struct platform_device *pdev,
+                 enum hssiss_tile_regbank regbank,
+                 u32 chan,
+                 u32 offset) {
+      
+        return hssi_csrrd32_local(pdev,regbank,chan,offset);
+}
 
-	struct get_set_csr_data csr_access;
-	int ret_status = !INTEL_FPGA_RET_SUCCESS;
+u32 hssi_csrrd32_ba_atomic(struct platform_device *pdev,
+                        enum hssiss_tile_regbank regbank,
+                        u32 chan,
+                        u32 offset) {
 
-	csr_access.offs      = offset;
-	csr_access.ch        = chan;
-	csr_access.word      = WORD_ACCESS;
-	csr_access.reg_type  = regbank;
-
-	if (atomicity)
-		ret_status = hssiss_execute_sal_cmd_atomic(pdev,
-							   SAL_GET_CSR,
-							   &csr_access);
-	else
-		ret_status = hssiss_execute_sal_cmd(pdev, SAL_GET_CSR,  &csr_access);
-
-	*ret_value  = csr_access.data;
-
-	 return ret_status;
+        return hssi_csrrd32_local(pdev,regbank,chan,offset);
 }
 
 
@@ -89,13 +104,17 @@ static void hssi_csrwr32_local(struct platform_device *pdev,
 		  	       u32 chan,
 		  	       u32 offset,
 		  	       bool atomicity,
-		  	       u32 reg_value) {
+		  	       u32 reg_value,
+			       bool is_byte_addressing) {
 	struct get_set_csr_data csr_access;
 	int ret_status = !INTEL_FPGA_RET_SUCCESS;
 
 	csr_access.offs      = offset;
 	csr_access.ch        = chan;
-	csr_access.word      = WORD_ACCESS;
+	if(is_byte_addressing)
+		csr_access.word      = BYTE_ACCESS;
+	else
+		csr_access.word      = WORD_ACCESS;
 	csr_access.reg_type  = regbank;
 	csr_access.data      = reg_value;
 
@@ -119,7 +138,7 @@ void hssi_csrwr32(struct platform_device *pdev,
                   u32 offset,
                   u32 reg_value) {
 
-	hssi_csrwr32_local(pdev, regbank, chan, offset, false, reg_value);
+	hssi_csrwr32_local(pdev, regbank, chan, offset, false, reg_value,false);
 }
 
 void hssi_csrwr32_atomic(struct platform_device *pdev,
@@ -128,8 +147,27 @@ void hssi_csrwr32_atomic(struct platform_device *pdev,
                   	 u32 offset,
                   	 u32 reg_value) {
 
-        hssi_csrwr32_local(pdev, regbank, chan, offset, true, reg_value);
+        hssi_csrwr32_local(pdev, regbank, chan, offset, true, reg_value,false);
 }
+
+void hssi_csrwr32_ba(struct platform_device *pdev,
+                  enum hssiss_tile_regbank regbank,
+                  u32 chan,
+                  u32 offset,
+                  u32 reg_value) {
+
+        hssi_csrwr32_local(pdev, regbank, chan, offset, false, reg_value,true);
+}
+
+void hssi_csrwr32_ba_atomic(struct platform_device *pdev,
+                         enum hssiss_tile_regbank regbank,
+                         u32 chan,
+                         u32 offset,
+                         u32 reg_value) {
+
+        hssi_csrwr32_local(pdev, regbank, chan, offset, true, reg_value,true);
+}
+
 
 u8 hssi_csrrd8(struct platform_device *pdev, 
 	       enum hssiss_tile_regbank regbank, 
@@ -214,28 +252,53 @@ void hssi_set_bit(struct platform_device *pdev,
 		  enum hssiss_tile_regbank regbank, 
 		  u32 chan, 
 		  u32 offset, 
-		  u32 bit_mask) {
+		  u32 bit_mask,
+		  bool is_byte_addressing) {
 	u32 value;
 
-	value = hssi_csrrd32(pdev, regbank, chan, offset);
+	if(is_byte_addressing)
+	{
+		value = hssi_csrrd32_ba(pdev, regbank, chan, offset);
 
-	value |= bit_mask;
+                value |= bit_mask;
 
-	hssi_csrwr32(pdev, regbank, chan, offset, value);
+                hssi_csrwr32_ba(pdev, regbank, chan, offset, value);
+
+	}
+	else
+	{	
+		value = hssi_csrrd32(pdev, regbank, chan, offset);
+
+		value |= bit_mask;
+
+		hssi_csrwr32(pdev, regbank, chan, offset, value);
+	}
 }
 
 void hssi_set_bit_atomic(struct platform_device *pdev,
                  	  enum hssiss_tile_regbank regbank,
                   	  u32 chan,
                  	  u32 offset,
-                 	  u32 bit_mask) {
+                 	  u32 bit_mask,
+			  bool is_byte_addressing) {
         u32 value;
 
-        value = hssi_csrrd32_atomic(pdev, regbank, chan, offset);
+	if(is_byte_addressing)
+	{
+		value = hssi_csrrd32_ba_atomic(pdev, regbank, chan, offset);
 
-        value |= bit_mask;
+                 value |= bit_mask;
 
-        hssi_csrwr32_atomic(pdev, regbank, chan, offset, value);
+                 hssi_csrwr32_ba_atomic(pdev, regbank, chan, offset, value);
+	}
+	else
+	{
+        	value = hssi_csrrd32_atomic(pdev, regbank, chan, offset);
+
+       		 value |= bit_mask;
+
+       		 hssi_csrwr32_atomic(pdev, regbank, chan, offset, value);
+	}
 }
 
 
@@ -243,38 +306,69 @@ void hssi_clear_bit(struct platform_device *pdev,
 		    enum hssiss_tile_regbank regbank, 
 		    u32 chan, 
 		    u32 offset, 
-		    u32 bit_mask) {
+		    u32 bit_mask,
+		    bool is_byte_addressing) {
 	u32 value;
+	if(is_byte_addressing)
+	{
+		value = hssi_csrrd32_ba(pdev, regbank, chan, offset);
 
-	value = hssi_csrrd32(pdev, regbank, chan, offset);
+	        value &= ~bit_mask;
+	
+	        hssi_csrwr32_ba(pdev, regbank, chan, offset, value);
+	}
+	else
+	{
 
-	value &= ~bit_mask;
+		value = hssi_csrrd32(pdev, regbank, chan, offset);
 
-	hssi_csrwr32(pdev, regbank, chan, offset, value);
+		value &= ~bit_mask;
+
+		hssi_csrwr32(pdev, regbank, chan, offset, value);
+	}
 }
 
 void hssi_clear_bit_atomic(struct platform_device *pdev,
                     	    enum hssiss_tile_regbank regbank,
                     	    u32 chan,
                      	    u32 offset,
-                    	    u32 bit_mask) {
+                    	    u32 bit_mask,
+			    bool is_byte_addressing) {
         u32 value;
 
-        value = hssi_csrrd32_atomic(pdev, regbank, chan, offset);
+	if(is_byte_addressing)
+	{
+	
+		value = hssi_csrrd32_ba_atomic(pdev, regbank, chan, offset);
 
-        value &= ~bit_mask;
+                value &= ~bit_mask;
 
-        hssi_csrwr32_atomic(pdev, regbank, chan, offset, value);
+                hssi_csrwr32_ba_atomic(pdev, regbank, chan, offset, value);
+	}
+	else
+	{	
+
+	        value = hssi_csrrd32_atomic(pdev, regbank, chan, offset);
+
+        	value &= ~bit_mask;
+
+	        hssi_csrwr32_atomic(pdev, regbank, chan, offset, value);
+	
+	}
 }
 
 bool hssi_bit_is_set(struct platform_device *pdev, 
 		     enum hssiss_tile_regbank regbank, 
 		     u32 chan, 
 		     u32 offset, 
-		     u32 bit_mask) {
+		     u32 bit_mask,
+		     bool is_byte_addressing){
 	u32 value;
 
-	value = hssi_csrrd32(pdev, regbank, chan, offset);
+	if(is_byte_addressing)
+                value = hssi_csrrd32_ba(pdev, regbank, chan, offset);
+        else
+                value = hssi_csrrd32(pdev, regbank, chan, offset);
 
 	return (value & bit_mask) ? true : false;
 }
@@ -283,10 +377,14 @@ bool hssi_bit_is_clear(struct platform_device *pdev,
 		       enum hssiss_tile_regbank regbank, 
 		       u32 chan, 
 		       u32 offset, 
-		       u32 bit_mask) {
+		       u32 bit_mask,
+		       bool is_byte_addressing) {
 	u32 value;
 
-	value = hssi_csrrd32(pdev, regbank, chan, offset);
+	if(is_byte_addressing)
+		value = hssi_csrrd32_ba(pdev, regbank, chan, offset);
+	else
+		value = hssi_csrrd32(pdev, regbank, chan, offset);
 
 	return (value & bit_mask) ? false : true;
 }
