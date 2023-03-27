@@ -63,7 +63,25 @@
                                 status = "okay";
                         };
 
+		};
+                clocks {
+			tod_in_clock: tod_in_clock {
+				#clock-cells = <0>;
+				compatible = "fixed-clock";
+				clock-frequency = <156250000>;
+				clock-output-names = "tod_in_clock";
 			};
+		};
+
+		tod_0_clk: tod_0_clk {
+			compatible = "intel, tod";
+			reg-names = "tod_ctrl";
+			reg = <0x84040000 0x00000040>;
+			clocks = <&tod_in_clock>;
+			clock-names = "tod_clock";
+			status = "okay";
+		};
+
 			hssiss_0_hssiss: hssiss_0_hssiss {
 				compatible = "intel, hssiss-1.0";
 				reg-names = "sscsr";
@@ -90,6 +108,7 @@
                                 tile_chan = <0x0>;
                                 hssi_port = <0x0>;
                                 phy-mode = "25gbase-kr";
+                                tod = <&tod_0_clk>;
                                 hssiss = <&hssiss_0_hssiss>;
                                 altr,tx-pma-delay-ns = <0xD>;
                                 altr,rx-pma-delay-ns = <0x8>;
@@ -97,8 +116,8 @@
                                 altr,rx-pma-delay-fns = <0x3E97>;
                                 altr,tx-external-phy-delay-ns = <0x0>;
                                 altr,rx-external-phy-delay-ns = <0x0>;
-                                fec-cw-pos-rx = <0x3>;
-                                fec-type="no-fec";
+                                fec-cw-pos-rx = <0x0>;
+                                fec-type="kr-fec";
                                 interrupt-parent = <&intc>;
                                 interrupt-names = "tx_irq", "rx_irq";
                                 interrupts = <0 24 4>, <0 25 4>;
@@ -107,6 +126,11 @@
                                 tx-fifo-depth = <0x1000>;
                                 rx-fifo-almost-full = <0x2000>;
                                 rx-fifo-almost-empty = <0x1000>;
+                                altr,has-ptp;
+                                ptp_tx_ref_pl = <0x00>;
+                                ptp_accu_mode = "Advanced";
+                                ptp_tx_routing_adj = <0x1085F>;
+                                ptp_rx_routing_adj = <0x10341>;
                                 status = "okay";
                                 fixed-link {
                                         speed =<25000>;

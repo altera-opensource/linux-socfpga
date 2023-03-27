@@ -42,7 +42,10 @@
 #define MOD_PARAM_PERM  0644
 
 
-
+/* Poll for PTP RX READY bit, If any disturbance on RX PCS, this can go low
+ * So that time we need to rerun the PTP TX RX USER FLOW again.
+ */
+#define PTP_TX_RX_USER_FLOW_POLL_TIMEOUT            500     
 
 #define INTEL_FPGA_FTILE_SW_RESET_WATCHDOG_CNTR		1000000
 
@@ -1948,5 +1951,7 @@ extern void ftile_ui_adjustments(struct timer_list *t);
 
 extern void intel_fpga_ftile_set_ethtool_ops(struct net_device *dev);
 
+void ftile_init_monitor_link_status(intel_fpga_xtile_eth_private *priv);
+void ftile_deinit_monitor_link_status(intel_fpga_xtile_eth_private *priv);
 
 #endif	  

@@ -348,7 +348,7 @@ static int intel_fpga_tod_probe(struct platform_device *pdev)
 	priv->dev = dev;
 
 	/* Time-of-Day (ToD) Clock period clock */
-	priv->tod_clk = devm_clk_get(&pdev->dev, "tod_clk");
+	priv->tod_clk = devm_clk_get(&pdev->dev, "tod_clock");
 	if (IS_ERR(priv->tod_clk)) {
 		ret = -ENXIO;
 		dev_err_probe(&pdev->dev, PTR_ERR(priv->tod_clk),

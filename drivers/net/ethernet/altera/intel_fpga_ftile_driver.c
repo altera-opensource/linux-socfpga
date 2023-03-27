@@ -268,10 +268,10 @@ static int eth_ftile_tx_rx_user_flow(intel_fpga_xtile_eth_private *priv)
 	u32 rx_fec_cw_pos[16];
 	u32 rx_xcvr_if_pulse_adj[16];
 	u32 ui_value;
-	int ret;
 	struct platform_device *pdev = priv->pdev_hssi;
 	u32 chan = priv->tile_chan;
-
+	u32 tx_routing_adj = 0, rx_routing_adj = 0;
+	u8 tx_routing_adj_sign, rx_routing_adj_sign;
 	u32 gui_option=0;
 
 	gui_option =  hssi_csrrd32_ba(pdev, HSSI_ETH_RECONFIG, chan, eth_soft_csroffs(gui_option));
@@ -370,12 +370,18 @@ static int eth_ftile_tx_rx_user_flow(intel_fpga_xtile_eth_private *priv)
 	tx_tam_adjust_sim = ((tx_const_delay_sign ? -tx_const_delay : tx_const_delay) +
 			     (tx_apulse_offset_sign[tx_ref_pl] ? -tx_apulse_offset[tx_ref_pl] : tx_apulse_offset[tx_ref_pl]) -
 			     tx_apulse_wdelay[tx_ref_pl]);
-	/* TBD For hardware run with advanced accuracy mode:
-	   tx_tam_adjust = tx_tam_adjust_sim + (tx_routing_adj_sign[tx_ref_pl] ? - tx_routing_adj[tx_ref_pl] : tx_routing_adj[tx_ref_pl]);
-
-	   Note: See Section 5.3.4 on how to obtain tx_routing_adj_sign and tx_routing_adj information.
+	/* Hardware run with advanced accuracy mode:
+		Note: See Section 5.3.4 on how to obtain tx_routing_adj_sign and tx_routing_adj information.
 	   (routing delays for specific image, generated via steps outlined in Section 5.3.4 of "Towards a F-Tile.." doc.)
 	   Others: */
+	
+	if (strcasecmp(priv->ptp_accu_mode, "Advanced") == 0)
+	{
+		tx_routing_adj = priv->ptp_tx_routing_adj;
+		tx_routing_adj_sign = tx_routing_adj_sign >> 31;
+		tx_tam_adjust = tx_tam_adjust_sim + (tx_routing_adj_sign ? - tx_routing_adj : tx_routing_adj);
+	}
+	
 	tx_tam_adjust = tx_tam_adjust_sim; // tx_tam_adjust is a 32-bit two's complement number.
 
 	/* Step 4b Calculate TX extra latency */
@@ -417,33 +423,33 @@ static int eth_ftile_tx_rx_user_flow(intel_fpga_xtile_eth_private *priv)
 	/* Step 5 Write the determined TX reference lane into IP */
 	regval = hssi_csrrd32_ba(pdev, HSSI_ETH_RECONFIG, chan, eth_soft_csroffs(ptp_ref_lane));
 	regval = (regval & ~ETH_PTP_TX_REF_LANE_MASK) | (tx_ref_pl << ETH_PTP_TX_REF_LANE_SHIFT);
-	hssi_csrwr32_ba( pdev, HSSI_ETH_RECONFIG, chan, eth_soft_csroffs(ptp_ref_lane),regval);
+	hssi_csrwr32_ba(pdev, HSSI_ETH_RECONFIG, chan, eth_soft_csroffs(ptp_ref_lane),regval);
 
 	/* Step 6 Write the calculated TX offsets to IP */
 
 	/* Step 6a Write TX virtual lane offsets - must be skipped for 10G/25G */
 	if (speed > 25) {
 		for (vl = 0; vl < num_vl; vl++) {
-			hssi_csrwr32_ba( pdev, HSSI_ETH_RECONFIG, chan, eth_mac_ptp_csroffs(0, tx_ptp_vl_offset[vl]),tx_vl_offset[vl]);
+			hssi_csrwr32_ba(pdev, HSSI_ETH_RECONFIG, chan, eth_mac_ptp_csroffs(0, tx_ptp_vl_offset[vl]), tx_vl_offset[vl]);
 		}
 	}
 
 	/* Step 6b Write TX extra latency */
-	hssi_csrwr32_ba( pdev, HSSI_ETH_RECONFIG, chan, eth_mac_ptp_csroffs(0, tx_ptp_extra_latency),tx_extra_latency);
+	hssi_csrwr32_ba(pdev, HSSI_ETH_RECONFIG, chan, eth_mac_ptp_csroffs(0, tx_ptp_extra_latency), tx_extra_latency);
 
 	/* Step 6c Write TX TAM adjust */
-	hssi_csrwr32_ba( pdev, HSSI_ETH_RECONFIG, chan, eth_soft_csroffs(ptp_tx_tam_adjust),tx_tam_adjust);
+	hssi_csrwr32_ba(pdev, HSSI_ETH_RECONFIG, chan, eth_soft_csroffs(ptp_tx_tam_adjust), tx_tam_adjust);
 
 	/* Step 7 UI value measurement */
 	// Perform step 1 to 7 as specified in Table 90.
 	// Note: For simulation or hardware run with 0ppm setup, user is advised to skip measurement and program 0ppm UI value as stated in Table 89.
 	// Program 0ppm UI value here and later start a timer to do UI value measurements / adjustments
-	hssi_csrwr32_ba( pdev, HSSI_ETH_RECONFIG, chan, eth_mac_ptp_csroffs(0, tx_ptp_ui),ui_value);
+	hssi_csrwr32_ba(pdev, HSSI_ETH_RECONFIG, chan, eth_mac_ptp_csroffs(0, tx_ptp_ui), ui_value);
 
 	/* Step 8 Notify soft PTP that user flow configuration is completed */
 	regval = hssi_csrrd32_ba(pdev, HSSI_ETH_RECONFIG, chan, eth_soft_csroffs(ptp_tx_user_cfg_status));
 	regval |= ETH_PTP_TX_USER_CFG_DONE;
-	hssi_csrwr32_ba(pdev, HSSI_ETH_RECONFIG, chan, eth_soft_csroffs(ptp_tx_user_cfg_status),regval);
+	hssi_csrwr32_ba(pdev, HSSI_ETH_RECONFIG, chan, eth_soft_csroffs(ptp_tx_user_cfg_status), regval);
 
 	/* Step 9 Wait until TX PTP is ready */
 	if (xtile_check_counter_complete(priv, HSSI_ETH_RECONFIG,
@@ -462,6 +468,15 @@ static int eth_ftile_tx_rx_user_flow(intel_fpga_xtile_eth_private *priv)
 	// Done via timer_setup at end of this function
 
 	/* RX User Flow */
+	/*TBD for all FEC lane, here done only for FEC Lane 0 */
+	if (xtile_check_counter_complete(priv, HSSI_ETH_RECONFIG,
+					   eth_rsfec_csroffs(0, 0, rsfec_lane_rx_stat),
+					   RSFEC_RX_STATUS_LANE_NOT_LOCKED, false,
+					   INTEL_FPGA_WORD_ALIGN)) {
+			netdev_err(priv->dev, "RS FEC lane is not locked\n");
+			return -EINVAL;
+	}
+
 	/* Step 1 After power up, reset or link down, wait until RX PCS is fully aligned */
 	// 10G-400G No FEC variants, 25G FEC variants:
 	switch (priv->phy_iface) {
@@ -491,7 +506,7 @@ static int eth_ftile_tx_rx_user_flow(intel_fpga_xtile_eth_private *priv)
 	}
 
 	// init_pl value obtained like this as per tcl scripts:
-	regval = hssi_csrrd32_ba(pdev, HSSI_ETH_RECONFIG, chan, eth_pma_avmm_csroffs(u.fht_cur_lane, 0));
+	regval = hssi_csrrd32_ba(pdev, HSSI_PHY_XCVR_PMACAP, chan, eth_pma_avmm_csroffs(u.fht_cur_lane, 0));
 	init_pl = xcvr_top_lane - regval;
 
 	/* Step 2 [FEC variant only] */
@@ -517,10 +532,10 @@ static int eth_ftile_tx_rx_user_flow(intel_fpga_xtile_eth_private *priv)
 			n = eth_pma_avmm_csroffs(fgt_q_dl_ctrl_a_l1, 0) - eth_pma_avmm_csroffs(fgt_q_dl_ctrl_a_l0, 0);
 			for (pl = 0; pl < num_pl; pl++) {
 				apl = (3 - ((pl + init_pl) % 4));
-				regval = hssi_csrrd32_ba(pdev, HSSI_ETH_RECONFIG, chan, eth_pma_avmm_csroffs(fgt_q_dl_ctrl_a_l0, xcvr_sel) + apl * n);
+				regval = hssi_csrrd32_ba(pdev, HSSI_PHY_XCVR_PMACAP, chan, eth_pma_avmm_csroffs(fgt_q_dl_ctrl_a_l0, xcvr_sel) + apl * n);
 				regval &= ~XCVR_FGT_Q_DL_CTRL_RX_LAT_CNTRVAL_ASYNC;
 				regval |= rx_xcvr_if_pulse_adj[pl * pl_fl_map] & XCVR_FGT_Q_DL_CTRL_RX_LAT_CNTRVAL_ASYNC;
-				hssi_csrwr32_ba(pdev, HSSI_ETH_RECONFIG, chan, eth_pma_avmm_csroffs(fgt_q_dl_ctrl_a_l0, xcvr_sel) + apl * n,regval);
+				hssi_csrwr32_ba(pdev, HSSI_PHY_XCVR_PMACAP, chan, eth_pma_avmm_csroffs(fgt_q_dl_ctrl_a_l0, xcvr_sel) + apl * n, regval);
 				xcvr_sel++; // tcl script has this xcvr_sel 8,9,A,B ==> quad3, xcvr_sel C,D,E,F ==> quad2, etc
 			}
 		} else {
@@ -738,12 +753,18 @@ static int eth_ftile_tx_rx_user_flow(intel_fpga_xtile_eth_private *priv)
 	}
 
 	/* TBD For hardware run with advanced accuracy mode:
-	   rx_tam_adjust = (rx_tam_adjust_sim) + (rx_routing_adj_sign[rx_ref_pl] ? - rx_routing_adj[rx_ref_pl] : rx_routing_adj[rx_ref_pl]);
-
-	   Note: See Section 10.3.5 on how to obtain rx_routing_adj_sign and rx_routing_adj information.
+	Note: See Section 10.3.5 on how to obtain rx_routing_adj_sign and rx_routing_adj information.
 	   (routing delays for specific image, generated via steps outlined in Section 10.3.5 of doc.)
 	   Others:
 	*/
+	
+	if (strcasecmp(priv->ptp_accu_mode, "Advanced") == 0)
+	{
+		rx_routing_adj = priv->ptp_rx_routing_adj;
+		rx_routing_adj_sign = rx_routing_adj_sign >> 31;
+		rx_tam_adjust = (rx_tam_adjust_sim) + (rx_routing_adj_sign ? - rx_routing_adj : rx_routing_adj);
+	}
+	   
 	rx_tam_adjust = rx_tam_adjust_sim; // rx_tam_adjust is a 32-bit two's complement number.
 
 	/* Step 6b Calculate RX extra latency */
@@ -802,14 +823,14 @@ static int eth_ftile_tx_rx_user_flow(intel_fpga_xtile_eth_private *priv)
 	}
 
 	/* Step 8b Write RX extra latency */
-	hssi_csrwr32_ba( pdev, HSSI_ETH_RECONFIG, chan, eth_mac_ptp_csroffs(0, rx_ptp_extra_latency),rx_extra_latency);
+	hssi_csrwr32_ba( pdev, HSSI_ETH_RECONFIG, chan, eth_mac_ptp_csroffs(0, rx_ptp_extra_latency), rx_extra_latency);
 
 	/* Step 8c Write RX TAM adjust */
-	hssi_csrwr32_ba( pdev, HSSI_ETH_RECONFIG, chan, eth_soft_csroffs(ptp_rx_tam_adjust),rx_tam_adjust);
+	hssi_csrwr32_ba( pdev, HSSI_ETH_RECONFIG, chan, eth_soft_csroffs(ptp_rx_tam_adjust), rx_tam_adjust);
 
 	/* Step 9 Continue UI value measurement */
 	// Program 0ppm UI value here and later start a timer to do UI value measurements / adjustments
-	hssi_csrwr32_ba( pdev, HSSI_ETH_RECONFIG, chan, eth_mac_ptp_csroffs(0, rx_ptp_ui),ui_value);
+	hssi_csrwr32_ba( pdev, HSSI_ETH_RECONFIG, chan, eth_mac_ptp_csroffs(0, rx_ptp_ui), ui_value);
 
 	/* Step 10 Notify soft PTP that user flow configuration is completed */
 	regval = hssi_csrrd32_ba(pdev, HSSI_ETH_RECONFIG, chan, eth_soft_csroffs(ptp_rx_user_cfg_status));
@@ -833,13 +854,14 @@ static int eth_ftile_tx_rx_user_flow(intel_fpga_xtile_eth_private *priv)
 	// Done via timer_setup at end of this function
 
 	/* Start timer to periodically adjust Rx+Tx UI value */
-	timer_setup(&priv->fec_timer, ftile_ui_adjustments, 0);
-	ret = mod_timer(&priv->fec_timer, jiffies + msecs_to_jiffies(500));
-	if (ret)
-		netdev_err(priv->dev, "Timer failed to start UI adjustment\n");
+	// timer_setup(&priv->fec_timer, ftile_ui_adjustments, 0);
+	// ret = mod_timer(&priv->fec_timer, jiffies + msecs_to_jiffies(500));
+	// if (ret)
+	// 	netdev_err(priv->dev, "Timer failed to start UI adjustment\n");
 
 	return 0;
 }
+
 void ftile_pma_digital_reset(intel_fpga_xtile_eth_private *priv, 
 		       bool tx_reset, 
 		       bool rx_reset)
@@ -990,4 +1012,71 @@ void xtile_get_stats64(struct net_device *dev,
 		       struct rtnl_link_stats64 *storage)
 {
   ftile_get_stats64(dev, storage);
+}
+
+static void check_ptp_rx_ready_bit(intel_fpga_xtile_eth_private *priv)
+{
+	bool is_set = true;
+
+	// Check PTP RX ready bit set or not set, If not set rerun ptp tx rx user flow again
+	is_set = hssi_bit_is_set(priv->pdev_hssi, HSSI_ETH_RECONFIG, priv->tile_chan, eth_soft_csroffs(ptp_status), ETH_RX_PTP_READY, true);
+	if (!is_set)
+	{
+		(void)eth_ftile_tx_rx_user_flow(priv);
+	}
+}
+
+void ftile_ptp_rx_ready_status(struct work_struct *work) {
+
+	bool is_prev_iter_fine;
+	bool is_next_iter_fine;
+    struct delayed_work *ptp_work;
+    intel_fpga_xtile_eth_private *priv;
+	
+
+    ptp_work = to_delayed_work(work);
+    priv = container_of(ptp_work, intel_fpga_xtile_eth_private, ptp_work);
+
+	is_prev_iter_fine = priv->prev_link_state;
+    is_next_iter_fine = hssi_ethport_is_stable(priv->pdev_hssi, priv->hssi_port, false);
+
+	/* This is for the 1st iteration where it is assumed link is up
+	 * because on ndo_open system has been prior initalized
+	 */	
+	if (is_prev_iter_fine == is_next_iter_fine) 
+	{
+		/* If RX PCS goes down and came up and which is not able to detect by driver, 
+	 	 * still there could be chance PTP RX READY bit would have went low.
+		 */
+		//check_ptp_rx_ready_bit(priv);
+		goto reshed;
+	}
+	else if (is_next_iter_fine == true) 
+	{
+		/* If prev connection was false and now RX PCS was aligned, 
+		 * there could be chance PTP RX READY bit would have not set.
+		 */
+		check_ptp_rx_ready_bit(priv);
+    }
+    else 
+	{
+		// do nothing
+    }
+	
+	priv->prev_link_state = is_next_iter_fine;
+
+reshed:
+    schedule_delayed_work(&priv->ptp_work, msecs_to_jiffies(PTP_TX_RX_USER_FLOW_POLL_TIMEOUT));
+}
+
+void ftile_init_monitor_link_status(intel_fpga_xtile_eth_private *priv) 
+{
+	priv->prev_link_state = true;
+	INIT_DELAYED_WORK(&priv->ptp_work, ftile_ptp_rx_ready_status);
+    schedule_delayed_work(&priv->ptp_work, msecs_to_jiffies(PTP_TX_RX_USER_FLOW_POLL_TIMEOUT));
+}
+
+void ftile_deinit_monitor_link_status(intel_fpga_xtile_eth_private *priv) 
+{
+	cancel_delayed_work_sync(&priv->ptp_work);
 }
