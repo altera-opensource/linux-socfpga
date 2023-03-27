@@ -707,6 +707,10 @@ static int xtile_open(struct net_device *dev)
 	if (priv->spec_ops->qsfp_ops.qsfp_init)
 		/* start the poll on the QSFP presence and link stability */
 		priv->spec_ops->qsfp_ops.qsfp_init(priv);
+
+	if (priv->spec_ops->ptp_ops.ptp_tx_rx_flow_check_init)
+	    /* Start the poll on the PTP RX ready bit stability */
+		priv->spec_ops->ptp_ops.ptp_tx_rx_flow_check_init(priv);
 	
 	return 0;
 
@@ -728,6 +732,10 @@ static int xtile_shutdown(struct net_device *dev)
 		/* stop polling for the QSFP presence, last status would
 	 	* be the one displayed by ethtool */
 		priv->spec_ops->qsfp_ops.qsfp_deinit(priv);
+
+	if (priv->spec_ops->ptp_ops.ptp_tx_rx_flow_check_deinit)
+	    /* Stop polling for the PTP RX ready bit stability */
+		priv->spec_ops->ptp_ops.ptp_tx_rx_flow_check_deinit(priv);
 
 	/* Stop the PHY */
 	if (priv->phylink)
@@ -1021,7 +1029,7 @@ static const struct net_device_ops intel_fpga_xtile_netdev_ops = {
 	.ndo_set_mac_address	= xtile_change_mac,
 	.ndo_set_rx_mode	= xtile_set_rx_mode,
 	.ndo_change_mtu		= xtile_change_mtu,
-	.ndo_do_ioctl		= xtile_do_ioctl,
+	.ndo_eth_ioctl		= xtile_do_ioctl,
 	.ndo_validate_addr      = eth_validate_addr,
 	.ndo_get_stats64	= xtile_get_stats64
 };
@@ -1272,6 +1280,40 @@ static int intel_fpga_xtile_probe(struct platform_device *pdev)
 		dev_err(&pdev->dev, "PTP requires modified dma\n");
 		ret = -ENODEV;
 		goto err_free_netdev;
+	}
+
+	if (priv->ptp_enable)
+	{
+		/* Tx reference physical lane */
+		if (of_property_read_u32(np, "ptp_tx_ref_pl",
+                                 &priv->ptp_tx_ref_pl)) {
+
+			priv->ptp_tx_ref_pl = 0;
+		}
+
+		/* PTP Timestamp Accuracy mode */
+		ret  = of_property_read_string(pdev->dev.of_node, "ptp_accu_mode",
+				       &priv->ptp_accu_mode);
+		if (ret < 0) {
+			priv->ptp_accu_mode = "Basic";
+		}
+
+		if (strcasecmp(priv->ptp_accu_mode, "Advanced") == 0)
+		{
+			/* Tx Routing adjustment delay */
+			if (of_property_read_u32(np, "ptp_tx_routing_adj",
+								&priv->ptp_tx_routing_adj)) {
+
+				priv->ptp_tx_routing_adj = 0;
+			}
+
+			/* Rx Routing adjustment delay */
+			if (of_property_read_u32(np, "ptp_rx_routing_adj",
+									&priv->ptp_rx_routing_adj)) {
+
+				priv->ptp_rx_routing_adj = 0;
+			}
+		}
 	}
 
 	/* mSGDMA Tx IRQ */
@@ -1601,6 +1643,10 @@ static const struct xtile_spec_ops etile_data = {
 
 static const struct xtile_spec_ops ftile_data = {
         .dma_ops   = &altera_dtype_prefetcher,
+		.ptp_ops   = {
+				.ptp_tx_rx_flow_check_init = ftile_init_monitor_link_status,
+				.ptp_tx_rx_flow_check_deinit = ftile_deinit_monitor_link_status,
+		},
         .reset_ops = {
                 .pma_digi_reset = ftile_pma_digital_reset,
         },

@@ -10,6 +10,11 @@ struct xtile_spec_ops {
                 void (*qsfp_deinit)(intel_fpga_xtile_eth_private*);
         } qsfp_ops;
 
+        struct ptp_ops {
+                void (*ptp_tx_rx_flow_check_init)(intel_fpga_xtile_eth_private*);
+                void (*ptp_tx_rx_flow_check_deinit)(intel_fpga_xtile_eth_private*);
+        } ptp_ops;
+
         struct reset_ops {
                 void (*pma_ana_reset)(intel_fpga_xtile_eth_private*);
                 void (*pma_digi_reset)(intel_fpga_xtile_eth_private*,

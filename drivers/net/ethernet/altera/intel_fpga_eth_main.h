@@ -40,6 +40,7 @@
 typedef struct {
 
         const char *fec_type;
+        const char *ptp_accu_mode;
         struct net_device *dev;
         struct device     *device;
         struct phylink    *phylink;
@@ -70,6 +71,9 @@ typedef struct {
         u32 rsfec_cw_pos_rx;
         u32 tx_external_phy_delay_ns;
         u32 rx_external_phy_delay_ns;
+        u32 ptp_tx_ref_pl;
+        u32 ptp_tx_routing_adj;
+        u32 ptp_rx_routing_adj;
 
         u8 duplex;
         u8 qsfp_lane;
@@ -84,6 +88,7 @@ typedef struct {
 
         struct napi_struct napi;
         struct delayed_work dwork;
+        struct delayed_work ptp_work;
         struct timer_list fec_timer;
         struct altera_dma_private dma_priv;
         struct phylink_config phylink_config;
