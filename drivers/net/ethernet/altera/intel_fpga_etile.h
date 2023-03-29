@@ -2607,6 +2607,7 @@ struct intel_fpga_etile_eth_private {
 	/* Shared PTP structure */
 	struct intel_fpga_tod_private ptp_priv;
 	u32 ptp_enable;
+	u8 rsfec_tam_lane_enable;
 
 	/* FIFO address space */
 	struct intel_fpga_rx_fifo __iomem *rx_fifo;
@@ -2616,7 +2617,7 @@ struct intel_fpga_etile_eth_private {
 
 	/* RS-FEC address space */
 	struct intel_fpga_etile_rsfec __iomem *rsfec;
-
+	
 	/* Tod-pio address space */
 	struct intel_fpga_etile_tod_pio __iomem *tod_pio;
 

@@ -8,6 +8,8 @@
  *   Dalon Westergreen
  *   Joyce Ooi
  *   Arzu Ozdogan-tackin
+ *   Malku Marshkole
+ *   Deepak Nagaraju
  *
  * Original driver contributed by GlobalLogic.
  */
@@ -466,7 +468,7 @@ int etile_start_xmit(struct sk_buff *skb, struct net_device *dev)
 	enum netdev_tx ret = NETDEV_TX_OK;
 	dma_addr_t dma_addr;
 
-	spin_lock_bh(&priv->tx_lock);
+		spin_lock_bh(&priv->tx_lock);
 
 	if (unlikely(etile_tx_avail(priv) < nfrags + 1)) {
 		if (!netif_queue_stopped(dev)) {
@@ -513,9 +515,10 @@ int etile_start_xmit(struct sk_buff *skb, struct net_device *dev)
 	/* Provide a hardware time stamp if requested.
 	 */
 	if (unlikely((skb_shinfo(skb)->tx_flags & SKBTX_HW_TSTAMP) &&
-		     priv->dma_priv.hwts_tx_en))
+		     priv->dma_priv.hwts_tx_en)) {
 		/* declare that device is doing timestamping */
 		skb_shinfo(skb)->tx_flags |= SKBTX_IN_PROGRESS;
+		}
 
 	/* Provide a software time stamp if requested and hardware timestamping
 	 * is not possible (SKBTX_IN_PROGRESS not set).
@@ -801,33 +804,35 @@ static int eth_etile_tx_rx_user_flow(struct intel_fpga_etile_eth_private *priv)
 
 	/* Check for 25G FEC variants */
 	if (priv->link_speed == SPEED_25000 && (!strcasecmp(kr_fec, priv->fec_type))) {
+		if (priv->rsfec_tam_lane_enable == 1) {
 		/*  Step 2a Read RX FEC codeword position */
-		switch (priv->rsfec_cw_pos_rx) {
-		case 0:
-			rx_fec_cw_pos_b0 = csrrd8(priv->rsfec,
-						  eth_rsfec_csroffs(rsfec_cw_pos_rx_0_b0));
-			rx_fec_cw_pos_b8 = csrrd8(priv->rsfec,
-						  eth_rsfec_csroffs(rsfec_cw_pos_rx_0_b8));
-			break;
-		case 1:
-			rx_fec_cw_pos_b0 = csrrd8(priv->rsfec,
-						  eth_rsfec_csroffs(rsfec_cw_pos_rx_1_b0));
-			rx_fec_cw_pos_b8 = csrrd8(priv->rsfec,
-						  eth_rsfec_csroffs(rsfec_cw_pos_rx_1_b8));
-			break;
-		case 2:
-			rx_fec_cw_pos_b0 = csrrd8(priv->rsfec,
-						  eth_rsfec_csroffs(rsfec_cw_pos_rx_2_b0));
-			rx_fec_cw_pos_b8 = csrrd8(priv->rsfec,
-						  eth_rsfec_csroffs(rsfec_cw_pos_rx_2_b8));
-			break;
-		case 3:
-		default:
-			rx_fec_cw_pos_b0 = csrrd8(priv->rsfec,
-						  eth_rsfec_csroffs(rsfec_cw_pos_rx_3_b0));
-			rx_fec_cw_pos_b8 = csrrd8(priv->rsfec,
-						  eth_rsfec_csroffs(rsfec_cw_pos_rx_3_b8));
-			break;
+			switch (priv->rsfec_cw_pos_rx) {
+			case 0:
+				rx_fec_cw_pos_b0 = csrrd8(priv->rsfec,
+							  eth_rsfec_csroffs(rsfec_cw_pos_rx_0_b0));
+				rx_fec_cw_pos_b8 = csrrd8(priv->rsfec,
+							  eth_rsfec_csroffs(rsfec_cw_pos_rx_0_b8));
+				break;
+			case 1:
+				rx_fec_cw_pos_b0 = csrrd8(priv->rsfec,
+							  eth_rsfec_csroffs(rsfec_cw_pos_rx_1_b0));
+				rx_fec_cw_pos_b8 = csrrd8(priv->rsfec,
+							  eth_rsfec_csroffs(rsfec_cw_pos_rx_1_b8));
+				break;
+			case 2:
+				rx_fec_cw_pos_b0 = csrrd8(priv->rsfec,
+							  eth_rsfec_csroffs(rsfec_cw_pos_rx_2_b0));
+				rx_fec_cw_pos_b8 = csrrd8(priv->rsfec,
+							  eth_rsfec_csroffs(rsfec_cw_pos_rx_2_b8));
+				break;
+			case 3:
+			default:
+				rx_fec_cw_pos_b0 = csrrd8(priv->rsfec,
+							  eth_rsfec_csroffs(rsfec_cw_pos_rx_3_b0));
+				rx_fec_cw_pos_b8 = csrrd8(priv->rsfec,
+							  eth_rsfec_csroffs(rsfec_cw_pos_rx_3_b8));
+				break;
+			}
 		}
 
 		rx_fec_cw_pos = (rx_fec_cw_pos_b8 << 8) | rx_fec_cw_pos_b0;
@@ -844,8 +849,10 @@ static int eth_etile_tx_rx_user_flow(struct intel_fpga_etile_eth_private *priv)
 		rx_pma_delay_ns = (INTEL_FPGA_RX_PMA_DELAY_25G * ui_value);
 		rx_extra_latency = ((rx_pma_delay_ns + priv->rx_external_phy_delay_ns -
 				    rx_spulse_offset) >> 8) | 0x80000000;
+
 	} else {
 		/*  Step 2b Read bitslip count from IP */
+
 		rx_bitslip_cnt = csrrd8(priv->xcvr, eth_pma_avmm_csroffs(reg_028));
 
 		/* Step 3 Determine sync pulse (Alignment Marker)
@@ -876,11 +883,13 @@ static int eth_etile_tx_rx_user_flow(struct intel_fpga_etile_eth_private *priv)
 	netdev_info(priv->dev, "tx_extra_latency:0x%x , rx_extra_latency:0x%x\n",
 		    tx_extra_latency, rx_extra_latency);
 
+	if (priv->rsfec_tam_lane_enable == 1) {
 	/* Adjust UI value */
-	timer_setup(&priv->fec_timer, ui_adjustments, 0);
-	ret = mod_timer(&priv->fec_timer, jiffies + msecs_to_jiffies(5000));
+		timer_setup(&priv->fec_timer, ui_adjustments, 0);
+		ret = mod_timer(&priv->fec_timer, jiffies + msecs_to_jiffies(5000));
 	if (ret)
 		netdev_err(priv->dev, "Timer failed to start UI adjustment\n");
+	}
 
 	return 0;
 }
@@ -912,196 +921,69 @@ static void etile_rsfec_reconfiguration(struct intel_fpga_etile_eth_private *pri
 	 *2 RS-FEC TX Select for Lane 3
 	 *3 RS-FEC RX Output Select for Lane 3
 	 **/
+/*25gptpfec-25gptpnofec and 25gptpfec – 10gptp*/
 
-	/*25gptpfec-25gptpnofec and 25gptpfec – 10gptp*/
-
+if (priv->rsfec_tam_lane_enable == 1) {
 	if ((priv->link_speed == SPEED_25000 || priv->link_speed == SPEED_10000) &&
 	    (!strcmp(priv->fec_type, "no-fec"))) {
-		switch (priv->rsfec_cw_pos_rx) {
-		case 0:
-		fec_lane_ena = csrrd8(priv->rsfec,
-				      eth_rsfec_csroffs(rsfec_top_clk_cfg_b8));
+		fec_lane_ena = csrrd8(priv->rsfec, eth_rsfec_csroffs(rsfec_top_clk_cfg_b8));
 		/* 0xE = enable lane 0 , bit[0] = lane0 */
-		fec_lane_ena &= 0xE;
-		csrwr8(fec_lane_ena, priv->rsfec,
-		       eth_rsfec_csroffs(rsfec_top_clk_cfg_b8));
-		core_tx_in_sel = csrrd8(priv->rsfec,
-					eth_rsfec_csroffs(rsfec_top_tx_cfg_b0));
-		core_tx_in_sel &= 0xF0;
-		/*make sure do not disturbed the RS-FEC TX Select For Lane1*/
-		core_tx_in_sel |= 0x1;
-		/*setting bit 2:0 to b01 RS-FEC TX Select For Lane0*/
-		csrwr8(core_tx_in_sel, priv->rsfec,
-		       eth_rsfec_csroffs(rsfec_top_tx_cfg_b0));
-		core_rx_out_sel = csrrd8(priv->rsfec,
-					 eth_rsfec_csroffs(rsfec_top_rx_cfg_b0));
-		core_rx_out_sel &= 0xF0;
-		core_rx_out_sel |= 0x1;
-		csrwr8(core_rx_out_sel, priv->rsfec,
-		       eth_rsfec_csroffs(rsfec_top_rx_cfg_b0));
-		break;
-		case 1:
-		fec_lane_ena = csrrd8(priv->rsfec,
-				      eth_rsfec_csroffs(rsfec_top_clk_cfg_b8));
-		/*0xE = enable lane 1 , bit[1] = lane1*/
-		fec_lane_ena &= 0xD;
-		csrwr8(fec_lane_ena, priv->rsfec,
-		       eth_rsfec_csroffs(rsfec_top_clk_cfg_b8));
-		core_tx_in_sel = csrrd8(priv->rsfec,
-					eth_rsfec_csroffs(rsfec_top_tx_cfg_b0));
-		core_tx_in_sel &= 0xF;
-		core_tx_in_sel |= (0x1 << 4);
-		csrwr8(core_tx_in_sel, priv->rsfec,
-		       eth_rsfec_csroffs(rsfec_top_tx_cfg_b0));
-		core_rx_out_sel = csrrd8(priv->rsfec,
-					 eth_rsfec_csroffs(rsfec_top_rx_cfg_b0));
-		core_rx_out_sel &= 0xF0;
-		core_rx_out_sel |= 0x1;
-		csrwr8(core_rx_out_sel, priv->rsfec,
-		       eth_rsfec_csroffs(rsfec_top_rx_cfg_b0));
-		break;
-		case 2:
-		fec_lane_ena = csrrd8(priv->rsfec,
-				      eth_rsfec_csroffs(rsfec_top_clk_cfg_b8));
-		/*0xE = enable lane 1 , bit[2] = 0, lane2*/
-		fec_lane_ena &= 0xB;
-		csrwr8(fec_lane_ena, priv->rsfec,
-		       eth_rsfec_csroffs(rsfec_top_clk_cfg_b8));
-		core_tx_in_sel = csrrd8(priv->rsfec,
-					eth_rsfec_csroffs(rsfec_top_tx_cfg_b8));
-		core_tx_in_sel &= 0xF0;
-		core_tx_in_sel |= 0x1;
-		csrwr8(core_tx_in_sel, priv->rsfec,
-		       eth_rsfec_csroffs(rsfec_top_tx_cfg_b8));
-		core_rx_out_sel = csrrd8(priv->rsfec,
-					 eth_rsfec_csroffs(rsfec_top_rx_cfg_b8));
-		core_rx_out_sel &= 0xF0;
-		core_rx_out_sel |= 0x1;
-		csrwr8(core_rx_out_sel, priv->rsfec,
-		       eth_rsfec_csroffs(rsfec_top_rx_cfg_b8));
-		break;
-		case 3:
-		fec_lane_ena = csrrd8(priv->rsfec,
-				      eth_rsfec_csroffs(rsfec_top_clk_cfg_b8));
-		fec_lane_ena &= 0xF7;
+		fec_lane_ena &= 0xF0;
 		fec_lane_ena |= 0x0;
-		csrwr8(fec_lane_ena, priv->rsfec,
-		       eth_rsfec_csroffs(rsfec_top_clk_cfg_b8));
-		fec_lane_ena = csrrd8(priv->rsfec,
-				      eth_rsfec_csroffs(rsfec_top_clk_cfg_b8));
-		core_tx_in_sel = csrrd8(priv->rsfec,
-					eth_rsfec_csroffs(rsfec_top_tx_cfg_b8));
-		core_tx_in_sel &= 0x8F;
-		core_tx_in_sel |= 0x60;
-		csrwr8(core_tx_in_sel, priv->rsfec,
-		       eth_rsfec_csroffs(rsfec_top_tx_cfg_b8));
-		core_tx_in_sel = csrrd8(priv->rsfec,
-					eth_rsfec_csroffs(rsfec_top_tx_cfg_b8));
-		core_rx_out_sel = csrrd8(priv->rsfec,
-					 eth_rsfec_csroffs(rsfec_top_rx_cfg_b8));
-		core_rx_out_sel &= 0xCF;
-		core_rx_out_sel |= 0x0;
-		csrwr8(core_rx_out_sel, priv->rsfec,
-		       eth_rsfec_csroffs(rsfec_top_rx_cfg_b8));
-		core_rx_out_sel = csrrd8(priv->rsfec,
-					 eth_rsfec_csroffs(rsfec_top_rx_cfg_b8));
-		break;
-		}
-	}
+		csrwr8(fec_lane_ena, priv->rsfec, eth_rsfec_csroffs(rsfec_top_clk_cfg_b8));
 
+		core_tx_in_sel = csrrd8(priv->rsfec, eth_rsfec_csroffs(rsfec_top_tx_cfg_b0));
+		core_tx_in_sel &= 0x88;
+		core_tx_in_sel |= 0x66;
+		csrwr8(core_tx_in_sel, priv->rsfec, eth_rsfec_csroffs(rsfec_top_tx_cfg_b0));
+
+		core_tx_in_sel = csrrd8(priv->rsfec, eth_rsfec_csroffs(rsfec_top_tx_cfg_b8));
+		core_tx_in_sel &= 0x88;
+		core_tx_in_sel |= 0x66;
+		csrwr8(core_tx_in_sel, priv->rsfec, eth_rsfec_csroffs(rsfec_top_tx_cfg_b8));
+
+		core_rx_out_sel = csrrd8(priv->rsfec, eth_rsfec_csroffs(rsfec_top_rx_cfg_b0));
+		core_rx_out_sel &= 0xCC;
+		core_rx_out_sel |= 0x0;
+		csrwr8(core_rx_out_sel, priv->rsfec, eth_rsfec_csroffs(rsfec_top_rx_cfg_b0));
+		core_rx_out_sel = csrrd8(priv->rsfec, eth_rsfec_csroffs(rsfec_top_rx_cfg_b0));
+
+		core_rx_out_sel = csrrd8(priv->rsfec, eth_rsfec_csroffs(rsfec_top_rx_cfg_b8));
+		core_rx_out_sel &= 0xCC;
+		core_rx_out_sel |= 0x0;
+		csrwr8(core_rx_out_sel, priv->rsfec, eth_rsfec_csroffs(rsfec_top_rx_cfg_b8));
+		core_rx_out_sel = csrrd8(priv->rsfec, eth_rsfec_csroffs(rsfec_top_rx_cfg_b8));
+	}
+	 /*25gptpnofec-25gptpfec and 10gptpnofec – 25gptpfec*/
 	if (priv->link_speed == SPEED_25000 &&  (!(strcmp(priv->fec_type, "kr-fec")))) {
 		csrwr8(0x0, priv->rsfec, eth_rsfec_csroffs(rsfec_top_clk_cfg_b8));
-		switch (priv->rsfec_cw_pos_rx) {
-		case 0:
-		fec_lane_ena = csrrd8(priv->rsfec,
-				      eth_rsfec_csroffs(rsfec_top_clk_cfg_b8));
-		/*0xE = enable lane 0 , bit[0] = lane0*/
-		fec_lane_ena &= 0xE;
-		csrwr8(fec_lane_ena, priv->rsfec,
-		       eth_rsfec_csroffs(rsfec_top_clk_cfg_b8));
-		core_tx_in_sel = csrrd8(priv->rsfec,
-					eth_rsfec_csroffs(rsfec_top_tx_cfg_b0));
-		core_tx_in_sel &= 0xF0;
-			/* make sure do not disturbed the RS-FEC TX Select For Lane 1 */
-		core_tx_in_sel |= 0x1;
-			/*setting bit2:0 to b01 RS-FEC TX Select For Lane0*/
-		csrwr8(core_tx_in_sel, priv->rsfec,
-		       eth_rsfec_csroffs(rsfec_top_tx_cfg_b0));
-		core_rx_out_sel = csrrd8(priv->rsfec,
-					 eth_rsfec_csroffs(rsfec_top_rx_cfg_b0));
-		core_rx_out_sel &= 0xF0;
-		core_rx_out_sel |= 0x1;
-		csrwr8(core_rx_out_sel, priv->rsfec,
-		       eth_rsfec_csroffs(rsfec_top_rx_cfg_b0));
-		break;
-		case 1:
-		fec_lane_ena = csrrd8(priv->rsfec,
-				      eth_rsfec_csroffs(rsfec_top_clk_cfg_b8));
-			/*0xE = enable lane 1 , bit[1] = lane1*/
-		fec_lane_ena &= 0xD;
-		csrwr8(fec_lane_ena, priv->rsfec,
-		       eth_rsfec_csroffs(rsfec_top_clk_cfg_b8));
-		core_tx_in_sel = csrrd8(priv->rsfec,
-					eth_rsfec_csroffs(rsfec_top_tx_cfg_b0));
-		core_tx_in_sel &= 0xF;
-		core_tx_in_sel |= (0x1 << 4);
-		csrwr8(core_tx_in_sel, priv->rsfec,
-		       eth_rsfec_csroffs(rsfec_top_tx_cfg_b0));
-		core_rx_out_sel = csrrd8(priv->rsfec,
-					 eth_rsfec_csroffs(rsfec_top_rx_cfg_b0));
-		core_rx_out_sel &= 0xF0;
-		core_rx_out_sel |= 0x1;
-		csrwr8(core_rx_out_sel, priv->rsfec,
-		       eth_rsfec_csroffs(rsfec_top_rx_cfg_b0));
-		break;
-		case 2:
-		fec_lane_ena = csrrd8(priv->rsfec,
-				      eth_rsfec_csroffs(rsfec_top_clk_cfg_b8));
-			/*0xE = enable lane 1 , bit[2] = 0, lane2*/
-		fec_lane_ena &= 0xB;
-		csrwr8(fec_lane_ena, priv->rsfec,
-		       eth_rsfec_csroffs(rsfec_top_clk_cfg_b8));
-		core_tx_in_sel = csrrd8(priv->rsfec,
-					eth_rsfec_csroffs(rsfec_top_tx_cfg_b8));
-		core_tx_in_sel &= 0xF0;
-		core_tx_in_sel |= 0x1;
-		csrwr8(core_tx_in_sel, priv->rsfec,
-		       eth_rsfec_csroffs(rsfec_top_tx_cfg_b8));
-		core_rx_out_sel = csrrd8(priv->rsfec,
-					 eth_rsfec_csroffs(rsfec_top_rx_cfg_b8));
-		core_rx_out_sel &= 0xF0;
-		core_rx_out_sel |= 0x1;
-		csrwr8(core_rx_out_sel, priv->rsfec,
-		       eth_rsfec_csroffs(rsfec_top_rx_cfg_b8));
-		break;
-		case 3:
-		fec_lane_ena = csrrd8(priv->rsfec,
-				      eth_rsfec_csroffs(rsfec_top_clk_cfg_b8));
-		/*0xE = enable lane 3 , bit[3] = 0, lane4*/
-		fec_lane_ena &= 0xF7;
-		fec_lane_ena |= 0x08;
-		csrwr8(fec_lane_ena, priv->rsfec,
-		       eth_rsfec_csroffs(rsfec_top_clk_cfg_b8));
-		fec_lane_ena = csrrd8(priv->rsfec,
-				      eth_rsfec_csroffs(rsfec_top_clk_cfg_b8));
-		core_tx_in_sel = csrrd8(priv->rsfec,
-					eth_rsfec_csroffs(rsfec_top_tx_cfg_b8));
-		core_tx_in_sel &= 0x8F;
-		core_tx_in_sel |= 0x10;
-		csrwr8(core_tx_in_sel, priv->rsfec,
-		       eth_rsfec_csroffs(rsfec_top_tx_cfg_b8));
-		core_tx_in_sel = csrrd8(priv->rsfec,
-					eth_rsfec_csroffs(rsfec_top_tx_cfg_b8));
-		core_rx_out_sel = csrrd8(priv->rsfec,
-					 eth_rsfec_csroffs(rsfec_top_rx_cfg_b8));
-		core_rx_out_sel &= 0xCF;
-		core_rx_out_sel |= 0x10;
-		csrwr8(core_rx_out_sel, priv->rsfec,
-		       eth_rsfec_csroffs(rsfec_top_rx_cfg_b8));
-		core_rx_out_sel = csrrd8(priv->rsfec,
-					 eth_rsfec_csroffs(rsfec_top_rx_cfg_b8));
-		break;
-		}
+		fec_lane_ena = csrrd8(priv->rsfec, eth_rsfec_csroffs(rsfec_top_clk_cfg_b8));
+		fec_lane_ena &= 0xf0;
+		fec_lane_ena |= 0xf;
+		csrwr8(fec_lane_ena, priv->rsfec, eth_rsfec_csroffs(rsfec_top_clk_cfg_b8));
+
+		core_tx_in_sel = csrrd8(priv->rsfec, eth_rsfec_csroffs(rsfec_top_tx_cfg_b0));
+		core_tx_in_sel &= 0x88;
+		core_tx_in_sel |= 0x11;
+		csrwr8(core_tx_in_sel, priv->rsfec, eth_rsfec_csroffs(rsfec_top_tx_cfg_b0));
+
+		core_tx_in_sel = csrrd8(priv->rsfec, eth_rsfec_csroffs(rsfec_top_tx_cfg_b8));
+		core_tx_in_sel &= 0x88;
+		core_tx_in_sel |= 0x11;
+		csrwr8(core_tx_in_sel, priv->rsfec, eth_rsfec_csroffs(rsfec_top_tx_cfg_b8));
+
+		core_rx_out_sel = csrrd8(priv->rsfec, eth_rsfec_csroffs(rsfec_top_rx_cfg_b0));
+		core_rx_out_sel &= 0xCC;
+		core_rx_out_sel |= 0x11;
+		csrwr8(core_rx_out_sel, priv->rsfec, eth_rsfec_csroffs(rsfec_top_rx_cfg_b0));
+		core_rx_out_sel = csrrd8(priv->rsfec, eth_rsfec_csroffs(rsfec_top_rx_cfg_b0));
+
+		core_rx_out_sel = csrrd8(priv->rsfec, eth_rsfec_csroffs(rsfec_top_rx_cfg_b8));
+		core_rx_out_sel &= 0xCC;
+		core_rx_out_sel |= 0x11;
+		csrwr8(core_rx_out_sel, priv->rsfec, eth_rsfec_csroffs(rsfec_top_rx_cfg_b8));
+		core_rx_out_sel = csrrd8(priv->rsfec, eth_rsfec_csroffs(rsfec_top_rx_cfg_b8));
+	}
 	}
 }
 
@@ -1439,6 +1321,7 @@ static int etile_PMA_analog_reset(struct intel_fpga_etile_eth_private *priv,
 	csrwr8(0x81, priv->xcvr, eth_pma_avmm_csroffs(reg_203));
 
 	ret = csrrd8(priv->xcvr, eth_pma_avmm_csroffs(reg_207));
+	ret = csrrd8(priv->xcvr, eth_pma_avmm_csroffs(reg_204));
 
 	if (etile_check_counter_complete(priv->xcvr, eth_pma_avmm_csroffs(reg_207),
 					 XCVR_PMA_AVMM_207_LAST_OP_ON_200_203_SUCCESS,
@@ -1446,6 +1329,7 @@ static int etile_PMA_analog_reset(struct intel_fpga_etile_eth_private *priv,
 		netdev_err(priv->dev, "Analog PMA reset failed, abort\n");
 		return -EINVAL;
 	}
+
 	ret = csrrd8(priv->xcvr, eth_pma_avmm_csroffs(reg_207));
 
 	if (etile_check_counter_complete(priv->xcvr, eth_pma_avmm_csroffs(reg_204),
@@ -2041,6 +1925,9 @@ static int etile_De_assert_RX_digital_reset(struct intel_fpga_etile_eth_private 
 static int init_rst_mac(struct intel_fpga_etile_eth_private *priv)
 {
 	int ret;
+	//u8 ret_8;
+
+	u8 core_lane_0_frac;
 
 	/* start the mac */
 	etile_set_mac(priv, true);
@@ -2060,10 +1947,13 @@ static int init_rst_mac(struct intel_fpga_etile_eth_private *priv)
 	 *	5.	PMA AVMM Read, Offset = 0x207, expected value = 0x80
 	 *	6.	PMA AVMM Read, Offset = 0x204, expected value = 0x0 (channel #)
 	 */
+
 	csrwr8(0x0, priv->xcvr, eth_pma_avmm_csroffs(reg_200));
 	csrwr8(0x0, priv->xcvr, eth_pma_avmm_csroffs(reg_201));
 	csrwr8(0x0, priv->xcvr, eth_pma_avmm_csroffs(reg_202));
 	csrwr8(0x81, priv->xcvr, eth_pma_avmm_csroffs(reg_203));
+
+	ret = csrrd8(priv->xcvr, eth_pma_avmm_csroffs(reg_207));
 
 	if (etile_check_counter_complete(priv->xcvr, eth_pma_avmm_csroffs(reg_207),
 					 XCVR_PMA_AVMM_207_LAST_OP_ON_200_203_SUCCESS,
@@ -2071,6 +1961,7 @@ static int init_rst_mac(struct intel_fpga_etile_eth_private *priv)
 		netdev_err(priv->dev, "Analog PMA reset failed, abort\n");
 		return -EINVAL;
 	}
+	ret = csrrd8(priv->xcvr, eth_pma_avmm_csroffs(reg_207));
 
 	if (etile_check_counter_complete(priv->xcvr, eth_pma_avmm_csroffs(reg_204),
 					 XCVR_PMA_AVMM_204_RET_PHYS_CHANNEL_NUMBER,
@@ -2092,7 +1983,15 @@ static int init_rst_mac(struct intel_fpga_etile_eth_private *priv)
 	 */
 	csrwr32(0x4, priv->mac_dev, eth_phy_csroffs(phy_config));
 
-	/* Step 5 - Ignore*/
+	/* Step 5 - Ignore*//*enabling fracture mode*/
+	if (priv->rsfec_cw_pos_rx == 0) {
+		core_lane_0_frac = csrrd8(priv->rsfec,
+					  eth_rsfec_csroffs(rsfec_core_cfg_b0));
+			core_lane_0_frac &= 0x0f;
+			core_lane_0_frac |= 0x03;
+			csrwr8(core_lane_0_frac, priv->rsfec,
+			       eth_rsfec_csroffs(rsfec_core_cfg_b0));
+			}
 
 	/* Step 6a - Enable Internal Loopback
 	 *	1.	PMA AVMM Write, Offset = 0x84, value = 0x1
@@ -2530,6 +2429,7 @@ int etile_dynamic_reconfiguration(struct intel_fpga_etile_eth_private *priv,
 	etile_PMA_analog_reset(priv, cmd);
 
 	tod_read_value = csrrd32(priv->tod_pio, eth_tod_pio_offs(etile_tod_pio_config));
+
 	if (priv->link_speed == SPEED_10000) {
 		tod_read_value = tod_read_value & 0xfffffffe;
 		tod_read_value = tod_read_value | 0x0;
@@ -3102,6 +3002,12 @@ static int intel_fpga_etile_probe(struct platform_device *pdev)
 	if (netif_msg_probe(priv))
 		dev_info(&pdev->dev, "\tXCVR  at 0x%08lx\n",
 			 (unsigned long)xcvr->start);
+
+	/*Read it from the device tree and then map*/
+
+	of_property_read_u32(pdev->dev.of_node, "fec-cw-pos-rx",
+			     &priv->rsfec_cw_pos_rx);
+
 	/* TOD-PIO address space */
 	ret = request_and_map(pdev, "tod_pio", &tod_pio,
 			      (void __iomem **)&priv->tod_pio);
@@ -3110,15 +3016,20 @@ static int intel_fpga_etile_probe(struct platform_device *pdev)
 	if (netif_msg_probe(priv))
 		dev_info(&pdev->dev, "\tTOD-PIO  at 0x%08lx\n",
 			 (unsigned long)tod_pio->start);
+
 	/* RS-FEC address space */
 	ret = request_and_map(pdev, "rsfec", &rsfec,
 			      (void __iomem **)&priv->rsfec);
-	if (ret)
-		goto err_free_netdev;
+	if (ret) {
+		priv->rsfec_tam_lane_enable = 0;
+	} else {
+		if (netif_msg_probe(priv)) {
+			priv->rsfec_tam_lane_enable = 1;
+			dev_info(&pdev->dev, "\tRS-FEC  at 0x%08lx\n",
+				 (unsigned long)rsfec->start);
+		}
+	}
 
-	if (netif_msg_probe(priv))
-		dev_info(&pdev->dev, "\tRS-FEC  at 0x%08lx\n",
-			 (unsigned long)rsfec->start);
 	/* we only support ptp with the msgdma */
 	if (priv->ptp_enable) {
 		/* MAP PTP */
@@ -3309,7 +3220,6 @@ static int intel_fpga_etile_probe(struct platform_device *pdev)
 		ret = -ENXIO;
 		goto err_init_phy;
 	}
-
 	return 0;
 
 err_init_phy:
