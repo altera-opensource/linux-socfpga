@@ -1043,12 +1043,12 @@ void ftile_ptp_rx_ready_status(struct work_struct *work) {
 	/* This is for the 1st iteration where it is assumed link is up
 	 * because on ndo_open system has been prior initalized
 	 */	
-	if (is_prev_iter_fine == is_next_iter_fine) 
+	if ((true == is_prev_iter_fine) && (true == is_next_iter_fine))
 	{
 		/* If RX PCS goes down and came up and which is not able to detect by driver, 
 	 	 * still there could be chance PTP RX READY bit would have went low.
 		 */
-		//check_ptp_rx_ready_bit(priv);
+		check_ptp_rx_ready_bit(priv);
 		goto reshed;
 	}
 	else if (is_next_iter_fine == true) 
