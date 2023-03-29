@@ -61,13 +61,23 @@ config SFP
 	depends on HWMON || HWMON=n
 	select MDIO_I2C
 
-comment "MII PHY device drivers"
-
 config QSFP
 	tristate "QSFP cage support"
 	depends on I2C && PHYLINK
 	depends on HWMON || HWMON=n
 	select MDIO_I2C
+
+config QSFP_MULTI_CHANNEL
+	tristate "QSFP multi channel support"
+	depends on I2C && PHYLINK
+	depends on HWMON || HWMON=n
+	select MDIO_I2C
+	help
+	  Adds support for 4 instances with 4 channel 
+	  support . Enabling this driver can work 
+	  for single channel and 4 channel QSFP lane enablement.
+	  
+	  Currently tested on YAMAICHI CAU120-038-D300 cable.
 
 comment "MII PHY device drivers"
 

@@ -34,6 +34,10 @@ obj-$(CONFIG_QSFP)		+= qsfp.o
 qsfp-obj-$(CONFIG_QSFP)		+= qsfp_bus.o
 obj-y				+= $(qsfp-obj-y) $(qsfp-obj-m)
 
+obj-$(CONFIG_QSFP_MULTI_CHANNEL)				+= qsfp_i2c.o qsfp_multi_channel.o 
+qsfp_multi_channel-obj-$(CONFIG_QSFP_MULTI_CHANNEL)		+= qsfp_bus.o
+obj-y								+= $(qsfp_multi_channel-obj-y) $(qsfp_multi_channel-obj-m)
+
 obj-$(CONFIG_ADIN_PHY)		+= adin.o
 obj-$(CONFIG_AMD_PHY)		+= amd.o
 aquantia-objs			+= aquantia_main.o

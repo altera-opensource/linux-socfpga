@@ -3,8 +3,7 @@
  * Copyright (C) 2020-2021 Intel Corporation. All rights reserved.
  *
  * Contributors:
- * Malku
- * Deepak
+ * Deepak Nagaraju
  * Original driver contributed by Intel.
  */
 #ifndef LINUX_QSFP_H
@@ -380,8 +379,28 @@ struct qsfp_socket_ops {
 			     u8 *data);
 };
 
+#if IS_ENABLED(CONFIG_QSFP_MULTI_CHANNEL)
+unsigned int qsfp_gpio_get_state(struct qsfp *qsfp);
+void qsfp_gpio_set_state(struct qsfp *qsfp, unsigned int state);
+unsigned int sff_gpio_get_state(struct qsfp *qsfp);
+unsigned int qsfp_get_state(struct qsfp *qsfp);
+void qsfp_set_state(struct qsfp *qsfp, unsigned int state);
 
-#if IS_ENABLED(CONFIG_QSFP)
+
+int qsfp_multi_module_revision(struct qsfp *old);
+int get_cable_attach(struct qsfp *old);
+void get_cable_info(char *vender_name);
+int get_tx_rx_loss(struct qsfp *old);
+int get_tx_fault(struct qsfp *old);
+int ext_status(struct qsfp *old);
+int eeprom_id_base(struct qsfp *old);
+int soft_poll_start(struct qsfp *old);
+int get_qsfp_options(struct qsfp *old);
+int soft_mask(struct qsfp *old);
+struct phy_device *gsfp_mod_phy(struct qsfp *old);
+int gsfp_probe_phy(struct qsfp *old);
+int get_module_revision(struct qsfp *qsfp);
+
 int qsfp_parse_port(struct qsfp_bus *bus, const struct qsfp_eeprom_id *id,
 		    unsigned long *support);
 bool qsfp_may_have_phy(struct qsfp_bus *bus, const struct qsfp_eeprom_id *id);
@@ -417,6 +436,41 @@ void qsfp_unregister_socket(struct qsfp_bus *bus);
 int get_cable_attach(struct qsfp *old);
 int get_channel_info(struct qsfp *old);
 
+#elif IS_ENABLED(CONFIG_QSFP)
+int qsfp_parse_port(struct qsfp_bus *bus, const struct qsfp_eeprom_id *id,
+		    unsigned long *support);
+bool qsfp_may_have_phy(struct qsfp_bus *bus, const struct qsfp_eeprom_id *id);
+void qsfp_parse_support(struct qsfp_bus *bus, const struct qsfp_eeprom_id *id,
+			unsigned long *support);
+phy_interface_t qsfp_select_interface(struct qsfp_bus *bus,
+				      unsigned long *link_modes);
+
+int qsfp_get_module_info(struct qsfp_bus *bus, struct ethtool_modinfo *modinfo);
+int qsfp_get_module_eeprom(struct qsfp_bus *bus, struct ethtool_eeprom *ee,
+			   u8 *data);
+void qsfp_upstream_start(struct qsfp_bus *bus);
+void qsfp_upstream_stop(struct qsfp_bus *bus);
+void qsfp_bus_put(struct qsfp_bus *bus);
+struct qsfp_bus *qsfp_bus_find_fwnode(struct fwnode_handle *fwnode);
+int qsfp_bus_add_upstream(struct qsfp_bus *bus, void *upstream,
+			  const struct qsfp_upstream_ops *ops);
+void qsfp_bus_del_upstream(struct qsfp_bus *bus);
+
+int qsfp_add_phy(struct qsfp_bus *bus, struct phy_device *phydev);
+void qsfp_remove_phy(struct qsfp_bus *bus);
+void qsfp_link_up(struct qsfp_bus *bus);
+void qsfp_link_down(struct qsfp_bus *bus);
+int qsfp_module_insert(struct qsfp_bus *bus, const struct qsfp_eeprom_id *id);
+void qsfp_module_remove(struct qsfp_bus *bus);
+int qsfp_module_start(struct qsfp_bus *bus);
+void qsfp_module_stop(struct qsfp_bus *bus);
+int qsfp_link_configure(struct qsfp_bus *bus, const struct qsfp_eeprom_id *id);
+struct qsfp_bus *qsfp_register_socket(struct device *dev, struct qsfp *qsfp,
+				      const struct qsfp_socket_ops *ops);
+void qsfp_unregister_socket(struct qsfp_bus *bus);
+
+int get_cable_attach(struct qsfp *old);
+int get_channel_info(struct qsfp *old);
 
 #else
 
