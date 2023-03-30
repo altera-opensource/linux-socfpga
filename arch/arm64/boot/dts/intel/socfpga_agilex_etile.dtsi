@@ -5,7 +5,8 @@
 
 /* Add this piece of dtsi fragment as #include "socfpga_agilex_etile.dtsi"
  * in the file socfpga_agilex_socdk.dts. Compile it in the kernel along with
- * socfpga_agilex.dtsi
+ * socfpga_agilex.dtsi in single channel design rsfec and tod_ctrl should be mapped 
+ * for fec-cw-pos-rx <lane 3>
  */
 
 /{
@@ -83,8 +84,8 @@
 				status = "okay";
 			};
 
-			qsfp_eth0: qsfp-eth0 {
-				compatible = "sff,qsfp";
+			qsfp_eth: qsfp-eth {
+				compatible = "sff,qsfp-multi-channel";
 				i2c-bus = <&i2c0>;
 				qsfpdd_initmode-gpio = <&qsfpdd_status_pio_1 0 GPIO_ACTIVE_HIGH>;
 				qsfpdd_modseln-gpio = <&qsfpdd_status_pio_1 2 GPIO_ACTIVE_LOW>;
@@ -92,6 +93,11 @@
 				qsfpdd_resetn-gpio = <&qsfpdd_status_pio_1 1 GPIO_ACTIVE_LOW>;
 				qsfpdd_intn-gpio = <&qsfpdd_status_pio 1 GPIO_ACTIVE_LOW>;
 				maximum-power-milliwatt = <1000>;
+				status = "okay";
+			};
+			
+			qsfp_eth0: qsfp-eth0 {
+				compatible = "sff,qsfp";
 				status = "okay";
 			};
 
