@@ -988,8 +988,6 @@ static int qsfp_probe(struct platform_device *pdev)
 static int qsfp_remove(struct platform_device *pdev)
 
 {
-	struct qsfp *qsfp = platform_get_drvdata(pdev);
-
 	return 0;
 }
 
