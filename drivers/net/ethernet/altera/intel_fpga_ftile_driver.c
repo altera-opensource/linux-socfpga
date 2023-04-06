@@ -13,6 +13,102 @@
 #include "intel_fpga_eth_hssi_itf.h"
 #include <linux/interrupt.h>
 
+#define FTILE_EHIP_RESET_TO		10000 /* in us */
+#define FTILE_EHIP_RESET_POLL_INTERVAL	5 /* in us */
+
+static int ftile_wait_reset_ack(struct platform_device *pdev, u32 chan,
+					u32 rst_ack_mask, u32 maskval)
+{
+	unsigned long timeout, start;
+	u32 val;
+
+	start = jiffies;
+	timeout = start + usecs_to_jiffies(FW_ACK_POLL_TIMEOUT_US);
+	do {
+		udelay(FTILE_EHIP_RESET_POLL_INTERVAL);
+		val = hssi_csrrd32_ba(pdev, HSSI_ETH_RECONFIG, chan,
+			eth_soft_csroffs(eth_reset_status));
+
+		if ((val & rst_ack_mask) == maskval)
+			return 0;
+
+	} while(time_before(jiffies, timeout));
+
+	return -ETIME;
+}
+
+int ftile_ehip_reset(intel_fpga_xtile_eth_private *priv,
+			bool tx, bool rx, bool sys)
+{
+	struct platform_device *pdev = priv->pdev_hssi;
+	u32 chan = priv->tile_chan;
+	u32 rst_ack_mask = ETH_SOFT_TX_RST | ETH_SOFT_RX_RST | ETH_EIO_SYS_RST;
+	u32 maskval = rst_ack_mask;
+	u32 val;
+
+	val = hssi_csrrd32_ba(pdev, HSSI_ETH_RECONFIG, chan,
+			eth_soft_csroffs(eth_reset));
+	/*
+	 * Trigger RX reset
+	 * 1.   EHIP CSR Write, Offset = 0x310, value = 0x4
+	 * Trigger TX reset
+	 * 1.   EHIP CSR Write, Offset = 0x310, value = 0x2
+	 * Trigger sys reset
+	 * 1.   EHIP CSR Write, Offset = 0x310, value = 0x1
+	 */
+	if (tx) {
+		val |= ETH_SOFT_TX_RST;
+		maskval &= ~ETH_SOFT_TX_RST;
+	}
+	if (rx) {
+		val |= ETH_SOFT_RX_RST;
+		maskval &= ~ETH_SOFT_RX_RST;
+	}
+
+	if (sys) {
+		val |= ETH_EIO_SYS_RST;
+		maskval = 0;
+	}
+
+	hssi_csrwr32_ba(pdev, HSSI_ETH_RECONFIG, chan,
+			eth_soft_csroffs(eth_reset), val);
+
+	return ftile_wait_reset_ack(pdev, chan, rst_ack_mask, maskval);
+
+}
+
+int ftile_ehip_deassert_reset(intel_fpga_xtile_eth_private *priv)
+{
+	struct platform_device *pdev = priv->pdev_hssi;
+	u32 chan = priv->tile_chan;
+	u32 rst_ack_mask = ETH_SOFT_TX_RST | ETH_SOFT_RX_RST | ETH_EIO_SYS_RST;
+	u32 maskval = 0;
+	u32 val;
+
+	val = hssi_csrrd32_ba(pdev, HSSI_ETH_RECONFIG, chan,
+			eth_soft_csroffs(eth_reset));
+
+	if (val & ETH_SOFT_TX_RST) {
+		val &= ~ETH_SOFT_TX_RST;
+		maskval |= ETH_SOFT_TX_RST;
+	}
+
+	if (val & ETH_SOFT_RX_RST) {
+		val &= ~ETH_SOFT_RX_RST;
+		maskval |= ETH_SOFT_RX_RST;
+	}
+
+	if (val & ETH_EIO_SYS_RST) {
+		val &= ~ETH_EIO_SYS_RST;
+		maskval = rst_ack_mask;
+	}
+
+	hssi_csrwr32_ba(pdev, HSSI_ETH_RECONFIG,chan,
+			eth_soft_csroffs(eth_reset), val);
+
+	return ftile_wait_reset_ack(pdev, chan, rst_ack_mask, maskval);
+}
+
 void ftile_set_mac(intel_fpga_xtile_eth_private *priv, 
 			  bool enable)
 {
@@ -894,7 +990,7 @@ int ftile_init_mac(intel_fpga_xtile_eth_private *priv)
 	/* Enable in E-tile Tx datapath */
 	ftile_set_mac(priv, true);
 	ftile_update_mac_addr(priv);
-
+#if 0
 	/* Step 1 - Trigger TX and RX digital reset + EIO_SYS_RST
 	 *		EHIP CSR Write, Offset = 0x310, value = 0x6
 	 */
@@ -921,6 +1017,8 @@ int ftile_init_mac(intel_fpga_xtile_eth_private *priv)
 		netdev_err(priv->dev, "RX PCS is not aligned\n");
 		return -EINVAL;
 	}
+
+#endif
 
 	/* Step 5 - IP Ready */
 	/* if the link goes down anytime, this whole process above needs to be repeated */
@@ -1014,7 +1112,7 @@ void xtile_get_stats64(struct net_device *dev,
   ftile_get_stats64(dev, storage);
 }
 
-static void check_ptp_rx_ready_bit(intel_fpga_xtile_eth_private *priv)
+void init_ptp_userflow(intel_fpga_xtile_eth_private *priv)
 {
 	bool is_set = true;
 
@@ -1024,59 +1122,4 @@ static void check_ptp_rx_ready_bit(intel_fpga_xtile_eth_private *priv)
 	{
 		(void)eth_ftile_tx_rx_user_flow(priv);
 	}
-}
-
-void ftile_ptp_rx_ready_status(struct work_struct *work) {
-
-	bool is_prev_iter_fine;
-	bool is_next_iter_fine;
-    struct delayed_work *ptp_work;
-    intel_fpga_xtile_eth_private *priv;
-	
-
-    ptp_work = to_delayed_work(work);
-    priv = container_of(ptp_work, intel_fpga_xtile_eth_private, ptp_work);
-
-	is_prev_iter_fine = priv->prev_link_state;
-    is_next_iter_fine = hssi_ethport_is_stable(priv->pdev_hssi, priv->hssi_port, false);
-
-	/* This is for the 1st iteration where it is assumed link is up
-	 * because on ndo_open system has been prior initalized
-	 */	
-	if ((true == is_prev_iter_fine) && (true == is_next_iter_fine))
-	{
-		/* If RX PCS goes down and came up and which is not able to detect by driver, 
-	 	 * still there could be chance PTP RX READY bit would have went low.
-		 */
-		check_ptp_rx_ready_bit(priv);
-		goto reshed;
-	}
-	else if (is_next_iter_fine == true) 
-	{
-		/* If prev connection was false and now RX PCS was aligned, 
-		 * there could be chance PTP RX READY bit would have not set.
-		 */
-		check_ptp_rx_ready_bit(priv);
-    }
-    else 
-	{
-		// do nothing
-    }
-	
-	priv->prev_link_state = is_next_iter_fine;
-
-reshed:
-    schedule_delayed_work(&priv->ptp_work, msecs_to_jiffies(PTP_TX_RX_USER_FLOW_POLL_TIMEOUT));
-}
-
-void ftile_init_monitor_link_status(intel_fpga_xtile_eth_private *priv) 
-{
-	priv->prev_link_state = true;
-	INIT_DELAYED_WORK(&priv->ptp_work, ftile_ptp_rx_ready_status);
-    schedule_delayed_work(&priv->ptp_work, msecs_to_jiffies(PTP_TX_RX_USER_FLOW_POLL_TIMEOUT));
-}
-
-void ftile_deinit_monitor_link_status(intel_fpga_xtile_eth_private *priv) 
-{
-	cancel_delayed_work_sync(&priv->ptp_work);
 }

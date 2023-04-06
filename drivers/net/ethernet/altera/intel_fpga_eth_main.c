@@ -30,7 +30,6 @@
 #include "intel_fpga_eth_etile.h"
 #include "intel_fpga_eth_hssi_itf.h"
 #include "intel_fpga_eth_tile_ops.h"
-#define MAX_STABILITY_CHECK  9
 
 /* Module parameters */
 static int debug = -1;
@@ -87,6 +86,34 @@ MODULE_PARM_DESC(dma_tx_num, "Number of descriptors in the TX list");
 
 static const struct of_device_id intel_fpga_xtile_ll_ids[];
 
+#define PORT_STS_TIMEOUT		10000	/* in us*/
+#define PORT_STS_STABILITY_COUNT	10 /* in us*/
+static int check_link_stable(intel_fpga_xtile_eth_private *priv)
+{
+	struct platform_device *pdev = priv->pdev_hssi;
+	u32 hssi_port = priv->hssi_port;
+	unsigned long timeout, start;
+	u32 counter = 0;
+	bool eth_portstatus;
+
+	start = jiffies;
+	timeout = start + usecs_to_jiffies(PORT_STS_TIMEOUT);
+	do
+	{
+		udelay(1);
+		eth_portstatus = hssi_ethport_is_stable(pdev, hssi_port, false);
+		if (!eth_portstatus)
+			counter = 0;
+		else
+			counter++;
+
+		if (counter == PORT_STS_STABILITY_COUNT)
+			return 0;
+
+	} while(time_before(jiffies, timeout));
+
+	return -ETIME;
+}
 
 static int xtile_fec_init(struct platform_device *pdev, intel_fpga_xtile_eth_private *priv)
 {
@@ -597,33 +624,117 @@ static void xtile_clear_mac_statistics(struct platform_device *pdev, u32 port)
 	hssi_reset_mac_stats(pdev, port, is_tx_reset, is_rx_reset);
 }
 
+#define LINK_STS_POLL_TIMEOUT		10000	/* in us*/
+static void eth_monitor_link_status(struct work_struct *work) {
+
+	bool curr_link_state;
+	bool prev_link_state;
+        struct delayed_work *dwork;
+        intel_fpga_xtile_eth_private *priv;
+
+        dwork = to_delayed_work(work);
+        priv = container_of(dwork, intel_fpga_xtile_eth_private, dwork);
+
+	prev_link_state = priv->curr_link_state;
+
+        curr_link_state =
+		hssi_ethport_is_stable(priv->pdev_hssi, priv->hssi_port, false);
+
+	if (prev_link_state != curr_link_state)
+		netdev_dbg(priv->dev, "prev_link_state: %d, cur_link_state: %d\n",
+				prev_link_state, curr_link_state);
+
+	/*
+	 * If the link is not stable to perform the networking function then
+	 * necessary defence need to be taken
+	 */
+	if (prev_link_state == curr_link_state) {
+	        /*
+		 * WA: This is for the 1st iteration where it is assumed link is up
+		 * because on ndo_open system has been prior initalized.
+		 * ptp_init required for f-tile.
+		 */
+		if ((priv->spec_ops->ptp_init) && curr_link_state)
+			priv->spec_ops->ptp_init(priv);
+
+		goto reshed;
+
+	} else if (curr_link_state) {
+		napi_enable(&priv->napi);
+
+		/*
+		 * In case there is issue and packet forwarded to DMA engine
+		 * but are not being consumed by it then the DMA ring wouldn't
+		 * be freed resulting in the depeletion of the ring buffers.
+		 * When the buffer threshold has reached we shouldn't wake the
+		 * queue back again
+		 */
+		if ((netif_queue_stopped(priv->dev)) &&
+			!(xtile_tx_avail(priv) <= TXQUEUESTOP_THRESHOLD)) {
+			netif_wake_queue(priv->dev);
+		}
+
+		rtnl_lock();
+		if (priv->phylink)
+			phylink_start(priv->phylink);
+		rtnl_unlock();
+
+		if (priv->spec_ops->ptp_init)
+			priv->spec_ops->ptp_init(priv);
+        }
+        else {
+		netif_stop_queue(priv->dev);
+		napi_synchronize(&priv->napi);
+		napi_disable(&priv->napi);
+
+		rtnl_lock();
+		if (priv->phylink)
+			phylink_stop(priv->phylink);
+		rtnl_unlock();
+		priv->dev->stats.tx_carrier_errors++;
+        }
+
+	priv->curr_link_state = curr_link_state;
+
+reshed:
+        schedule_delayed_work(&priv->dwork, msecs_to_jiffies(LINK_STS_POLL_TIMEOUT));
+}
+
+
+static void eth_link_up(intel_fpga_xtile_eth_private *priv)
+{
+
+	priv->curr_link_state = true;
+	INIT_DELAYED_WORK(&priv->dwork, eth_monitor_link_status);
+        schedule_delayed_work(&priv->dwork, msecs_to_jiffies(LINK_STS_POLL_TIMEOUT));
+}
+
+static void eth_link_down(intel_fpga_xtile_eth_private *priv)
+{
+	cancel_delayed_work_sync(&priv->dwork);
+}
+
 /* Open and initialize the interface */
 static int xtile_open(struct net_device *dev)
 {
 	intel_fpga_xtile_eth_private *priv = netdev_priv(dev);
 	struct platform_device *pdev = priv->pdev_hssi;
 	u32 hssi_port = priv->hssi_port;
-	bool eth_portstatus;
-	u32 count_test = 0;
 	unsigned long flags;
 	int ret = 0;
 	int i;
 
-	do
-	{
-		eth_portstatus = hssi_ethport_is_stable(pdev, hssi_port, false);
-		udelay(1);
+	/*
+	 * deassert reset:
+	 * emib interface, mac, pcs, fec, pma, stat for both tx and rx
+	 * different for etile aand  ftile
+	 */
+	if (priv->spec_ops->ehip_reset_deassert)
+		priv->spec_ops->ehip_reset_deassert(priv);
 
-	} while( (eth_portstatus == false) &&
-		 (count_test++ < MAX_STABILITY_CHECK) );
-	
-	eth_portstatus = hssi_ethport_is_stable(pdev, hssi_port, true);
-	
-	/* We check for port stability to log the error and don't proceed further */
-	if (eth_portstatus == false) {
-		ret = -EREMOTEIO;
+	ret = check_link_stable(priv);
+	if (ret < 0)
 		goto phy_error;
-	}
 
 	/* Create and initialize the TX/RX descriptors chains. */
 	priv->dma_priv.rx_ring_size = dma_rx_num;
@@ -704,14 +815,9 @@ static int xtile_open(struct net_device *dev)
 	if (priv->phylink)
 		phylink_start(priv->phylink);
 
-	if (priv->spec_ops->qsfp_ops.qsfp_init)
-		/* start the poll on the QSFP presence and link stability */
-		priv->spec_ops->qsfp_ops.qsfp_init(priv);
+	if (priv->spec_ops->link_up)
+		priv->spec_ops->link_up(priv);
 
-	if (priv->spec_ops->ptp_ops.ptp_tx_rx_flow_check_init)
-	    /* Start the poll on the PTP RX ready bit stability */
-		priv->spec_ops->ptp_ops.ptp_tx_rx_flow_check_init(priv);
-	
 	return 0;
 
 init_error:
@@ -727,15 +833,6 @@ static int xtile_shutdown(struct net_device *dev)
 {
 	intel_fpga_xtile_eth_private *priv = netdev_priv(dev);
 	unsigned long flags;
-
-	if (priv->spec_ops->qsfp_ops.qsfp_deinit)
-		/* stop polling for the QSFP presence, last status would
-	 	* be the one displayed by ethtool */
-		priv->spec_ops->qsfp_ops.qsfp_deinit(priv);
-
-	if (priv->spec_ops->ptp_ops.ptp_tx_rx_flow_check_deinit)
-	    /* Stop polling for the PTP RX ready bit stability */
-		priv->spec_ops->ptp_ops.ptp_tx_rx_flow_check_deinit(priv);
 
 	/* Stop the PHY */
 	if (priv->phylink)
@@ -766,16 +863,18 @@ static int xtile_shutdown(struct net_device *dev)
         spin_unlock(&priv->tx_lock);
         spin_unlock(&priv->mac_cfg_lock);
 
-	/* disable and reset the MAC, empties fifo */
-	/* Trigger RX digital reset */
-	if (priv->spec_ops->reset_ops.pma_digi_reset)
-		priv->spec_ops->reset_ops.pma_digi_reset(priv, false, true);
-
 	priv->spec_ops->dma_ops->reset_dma(&priv->dma_priv);
 	xtile_free_skbufs(dev);
 
 	priv->spec_ops->dma_ops->uninit_dma(&priv->dma_priv);
 	del_timer_sync(&priv->fec_timer);
+
+	if (priv->spec_ops->link_down)
+		priv->spec_ops->link_down(priv);
+
+	/* reset: emib interface, mac, pcs, fec, pma, stat for both tx and rx */
+	if (priv->spec_ops->ehip_reset)
+		priv->spec_ops->ehip_reset(priv, false, false, true);
 
 	return 0;
 }
@@ -1561,42 +1660,6 @@ static int intel_fpga_xtile_remove(struct platform_device *pdev)
 	return 0;
 }
 
-static void
-intel_fpga_xtile_qsfp_up(intel_fpga_xtile_eth_private *priv) {
-
-	napi_enable(&priv->napi);
-
-	/* In case there is issue and packet forwarded to DMA engine
-	 * but are not being consumed by it then the DMA ring wouldn't
-	 * be freed resulting in the depeletion of the ring buffers.
-	 * When the buffer threshold has reached we shouldn't wake the
-	 * queue back again
-	 */
-	if ((netif_queue_stopped(priv->dev)) &&
-			!(xtile_tx_avail(priv) <= TXQUEUESTOP_THRESHOLD)) {
-		netif_wake_queue(priv->dev);
-	}
-
-	rtnl_lock();
-	if (priv->phylink)
-		phylink_start(priv->phylink);
-	rtnl_unlock();
-}
-
-static void
-intel_fpga_xtile_qsfp_down(intel_fpga_xtile_eth_private *priv) {
-
-	netif_stop_queue(priv->dev);
-	napi_synchronize(&priv->napi);
-	napi_disable(&priv->napi);
-
-	rtnl_lock();
-	if (priv->phylink)
-		phylink_stop(priv->phylink);
-	rtnl_unlock();
-	priv->dev->stats.tx_carrier_errors++;
-}
-
 static const struct altera_dmaops altera_dtype_prefetcher = {
 	.altera_dtype   = ALTERA_DTYPE_MSGDMA_PREF,
 	.dmamask        = 64,
@@ -1619,15 +1682,10 @@ static const struct altera_dmaops altera_dtype_prefetcher = {
 
 static const struct xtile_spec_ops etile_data = {
 	.dma_ops   = &altera_dtype_prefetcher,
-	.qsfp_ops = {
-		.qsfp_init	= init_qsfp_ctrl_space,
-		.qsfp_deinit	= deinit_qsfp_ctrl_space,
-		.qsfp_link_up   = intel_fpga_xtile_qsfp_up,
-		.qsfp_link_down = intel_fpga_xtile_qsfp_down,
-	},
-	.reset_ops = {
-		.pma_digi_reset = etile_pma_digital_reset,
-	},
+	.link_up = eth_link_up,
+	.link_down = eth_link_down,
+	.ehip_reset_deassert = etile_ehip_deassert_reset,
+	.ehip_reset = etile_ehip_reset,
 	.mac_ops = {
 		.init_mac = etile_init_mac,
 		.update_mac = etile_update_mac_addr,
@@ -1643,13 +1701,11 @@ static const struct xtile_spec_ops etile_data = {
 
 static const struct xtile_spec_ops ftile_data = {
         .dma_ops   = &altera_dtype_prefetcher,
-		.ptp_ops   = {
-				.ptp_tx_rx_flow_check_init = ftile_init_monitor_link_status,
-				.ptp_tx_rx_flow_check_deinit = ftile_deinit_monitor_link_status,
-		},
-        .reset_ops = {
-                .pma_digi_reset = ftile_pma_digital_reset,
-        },
+	.link_up = eth_link_up,
+	.link_down = eth_link_down,
+	.ehip_reset_deassert = ftile_ehip_deassert_reset,
+	.ehip_reset = ftile_ehip_reset,
+	.ptp_init = init_ptp_userflow,
         .mac_ops = {
                 .init_mac = ftile_init_mac,
                 .update_mac = ftile_update_mac_addr,

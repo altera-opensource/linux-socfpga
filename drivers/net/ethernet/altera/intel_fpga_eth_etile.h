@@ -2542,10 +2542,11 @@ int xtile_check_counter_complete(intel_fpga_xtile_eth_private *priv,
 void etile_update_mac_addr(intel_fpga_xtile_eth_private *priv);
 void intel_fpga_etile_set_ethtool_ops(struct net_device *netdev);
 
-void init_qsfp_ctrl_space(intel_fpga_xtile_eth_private *priv);
-void deinit_qsfp_ctrl_space(intel_fpga_xtile_eth_private *priv);
-
 int fec_init(struct platform_device *pdev, intel_fpga_xtile_eth_private *priv);
+
+int etile_ehip_reset(intel_fpga_xtile_eth_private *priv,
+			bool tx, bool rx, bool sys);
+int etile_ehip_deassert_reset(intel_fpga_xtile_eth_private *priv);
 
 #ifdef CONFIG_INTEL_FPGA_ETILE_DEBUG_FS
 int intel_fpga_etile_init_fs(struct net_device *dev);

@@ -18,7 +18,6 @@
 #include "altera_msgdma_prefetcher.h"
 #include "altera_msgdmahw_prefetcher.h"
 #include "altera_sgdma.h"
-#include "intel_fpga_eth_qsfp.h"
 
 #define INTEL_FPGA_XTILE_ETH_RESOURCE_NAME "intel_fpga_eth"
 
@@ -46,7 +45,6 @@ typedef struct {
         struct phylink    *phylink;
         struct xtile_spec_ops *spec_ops;
         struct platform_device *pdev_hssi;
-        struct qsfp_reg_space __iomem *qsfp_reg;
         struct intel_fpga_rx_fifo __iomem *rx_fifo;
         struct intel_fpga_rx_fifo __iomem *tx_fifo;
 
@@ -79,7 +77,7 @@ typedef struct {
         u8 qsfp_lane;
         bool autoneg;
         bool ptp_enable;
-        bool prev_link_state;
+        bool curr_link_state;
         bool cable_unplugged;
 
         spinlock_t tx_lock;

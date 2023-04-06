@@ -2,24 +2,11 @@
 
 struct xtile_spec_ops {
 	const struct altera_dmaops *dma_ops;
-        
-	struct qsfp_ops {
-                void (*qsfp_init)(intel_fpga_xtile_eth_private*);
-                void (*qsfp_link_up)(intel_fpga_xtile_eth_private*);
-                void (*qsfp_link_down)(intel_fpga_xtile_eth_private*);
-                void (*qsfp_deinit)(intel_fpga_xtile_eth_private*);
-        } qsfp_ops;
 
-        struct ptp_ops {
-                void (*ptp_tx_rx_flow_check_init)(intel_fpga_xtile_eth_private*);
-                void (*ptp_tx_rx_flow_check_deinit)(intel_fpga_xtile_eth_private*);
-        } ptp_ops;
-
-        struct reset_ops {
-                void (*pma_ana_reset)(intel_fpga_xtile_eth_private*);
-                void (*pma_digi_reset)(intel_fpga_xtile_eth_private*,
-					bool, bool);
-        } reset_ops;
+	void (*link_up)(intel_fpga_xtile_eth_private*);
+	void (*link_down)(intel_fpga_xtile_eth_private*);
+	int (*ehip_reset_deassert)(intel_fpga_xtile_eth_private*);
+	int (*ehip_reset)(intel_fpga_xtile_eth_private*, bool tx, bool rx, bool sys);
 
         struct mac_ops {
                 void (*update_mac)(intel_fpga_xtile_eth_private *);
@@ -34,6 +21,8 @@ struct xtile_spec_ops {
 	struct eth_ops {
 		void (*eth_reg_callback) (struct net_device *netdev);
 	} eth_ops;
+
+	void (*ptp_init)(intel_fpga_xtile_eth_private *);
 };
 
 
