@@ -16,6 +16,7 @@
 #include "altera_msgdmahw_prefetcher.h"
 #include "altera_sgdma.h"
 #include "intel_fpga_eth_main.h"
+#include "intel_fpga_eth_hssi_itf.h"
 
 static void xtile_prefetcher_reg_dump_tx(struct altera_dma_private *priv) {
 
@@ -233,7 +234,7 @@ static ssize_t show_msgdma_tx_desc_dump(struct device *dev,
         intel_fpga_xtile_eth_private *priv=  netdev_priv(ndev);
 
 	xtile_unprocess_desc_tx(&priv->dma_priv);
-	
+
 	return sprintf(buf, "%x", 1);
 }
 
@@ -243,13 +244,16 @@ static ssize_t show_link_state(struct device *dev,
         struct platform_device *pdev = to_platform_device(dev);
         struct net_device *ndev = platform_get_drvdata(pdev);
         intel_fpga_xtile_eth_private *priv=  netdev_priv(ndev);
+	u32 port = priv->hssi_port;
+	bool link_sts;
 
 	netdev_info(priv->dev,
 			"Cable is %s\n", priv->cable_unplugged ?
 			"not connected":"connected");
 
+	link_sts = hssi_ethport_is_stable(pdev, port, false);
 	netdev_info(priv->dev,
-			"Eth link %s\n", priv->prev_link_state ?
+			"Eth link %s\n", link_sts ?
 			"stable" : "not stable");
 
         return sprintf(buf, "%x", 1);

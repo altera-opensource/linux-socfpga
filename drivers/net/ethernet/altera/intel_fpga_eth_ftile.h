@@ -34,7 +34,6 @@
 #include "altera_msgdma_prefetcher.h"
 #include "altera_sgdma.h"
 #include "intel_fpga_eth_main.h"
-#include "intel_fpga_eth_qsfp.h"
 //#include "intel_freq_control.h"
 #define INTEL_FPGA_BYTE_ALIGN	8
 #define INTEL_FPGA_WORD_ALIGN	32
@@ -1936,9 +1935,10 @@ struct intel_fpga_ftile_xcvr {
 int ftile_init_mac(intel_fpga_xtile_eth_private *priv);
 void ftile_get_stats64(struct net_device *dev,
                        struct rtnl_link_stats64 *storage);
-void ftile_pma_digital_reset(intel_fpga_xtile_eth_private *priv,
-                       bool tx_reset,
-                       bool rx_reset);
+
+int ftile_ehip_reset(intel_fpga_xtile_eth_private *priv,
+			bool tx_reset, bool rx_reset, bool sys_reset);
+int ftile_ehip_deassert_reset(intel_fpga_xtile_eth_private *priv);
 int xtile_check_counter_complete(intel_fpga_xtile_eth_private *priv,
                                  u32 regbank,
                                  size_t offs,
@@ -1951,7 +1951,6 @@ extern void ftile_ui_adjustments(struct timer_list *t);
 
 extern void intel_fpga_ftile_set_ethtool_ops(struct net_device *dev);
 
-void ftile_init_monitor_link_status(intel_fpga_xtile_eth_private *priv);
-void ftile_deinit_monitor_link_status(intel_fpga_xtile_eth_private *priv);
+void init_ptp_userflow(intel_fpga_xtile_eth_private *priv);
 
 #endif	  

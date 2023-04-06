@@ -255,26 +255,55 @@ static int eth_etile_tx_rx_user_flow(intel_fpga_xtile_eth_private *priv)
 	return 0;
 }
 
-void etile_pma_digital_reset(intel_fpga_xtile_eth_private *priv,
-				bool tx_reset,
-				bool rx_reset)
+int etile_ehip_reset(intel_fpga_xtile_eth_private *priv,
+			bool tx, bool rx, bool sys)
 {
 	struct platform_device *pdev = priv->pdev_hssi;
 	u32 chan = priv->tile_chan;
+	u32 val;
+	int ret;
 
-	/* Trigger RX digital reset
-	 * 1.   EHIP CSR Write, Offset = 0x310, value = 0x4
-	 * Trigger TX digital reset
-	 * 1.   EHIP CSR Write, Offset = 0x310, value = 0x2
-	 */
+	val = hssi_csrrd32(pdev, HSSI_ETH_RECONFIG, chan,
+			eth_phy_csroffs(phy_config));
 
-	if (rx_reset)
-		hssi_csrwr8(pdev, HSSI_ETH_RECONFIG,
-			    chan, eth_phy_csroffs(phy_config), 0x4);
-	if (tx_reset)
-		hssi_csrwr8(pdev, HSSI_ETH_RECONFIG,
-			    chan, eth_phy_csroffs(phy_config), 0x2);
+	if (tx)
+		val |= ETH_PHY_CONF_SOFT_TXP_RESET;
+	if (rx)
+		val |= ETH_PHY_CONF_SOFT_RXP_RESET;
+	if (sys)
+		val |= ETH_PHY_CONF_IO_SYS_RESET;
+
+	hssi_csrwr32(pdev, HSSI_ETH_RECONFIG, chan,
+			eth_phy_csroffs(phy_config), val);
+	udelay(3);
+
+	return 0;
 }
+
+int etile_ehip_deassert_reset(intel_fpga_xtile_eth_private *priv) {
+
+	struct platform_device *pdev = priv->pdev_hssi;
+	u32 chan = priv->tile_chan;
+	u32 val;
+
+	val = hssi_csrrd32(pdev, HSSI_ETH_RECONFIG, chan,
+			eth_phy_csroffs(phy_config));
+
+	if (val & ETH_PHY_CONF_SOFT_TXP_RESET)
+		val &= ~ETH_PHY_CONF_SOFT_TXP_RESET;
+	if (val & ETH_PHY_CONF_SOFT_RXP_RESET)
+		val &= ~ETH_PHY_CONF_SOFT_RXP_RESET;
+	if (val & ETH_PHY_CONF_IO_SYS_RESET)
+		val &= ~ETH_PHY_CONF_IO_SYS_RESET;
+
+	hssi_csrwr32(pdev, HSSI_ETH_RECONFIG,chan,
+			eth_phy_csroffs(phy_config), val);
+
+	udelay(3);
+
+	return 0;
+}
+
 
 int etile_init_mac(intel_fpga_xtile_eth_private *priv)
 {
