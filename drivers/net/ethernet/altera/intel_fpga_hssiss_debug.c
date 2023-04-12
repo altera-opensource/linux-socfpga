@@ -34,10 +34,10 @@ static ssize_t hssiss_dbgfs_csr_read(struct file *filep, char __user *ubuf,
 				   size_t count, loff_t *offp)
 {
 	struct hssiss_dbg *d = filep->private_data;
-	char buf[sizeof(u32)];
+	char buf[10];
 	int size;
 
-	size = snprintf(buf, sizeof(u32), "%x", d->read.data);
+	size = snprintf(buf, sizeof(buf), "%x\n", d->read.data);
 
 	return simple_read_from_buffer(ubuf, count, offp, buf, size);
 }
@@ -431,16 +431,15 @@ static ssize_t hssiss_dbgfs_ctrladdr_read(struct file *filep, char __user *ubuf,
 	struct hssiss_dbg *d = filep->private_data;
 	struct platform_device *pdev = d->pdev;
 	struct hssiss_private *priv = platform_get_drvdata(pdev);
-	char buf[sizeof(u32)];
+	char buf[10];
 	u32 val;
 	int size;
 
 	val = csrrd32_withoffset(priv->sscsr, priv->csr_addroff,
 					HSSISS_CSR_CTRLADDR);
 
-	size = snprintf(buf, sizeof(u32), "%x", val);
+	size = snprintf(buf, sizeof(buf), "%x\n", val);
 
-	dev_info(&pdev->dev, "val: %x\n", val);
 	return simple_read_from_buffer(ubuf, count, offp, buf, size);
 
 }
@@ -475,7 +474,6 @@ static ssize_t hssiss_dbgfs_ctrladdr_write(struct file *filep, const char __user
 
 	csrwr32_withoffset(val, priv->sscsr, priv->csr_addroff,
 					HSSISS_CSR_CTRLADDR);
-	dev_info(&pdev->dev, "val: %x\n", val);
 
 	return count;
 }
@@ -486,16 +484,15 @@ static ssize_t hssiss_dbgfs_cmdsts_read(struct file *filep, char __user *ubuf,
 	struct hssiss_dbg *d = filep->private_data;
 	struct platform_device *pdev = d->pdev;
 	struct hssiss_private *priv = platform_get_drvdata(pdev);
-	char buf[sizeof(u32)];
+	char buf[10];
 	u32 val;
 	int size;
 
 	val = csrrd32_withoffset(priv->sscsr, priv->csr_addroff,
 					HSSISS_CSR_CMDSTS);
 
-	size = snprintf(buf, sizeof(u32), "%x", val);
+	size = snprintf(buf, sizeof(buf), "%x\n", val);
 
-	dev_info(&pdev->dev, "val: %x\n", val);
 	return simple_read_from_buffer(ubuf, count, offp, buf, size);
 
 }
@@ -530,7 +527,6 @@ static ssize_t hssiss_dbgfs_cmdsts_write(struct file *filep, const char __user *
 
 	csrwr32_withoffset(val, priv->sscsr, priv->csr_addroff,
 					HSSISS_CSR_CMDSTS);
-	dev_info(&pdev->dev, "val: %x\n", val);
 
 	return count;
 }
@@ -541,16 +537,15 @@ static ssize_t hssiss_dbgfs_wr_read(struct file *filep, char __user *ubuf,
 	struct hssiss_dbg *d = filep->private_data;
 	struct platform_device *pdev = d->pdev;
 	struct hssiss_private *priv = platform_get_drvdata(pdev);
-	char buf[sizeof(u32)];
+	char buf[10];
 	u32 val;
 	int size;
 
 	val = csrrd32_withoffset(priv->sscsr, priv->csr_addroff,
 					HSSISS_CSR_WR_DATA);
 
-	size = snprintf(buf, sizeof(u32), "%x", val);
+	size = snprintf(buf, sizeof(buf), "%x\n", val);
 
-	dev_info(&pdev->dev, "val: %x\n", val);
 	return simple_read_from_buffer(ubuf, count, offp, buf, size);
 
 }
@@ -585,7 +580,6 @@ static ssize_t hssiss_dbgfs_wr_write(struct file *filep, const char __user *ubuf
 
 	csrwr32_withoffset(val, priv->sscsr, priv->csr_addroff,
 					HSSISS_CSR_WR_DATA);
-	dev_info(&pdev->dev, "val: %x\n", val);
 
 	return count;
 }
@@ -596,16 +590,15 @@ static ssize_t hssiss_dbgfs_rd_read(struct file *filep, char __user *ubuf,
 	struct hssiss_dbg *d = filep->private_data;
 	struct platform_device *pdev = d->pdev;
 	struct hssiss_private *priv = platform_get_drvdata(pdev);
-	char buf[sizeof(u32)];
+	char buf[10];
 	u32 val;
 	int size;
 
 	val = csrrd32_withoffset(priv->sscsr, priv->csr_addroff,
 					HSSISS_CSR_RD_DATA);
 
-	size = snprintf(buf, sizeof(u32), "%x", val);
+	size = snprintf(buf, sizeof(buf), "%x\n", val);
 
-	dev_info(&pdev->dev, "val: %x\n", val);
 	return simple_read_from_buffer(ubuf, count, offp, buf, size);
 
 }
@@ -640,7 +633,6 @@ static ssize_t hssiss_dbgfs_rd_write(struct file *filep, const char __user *ubuf
 
 	csrwr32_withoffset(val, priv->sscsr, priv->csr_addroff,
 					HSSISS_CSR_RD_DATA);
-	dev_info(&pdev->dev, "val: %x\n", val);
 
 	return count;
 }
@@ -649,10 +641,10 @@ static ssize_t hssiss_dbgfs_direct_reg_read(struct file *filep, char __user *ubu
 				   size_t count, loff_t *offp)
 {
 	struct hssiss_dbg *d = filep->private_data;
-	char buf[sizeof(u32)];
+	char buf[10];
 	int size;
 
-	size = snprintf(buf, sizeof(u32), "%x", d->read.data);
+	size = snprintf(buf, sizeof(buf), "%x\n", d->read.data);
 
 	return simple_read_from_buffer(ubuf, count, offp, buf, size);
 
@@ -706,9 +698,6 @@ static ssize_t hssiss_dbgfs_direct_reg_write(struct file *filep, const char __us
 		}
 	}
 
-	dev_info(&pdev->dev,
-			"readdata: %x, base: %x, offset: %x, direct: %d val: %x\n",
-			d->read.data, base, offset, direct, val);
 
 	return count;
 }
