@@ -86,6 +86,7 @@ typedef struct {
 
         struct napi_struct napi;
         struct delayed_work dwork;
+	struct work_struct  ui_worker;
         struct delayed_work ptp_work;
         struct timer_list fec_timer;
         struct altera_dma_private dma_priv;

@@ -1947,7 +1947,8 @@ int xtile_check_counter_complete(intel_fpga_xtile_eth_private *priv,
                                  int align);
 void ftile_update_mac_addr(intel_fpga_xtile_eth_private *priv);
 
-extern void ftile_ui_adjustments(struct timer_list *t);
+extern void ftile_ui_adjustments(struct work_struct *work);
+extern void ftile_ui_adjustments_init_worker(intel_fpga_xtile_eth_private *priv);
 
 extern void intel_fpga_ftile_set_ethtool_ops(struct net_device *dev);
 

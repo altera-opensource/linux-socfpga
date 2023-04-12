@@ -950,10 +950,8 @@ static int eth_ftile_tx_rx_user_flow(intel_fpga_xtile_eth_private *priv)
 	// Done via timer_setup at end of this function
 
 	/* Start timer to periodically adjust Rx+Tx UI value */
-	// timer_setup(&priv->fec_timer, ftile_ui_adjustments, 0);
-	// ret = mod_timer(&priv->fec_timer, jiffies + msecs_to_jiffies(500));
-	// if (ret)
-	// 	netdev_err(priv->dev, "Timer failed to start UI adjustment\n");
+	ftile_ui_adjustments_init_worker(priv);
+
 
 	return 0;
 }
@@ -1048,21 +1046,21 @@ int ftile_init_mac(intel_fpga_xtile_eth_private *priv)
 
 
 	/* rx stats */
-	lsb = hssi_csrrd32_ba_atomic(pdev, HSSI_ETH_RECONFIG, chan,
+	lsb = hssi_csrrd32_ba(pdev, HSSI_ETH_RECONFIG, chan,
 		      eth_mac_ptp_csroffs(0, rx_frame_octetsok_lsb));
-	msb = hssi_csrrd32_ba_atomic(pdev, HSSI_ETH_RECONFIG, chan,
+	msb = hssi_csrrd32_ba(pdev, HSSI_ETH_RECONFIG, chan,
 		      eth_mac_ptp_csroffs(0, rx_frame_octetsok_msb));
 	storage->rx_bytes = ((u64)msb << 32) | lsb;
 
-	lsb =hssi_csrrd32_ba_atomic(pdev, HSSI_ETH_RECONFIG, chan,
+	lsb =hssi_csrrd32_ba(pdev, HSSI_ETH_RECONFIG, chan,
 		      eth_mac_ptp_csroffs(0, rx_mcast_data_ok_lsb));
-	msb = hssi_csrrd32_ba_atomic(pdev, HSSI_ETH_RECONFIG, chan,
+	msb = hssi_csrrd32_ba(pdev, HSSI_ETH_RECONFIG, chan,
 		      eth_mac_ptp_csroffs(0, rx_mcast_data_ok_msb));
 	storage->multicast = ((u64)msb << 32) | lsb;
 
 	storage->collisions = 0;
 
-	lsb = hssi_csrrd32_ba_atomic(pdev, HSSI_ETH_RECONFIG, chan,
+	lsb = hssi_csrrd32_ba(pdev, HSSI_ETH_RECONFIG, chan,
 		      eth_mac_ptp_csroffs(0, rx_lenerr_lsb));
 	msb = 0;
 	storage->rx_length_errors = ((u64)msb << 32) | lsb;
@@ -1081,17 +1079,17 @@ int ftile_init_mac(intel_fpga_xtile_eth_private *priv)
 	storage->rx_dropped += dev->stats.rx_dropped;
 
 	/* tx stats */
-	lsb =hssi_csrrd32_ba_atomic(pdev, HSSI_ETH_RECONFIG, chan,
+	lsb =hssi_csrrd32_ba(pdev, HSSI_ETH_RECONFIG, chan,
 		      eth_mac_ptp_csroffs(0, tx_frame_octetsok_lsb));
-	msb = hssi_csrrd32_ba_atomic(pdev, HSSI_ETH_RECONFIG, chan,
+	msb = hssi_csrrd32_ba(pdev, HSSI_ETH_RECONFIG, chan,
 		      eth_mac_ptp_csroffs(0, tx_frame_octetsok_msb));
 	storage->tx_bytes = ((u64)msb << 32) | lsb;
 
-	lsb = hssi_csrrd32_ba_atomic(pdev, HSSI_ETH_RECONFIG, chan, eth_mac_ptp_csroffs(0, tx_malformed_ctrl_lsb));
+	lsb = hssi_csrrd32_ba(pdev, HSSI_ETH_RECONFIG, chan, eth_mac_ptp_csroffs(0, tx_malformed_ctrl_lsb));
 	msb = 0;
 	storage->tx_errors = ((u64)msb << 32) | lsb;
 
-	lsb = hssi_csrrd32_ba_atomic(pdev, HSSI_ETH_RECONFIG, chan, eth_mac_ptp_csroffs(0, tx_dropped_ctrl_lsb));
+	lsb = hssi_csrrd32_ba(pdev, HSSI_ETH_RECONFIG, chan, eth_mac_ptp_csroffs(0, tx_dropped_ctrl_lsb));
 	msb = 0;
 	storage->tx_dropped = ((u64)msb << 32) | lsb;
 
