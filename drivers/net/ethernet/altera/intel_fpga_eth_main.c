@@ -655,7 +655,11 @@ static void eth_monitor_link_status(struct work_struct *work) {
 		 * ptp_init required for f-tile.
 		 */
 		if ((priv->spec_ops->ptp_init) && curr_link_state)
+		{
+			del_timer_sync(&priv->fec_timer);
+			cancel_work_sync(&priv->ui_worker);
 			priv->spec_ops->ptp_init(priv);
+		}
 
 		goto reshed;
 
@@ -680,7 +684,11 @@ static void eth_monitor_link_status(struct work_struct *work) {
 		rtnl_unlock();
 
 		if (priv->spec_ops->ptp_init)
+		{
+			del_timer_sync(&priv->fec_timer);
+			cancel_work_sync(&priv->ui_worker);
 			priv->spec_ops->ptp_init(priv);
+		}
         }
         else {
 		netif_stop_queue(priv->dev);
@@ -712,6 +720,8 @@ static void eth_link_up(intel_fpga_xtile_eth_private *priv)
 static void eth_link_down(intel_fpga_xtile_eth_private *priv)
 {
 	cancel_delayed_work_sync(&priv->dwork);
+	del_timer_sync(&priv->fec_timer);
+	cancel_work_sync(&priv->ui_worker);
 }
 
 /* Open and initialize the interface */
@@ -867,7 +877,6 @@ static int xtile_shutdown(struct net_device *dev)
 	xtile_free_skbufs(dev);
 
 	priv->spec_ops->dma_ops->uninit_dma(&priv->dma_priv);
-	del_timer_sync(&priv->fec_timer);
 
 	if (priv->spec_ops->link_down)
 		priv->spec_ops->link_down(priv);

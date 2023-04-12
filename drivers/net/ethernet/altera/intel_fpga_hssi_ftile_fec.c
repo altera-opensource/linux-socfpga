@@ -27,14 +27,32 @@
 
 
 
-void ftile_ui_adjustments(struct timer_list *t);
+void ftile_ui_adjustments(struct work_struct *work);
+
+void ftile_ui_adjustments_init_worker(intel_fpga_xtile_eth_private *priv);
+
+void ftile_ui_adjustments_worker_handle(struct timer_list *t) 
+{
+	intel_fpga_xtile_eth_private *priv = from_timer(priv, t, fec_timer);
+	schedule_work(&priv->ui_worker);
+}
+
+void ftile_ui_adjustments_init_worker(intel_fpga_xtile_eth_private *priv)
+{
+	int ret;
+	INIT_WORK(&priv->ui_worker, ftile_ui_adjustments);
+	timer_setup(&priv->fec_timer,ftile_ui_adjustments_worker_handle, 0);
+	ret = mod_timer(&priv->fec_timer, jiffies + msecs_to_jiffies(500));
+	if (ret)
+		netdev_err(priv->dev, "Timer failed to start UI adjustment\n");
+}
 
 
 
 /* Calculate Unit Interval Adjustments */
-void ftile_ui_adjustments(struct timer_list *t)
+void ftile_ui_adjustments(struct work_struct *work)
 {
-	intel_fpga_xtile_eth_private *priv = from_timer(priv, t, fec_timer);
+	intel_fpga_xtile_eth_private *priv = container_of(work, intel_fpga_xtile_eth_private, ui_worker);
 	struct platform_device *pdev = priv->pdev_hssi;
 	u32 chan = priv->tile_chan;
 	static u64 start_jiffies;
@@ -167,8 +185,8 @@ void ftile_ui_adjustments(struct timer_list *t)
 			rx_tam_delta = rx_tam_nth + 0x3B9ACA000000UL - rx_tam_initial; // 10^9 ns = 0x3B9ACA000000
 		else
 			rx_tam_delta = rx_tam_nth - rx_tam_initial;
-		dev_info(priv->device, "%s tx_tam_initial:0x%llx tx_tam_nth:0x%llx tx_tam_delta:0x%llx\n", __func__, tx_tam_initial, tx_tam_nth, tx_tam_delta);
-		dev_info(priv->device, "%s rx_tam_initial:0x%llx rx_tam_nth:0x%llx rx_tam_delta:0x%llx\n", __func__, rx_tam_initial, rx_tam_nth, rx_tam_delta);
+		dev_dbg(priv->device, "%s tx_tam_initial:0x%llx tx_tam_nth:0x%llx tx_tam_delta:0x%llx\n", __func__, tx_tam_initial, tx_tam_nth, tx_tam_delta);
+		dev_dbg(priv->device, "%s rx_tam_initial:0x%llx rx_tam_nth:0x%llx rx_tam_delta:0x%llx\n", __func__, rx_tam_initial, rx_tam_nth, rx_tam_delta);
 
 		// TBD add other PHY modes and ui_value for those...
 		switch (priv->phy_iface) {
@@ -192,14 +210,14 @@ void ftile_ui_adjustments(struct timer_list *t)
 			rx_tam_count = (rx_tam_count_nth + (1 << 15)) - rx_tam_count_initial;
 		else
 			rx_tam_count = rx_tam_count_nth - rx_tam_count_initial;
-		dev_info(priv->device, "%s tx_tam_count_initial:0x%08x tx_tam_count_nth:0x%08x tx_tam_count:0x%08x\n", __func__, tx_tam_count_initial, tx_tam_count_nth, tx_tam_count);
-		dev_info(priv->device, "%s rx_tam_count_initial:0x%08x rx_tam_count_nth:0x%08x rx_tam_count:0x%08x\n", __func__, rx_tam_count_initial, rx_tam_count_nth, rx_tam_count);
+		dev_dbg(priv->device, "%s tx_tam_count_initial:0x%08x tx_tam_count_nth:0x%08x tx_tam_count:0x%08x\n", __func__, tx_tam_count_initial, tx_tam_count_nth, tx_tam_count);
+		dev_dbg(priv->device, "%s rx_tam_count_initial:0x%08x rx_tam_count_nth:0x%08x rx_tam_count:0x%08x\n", __func__, rx_tam_count_initial, rx_tam_count_nth, rx_tam_count);
 
 		/* Step 7d Calculate UI value */
 		// Make sure the format is {4-bit nanoseconds, 28-bit fractional nanoseconds}
 		tx_ui = (tx_tam_delta << 12) / (((u64)tx_tam_count * tx_tam_interval) / 1/*priv->num_lanes*/); // priv->num_lanes=PL
 		rx_ui = (rx_tam_delta << 12) / (((u64)rx_tam_count * rx_tam_interval) /1/* priv->num_lanes*/); // priv->num_lanes=PL
-		dev_info(priv->device, "%s tx_ui:0x%08llx rx_ui:0x%08llx\n", __func__, tx_ui, rx_ui);
+		dev_dbg(priv->device, "%s tx_ui:0x%08llx rx_ui:0x%08llx\n", __func__, tx_ui, rx_ui);
 
 		// check new tx_ui / rx_ui against min./max. ui_value
 		if (tx_ui > 0x9EE420 || tx_ui < 0x9EDC00) {
