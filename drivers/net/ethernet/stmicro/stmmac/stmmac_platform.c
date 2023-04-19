@@ -276,6 +276,10 @@ static int stmmac_mtl_setup(struct platform_device *pdev,
 			plat->tx_queues_cfg[queue].use_prio = true;
 		}
 
+		/* Enable TBS for selected queues */
+		plat->tx_queues_cfg[queue].tbs_en =
+			of_property_read_bool(q_node, "snps,tbs-enable");
+
 		queue++;
 	}
 	if (queue != plat->tx_queues_to_use) {
