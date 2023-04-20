@@ -125,11 +125,10 @@ module_param(chain_mode, int, 0444);
 MODULE_PARM_DESC(chain_mode, "To use chain instead of ring mode");
 
 static irqreturn_t stmmac_interrupt(int irq, void *dev_id);
-/* For MSI interrupts handling */
 static irqreturn_t stmmac_mac_interrupt(int irq, void *dev_id);
 static irqreturn_t stmmac_safety_interrupt(int irq, void *dev_id);
-static irqreturn_t stmmac_msi_intr_tx(int irq, void *data);
-static irqreturn_t stmmac_msi_intr_rx(int irq, void *data);
+static irqreturn_t stmmac_intr_tx(int irq, void *data);
+static irqreturn_t stmmac_intr_rx(int irq, void *data);
 static void stmmac_reset_rx_queue(struct stmmac_priv *priv, u32 queue);
 static void stmmac_reset_tx_queue(struct stmmac_priv *priv, u32 queue);
 static void stmmac_reset_queues_param(struct stmmac_priv *priv);
@@ -3501,7 +3500,7 @@ static void stmmac_free_irq(struct net_device *dev,
 	}
 }
 
-static int stmmac_request_irq_multi_msi(struct net_device *dev)
+static int stmmac_request_irq_multi(struct net_device *dev)
 {
 	struct stmmac_priv *priv = netdev_priv(dev);
 	enum request_irq_err irq_err;
@@ -3606,12 +3605,17 @@ static int stmmac_request_irq_multi_msi(struct net_device *dev)
 		int_name = priv->int_name_rx_irq[i];
 		sprintf(int_name, "%s:%s-%d", dev->name, "rx", i);
 		ret = request_irq(priv->rx_irq[i],
-				  stmmac_msi_intr_rx,
+				  stmmac_intr_rx,
 				  0, int_name, &priv->dma_conf.rx_queue[i]);
 		if (unlikely(ret < 0)) {
-			netdev_err(priv->dev,
-				   "%s: alloc rx-%d  MSI %d (error: %d)\n",
-				   __func__, i, priv->rx_irq[i], ret);
+			if (priv->plat->multi_msi_en)
+				netdev_err(priv->dev,
+					   "%s: alloc rx-%d  MSI %d (error: %d)\n",
+					   __func__, i, priv->rx_irq[i], ret);
+			if (priv->plat->dma_cfg->multi_irq_en)
+				netdev_err(priv->dev,
+					   "%s: alloc rx-%d %d (error: %d)\n",
+					   __func__, i, priv->rx_irq[i], ret);
 			irq_err = REQ_IRQ_ERR_RX;
 			irq_idx = i;
 			goto irq_error;
@@ -3631,12 +3635,17 @@ static int stmmac_request_irq_multi_msi(struct net_device *dev)
 		int_name = priv->int_name_tx_irq[i];
 		sprintf(int_name, "%s:%s-%d", dev->name, "tx", i);
 		ret = request_irq(priv->tx_irq[i],
-				  stmmac_msi_intr_tx,
+				  stmmac_intr_tx,
 				  0, int_name, &priv->dma_conf.tx_queue[i]);
 		if (unlikely(ret < 0)) {
-			netdev_err(priv->dev,
-				   "%s: alloc tx-%d  MSI %d (error: %d)\n",
-				   __func__, i, priv->tx_irq[i], ret);
+			if (priv->plat->multi_msi_en)
+				netdev_err(priv->dev,
+					   "%s: alloc tx-%d  MSI %d (error: %d)\n",
+					   __func__, i, priv->tx_irq[i], ret);
+			if (priv->plat->dma_cfg->multi_irq_en)
+				netdev_err(priv->dev,
+					   "%s: alloc tx-%d %d (error: %d)\n",
+					   __func__, i, priv->rx_irq[i], ret);
 			irq_err = REQ_IRQ_ERR_TX;
 			irq_idx = i;
 			goto irq_error;
@@ -3710,8 +3719,8 @@ static int stmmac_request_irq(struct net_device *dev)
 	int ret;
 
 	/* Request the IRQ lines */
-	if (priv->plat->multi_msi_en)
-		ret = stmmac_request_irq_multi_msi(dev);
+	if (priv->plat->multi_msi_en || priv->plat->dma_cfg->multi_irq_en)
+		ret = stmmac_request_irq_multi(dev);
 	else
 		ret = stmmac_request_irq_single(dev);
 
@@ -5882,7 +5891,7 @@ static irqreturn_t stmmac_safety_interrupt(int irq, void *dev_id)
 	return IRQ_HANDLED;
 }
 
-static irqreturn_t stmmac_msi_intr_tx(int irq, void *data)
+static irqreturn_t stmmac_intr_tx(int irq, void *data)
 {
 	struct stmmac_tx_queue *tx_q = (struct stmmac_tx_queue *)data;
 	struct stmmac_dma_conf *dma_conf;
@@ -5914,7 +5923,7 @@ static irqreturn_t stmmac_msi_intr_tx(int irq, void *data)
 	return IRQ_HANDLED;
 }
 
-static irqreturn_t stmmac_msi_intr_rx(int irq, void *data)
+static irqreturn_t stmmac_intr_rx(int irq, void *data)
 {
 	struct stmmac_rx_queue *rx_q = (struct stmmac_rx_queue *)data;
 	struct stmmac_dma_conf *dma_conf;
@@ -5951,12 +5960,12 @@ static void stmmac_poll_controller(struct net_device *dev)
 	if (test_bit(STMMAC_DOWN, &priv->state))
 		return;
 
-	if (priv->plat->multi_msi_en) {
+	if (priv->plat->multi_msi_en || priv->plat->dma_cfg->multi_irq_en) {
 		for (i = 0; i < priv->plat->rx_queues_to_use; i++)
-			stmmac_msi_intr_rx(0, &priv->dma_conf.rx_queue[i]);
+			stmmac_intr_rx(0, &priv->dma_conf.rx_queue[i]);
 
 		for (i = 0; i < priv->plat->tx_queues_to_use; i++)
-			stmmac_msi_intr_tx(0, &priv->dma_conf.tx_queue[i]);
+			stmmac_intr_tx(0, &priv->dma_conf.tx_queue[i]);
 	} else {
 		disable_irq(dev->irq);
 		stmmac_interrupt(dev->irq, dev);
