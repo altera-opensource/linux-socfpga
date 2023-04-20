@@ -39,7 +39,7 @@
 
 &gmac0 {
 	status = "okay";
-	phy-mode = "rgmii-id";
+	phy-mode = "rgmii";
 	phy-handle = <&emac0_phy0>;
 	max-frame-size = <9000>;
 
