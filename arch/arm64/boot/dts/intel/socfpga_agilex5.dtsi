@@ -457,6 +457,19 @@
 			clocks = <&clkmgr AGILEX5_L4_SP_CLK>;
 		};
 
+		usb0: usb@10b00000 {
+			compatible = "snps,dwc2";
+			reg = <0x10b00000 0x40000>;
+			interrupts = <GIC_SPI 93 IRQ_TYPE_LEVEL_HIGH>;
+			phys = <&usbphy0>;
+			phy-names = "usb2-phy";
+			resets = <&rst USB0_RESET>, <&rst USB0_OCP_RESET>;
+			reset-names = "dwc2", "dwc2-ecc";
+			clocks = <&clkmgr AGILEX5_USB2OTG_HCLK>;
+			clock-names = "otg";
+			status = "disabled";
+		};
+
 		usb31: usb3@11000000 {
 			compatible = "intel,agilex5-dwc3";
 			reg = <0x11000000 0x100000>;

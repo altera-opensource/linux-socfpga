@@ -120,6 +120,11 @@
 	status = "okay";
 };
 
+&usb0 {
+	status = "okay";
+	disable-over-current;
+};
+
 &watchdog0 {
 	status = "okay";
 };
