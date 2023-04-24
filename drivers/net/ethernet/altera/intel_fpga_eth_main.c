@@ -713,7 +713,6 @@ static void eth_link_up(intel_fpga_xtile_eth_private *priv)
 {
 
 	priv->curr_link_state = true;
-	INIT_DELAYED_WORK(&priv->dwork, eth_monitor_link_status);
         schedule_delayed_work(&priv->dwork, msecs_to_jiffies(LINK_STS_POLL_TIMEOUT));
 }
 
@@ -1123,11 +1122,52 @@ static int xtile_do_ioctl(struct net_device *dev, struct ifreq *ifr, int cmd)
 	return ret;
 }
 
+static void drv_get_stats64(struct net_device *dev,
+		       struct rtnl_link_stats64 *storage)
+{
+	/* a. All the blocking calls are avoided and only driver
+	 * gathered statistics are populated. This is to avoid
+	 * long spin locks
+	 * b. Run time statistics can be dumped via ethtool
+	 */
+
+	storage->multicast  = 0;
+	storage->collisions = 0;
+
+	/* rx stats */
+	storage->rx_crc_errors    = 0;
+	storage->rx_over_errors   = 0;
+	storage->rx_fifo_errors   = 0;
+	storage->rx_missed_errors = 0;
+	storage->rx_length_errors = 0;
+	storage->rx_bytes   = dev->stats.rx_bytes;
+	storage->rx_packets = dev->stats.rx_packets;
+	storage->rx_dropped = dev->stats.rx_dropped;
+	storage->rx_errors  = storage->rx_length_errors +
+		storage->rx_crc_errors;
+
+	/* tx stats */
+	storage->tx_errors 	         = 0;
+	storage->tx_dropped          = 0;
+	storage->rx_compressed 	     = 0;
+	storage->tx_compressed 	     = 0;
+	storage->tx_fifo_errors      = 0;
+	storage->tx_window_errors    = 0;
+	storage->tx_aborted_errors   = 0;
+	storage->tx_heartbeat_errors = 0;
+	storage->tx_bytes = dev->stats.tx_bytes;
+	storage->tx_packets = dev->stats.tx_packets;
+}
+
 static void xtile_get_stats64(struct net_device *dev,
 			struct rtnl_link_stats64 *storage)
 {
 	intel_fpga_xtile_eth_private *priv = netdev_priv(dev);
-	priv->spec_ops->stat_ops.net_stats(dev, storage);
+
+	if (priv->spec_ops->net_stats)
+		priv->spec_ops->net_stats(dev, storage);
+	else
+		drv_get_stats64(dev, storage);
 }
 
 static const struct net_device_ops intel_fpga_xtile_netdev_ops = {
@@ -1624,6 +1664,8 @@ static int intel_fpga_xtile_probe(struct platform_device *pdev)
 		dev_info(&pdev->dev, "\tPTP Clock: %s\n", priv->ptp_priv->ptp_clock_ops.name);
 	}
 
+	INIT_DELAYED_WORK(&priv->dwork, eth_monitor_link_status);
+
 	ret = register_netdev(ndev);
 	if (ret) {
 		dev_err(&pdev->dev, "failed to register ethernet device\n");
@@ -1641,7 +1683,7 @@ static int intel_fpga_xtile_probe(struct platform_device *pdev)
 
 	return 0;
 
-err_init_fec:	
+err_init_fec:
 	unregister_netdev(ndev);
 err_register_netdev:
 	netif_napi_del(&priv->napi);
@@ -1699,9 +1741,6 @@ static const struct xtile_spec_ops etile_data = {
 		.init_mac = etile_init_mac,
 		.update_mac = etile_update_mac_addr,
 	},
-	.stat_ops = {
-		.net_stats = etile_get_stats64,
-	},
 	.eth_ops = {
 		.eth_reg_callback =
 			intel_fpga_etile_set_ethtool_ops,
@@ -1718,9 +1757,6 @@ static const struct xtile_spec_ops ftile_data = {
         .mac_ops = {
                 .init_mac = ftile_init_mac,
                 .update_mac = ftile_update_mac_addr,
-        },
-        .stat_ops = {
-                .net_stats = ftile_get_stats64,
         },
         .eth_ops = {
                 .eth_reg_callback =

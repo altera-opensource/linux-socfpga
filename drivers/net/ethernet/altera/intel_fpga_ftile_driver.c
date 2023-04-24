@@ -1038,7 +1038,7 @@ int ftile_init_mac(intel_fpga_xtile_eth_private *priv)
  void ftile_get_stats64(struct net_device *dev,
 		       struct rtnl_link_stats64 *storage)
 {
-	 intel_fpga_xtile_eth_private *priv = netdev_priv(dev);
+	intel_fpga_xtile_eth_private *priv = netdev_priv(dev);
 	struct platform_device *pdev = priv->pdev_hssi;
 	u32 chan = priv->tile_chan;
 	u32 lsb;
@@ -1101,13 +1101,6 @@ int ftile_init_mac(intel_fpga_xtile_eth_private *priv)
 	storage->tx_compressed = 0;
 	//IP UG does not have total TX packets
 	storage->tx_packets = priv->dev->stats.tx_packets;
-}
-
-
-void xtile_get_stats64(struct net_device *dev,
-		       struct rtnl_link_stats64 *storage)
-{
-  ftile_get_stats64(dev, storage);
 }
 
 void init_ptp_userflow(intel_fpga_xtile_eth_private *priv)
