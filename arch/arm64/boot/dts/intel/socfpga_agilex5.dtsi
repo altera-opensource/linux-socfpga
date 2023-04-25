@@ -8,7 +8,7 @@
 #include <dt-bindings/gpio/gpio.h>
 #include <dt-bindings/interrupt-controller/arm-gic.h>
 #include <dt-bindings/interrupt-controller/irq.h>
-#include <dt-bindings/clock/agilex-clock.h>
+#include <dt-bindings/clock/agilex5-clock.h>
 
 / {
 	compatible = "intel,socfpga-agilex";
@@ -141,7 +141,7 @@
 		ranges = <0 0 0 0xffffffff>;
 
 		clkmgr: clock-controller@10d10000 {
-			compatible = "intel,agilex-clkmgr";
+			compatible = "intel,agilex5-clkmgr";
 			reg = <0x10d10000 0x1000>;
 			#clock-cells = <1>;
 		};
@@ -248,7 +248,7 @@
 			snps,tso;
 			altr,sysmgr-syscon = <&sysmgr 0x44 0>;
 			snps,rx-vlan-offload;
-			clocks = <&clkmgr AGILEX_EMAC0_CLK>, <&clkmgr AGILEX_EMAC_PTP_CLK>;
+			clocks = <&clkmgr AGILEX5_EMAC0_CLK>, <&clkmgr AGILEX5_EMAC_PTP_CLK>;
 			clock-names = "stmmaceth", "ptp_ref";
 			status = "disabled";
 		};
@@ -282,7 +282,7 @@
 			fifo-depth = <0x800>;
 			resets = <&rst SDMMC_RESET>;
 			reset-names = "reset";
-			clocks = <&clkmgr AGILEX_L4_MP_CLK>, <&clkmgr AGILEX_SDMMC_CLK>;
+			clocks = <&clkmgr AGILEX5_L4_MP_CLK>, <&clkmgr AGILEX5_SDMCLK>;
 			clock-names = "biu", "ciu";
 			/*iommus = <&smmu 5>;*/
 			status = "disabled";
@@ -296,7 +296,7 @@
 					<0x10840000 0x1000>;
 			reg-names = "reg", "sdma";
 			interrupts = <GIC_SPI 97 IRQ_TYPE_LEVEL_HIGH>;
-			clocks = <&clkmgr AGILEX_NAND_CLK>;
+			clocks = <&clkmgr AGILEX5_NAND_NF_CLK>;
 			clock-names = "nf_clk";
 			resets = <&rst NAND_RESET>, <&rst NAND_OCP_RESET>;
 			cdns,board-delay-ps = <4830>;
@@ -311,8 +311,8 @@
 		dmac0: dma-controller@10DB0000 {
 			compatible = "snps,axi-dma-1.01a";
 			reg = <0x10DB0000 0x500>;
-			clocks = <&clkmgr AGILEX_L4_MAIN_CLK>,
-				 <&clkmgr AGILEX_L4_MP_CLK>;
+			clocks = <&clkmgr AGILEX5_L4_MAIN_CLK>,
+				 <&clkmgr AGILEX5_L4_MP_CLK>;
 			clock-names = "core-clk", "cfgr-clk";
 			interrupt-parent = <&intc>;
 			interrupts = <GIC_SPI 86 IRQ_TYPE_LEVEL_HIGH>;
@@ -329,8 +329,8 @@
 		dmac1: dma-controller@10DC0000 {
 			compatible = "snps,axi-dma-1.01a";
 			reg = <0x10DC0000 0x500>;
-			clocks = <&clkmgr AGILEX_L4_MAIN_CLK>,
-				 <&clkmgr AGILEX_L4_MP_CLK>;
+			clocks = <&clkmgr AGILEX5_L4_MAIN_CLK>,
+				 <&clkmgr AGILEX5_L4_MP_CLK>;
 			clock-names = "core-clk", "cfgr-clk";
 			interrupt-parent = <&intc>;
 			interrupts = <GIC_SPI 171 IRQ_TYPE_LEVEL_HIGH>;
@@ -360,7 +360,7 @@
 			reset-names = "spi";
 			reg-io-width = <4>;
 			num-cs = <4>;
-			clocks = <&clkmgr AGILEX_L4_MAIN_CLK>;
+			clocks = <&clkmgr AGILEX5_L4_MAIN_CLK>;
 			dmas = <&dmac0 2>, <&dmac0 3>;
 			dma-names ="tx", "rx";
 
@@ -394,7 +394,7 @@
 			reset-names = "spi";
 			reg-io-width = <4>;
 			num-cs = <4>;
-			clocks = <&clkmgr AGILEX_L4_MAIN_CLK>;
+			clocks = <&clkmgr AGILEX5_L4_MAIN_CLK>;
 			status = "disabled";
 		};
 
@@ -407,7 +407,7 @@
 			compatible = "snps,dw-apb-timer";
 			interrupts = <GIC_SPI 113 IRQ_TYPE_LEVEL_HIGH>;
 			reg = <0x10c03000 0x100>;
-			clocks = <&clkmgr AGILEX_L4_SP_CLK>;
+			clocks = <&clkmgr AGILEX5_L4_SP_CLK>;
 			clock-names = "timer";
 		};
 
@@ -415,7 +415,7 @@
 			compatible = "snps,dw-apb-timer";
 			interrupts = <GIC_SPI 114 IRQ_TYPE_LEVEL_HIGH>;
 			reg = <0x10c03100 0x100>;
-			clocks = <&clkmgr AGILEX_L4_SP_CLK>;
+			clocks = <&clkmgr AGILEX5_L4_SP_CLK>;
 			clock-names = "timer";
 		};
 
@@ -423,7 +423,7 @@
 			compatible = "snps,dw-apb-timer";
 			interrupts = <GIC_SPI 115 IRQ_TYPE_LEVEL_HIGH>;
 			reg = <0x10d00000 0x100>;
-			clocks = <&clkmgr AGILEX_L4_SP_CLK>;
+			clocks = <&clkmgr AGILEX5_L4_SP_CLK>;
 			clock-names = "timer";
 		};
 
@@ -431,7 +431,7 @@
 			compatible = "snps,dw-apb-timer";
 			interrupts = <GIC_SPI 116 IRQ_TYPE_LEVEL_HIGH>;
 			reg = <0x10d00100 0x100>;
-			clocks = <&clkmgr AGILEX_L4_SP_CLK>;
+			clocks = <&clkmgr AGILEX5_L4_SP_CLK>;
 			clock-names = "timer";
 		};
 
@@ -443,7 +443,7 @@
 			reg-io-width = <4>;
 			resets = <&rst UART0_RESET>;
 			status = "disabled";
-			clocks = <&clkmgr AGILEX_L4_SP_CLK>;
+			clocks = <&clkmgr AGILEX5_L4_SP_CLK>;
 		};
 
 		uart1: serial@10c02100 {
@@ -454,7 +454,7 @@
 			reg-io-width = <4>;
 			resets = <&rst UART1_RESET>;
 			status = "disabled";
-			clocks = <&clkmgr AGILEX_L4_SP_CLK>;
+			clocks = <&clkmgr AGILEX5_L4_SP_CLK>;
 		};
 
 		watchdog0: watchdog@10d00200 {
@@ -462,7 +462,7 @@
 			reg = <0x10d00200 0x100>;
 			interrupts = <GIC_SPI 117 IRQ_TYPE_LEVEL_HIGH>;
 			resets = <&rst WATCHDOG0_RESET>;
-			clocks = <&clkmgr AGILEX_L4_SYS_FREE_CLK>;
+			clocks = <&clkmgr AGILEX5_L4_SYS_FREE_CLK>;
 			status = "disabled";
 		};
 
@@ -471,7 +471,7 @@
 			reg = <0x10d00300 0x100>;
 			interrupts = <GIC_SPI 118 IRQ_TYPE_LEVEL_HIGH>;
 			resets = <&rst WATCHDOG1_RESET>;
-			clocks = <&clkmgr AGILEX_L4_SYS_FREE_CLK>;
+			clocks = <&clkmgr AGILEX5_L4_SYS_FREE_CLK>;
 			status = "disabled";
 		};
 
@@ -480,7 +480,7 @@
 			reg = <0x10d00400 0x100>;
 			interrupts = <GIC_SPI 125 IRQ_TYPE_LEVEL_HIGH>;
 			resets = <&rst WATCHDOG2_RESET>;
-			clocks = <&clkmgr AGILEX_L4_SYS_FREE_CLK>;
+			clocks = <&clkmgr AGILEX5_L4_SYS_FREE_CLK>;
 			status = "disabled";
 		};
 
@@ -489,7 +489,7 @@
 			reg = <0x10d00500 0x100>;
 			interrupts = <GIC_SPI 126 IRQ_TYPE_LEVEL_HIGH>;
 			resets = <&rst WATCHDOG3_RESET>;
-			clocks = <&clkmgr AGILEX_L4_SYS_FREE_CLK>;
+			clocks = <&clkmgr AGILEX5_L4_SYS_FREE_CLK>;
 			status = "disabled";
 		};
 		watchdog4: watchdog@10d00600 {
@@ -497,7 +497,7 @@
 			reg = <0x10d00600 0x100>;
 			interrupts = <GIC_SPI 175 IRQ_TYPE_LEVEL_HIGH>;
 			resets = <&rst WATCHDOG4_RESET>;
-			clocks = <&clkmgr AGILEX_L4_SYS_FREE_CLK>;
+			clocks = <&clkmgr AGILEX5_L4_SYS_FREE_CLK>;
 			status = "disabled";
 		};
 
