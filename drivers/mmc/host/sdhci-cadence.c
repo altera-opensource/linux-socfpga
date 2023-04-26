@@ -689,6 +689,7 @@ static const struct sdhci_pltfm_data sdhci_cdns_uniphier_pltfm_data = {
 
 static const struct sdhci_pltfm_data sdhci_cdns_pltfm_data = {
 	.ops = &sdhci_cdns_ops,
+	.quirks2 = SDHCI_QUIRK2_PRESET_VALUE_BROKEN,
 };
 
 static void sdhci_cdns_hs400_enhanced_strobe(struct mmc_host *mmc,
