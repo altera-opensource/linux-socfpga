@@ -541,6 +541,11 @@ properties:
       Enables the TSO feature otherwise it will be managed by MAC HW capability
       register.
 
+  snps,rx-vlan-offload:
+    $ref: /schemas/types.yaml#/definitions/flag
+    description:
+      Enable hardware-accelerated RX VLAN stripping.
+
   mdio:
     $ref: mdio.yaml#
     unevaluatedProperties: false
