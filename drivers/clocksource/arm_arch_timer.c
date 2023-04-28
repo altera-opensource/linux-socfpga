@@ -266,6 +266,17 @@ struct ate_acpi_oem_info {
 	u32 oem_revision;
 };
 
+int get_ptp_clocksource_id(enum clocksource_ids *cs_id)
+{
+	if (cs_id)
+		*cs_id = clocksource_counter.id;
+	else
+		return -EOPNOTSUPP;
+
+	return 0;
+}
+EXPORT_SYMBOL_GPL(get_ptp_clocksource_id);
+
 #ifdef CONFIG_FSL_ERRATUM_A008585
 /*
  * The number of retries is an arbitrary value well beyond the highest number
