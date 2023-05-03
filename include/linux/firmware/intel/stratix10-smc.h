@@ -1981,6 +1981,25 @@ INTEL_SIP_SMC_FAST_CALL_VAL(INTEL_SIP_SMC_FUNCID_FPGA_CONFIG_COMPLETED_WRITE)
 	INTEL_SIP_SMC_STD_CALL_VAL(INTEL_SIP_SMC_FUNCID_FCS_ECDSA_SHA2_DATA_SIGNATURE_VERIFY_SMMU_FINALIZE)
 
 /**
+ * Request INTEL_SIP_SMC_SEU_ERR_STATUS
+ * Sync call to get previous Double Bit ECC error information.
+ *
+ * Call register usage:
+ * a0 INTEL_SIP_SMC_SEU_ERR_STATUS
+ * a1-7 not used
+ *
+ * Return status:
+ * a0 INTEL_SIP_SMC_STATUS_OK, INTEL_SIP_SMC_STATUS_NOT_SUPPORTED or
+ *    INTEL_SIP_SMC_STATUS_ERROR
+ * a1 error count of response data
+ * a2 sector address of response data
+ * a3 error information
+ */
+#define INTEL_SIP_SMC_FUNCID_SEU_ERR_STATUS 153
+#define INTEL_SIP_SMC_SEU_ERR_STATUS \
+		INTEL_SIP_SMC_FAST_CALL_VAL(INTEL_SIP_SMC_FUNCID_SEU_ERR_STATUS)
+
+/**
  * Request INTEL_SIP_SMC_SVC_VERSION
  *
  * Sync call used to query the SIP SMC API Version
