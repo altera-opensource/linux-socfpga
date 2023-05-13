@@ -2193,6 +2193,10 @@ int phylink_ethtool_ksettings_set(struct phylink *pl,
 
 	ASSERT_RTNL();
 
+	/* Mask out unsupported advertisements */
+	linkmode_and(config.advertising, kset->link_modes.advertising,
+		     pl->supported);
+
 	if (pl->phydev) {
 		/* We can rely on phylib for this update; we also do not need
 		 * to update the pl->link_config settings:
@@ -2216,10 +2220,6 @@ int phylink_ethtool_ksettings_set(struct phylink *pl,
 	}
 
 	config = pl->link_config;
-
-	/* Mask out unsupported advertisements */
-	linkmode_and(config.advertising, kset->link_modes.advertising,
-		     pl->supported);
 
 	/* FIXME: should we reject autoneg if phy/mac does not support it? */
 	switch (kset->base.autoneg) {
