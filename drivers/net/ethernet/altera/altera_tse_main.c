@@ -442,9 +442,9 @@ static int tse_rx(struct altera_tse_private *priv, int limit)
 static int tse_tx_complete(struct altera_tse_private *priv)
 {
 	unsigned int txsize = priv->dma_priv.tx_ring_size;
-	u32 ready;
-	unsigned int entry;
 	struct altera_dma_buffer *tx_buff;
+	unsigned int entry;
+	
 	int txcomplete = 0;
 	u32 ready;
 
@@ -557,14 +557,10 @@ static irqreturn_t altera_isr(int irq, void *dev_id)
 static netdev_tx_t tse_start_xmit(struct sk_buff *skb, struct net_device *dev)
 {
 	struct altera_tse_private *priv = netdev_priv(dev);
-	unsigned int txsize = priv->dma_priv.tx_ring_size;
-	unsigned int entry;
-	struct altera_dma_buffer *buffer = NULL;
-	int nfrags = skb_shinfo(skb)->nr_frags;
 	unsigned int nopaged_len = skb_headlen(skb);
-	unsigned int txsize = priv->tx_ring_size;
+	unsigned int txsize = priv->dma_priv.tx_ring_size;
 	int nfrags = skb_shinfo(skb)->nr_frags;
-	struct tse_buffer *buffer = NULL;
+	struct altera_dma_buffer *buffer = NULL;
 	netdev_tx_t ret = NETDEV_TX_OK;
 	dma_addr_t dma_addr;
 	unsigned int entry;
@@ -1148,6 +1144,73 @@ static struct net_device_ops altera_tse_netdev_ops = {
 	.ndo_eth_ioctl		= tse_do_ioctl,
 };
 
+static void alt_tse_mac_an_restart(struct phylink_config *config)
+{
+}
+
+static void alt_tse_mac_config(struct phylink_config *config, unsigned int mode,
+			       const struct phylink_link_state *state)
+{
+	struct net_device *ndev = to_net_dev(config->dev);
+	struct altera_tse_private *priv = netdev_priv(ndev);
+
+	spin_lock(&priv->mac_cfg_lock);
+	reset_mac(priv);
+	tse_set_mac(priv, true);
+	spin_unlock(&priv->mac_cfg_lock);
+}
+
+static void alt_tse_mac_link_down(struct phylink_config *config,
+				  unsigned int mode, phy_interface_t interface)
+{
+}
+
+static void alt_tse_mac_link_up(struct phylink_config *config,
+				struct phy_device *phy, unsigned int mode,
+				phy_interface_t interface, int speed,
+				int duplex, bool tx_pause, bool rx_pause)
+{
+	struct net_device *ndev = to_net_dev(config->dev);
+	struct altera_tse_private *priv = netdev_priv(ndev);
+	u32 ctrl;
+
+	ctrl = csrrd32(priv->mac_dev, tse_csroffs(command_config));
+	ctrl &= ~(MAC_CMDCFG_ENA_10 | MAC_CMDCFG_ETH_SPEED | MAC_CMDCFG_HD_ENA);
+
+	if (duplex == DUPLEX_HALF)
+		ctrl |= MAC_CMDCFG_HD_ENA;
+
+	if (speed == SPEED_1000)
+		ctrl |= MAC_CMDCFG_ETH_SPEED;
+	else if (speed == SPEED_10)
+		ctrl |= MAC_CMDCFG_ENA_10;
+
+	spin_lock(&priv->mac_cfg_lock);
+	csrwr32(ctrl, priv->mac_dev, tse_csroffs(command_config));
+	spin_unlock(&priv->mac_cfg_lock);
+}
+
+static struct phylink_pcs *alt_tse_select_pcs(struct phylink_config *config,
+					      phy_interface_t interface)
+{
+	struct net_device *ndev = to_net_dev(config->dev);
+	struct altera_tse_private *priv = netdev_priv(ndev);
+
+	if (interface == PHY_INTERFACE_MODE_SGMII ||
+	    interface == PHY_INTERFACE_MODE_1000BASEX)
+		return priv->pcs;
+	else
+		return NULL;
+}
+
+static const struct phylink_mac_ops alt_tse_phylink_ops = {
+	.validate = phylink_generic_validate,
+	.mac_an_restart = alt_tse_mac_an_restart,
+	.mac_config = alt_tse_mac_config,
+	.mac_link_down = alt_tse_mac_link_down,
+	.mac_link_up = alt_tse_mac_link_up,
+	.mac_select_pcs = alt_tse_select_pcs,
+};
 /* Probe Altera TSE MAC device
  */
 static int altera_tse_probe(struct platform_device *pdev)
@@ -1155,10 +1218,11 @@ static int altera_tse_probe(struct platform_device *pdev)
 	const struct of_device_id *of_id = NULL;
 	struct altera_tse_private *priv;
 	struct resource *control_port;
-	struct altera_tse_private *priv;
+	struct resource *pcs_res;
+	struct net_device *ndev;
 	void __iomem *descmap;
-	const unsigned char *macaddr;
-	const struct of_device_id *of_id = NULL;
+	int pcs_reg_width = 2;
+	int ret = -ENODEV;
 
 	ndev = alloc_etherdev(sizeof(struct altera_tse_private));
 	if (!ndev) {
@@ -1205,6 +1269,17 @@ static int altera_tse_probe(struct platform_device *pdev)
 			      (void __iomem **)&priv->mac_dev);
 	if (ret)
 		goto err_free_netdev;
+	/* SGMII PCS address space. The location can vary depending on how the
+	 * IP is integrated. We can have a resource dedicated to it at a specific
+	 * address space, but if it's not the case, we fallback to the mdiophy0
+	 * from the MAC's address space
+	 */
+	ret = request_and_map(pdev, "pcs", &pcs_res,
+			      &priv->pcs_base);
+	if (ret) {
+		priv->pcs_base = priv->mac_dev + tse_csroffs(mdio_phy0);
+		pcs_reg_width = 4;
+	}
 
 	/* Rx IRQ */
 	priv->rx_irq = platform_get_irq_byname(pdev, "rx_irq");
