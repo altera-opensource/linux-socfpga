@@ -88,7 +88,7 @@ static int hssiss_mailbox_reg_set(void __iomem *base,
 }
 
 static int hssiss_sal_execute(struct platform_device *pdev, u32 ctrl_addr,
-				u32 cmd_sts, bool atomic)
+			u32 cmd_sts, u32 *val, bool atomic)
 {
 	int ret;
 	struct hssiss_private *priv = platform_get_drvdata(pdev);
@@ -99,6 +99,13 @@ static int hssiss_sal_execute(struct platform_device *pdev, u32 ctrl_addr,
 		spin_lock(&priv->sal_spinlock);
 	else
 		mutex_lock(&priv->sal_mutex);
+
+	if ((cmd_sts & HSSI_SAL_CMDSTS_WR) && val) {
+		ret = hssiss_mailbox_reg_set(base, csr_addroff,
+					HSSISS_CSR_WR_DATA, *val, atomic);
+		if (ret < 0)
+			goto unlock;
+	}
 
 	csrwr32_withoffset(ctrl_addr, base, csr_addroff, HSSISS_CSR_CTRLADDR);
 	csrwr32_withoffset(cmd_sts, base, csr_addroff, HSSISS_CSR_CMDSTS);
@@ -127,6 +134,11 @@ static int hssiss_sal_execute(struct platform_device *pdev, u32 ctrl_addr,
 			ret = 0;
 	}
 
+	if (!ret && (cmd_sts & HSSI_SAL_CMDSTS_RD) && val) {
+		*val = csrrd32_withoffset(priv->sscsr,
+				priv->csr_addroff, HSSISS_CSR_RD_DATA);
+	}
+
 unlock:
 	if (atomic)
 		spin_unlock(&priv->sal_spinlock);
@@ -152,7 +164,7 @@ static int enable_disable_loopback(struct platform_device *pdev, u32 cmdid,
 	ctrl_addr |= port << HSSI_SAL_CTRLADDR_PORT_SHIFT;
 	cmd_sts |= HSSI_SAL_CMDSTS_WR;
 
-	return hssiss_sal_execute(pdev, ctrl_addr, cmd_sts, atomic);
+	return hssiss_sal_execute(pdev, ctrl_addr, cmd_sts, NULL, atomic);
 }
 
 /*
@@ -191,21 +203,9 @@ static int get_set_csr(struct platform_device *pdev, u32 cmd, void *csr_data,
 	ctrl_addr |= cmd;
 	cmd_sts |= (data->offs % 4) << HSSI_SAL_CMDSTS_REG_OFFS_SHIFT;
 
-	if (rd) {
-		cmd_sts |= HSSI_SAL_CMDSTS_RD;
-	} else {
-		cmd_sts |= HSSI_SAL_CMDSTS_WR;
-		ret = hssiss_mailbox_reg_set(priv->sscsr, priv->csr_addroff,
-					HSSISS_CSR_WR_DATA, data->data, atomic);
-		if (ret < 0)
-			return ret;
-	}
+	cmd_sts |= rd ? HSSI_SAL_CMDSTS_RD : HSSI_SAL_CMDSTS_WR;
 
-	ret = hssiss_sal_execute(pdev, ctrl_addr, cmd_sts, atomic);
-
-	if (rd && (ret == 0))
-		data->data = csrrd32_withoffset(priv->sscsr,
-				priv->csr_addroff, HSSISS_CSR_RD_DATA);
+	ret = hssiss_sal_execute(pdev, ctrl_addr, cmd_sts, &data->data, atomic);
 
 	return ret;
 }
@@ -220,7 +220,7 @@ static int test_nios(struct platform_device *pdev, u32 cmd, bool atomic)
 
 	dev_info(&pdev->dev, "ctrl_addr: %x, cmd_sts: %x\n", ctrl_addr, cmd_sts);
 
-	return hssiss_sal_execute(pdev, ctrl_addr, cmd_sts, atomic);
+	return hssiss_sal_execute(pdev, ctrl_addr, cmd_sts, NULL, atomic);
 }
 
 static int get_set_dr_profile(struct platform_device *pdev, u32 cmd, void *dr_data,
@@ -229,7 +229,6 @@ static int get_set_dr_profile(struct platform_device *pdev, u32 cmd, void *dr_da
 	int ret;
 	u32 ctrl_addr = 0;
 	u32 cmd_sts = 0;
-	struct hssiss_private *priv = platform_get_drvdata(pdev);
 	struct get_set_dr_data *data = (struct get_set_dr_data *)dr_data;
 	u32 val = 0;
 
@@ -242,17 +241,11 @@ static int get_set_dr_profile(struct platform_device *pdev, u32 cmd, void *dr_da
 		cmd_sts |= HSSI_SAL_CMDSTS_WR;
 		val |= data->profile & HSSI_DR_PROFILE_MASK;
 		val |= (data->dr_grp << DR_GRP_INDEX) & HSSI_DR_GRP_MASK;
-		ret = hssiss_mailbox_reg_set(priv->sscsr, priv->csr_addroff,
-					HSSISS_CSR_WR_DATA, val, atomic);
-		if (ret < 0)
-			return ret;
 	}
 
-	ret = hssiss_sal_execute(pdev, ctrl_addr, cmd_sts, atomic);
+	ret = hssiss_sal_execute(pdev, ctrl_addr, cmd_sts, &val, atomic);
 
 	if (rd && (ret == 0)) {
-		val = csrrd32_withoffset(priv->sscsr,
-				priv->csr_addroff, HSSISS_CSR_RD_DATA);
 		data->dr_grp = (val & HSSI_DR_GRP_MASK) >> DR_GRP_INDEX;
 		data->profile = val & HSSI_DR_PROFILE_MASK;
 	}
@@ -279,7 +272,7 @@ static int reset_mac_stat(struct platform_device *pdev, u32 cmd,
 	ctrl_addr |= cmd;
 	cmd_sts |= HSSI_SAL_CMDSTS_WR;
 
-	ret = hssiss_sal_execute(pdev, ctrl_addr, cmd_sts, atomic);
+	ret = hssiss_sal_execute(pdev, ctrl_addr, cmd_sts, NULL, atomic);
 
 	return ret;
 }
@@ -292,15 +285,13 @@ static int get_mtu(struct platform_device *pdev, u32 cmd,
 	u32 cmd_sts = 0;
 	u32 val;
 	struct get_mtu_data *data = (struct get_mtu_data*)priv_data;
-	struct hssiss_private *priv = platform_get_drvdata(pdev);
 
 	ctrl_addr |= data->port << HSSI_SAL_CTRLADDR_PORT_SHIFT;
 	ctrl_addr |= cmd;
 	cmd_sts |= HSSI_SAL_CMDSTS_RD;
 
-	ret = hssiss_sal_execute(pdev, ctrl_addr, cmd_sts, atomic);
+	ret = hssiss_sal_execute(pdev, ctrl_addr, cmd_sts, &val, atomic);
 	if (ret == 0) {
-		val = csrrd32_withoffset(priv->sscsr, priv->csr_addroff, HSSISS_CSR_RD_DATA);
 		data->max_tx_frame_size = val & GENMASK(31,16) >> 16;
 		data->max_rx_frame_size = val & GENMASK(15,0);
 	}
@@ -316,7 +307,6 @@ static int read_mac_stat(struct platform_device *pdev, u32 cmd,
 	u32 cmd_sts = 0;
 	struct read_mac_stat_data *data =
 		(struct read_mac_stat_data *)priv_data;
-	struct hssiss_private *priv = platform_get_drvdata(pdev);
 
 	ctrl_addr |= data->port_data << HSSI_SAL_CTRLADDR_PORT_SHIFT;
 	ctrl_addr |= cmd;
@@ -324,9 +314,7 @@ static int read_mac_stat(struct platform_device *pdev, u32 cmd,
 	ctrl_addr |= data->lsb << HSSI_SAL_CTRLADDR_LSB_SHIFT;
 	cmd_sts |= HSSI_SAL_CMDSTS_RD;
 
-	ret = hssiss_sal_execute(pdev, ctrl_addr, cmd_sts, atomic);
-	if (ret == 0)
-		data->port_data = csrrd32_withoffset(priv->sscsr, priv->csr_addroff, HSSISS_CSR_RD_DATA);
+	ret = hssiss_sal_execute(pdev, ctrl_addr, cmd_sts, &data->port_data, atomic);
 
 	return ret;
 }
@@ -339,15 +327,12 @@ static int ncsi_link_status(struct platform_device *pdev, u32 cmd,
 	u32 cmd_sts = 0;
 	union ncsi_link_status_data *data =
 		(union ncsi_link_status_data *)priv_data;
-	struct hssiss_private *priv = platform_get_drvdata(pdev);
 
 	ctrl_addr |= data->full << HSSI_SAL_CTRLADDR_PORT_SHIFT;
 	ctrl_addr |= cmd;
 	cmd_sts |= HSSI_SAL_CMDSTS_RD;
 
-	ret = hssiss_sal_execute(pdev, ctrl_addr, cmd_sts, atomic);
-	if (ret == 0)
-		data->full = csrrd32_withoffset(priv->sscsr, priv->csr_addroff, HSSISS_CSR_RD_DATA);
+	ret = hssiss_sal_execute(pdev, ctrl_addr, cmd_sts, &data->full, atomic);
 
 	return ret;
 }
@@ -359,14 +344,11 @@ static int get_fw_version(struct platform_device *pdev, u32 cmd,
 	u32 ctrl_addr = 0;
 	u32 cmd_sts = 0;
 	u32 *data =(u32 *)priv_data;
-	struct hssiss_private *priv = platform_get_drvdata(pdev);
 
 	ctrl_addr |= cmd;
 	cmd_sts |= HSSI_SAL_CMDSTS_RD;
 
-	ret = hssiss_sal_execute(pdev, ctrl_addr, cmd_sts, atomic);
-	if (ret == 0)
-		*data = csrrd32_withoffset(priv->sscsr, priv->csr_addroff, HSSISS_CSR_RD_DATA);
+	ret = hssiss_sal_execute(pdev, ctrl_addr, cmd_sts, data, atomic);
 
 	return ret;
 }
