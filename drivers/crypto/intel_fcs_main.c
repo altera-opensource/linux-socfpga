@@ -3817,20 +3817,7 @@ static int fcs_driver_probe(struct platform_device *pdev)
 			MISC_DYNAMIC_MINOR);
 		return ret;
 	}
-
-	/* register hwrng device */
-	priv->rng.name = "intel-rng";
-	priv->rng.read = fcs_rng_read;
-	priv->rng.priv = (unsigned long)priv;
-
-	ret = hwrng_register(&priv->rng);
-	if (ret) {
-		dev_err(dev, "can't register RNG device (%d)\n", ret);
-		return ret;
-	}
-
-	platform_set_drvdata(pdev, priv);
-
+	
 	of_property_read_string(dev->of_node, "platform", &platform);
 
 	/* Proceed only if platform is agilex as
@@ -3892,6 +3879,19 @@ static int fcs_driver_probe(struct platform_device *pdev)
 			intel_fcs_smmu_init(priv);
 		}
 	}
+
+	/* register hwrng device */
+	priv->rng.name = "intel-rng";
+	priv->rng.read = fcs_rng_read;
+	priv->rng.priv = (unsigned long)priv;
+
+	ret = hwrng_register(&priv->rng);
+	if (ret) {
+		dev_err(dev, "can't register RNG device (%d)\n", ret);
+		return ret;
+	}
+
+	platform_set_drvdata(pdev, priv);
 
 	return 0;
 }
