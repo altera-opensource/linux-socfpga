@@ -1596,7 +1596,7 @@ static int intel_fpga_qse_ll_probe(struct platform_device *pdev)
 	ndev->features |= NETIF_F_HW_VLAN_CTAG_RX;
 
 	/* setup NAPI interface */
-	netif_napi_add(ndev, &priv->napi, qse_poll, NAPI_POLL_WEIGHT);
+	netif_napi_add(ndev, &priv->napi, qse_poll);
 
 	spin_lock_init(&priv->mac_cfg_lock);
 	spin_lock_init(&priv->tx_lock);
