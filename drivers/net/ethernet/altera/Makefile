@@ -8,8 +8,17 @@ altera_eth-objs := altera_utils.o altera_eth_dma.o \
 		   altera_sgdma.o altera_msgdma.o \
 		   altera_msgdma_prefetcher.o
 
-obj-$(CONFIG_INTEL_FPGA_TOD) += intel_fpga_tod.o \
-				altera_utils.o
+obj-$(CONFIG_INTEL_FPGA_TOD) += altera_utils.o \
+				 intel_freq_ctrl_zl30793_spi.o \
+			     intel_freq_control_zl30793.o \
+			     intel_freq_ctrl_si5518_spi.o \
+			     intel_freq_ctrl_lmk05028_i2c.o \
+				 intel_freq_ctrl_zl30733_i2c.o \
+				 intel_freq_control_zl30733.o\
+			     intel_freq_control.o \
+			     intel_freq_ctrl_common_spi.o \
+			     intel_freq_ctrl_common_i2c.o \
+			     intel_fpga_tod.o 
 
 ifeq ($(CONFIG_ALTERA_TSE),y)
 	obj-$(CONFIG_ALTERA_TSE) += altera_tse.o
@@ -49,5 +58,6 @@ ifeq ($(CONFIG_INTEL_FPGA_HSSI_XTILE),y)
                                       intel_fpga_hssi_etile_ethtool.o \
 				      intel_fpga_ftile_driver.o		\
 				      intel_fpga_hssi_ftile_fec.o	\
-				      intel_fpga_hssi_ftile_ethtool.o
+				      intel_fpga_hssi_ftile_ethtool.o	\
+
 endif

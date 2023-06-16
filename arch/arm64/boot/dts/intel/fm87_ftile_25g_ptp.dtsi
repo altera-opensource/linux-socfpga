@@ -72,6 +72,13 @@
 				clock-output-names = "tod_in_clock";
 			};
 		};
+                ptp_clockcleaner: ptp_clockcleaner {
+                        compatible = "intel, freq-steering-zl-i2c";
+			dpll-name = "zl30733";
+			interface  = "i2c";
+		        bus-num    = <1>;
+			bus-address = <0x70>;
+		};
 
 		tod_0_clk: tod_0_clk {
 			compatible = "intel, tod";
@@ -80,6 +87,8 @@
 			clocks = <&tod_in_clock>;
 			clock-names = "tod_clock";
 			status = "okay";
+                        altr,has-ptp-clockcleaner;
+			clock-cleaner = <&ptp_clockcleaner>;
 		};
 
 			hssiss_0_hssiss: hssiss_0_hssiss {
@@ -97,16 +106,16 @@
                                             "rx_csr"   ,
                                             "rx_fifo"  ;
 
-                                reg =   <0x84400000 0x00000020>,
-                                        <0x84400020 0x00000020>,
-                                        <0x84400040 0x00000020>,
-                                        <0x84400080 0x00000020>,
-                                        <0x844000A0 0x00000020>,
-                                        <0x844000C0 0x00000010>;
+                                reg =   <0x84480000 0x00000020>,
+                                        <0x84480020 0x00000020>,
+                                        <0x84480040 0x00000020>,
+                                        <0x84480080 0x00000020>,
+                                        <0x844800A0 0x00000020>,
+                                        <0x844800C0 0x00000010>;
 
                                 compatible = "altr,hssi-ftile-1.0";
-                                tile_chan = <0x0>;
-                                hssi_port = <0x0>;
+                                tile_chan = <0x8>;
+                                hssi_port = <0x8>;
                                 phy-mode = "25gbase-kr";
                                 tod = <&tod_0_clk>;
                                 hssiss = <&hssiss_0_hssiss>;
@@ -135,7 +144,8 @@
                                 fixed-link {
                                         speed =<25000>;
                                         full-duplex;
-                        };
+                       		 };
+				
                 };
 		
 	};

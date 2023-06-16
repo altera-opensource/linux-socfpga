@@ -1,12 +1,3 @@
-// SPDX-License-Identifier: GPL-2.0
-/* Intel FPGA ToD PTP Hardware Clock (PHC) Linux driver
- * Copyright (C) 2015-2016 Altera Corporation. All rights reserved.
- * Copyright (C) 2017-2020 Intel Corporation. All rights reserved.
- *
- * Author(s):
- *	Dalon Westergreen <dalon.westergreen@intel.com>
- */
-
 #include <linux/clk.h>
 #include <linux/delay.h>
 #include <linux/gcd.h>
@@ -94,21 +85,35 @@ static int intel_fpga_tod_adjust_fine(struct ptp_clock_info *ptp,
 {
 	struct intel_fpga_tod_private *priv =
 		container_of(ptp, struct intel_fpga_tod_private, ptp_clock_ops);
-	u32 tod_period, tod_rem, tod_drift_adjust_fns, tod_drift_adjust_rate;
+	u32 tod_period, tod_rem, tod_drift_adjust_fns;
+        u32 tod_drift_adjust_rate, gcd_out;
+	s64 ppb;
+	s64 new_ppb;
+	int ret = 0;
 	unsigned long flags;
 	unsigned long rate;
-	int ret = 0;
-	s64 ppb;
-	u64 new_ppb;
+
+
+
+	/* If there is frequency steering hardware present then use the same */
+	if ( (priv->ptp_clockcleaner_enable) && (priv->ptp_freq_priv) &&
+			(priv->ptp_freq_priv->freqctrl_ops.freqctrl) ){
+		
+		priv->ptp_freq_priv->queued_work.scaled_ppm = scaled_ppm;
+		priv->ptp_freq_priv->freqctrl_ops.freqctrl(&priv->ptp_freq_priv->queued_work);
+		
+		ret = 0;
+		goto out;
+	}
 
 	rate = clk_get_rate(priv->tod_clk);
+	if (!rate) {
+		ret = -ENODEV;
+		goto out;
+	}
 
-	/* From scaled_ppm_to_ppb */
-	ppb = 1 + scaled_ppm;
-	ppb *= 125;
-	ppb >>= 13;
-
-	new_ppb = (s32)ppb + NOMINAL_PPB;
+	ppb = scaled_ppm_to_ppb(scaled_ppm);
+	new_ppb = ppb + NOMINAL_PPB;
 
 	tod_period = div_u64_rem(new_ppb << 16, rate, &tod_rem);
 	if (tod_period > TOD_PERIOD_MAX) {
@@ -119,13 +124,15 @@ static int intel_fpga_tod_adjust_fine(struct ptp_clock_info *ptp,
 	/* The drift of ToD adjusted periodically by adding a drift_adjust_fns
 	 * correction value every drift_adjust_rate count of clock cycles.
 	 */
-	tod_drift_adjust_fns = tod_rem / gcd(tod_rem, rate);
-	tod_drift_adjust_rate = rate / gcd(tod_rem, rate);
+	gcd_out = gcd(tod_rem, rate);
 
-	while ((tod_drift_adjust_fns > TOD_DRIFT_ADJUST_FNS_MAX) |
-		(tod_drift_adjust_rate > TOD_DRIFT_ADJUST_RATE_MAX)) {
-		tod_drift_adjust_fns = tod_drift_adjust_fns >> 1;
-		tod_drift_adjust_rate = tod_drift_adjust_rate >> 1;
+	tod_drift_adjust_fns = tod_rem / gcd_out;
+	tod_drift_adjust_rate = rate / gcd_out;
+
+	while ((tod_drift_adjust_fns > TOD_DRIFT_ADJUST_FNS_MAX) ||
+	       (tod_drift_adjust_rate > TOD_DRIFT_ADJUST_RATE_MAX)) {
+		tod_drift_adjust_fns >>= 1;
+		tod_drift_adjust_rate >>= 1;
 	}
 
 	if (tod_drift_adjust_fns == 0)
@@ -256,12 +263,98 @@ static int intel_fpga_tod_set_time(struct ptp_clock_info *ptp,
 	return 0;
 }
 
+static int intel_fpga_tod_extts_configure(struct ptp_clock_request *rq)
+{
+	/* Reject requests with unsupported flags */
+	if (rq->extts.flags & ~(PTP_ENABLE_FEATURE |
+				PTP_RISING_EDGE |
+				PTP_FALLING_EDGE |
+				PTP_STRICT_FLAGS))
+		return -EOPNOTSUPP;
+
+	/* Reject requests to enable time stamping on both edges. */
+	if ((rq->extts.flags & PTP_STRICT_FLAGS) &&
+	    (rq->extts.flags & PTP_ENABLE_FEATURE) &&
+	    (rq->extts.flags & PTP_EXTTS_EDGES) == PTP_EXTTS_EDGES)
+		return -EOPNOTSUPP;
+
+	return 0;
+}
+
+
 static int intel_fpga_tod_enable_feature(struct ptp_clock_info *ptp,
 					 struct ptp_clock_request *request,
-					 int on)
+					 int feature_on)
 {
-	return -EOPNOTSUPP;
+	struct intel_fpga_tod_private *priv =
+		container_of(ptp, struct intel_fpga_tod_private, ptp_clock_ops);
+	unsigned long flags;
+	int ret;
+
+	spin_lock_irqsave(&priv->tod_lock, flags);
+	
+	switch (request->type) {
+		case PTP_CLK_REQ_EXTTS:
+			ret = intel_fpga_tod_extts_configure(request);
+			break;
+		default:
+			return -EOPNOTSUPP;
+	}
+
+	spin_unlock_irqrestore(&priv->tod_lock, flags);
+	
+	return 0;
 }
+
+static long intel_fpga_ts_work_delay(struct ptp_clock_info *ptp) {
+	
+	struct intel_fpga_tod_private *priv =
+		container_of(ptp, struct intel_fpga_tod_private, ptp_clock_ops);
+	struct ptp_clock_event event;
+	unsigned long flags;
+	u32 nanosec, seconds_lsb, seconds_msb;
+	u64 seconds;
+
+	spin_lock_irqsave(&priv->tod_lock, flags);
+        
+	nanosec = csrrd32(priv->tod_ctrl, tod_csroffs(nanosec));
+
+	seconds_lsb = csrrd32(priv->tod_ctrl, tod_csroffs(seconds_lsb));
+	seconds_msb = csrrd32(priv->tod_ctrl, tod_csroffs(seconds_msb));
+
+	spin_unlock_irqrestore(&priv->tod_lock, flags);
+
+	/* Calculate new time */
+	seconds = (((u64)(seconds_msb & 0x0000ffff)) << 32) | seconds_lsb;
+
+	/* queue the ptp event to be triggered */	
+	event.type = PTP_CLOCK_EXTTS;
+	event.index = ptp_clock_index(priv->ptp_clock);
+	event.timestamp = seconds * NSEC_PER_SEC + nanosec;
+	ptp_clock_event(priv->ptp_clock, &event);
+
+	return priv->ptp_event_delay;
+}
+
+static int intel_fpga_phc_getcrosststamp(struct ptp_clock_info *ptp,
+                                     struct system_device_crosststamp *xtstamp) {
+
+	u64 devns = 0;	
+	struct timespec64 ts;
+
+        /* get system time */
+        xtstamp->sys_monoraw = ktime_get();
+	xtstamp->sys_realtime = ktime_get_real();
+
+        /* get ptp hardware time */
+        intel_fpga_tod_get_time(ptp, &ts);
+
+        devns = NSEC_PER_SEC * (u64)ts.tv_sec + (u64)ts.tv_nsec;
+        xtstamp->device  = ns_to_ktime(devns);
+
+        return 0;
+}
+
 
 static struct ptp_clock_info intel_fpga_tod_clock_ops = {
 	.owner = THIS_MODULE,
@@ -276,6 +369,8 @@ static struct ptp_clock_info intel_fpga_tod_clock_ops = {
 	.gettime64 = intel_fpga_tod_get_time,
 	.settime64 = intel_fpga_tod_set_time,
 	.enable = intel_fpga_tod_enable_feature,
+    .do_aux_work = intel_fpga_ts_work_delay,
+    .getcrosststamp = intel_fpga_phc_getcrosststamp,
 };
 
 /* Register the PTP clock driver to kernel */
@@ -284,6 +379,9 @@ static int intel_fpga_tod_register(struct intel_fpga_tod_private *priv,
 {
 	int ret = 0;
 	struct timespec64 ts = { 0, 0 };
+	unsigned long flags;
+	u32 tod_period, tod_rem, tod_drift_adjust_fns, tod_drift_adjust_rate;
+	unsigned long rate;
 
 	priv->ptp_clock_ops = intel_fpga_tod_clock_ops;
 
@@ -300,6 +398,42 @@ static int intel_fpga_tod_register(struct intel_fpga_tod_private *priv,
 
 	/* Initialize the hardware clock to zero */
 	intel_fpga_tod_set_time(&priv->ptp_clock_ops, &ts);
+	rate = clk_get_rate(priv->tod_clk);
+	if(!rate )
+		return 0;
+
+	tod_period = div_u64_rem( NOMINAL_PPB << 16, rate, &tod_rem);
+	if (tod_period > TOD_PERIOD_MAX) {
+		ret = -ERANGE;
+		goto out;
+	}
+
+	/* The drift of ToD adjusted periodically by adding a drift_adjust_fns
+	 * correction value every drift_adjust_rate count of clock cycles.
+	 */
+	tod_drift_adjust_fns = tod_rem / gcd(tod_rem, rate);
+	tod_drift_adjust_rate = rate / gcd(tod_rem, rate);
+
+	while ((tod_drift_adjust_fns > TOD_DRIFT_ADJUST_FNS_MAX) |
+		(tod_drift_adjust_rate > TOD_DRIFT_ADJUST_RATE_MAX)) {
+		tod_drift_adjust_fns = tod_drift_adjust_fns >> 1;
+		tod_drift_adjust_rate = tod_drift_adjust_rate >> 1;
+	}
+
+	if (tod_drift_adjust_fns == 0)
+		tod_drift_adjust_rate = 0;
+
+	spin_lock_irqsave(&priv->tod_lock, flags);
+	csrwr32(tod_period, priv->tod_ctrl, tod_csroffs(period));
+	csrwr32(0, priv->tod_ctrl, tod_csroffs(adjust_period));
+	csrwr32(0, priv->tod_ctrl, tod_csroffs(adjust_count));
+	csrwr32(tod_drift_adjust_fns, priv->tod_ctrl,
+		tod_csroffs(drift_adjust));
+	csrwr32(tod_drift_adjust_rate, priv->tod_ctrl,
+		tod_csroffs(drift_adjust_rate));
+	spin_unlock_irqrestore(&priv->tod_lock, flags);
+
+out:
 
 err:
 	return ret;
@@ -318,6 +452,8 @@ static int intel_fpga_tod_unregister(struct platform_device *pdev)
 	if (priv->tod_clk)
 		clk_disable_unprepare(priv->tod_clk);
 
+
+
 	return 0;
 }
 
@@ -326,6 +462,8 @@ static int intel_fpga_tod_probe(struct platform_device *pdev)
 {
 	int ret = -ENODEV;
 	struct resource *ptp_res;
+	struct device_node *dev_fc;
+	struct platform_device *pdev_fc;
 	struct intel_fpga_tod_private *priv;
 	struct device *dev = &pdev->dev;
 
@@ -354,6 +492,38 @@ static int intel_fpga_tod_probe(struct platform_device *pdev)
 		dev_err_probe(&pdev->dev, PTR_ERR(priv->tod_clk),
 			      "cannot obtain ToD period clock\n");
 		goto err;
+	}
+
+	priv->ptp_clockcleaner_enable =
+	    of_property_read_bool(pdev->dev.of_node,
+			    "altr,has-ptp-clockcleaner");
+
+	priv->ptp_freq_priv = NULL;
+
+	/* There is a frequency steering hardware present in the system */
+	if (priv->ptp_clockcleaner_enable) {
+
+		/* Get the Freq steering node device from the device tree node */
+		dev_fc = of_parse_phandle(pdev->dev.of_node,
+				"clock-cleaner", 0);
+
+		if (dev_fc) {
+			pdev_fc = of_find_device_by_node(dev_fc);
+			if (!pdev_fc) {
+				dev_err(&pdev->dev, "clock cleaner hw details not found\n");
+				of_node_put(dev_fc);
+			}
+			else {
+				priv->ptp_freq_priv =
+					dev_get_drvdata(&pdev_fc->dev);
+					if(!priv->ptp_freq_priv)
+					{
+						ret = -EPROBE_DEFER;
+						goto err;
+					}
+						
+			}
+		}
 	}
 
 	ret = intel_fpga_tod_register(priv, dev);

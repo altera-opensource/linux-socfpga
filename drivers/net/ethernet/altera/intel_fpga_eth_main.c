@@ -30,7 +30,6 @@
 #include "intel_fpga_eth_etile.h"
 #include "intel_fpga_eth_hssi_itf.h"
 #include "intel_fpga_eth_tile_ops.h"
-
 /* Module parameters */
 static int debug = -1;
 
@@ -86,7 +85,7 @@ MODULE_PARM_DESC(dma_tx_num, "Number of descriptors in the TX list");
 
 static const struct of_device_id intel_fpga_xtile_ll_ids[];
 
-#define PORT_STS_TIMEOUT		10000	/* in us*/
+#define PORT_STS_TIMEOUT		20000	/* in us*/
 #define PORT_STS_STABILITY_COUNT	10 /* in us*/
 static int check_link_stable(intel_fpga_xtile_eth_private *priv)
 {
@@ -827,6 +826,7 @@ static int xtile_open(struct net_device *dev)
 	if (priv->spec_ops->link_up)
 		priv->spec_ops->link_up(priv);
 
+
 	return 0;
 
 init_error:
@@ -1353,7 +1353,9 @@ static int intel_fpga_xtile_probe(struct platform_device *pdev)
 	intel_fpga_xtile_eth_private *priv;
 	struct device_node *dev_tod;
 	struct platform_device *pdev_tod;
-
+	struct fwnode_handle *ptp_node;
+	struct clock_cleaner *clockcleaner_data = NULL;
+	
 	np = pdev->dev.of_node;
 
 	ndev = alloc_etherdev(sizeof(intel_fpga_xtile_eth_private));
@@ -1463,7 +1465,13 @@ static int intel_fpga_xtile_probe(struct platform_device *pdev)
 			}
 		}
 	}
-
+	priv->ptp_clockcleaner_enable = of_property_read_bool(pdev->dev.of_node,
+							      "altr,has-ptp-clockcleaner");
+	if (!priv->ptp_enable && !priv->ptp_clockcleaner_enable ) {
+		dev_err(&pdev->dev, "Hardware Clock Frequency adjustment requires PTP\n");
+		ret = -ENODEV;
+		goto err_free_netdev;
+	}
 	/* mSGDMA Tx IRQ */
 	priv->tx_irq = platform_get_irq_byname(pdev, "tx_irq");
 	if (priv->tx_irq == -ENXIO) {
@@ -1583,15 +1591,14 @@ static int intel_fpga_xtile_probe(struct platform_device *pdev)
 		priv->rx_external_phy_delay_ns = 0;
 	}
 
-	/* get default MAC address from device tree */
-	if(of_get_mac_address(pdev->dev.of_node,macaddr))
-	{
+	if(of_get_mac_address(pdev->dev.of_node,macaddr)){
 		dev_info(&pdev->dev, "cannot obtain MAC address using random HW addresss\n");
 		eth_hw_addr_random(ndev);
 
 	}
-	else
+	else{
 		ether_addr_copy(ndev->dev_addr, macaddr);
+	}
 
 	/* initialize netdev */
 	ndev->netdev_ops = &intel_fpga_xtile_netdev_ops;
@@ -1658,7 +1665,7 @@ static int intel_fpga_xtile_probe(struct platform_device *pdev)
 			priv->ptp_priv = dev_get_drvdata(&pdev_tod->dev);
 		if (!pdev_tod || !priv->ptp_priv) {
 			dev_err(&pdev->dev, "PTP clock not available\n");
-			ret = -ENXIO;
+			ret = -EPROBE_DEFER;
 			goto err_free_netdev;
 		}
 		dev_info(&pdev->dev, "\tPTP Clock: %s\n", priv->ptp_priv->ptp_clock_ops.name);

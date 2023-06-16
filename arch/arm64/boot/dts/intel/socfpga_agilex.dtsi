@@ -264,7 +264,7 @@
 			interrupts = <GIC_SPI 104 IRQ_TYPE_LEVEL_HIGH>;
 			resets = <&rst I2C1_RESET>;
 			clocks = <&clkmgr AGILEX_L4_SP_CLK>;
-			status = "disabled";
+			status = "okay";
 		};
 
 		i2c2: i2c@ffc02a00 {
