@@ -18,7 +18,7 @@
 #include "altera_msgdma_prefetcher.h"
 #include "altera_msgdmahw_prefetcher.h"
 #include "altera_sgdma.h"
-
+#include "intel_freq_control.h"
 #define INTEL_FPGA_XTILE_ETH_RESOURCE_NAME "intel_fpga_eth"
 
 #define INTEL_FPGA_RET_SUCCESS                          0
@@ -93,6 +93,7 @@ typedef struct {
         struct intel_fpga_tod_private *ptp_priv;
 
         phy_interface_t phy_iface;
+	u32 ptp_clockcleaner_enable;
 
 } intel_fpga_xtile_eth_private;
 

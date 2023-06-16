@@ -15,6 +15,17 @@
 #include <linux/ptp_clock_kernel.h>
 #include <linux/platform_device.h>
 #include <linux/mutex.h>
+#include "intel_freq_control.h"
+
+#define NOMINAL_PPB                     1000000000ULL
+#define TOD_PERIOD_MAX                  0xfffff
+#define TOD_PERIOD_MIN                  0
+#define TOD_DRIFT_ADJUST_FNS_MAX        0xffff
+#define TOD_DRIFT_ADJUST_RATE_MAX       0xffff
+#define TOD_ADJUST_COUNT_MAX            0xfffff
+#define TOD_ADJUST_MS_MAX               (((((TOD_PERIOD_MAX) >> 16) + 1) * \
+                                          ((TOD_ADJUST_COUNT_MAX) + 1)) /  \
+                                         1000000UL)
 
 /* Altera Time-of-Day (ToD) clock register space. */
 struct intel_fpga_tod {
@@ -43,6 +54,13 @@ struct intel_fpga_tod_private {
 
 	/* ToD clock registers protection */
 	spinlock_t tod_lock;
+
+	bool ptp_clockcleaner_enable;
+
+	long  ptp_event_delay;
+	/* PTP Clock Cleaner structure */
+	struct intel_freq_control_private *ptp_freq_priv;
+
 };
 
 int intel_fpga_tod_init(struct intel_fpga_tod_private *priv);
