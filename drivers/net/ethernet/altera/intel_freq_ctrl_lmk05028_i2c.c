@@ -141,8 +141,8 @@ void intel_freq_control_lmk05028(struct work_struct *work)
 
 	i2c_cli = priv->fc_acc_type.i2c_cli;
 
-        if (!(r_in && post_div_val && prescaler_div_val && denominator))
-                lmk05028_read_constant_values(i2c_cli, &r_in,
+        // if (!(r_in && post_div_val && prescaler_div_val && denominator))  -- condition necessity to be identified 
+        lmk05028_read_constant_values(i2c_cli, &r_in,
 				&post_div_val,
 				&prescaler_div_val,
 				&constant_results,

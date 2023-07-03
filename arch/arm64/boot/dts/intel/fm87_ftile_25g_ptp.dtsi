@@ -119,6 +119,7 @@
                                 phy-mode = "25gbase-kr";
                                 tod = <&tod_0_clk>;
                                 hssiss = <&hssiss_0_hssiss>;
+                                pma_lanes_used = <0x1>;
                                 altr,tx-pma-delay-ns = <0xD>;
                                 altr,rx-pma-delay-ns = <0x8>;
                                 altr,tx-pma-delay-fns = <0x24D>;
@@ -138,8 +139,8 @@
                                 altr,has-ptp;
                                 ptp_tx_ref_pl = <0x00>;
                                 ptp_accu_mode = "Advanced";
-                                ptp_tx_routing_adj = <0x1085F>;
-                                ptp_rx_routing_adj = <0x10341>;
+                                ptp_tx_routing_adj = <0x12AF5>;
+                                ptp_rx_routing_adj = <0x12780>;
                                 status = "okay";
                                 fixed-link {
                                         speed =<25000>;

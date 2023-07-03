@@ -1346,7 +1346,7 @@ static int intel_fpga_xtile_probe(struct platform_device *pdev)
 	struct resource *rx_fifo;
 	struct resource *tx_fifo;
 	struct device_node *dev_hssi;
-	const unsigned char *macaddr;
+	u8 macaddr[ETH_ALEN];
 	struct fwnode_handle *fixed_node;
 	struct platform_device *pdev_hssi;
 	const struct xtile_spec_ops *op_ptr;
@@ -1419,7 +1419,13 @@ static int intel_fpga_xtile_probe(struct platform_device *pdev)
 		ret = -ENXIO;
 		goto err_free_netdev;
 	}
-
+	
+	if (of_property_read_u32(np, "pma_lanes_used",
+                                 &priv->pma_lanes_used)) {
+			
+		dev_warn(&pdev->dev, "cannot obtain pma lane count defaulting to be 1\n");
+		priv->pma_lanes_used =1;
+	}
 	priv->spec_ops = (struct xtile_spec_ops *) op_ptr;
 
 	/* PTP is only supported with a modified MSGDMA */
@@ -1432,6 +1438,7 @@ static int intel_fpga_xtile_probe(struct platform_device *pdev)
 		goto err_free_netdev;
 	}
 
+	
 	if (priv->ptp_enable)
 	{
 		/* Tx reference physical lane */

@@ -61,7 +61,7 @@ void ui_adjustments(struct timer_list *t)
 	u32 rx_tam_l_nth, rx_tam_h_nth, rx_tam_count_nth;
 	u64 tx_tam_initial, rx_tam_initial, tx_tam_nth, rx_tam_nth;
 	u32 tx_tam_interval = 0, rx_tam_interval = 0;
-	u32 tx_tam_count_est = 0, rx_tam_count_est = 0, ui_value, tx_tam_count, rx_tam_count;
+	u32 tx_tam_count_est = 0, rx_tam_count_est =0, ui_value, tx_tam_count, rx_tam_count;
 	u64 tx_tam_delta, rx_tam_delta;
 	u64 tx_ui = 0, rx_ui = 0;
 	u64 start_jiffies;

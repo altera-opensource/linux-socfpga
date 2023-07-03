@@ -179,8 +179,8 @@ void intel_freq_control_zl30733(struct work_struct *work)
 
 static void zl30733_check_dpll(struct i2c_client *i2c_cli)
 {
-	u8 i = 1, loop, buf; // DPLL1 is being used
-
+	u8 i = 1, buf; // DPLL1 is being used
+	int loop;
 	pr_info("%s: Wait for ZL30733 DPLL1 lock...\n", __func__);
 	for (loop = 0; loop < 10000; ++loop) {
 		if (i2c_zl30733_read_byte_data(i2c_cli, ZL30733_REG_DPLL_MON_STATUS(i), &buf, 1) == 0) {
