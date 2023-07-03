@@ -226,7 +226,11 @@ static int eth_etile_tx_rx_user_flow(intel_fpga_xtile_eth_private *priv)
 					    rx_bitslip_cnt);
 			}
 		}
-		rx_spulse_offset = (rx_bitslip_cnt * ui_value);
+		else
+		{
+			rx_spulse_offset = (rx_bitslip_cnt * ui_value);
+		}
+		
 
 		netdev_info(priv->dev, "Rx bitslip cnt:%d ui value:%x\n",
 			    rx_bitslip_cnt, ui_value);

@@ -72,6 +72,7 @@ typedef struct {
         u32 ptp_tx_ref_pl;
         u32 ptp_tx_routing_adj;
         u32 ptp_rx_routing_adj;
+        u32 pma_lanes_used;
 
         u8 duplex;
         u8 qsfp_lane;

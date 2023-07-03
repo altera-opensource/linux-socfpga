@@ -220,7 +220,7 @@ static u32 get_gb_66_110_occupancy(const u32 speed, const u32 rvld_lsb, const u3
 	const u8 occ_2   = occ >> 2;
 	const u8 gbs     = (rvld_lsb & ETH_PHY_PTP_LSB_GBSTATE_MASK) >> ETH_PHY_PTP_LSB_GBSTATE_SHIFT;
 
-	if (speed == 50) {
+	if (speed == SPEED_50000) {
 		if (occ_2_1 == 0)
 			return 0;
 		else if (occ_2_1 == 1)
@@ -231,7 +231,7 @@ static u32 get_gb_66_110_occupancy(const u32 speed, const u32 rvld_lsb, const u3
 			printk(KERN_ALERT "%s Illegal case for GB 66_110\n", __func__);
 			return 0;
 		}
-	} else if (speed == 100) {
+	} else if (speed == SPEED_100000) {
 		if (gbs == 0) {
 			if (occ_2 == 1)
 				return 110;
@@ -260,13 +260,13 @@ static u32 get_am_detect_occupancy(const u32 speed, const u32 rvld_lsb, const u3
 	const u8 occ   = (rvld_msb & ETH_PHY_PTP_MSB_AM_DETECT_OCC_MASK) >> ETH_PHY_PTP_MSB_AM_DETECT_OCC_SHIFT;
 	const u8 occ_0 = occ & 1;
 
-	if (speed == 50) {
+	if (speed == SPEED_50000) {
 		if (occ_0 == 0) {
 			return 0;
 		} else if (occ_0 == 1) {
 			return 66;
 		}
-	} else if (speed == 100) {
+	} else if (speed == SPEED_100000) {
 		if (occ == 0) {
 			return 44;
 		} else if (occ == 1) {
@@ -289,7 +289,7 @@ static u32 get_blk_align_occupancy(const u32 speed, const u32 rvld_lsb, const u3
 	const u8 al_pos    = (rvld_msb & ETH_PHY_PTP_MSB_AL_POS_50G_MASK) >> ETH_PHY_PTP_MSB_AL_POS_50G_SHIFT;
 	const u8 occ_1_0   = blk_align & 3;
 
-	if (speed == 50) {
+	if (speed == SPEED_50000) {
 		if (occ_1_0 == 0) {
 			return 65 - al_pos;
 		} else if (occ_1_0 == 1) {
@@ -299,7 +299,7 @@ static u32 get_blk_align_occupancy(const u32 speed, const u32 rvld_lsb, const u3
 		} else if (occ_1_0 == 3) {
 			return 66 + (65 - al_pos) + 66;
 		}
-	} else if (speed == 100) {
+	} else if (speed == SPEED_100000) {
 		if (occ_1_0 == 0) {
 			return 21 - al_pos;
 		} else if (occ_1_0 == 1) {
@@ -317,10 +317,9 @@ static u32 get_gb_33_66_occupancy(const u32 speed, const u32 rvld_lsb, const u32
 {
 	const u8 occ = (rvld_msb & ETH_PHY_PTP_MSB_GB33TO66_OCC_MASK) >> ETH_PHY_PTP_MSB_GB33TO66_OCC_SHIFT;
 
-	if (occ == 0 || occ == 1)
-		return 0;
-	if (occ == 2 || occ == 3)
+	if (occ > 1) /* nfor values 0 & 1 return 0 , for 2&3 return 33 */
 		return 33;
+
 	return 0;
 }
 
@@ -367,16 +366,18 @@ static int eth_ftile_tx_rx_user_flow(intel_fpga_xtile_eth_private *priv)
 	struct platform_device *pdev = priv->pdev_hssi;
 	u32 chan = priv->tile_chan;
 	u32 tx_routing_adj = 0, rx_routing_adj = 0;
-	u8 tx_routing_adj_sign, rx_routing_adj_sign;
+	u8 tx_routing_adj_sign =0 , rx_routing_adj_sign =0;
 	u32 gui_option=0;
 
+	memset(tx_vl_offset,0,sizeof(tx_vl_offset));
+	speed = priv->link_speed;
 	gui_option =  hssi_csrrd32_ba(pdev, HSSI_ETH_RECONFIG, chan, eth_soft_csroffs(gui_option));
 	// TBD add other PHY modes
 	switch (priv->phy_iface) {
 	case PHY_INTERFACE_MODE_10GKR:
 	case PHY_INTERFACE_MODE_10GBASER:
 		ui_value = INTEL_FPGA_FTILE_UI_VALUE_10G;
-		speed = 10;
+	
 		num_vl = 1; // VL value
 		if ((gui_option & XCVR_PMA_TYPE) == XCVR_PMA_TYPE_FGT) {
 			tx_pma_delay_ui = INTEL_FPGA_TX_PMA_DELAY_25G_UX;
@@ -389,22 +390,22 @@ static int eth_ftile_tx_rx_user_flow(intel_fpga_xtile_eth_private *priv)
 	case PHY_INTERFACE_MODE_25GKR:
 	case PHY_INTERFACE_MODE_25GBASER:
 		ui_value = INTEL_FPGA_FTILE_UI_VALUE_25G;
-		speed = 25;
 		num_vl = 1; // VL value
 		if ((gui_option & XCVR_PMA_TYPE) == XCVR_PMA_TYPE_FGT) {
 			tx_pma_delay_ui = INTEL_FPGA_TX_PMA_DELAY_25G_UX;
 			rx_pma_delay_ui = INTEL_FPGA_RX_PMA_DELAY_25G_UX;
 		} else { // XCVR_PMA_TYPE_FHT
-			tx_pma_delay_ui =INTEL_FPGA_TX_PMA_DELAY_25G_UX;// INTEL_FPGA_TX_PMA_DELAY_25G_BK;
-			rx_pma_delay_ui =INTEL_FPGA_RX_PMA_DELAY_25G_UX;// INTEL_FPGA_RX_PMA_DELAY_25G_BK;
+			tx_pma_delay_ui = INTEL_FPGA_TX_PMA_DELAY_25G_BK;
+			rx_pma_delay_ui = INTEL_FPGA_RX_PMA_DELAY_25G_BK;
 		}
 		break;
 	default:
 		netdev_err(priv->dev, "Unsupported PHY mode: %s\n", phy_modes(priv->phy_iface));
 		return -ENODEV;
 	}
-	num_fl = speed / 25;      // FL
-	num_pl =1;// priv->num_lanes; // PL
+	/*TBD: num_Fl value for speeds other than 25G to be calculated**/
+	num_fl = 1;      // Fec Lanes
+	num_pl = priv->pma_lanes_used;// priv->num_lanes; // PL
 
 	/* TX User Flow */
 	/* Step 1 After power up or reset, wait until TX raw offset data are ready */
@@ -466,6 +467,8 @@ static int eth_ftile_tx_rx_user_flow(intel_fpga_xtile_eth_private *priv)
 	tx_tam_adjust_sim = ((tx_const_delay_sign ? -tx_const_delay : tx_const_delay) +
 			     (tx_apulse_offset_sign[tx_ref_pl] ? -tx_apulse_offset[tx_ref_pl] : tx_apulse_offset[tx_ref_pl]) -
 			     tx_apulse_wdelay[tx_ref_pl]);
+
+	tx_tam_adjust = tx_tam_adjust_sim; // tx_tam_adjust is a 32-bit two's complement number.			 
 	/* Hardware run with advanced accuracy mode:
 		Note: See Section 5.3.4 on how to obtain tx_routing_adj_sign and tx_routing_adj information.
 	   (routing delays for specific image, generated via steps outlined in Section 5.3.4 of "Towards a F-Tile.." doc.)
@@ -474,11 +477,9 @@ static int eth_ftile_tx_rx_user_flow(intel_fpga_xtile_eth_private *priv)
 	if (strcasecmp(priv->ptp_accu_mode, "Advanced") == 0)
 	{
 		tx_routing_adj = priv->ptp_tx_routing_adj;
-		tx_routing_adj_sign = tx_routing_adj_sign >> 31;
+		tx_routing_adj_sign = tx_routing_adj >> 31;
 		tx_tam_adjust = tx_tam_adjust_sim + (tx_routing_adj_sign ? - tx_routing_adj : tx_routing_adj);
 	}
-	
-	tx_tam_adjust = tx_tam_adjust_sim; // tx_tam_adjust is a 32-bit two's complement number.
 
 	/* Step 4b Calculate TX extra latency */
 	/* Convert unit of TX PMA delay from UI to nanoseconds
@@ -492,7 +493,7 @@ static int eth_ftile_tx_rx_user_flow(intel_fpga_xtile_eth_private *priv)
 	tx_extra_latency &= 0x7FFFFFFF;
 
 	/* Step 4c - must be skipped for 10G/25G */
-	if (speed > 25) {
+	if (speed > SPEED_25000) {
 		// Calculate TX virtual lane offsets
 		// Using VL0 as reference virtual lane, assign TX virtual lane offset values according to virtual lane order as described in section 5.2.3.
 		/*
@@ -524,7 +525,7 @@ static int eth_ftile_tx_rx_user_flow(intel_fpga_xtile_eth_private *priv)
 	/* Step 6 Write the calculated TX offsets to IP */
 
 	/* Step 6a Write TX virtual lane offsets - must be skipped for 10G/25G */
-	if (speed > 25) {
+	if (speed > SPEED_25000) {
 		for (vl = 0; vl < num_vl; vl++) {
 			hssi_csrwr32_ba(pdev, HSSI_ETH_RECONFIG, chan, eth_mac_ptp_csroffs(0, tx_ptp_vl_offset[vl]), tx_vl_offset[vl]);
 		}
@@ -676,7 +677,7 @@ static int eth_ftile_tx_rx_user_flow(intel_fpga_xtile_eth_private *priv)
 		if (rx_apulse_time[pl] > rx_apulse_time_max)
 			rx_apulse_time_max = rx_apulse_time[pl];
 	}
-	if (speed <= 25 && strcasecmp(priv->fec_type, "no-fec") == 0) {
+	if (speed <= SPEED_25000 && strcasecmp(priv->fec_type, "no-fec") == 0) {
 		// 10G/25G No FEC variants:
 		regval = hssi_csrrd32_ba(pdev, HSSI_ETH_RECONFIG, chan, eth_phy_csroffs(0, phy_rx_bitslip_cnt));
 		rx_bitslip_cnt       = regval & ETH_PHY_RX_PCS_BITSLIP_CNT;
@@ -704,9 +705,9 @@ static int eth_ftile_tx_rx_user_flow(intel_fpga_xtile_eth_private *priv)
 				rx_spulse_offset_sign[fl] = 1;
 			}
 		}
-	} else if (speed == 50 || speed == 100) {
+	} else if (speed == SPEED_50000 || speed == SPEED_100000) {
 		// 50G/100G No FEC variants:
-		if (speed == 50) // 50G-2
+		if (speed == SPEED_50000) // 50G-2
 			am_interval = 32768 * 66;
 		else // 100G-4:
 			am_interval = 81920 * 66;
@@ -717,7 +718,7 @@ static int eth_ftile_tx_rx_user_flow(intel_fpga_xtile_eth_private *priv)
 			rvld_lsb[vl] = hssi_csrrd32_ba(pdev, HSSI_ETH_RECONFIG, chan, eth_phy_csroffs(0, ptp_vl_data_lsb[vl]));
 			rvld_msb[vl] = hssi_csrrd32_ba(pdev, HSSI_ETH_RECONFIG, chan, eth_phy_csroffs(0, ptp_vl_data_msb[vl]));
 			local_vl = (rvld_lsb[vl] & ETH_PHY_PTP_LSB_LOCAL_VL_MASK) >> ETH_PHY_PTP_LSB_LOCAL_VL_SHIFT;
-			if (speed == 50) {
+			if (speed == SPEED_50000) {
 				final_offs = (get_gb_33_66_occupancy(speed, rvld_lsb[vl], rvld_msb[vl]) +
 					      get_gb_66_110_occupancy(speed, rvld_lsb[vl], rvld_msb[vl]) +
 					      2 * get_blk_align_occupancy(speed, rvld_lsb[vl], rvld_msb[vl]) +
@@ -751,7 +752,7 @@ static int eth_ftile_tx_rx_user_flow(intel_fpga_xtile_eth_private *priv)
 			rx_spulse_offset[local_vl]      = ((u64)(am_interval - rx_spulse_post_am[local_vl]) * ui_value) >> 12;
 			rx_spulse_offset_sign[local_vl] = 0;
 		}
-	} else if (speed == 10 || speed == 25) {
+	} else if (speed == SPEED_10000 || speed == SPEED_25000) {
 		// 10G/25G No FEC variants:
 		/* Note: Format of UI is {4-bit ns, 28-bit frac ns}, while other variables are {N-bit ns, 16-bit frac ns},
 		   where N is the largest number to store max value from the calculation. Result of the multiplication
@@ -759,8 +760,12 @@ static int eth_ftile_tx_rx_user_flow(intel_fpga_xtile_eth_private *priv)
 		rx_spulse_offset[0]      = ((u64)(rx_bitslip_cnt + rx_dlpulse_alignment) * ui_value) >> 12;
 		rx_spulse_offset_sign[0] = 0;
 	}
+	else
+	{
 
-	if (speed == 10 || speed == 25) {
+	}
+
+	if (speed == SPEED_10000 || speed == SPEED_25000) {
 		// Step 5b, 5c and 5d could be skipped for single lane 10G and 25G:
 		rx_ref_pl = 0;
 		rx_ref_fl = 0;
@@ -848,6 +853,8 @@ static int eth_ftile_tx_rx_user_flow(intel_fpga_xtile_eth_private *priv)
 				     + (rx_spulse_offset_sign[rx_ref_vl] ? -rx_spulse_offset[rx_ref_vl] : rx_spulse_offset[rx_ref_vl]));
 	}
 
+	rx_tam_adjust = rx_tam_adjust_sim; // rx_tam_adjust is a 32-bit two's complement number.
+
 	/* TBD For hardware run with advanced accuracy mode:
 	Note: See Section 10.3.5 on how to obtain rx_routing_adj_sign and rx_routing_adj information.
 	   (routing delays for specific image, generated via steps outlined in Section 10.3.5 of doc.)
@@ -857,11 +864,9 @@ static int eth_ftile_tx_rx_user_flow(intel_fpga_xtile_eth_private *priv)
 	if (strcasecmp(priv->ptp_accu_mode, "Advanced") == 0)
 	{
 		rx_routing_adj = priv->ptp_rx_routing_adj;
-		rx_routing_adj_sign = rx_routing_adj_sign >> 31;
+		rx_routing_adj_sign = rx_routing_adj >> 31;
 		rx_tam_adjust = (rx_tam_adjust_sim) + (rx_routing_adj_sign ? - rx_routing_adj : rx_routing_adj);
 	}
-	   
-	rx_tam_adjust = rx_tam_adjust_sim; // rx_tam_adjust is a 32-bit two's complement number.
 
 	/* Step 6b Calculate RX extra latency */
 	// Convert unit of RX PMA delay from UI to nanoseconds
@@ -875,7 +880,7 @@ static int eth_ftile_tx_rx_user_flow(intel_fpga_xtile_eth_private *priv)
 	rx_extra_latency |= 0x80000000;
 
 	/* Step 6c Calculate RX virtual lane offsets - must be skipped for 10G/25G. */
-	if (speed > 25) {
+	if (speed > SPEED_25000) {
 		// Using determined reference virtual lane, assign RX virtual lane offset values as described in section 10.2.3.
 		/* Note: Format of UI is {4-bit ns, 28-bit frac ns}, while other variables are {N-bit ns, 16-bit frac ns},
 		   where N is the largest number to store max value from the calculation. Result of the multiplication
@@ -891,10 +896,10 @@ static int eth_ftile_tx_rx_user_flow(intel_fpga_xtile_eth_private *priv)
 				rx_vl_offset[vl] = ((u64)(vl - (vl % num_pl)) / num_pl * 66 * ui_value) >> 12;
 		} else if (!strcasecmp(priv->fec_type, "no-fec")) {
 			// No FEC 100G variants:
-			if (speed == 100) {
+			if (speed == SPEED_100000) {
 				for (vl = 0; vl < num_vl; vl++)
 					rx_vl_offset[vl] = ((u64)2 * ui_value) >> 12;
-			} else if (speed == 100) {
+			} else if (speed == SPEED_100000) {
 				// No FEC 50G variants:
 				for (vl = 0; vl < num_vl; vl++)
 					rx_vl_offset[vl] = ui_value >> 13; // 0.5 * UI
@@ -903,7 +908,7 @@ static int eth_ftile_tx_rx_user_flow(intel_fpga_xtile_eth_private *priv)
 	}
 
 	/* Step 7 Write the determined RX reference lane into IP - this step must be skipped for 10G/25G. */
-	if (speed > 25) {
+	if (speed > SPEED_25000) {
 		regval = hssi_csrrd32_ba(pdev, HSSI_ETH_RECONFIG, chan, eth_soft_csroffs(ptp_ref_lane));
 		regval = (regval & ~ETH_PTP_RX_REF_LANE_MASK) | (rx_ref_pl << ETH_PTP_RX_REF_LANE_SHIFT);
 		hssi_csrwr32_ba(pdev, HSSI_ETH_RECONFIG, chan, eth_soft_csroffs(ptp_ref_lane),regval);
@@ -912,7 +917,7 @@ static int eth_ftile_tx_rx_user_flow(intel_fpga_xtile_eth_private *priv)
 	/* Step 8 Write the calculated RX offsets to IP */
 
 	/* Step 8a Write RX virtual lane offsets - skipped for 10G/25G. */
-	if (speed > 25) {
+	if (speed > SPEED_25000) {
 		for (vl = 0; vl < num_vl; vl++) {
 			hssi_csrwr32_ba(pdev, HSSI_ETH_RECONFIG, chan, eth_mac_ptp_csroffs(0, rx_ptp_vl_offset[vl]),rx_vl_offset[vl]);
 		}

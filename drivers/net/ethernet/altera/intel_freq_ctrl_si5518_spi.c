@@ -30,11 +30,12 @@ void intel_freq_control_si5518(struct work_struct *work)
 
         p_work = container_of(work, struct freq_work, w);
         scaled_ppm = p_work->scaled_ppm;
+        
+        priv = container_of(p_work, struct intel_freq_control_private, queued_work);
 	spi = priv->fc_acc_type.spi_dev;
-
 	si5518_ma_step_size = priv->step_size;
 
-	priv = container_of(p_work, struct intel_freq_control_private, queued_work);
+	
 
         if (abs(scaled_ppm) > (10 << 16))
                 dev_warn(&spi->dev, "%s: scaled_ppm:%li (ppm:%li) outside range of +/-10ppm\n",
