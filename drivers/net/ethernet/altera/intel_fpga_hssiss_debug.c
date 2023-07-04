@@ -368,14 +368,17 @@ static ssize_t hssiss_dbgfs_dumpcsr_read(struct file *filep, char __user *ubuf,
 	ret += scnprintf(buf + ret, BUF_SIZE - ret, "HSSISS_CSR_COMMON_FEATURE_LIST: %x\n", val);
 
 	ret += scnprintf(buf + ret, BUF_SIZE - ret, "Dumping port attributes\n");
-	for (i = 0; i < 15; i++) {
-		if (priv->ver == HSSISS_FTILE) {
-			val = csrrd32(base, HSSISS_CSR_INTER_ATTRIB_PORT_FTILE + (i * 4));
-		} else {
-			val = csrrd32_withoffset(base, csr_addroff,
-				HSSISS_CSR_INTER_ATTRIB_PORT + (i * 4));
-		}
+	for (i = 0; i < 15; i++) { /* E-tile and FGT in F-tile */
+		val = csrrd32_withoffset(base, csr_addroff,
+			HSSISS_CSR_INTER_ATTRIB_PORT + (i * 4));
 		ret += scnprintf(buf + ret, BUF_SIZE - ret, "\t%x: %x\n", i, val);
+	}
+
+	if (priv->ver == HSSISS_FTILE) { /* For F-tile FHT only */
+		for (i = 16; i < 20; i++) {
+			val = csrrd32(base, HSSISS_CSR_INTER_ATTRIB_PORT_FHT + (i * 4));
+			ret += scnprintf(buf + ret, BUF_SIZE - ret, "\t%x: %x\n", i, val);
+		}
 	}
 
 	val = csrrd32_withoffset(base, csr_addroff, HSSISS_CSR_CMDSTS);
@@ -397,14 +400,19 @@ static ssize_t hssiss_dbgfs_dumpcsr_read(struct file *filep, char __user *ubuf,
 	ret += scnprintf(buf + ret, BUF_SIZE - ret, "HSSISS_CSR_GMII_RX_LATENCY: %x\n", val);
 
 	ret += scnprintf(buf + ret, BUF_SIZE - ret, "Dumping port status\n");
-	for (i = 0; i < 15; i++) {
-		if (priv->ver == HSSISS_FTILE) {
-			val = csrrd32(base, HSSISS_CSR_ETH_PORT_STS_FTILE + (i * 4));
-		} else {
-			val = csrrd32_withoffset(base, csr_addroff,
+
+	for (i = 0; i < 15; i++) { /* E-tile and FGT in F-tile */
+		val = csrrd32_withoffset(base, csr_addroff,
 				HSSISS_CSR_ETH_PORT_STS + (i * 4));
-		}
 		ret += scnprintf(buf + ret, BUF_SIZE - ret, "\t%x: %x\n", i, val);
+	}
+
+	if (priv->ver == HSSISS_FTILE) { /* For F-tile FHT only */
+		for (i = 16; i < 20; i++) {
+			val = csrrd32(base, HSSISS_CSR_ETH_PORT_STS_FHT + (i * 4));
+			ret += scnprintf(buf + ret, BUF_SIZE - ret, "\t%x: %x\n", i, val);
+		}
+
 	}
 
 	val = csrrd32_withoffset(base, csr_addroff, HSSISS_CSR_TSE_CTRL);

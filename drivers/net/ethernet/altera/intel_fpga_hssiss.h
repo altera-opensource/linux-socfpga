@@ -39,8 +39,8 @@
 #define HSSISS_CSR_GENERAL_STATUS		0xbc
 
 /*F-tile specific */
-#define HSSISS_CSR_INTER_ATTRIB_PORT_FTILE	0x300 /* + x * 4 */
-#define HSSISS_CSR_ETH_PORT_STS_FTILE		0x200 /* + x * 4 */
+#define HSSISS_CSR_INTER_ATTRIB_PORT_FHT	0x300 /* + x * 4 */
+#define HSSISS_CSR_ETH_PORT_STS_FHT		0x200 /* + x * 4 */
 
 /* Ftile only: PFC offset + x * 4, read returns 0 if port doesn't exit */
 #define HSSISS_CSR_PFC_CTRL			0x400
