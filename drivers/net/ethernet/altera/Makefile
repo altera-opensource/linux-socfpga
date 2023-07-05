@@ -11,8 +11,4 @@ ifeq ($(CONFIG_ALTERA_TSE),y)
 	obj-$(CONFIG_ALTERA_TSE) += altera_tse.o
 	altera_tse-objs := altera_tse_main.o altera_tse_ethtool.o
 endif
-ifeq ($(CONFIG_INTEL_FPGA_QSE_LL),y)
-	obj-$(CONFIG_INTEL_FPGA_QSE_LL) += intel_fpga_qse_ll.o
-	intel_fpga_qse_ll-objs := intel_fpga_qse_ll_main.o intel_fpga_qse_ll_ethtool.o
-endif
 
