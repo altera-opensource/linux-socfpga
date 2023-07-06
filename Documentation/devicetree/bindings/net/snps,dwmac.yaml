@@ -234,6 +234,7 @@ properties:
             When a PFC frame is received with priorities matching the bitmask,
             the queue is blocked from transmitting for the pause time specified
             in the PFC frame.
+          * snps,tbs-enable, enable Time Based Scheduling(TBS) for TX queue.
 
   snps,reset-gpio:
     deprecated: true
