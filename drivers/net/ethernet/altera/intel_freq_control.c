@@ -17,8 +17,6 @@
 #include "intel_freq_ctrl_common_spi.h"
 #include "intel_freq_ctrl_zl30793_spi.h"
 #include "intel_freq_ctrl_common_i2c.h"
-#include "intel_freq_ctrl_lmk05028_i2c.h"
-#include "intel_freq_ctrl_si5518_spi.h"
 #include "intel_freq_ctrl_zl30733_i2c.h"
 
 static void 
@@ -185,18 +183,6 @@ static const struct xtile_intf_ops zl_spi_data = {
 	.clock_check = spi_dev_check_zl30793_clock,
 };
 
-static const struct xtile_intf_ops si_spi_data = {
-	.client_validator = determine_spi_client,
-	.clock_cleaner = intel_freq_control_si5518,
-	.clock_check = spi_dev_check_si5518_clock,
-};
-
-static const struct xtile_intf_ops lmk_i2c_data = {
-        .client_validator = determine_i2c_client,
-        .clock_cleaner = intel_freq_control_lmk05028,
-};
-
-
 static const struct xtile_intf_ops zl_i2c_data = {
         .client_validator = determine_i2c_client,
         .clock_cleaner = intel_freq_control_zl30733,
@@ -208,12 +194,6 @@ static const struct of_device_id intel_fpga_fs_ids[] = {
                 
 	{.compatible = "intel, freq-steering-zl-spi",
 	 .data = &zl_spi_data, 
-	},
-	{.compatible = "intel, freq-steering-si-spi",
-	 .data = &si_spi_data, 
-	},
-	{.compatible = "intel, freq-steering-lmk-i2c",
-	 .data = &lmk_i2c_data, 
 	},
 	{.compatible = "intel, freq-steering-zl-i2c",
 	 .data = &zl_i2c_data, 
