@@ -249,9 +249,41 @@ typedef union eth_port_status {
 	u32 full;
 } hssi_eth_port_sts;
 
+typedef union eth_port_attr {
+	struct {
+		u32 profile:6;
+		u32 rdy_latency:4;
+		u32 data_bus_width:3;
+		u32 low_speed_eth:2;
+		u32 dr_en:1;
+		u32 sub_profile:5;
+		u32 rsfec_en:1;
+		u32 anlt_en:1;
+		u32 ptp_en:1;
+		u32 reserved:8;
+	} part;
+	u32 full;
+} hssi_eth_port_attr;
+
 enum hssiss_hip_type {
 	HSSISS_ETILE = 1,
 	HSSISS_FTILE = 2,
+};
+
+enum hssi_port_profile {
+	HSSI_PORT_PROFILE_10GBE = 20,
+	HSSI_PORT_PROFILE_25GBE,
+	HSSI_PORT_PROFILE_40GCAUI_4,
+	HSSI_PORT_PROFILE_50GAUI_2,
+	HSSI_PORT_PROFILE_50GAUI_1,
+	HSSI_PORT_PROFILE_100GAUI_1,
+	HSSI_PORT_PROFILE_100GAUI_2,
+	HSSI_PORT_PROFILE_100GCAUI_4,
+	HSSI_PORT_PROFILE_200GAUI_2,
+	HSSI_PORT_PROFILE_200GAUI_4,
+	HSSI_PORT_PROFILE_200GAUI_8,
+	HSSI_PORT_PROFILE_400GAUI_4,
+	HSSI_PORT_PROFILE_400GAUI_8,
 };
 
 enum hssiss_tile_regbank {
@@ -382,6 +414,7 @@ int hssiss_execute_sal_cmd(struct platform_device *pdev,
 int hssiss_execute_sal_cmd_atomic(struct platform_device *pdev,
 		enum hssiss_salcmd cmd, void *data);
 hssi_eth_port_sts hssiss_get_ethport_status(struct platform_device *pdev, int port);
+hssi_eth_port_attr hssiss_get_ethport_attr(struct platform_device *pdev, int port);
 int hssiss_cold_rst(struct platform_device *pdev);
 void hssiss_hotplug_enable(struct platform_device *pdev, bool enable);
 enum hssiss_hip_type hssiss_get_hip_type(struct platform_device *pdev);

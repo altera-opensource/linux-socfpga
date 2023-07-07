@@ -455,6 +455,29 @@ hssi_eth_port_sts hssiss_get_ethport_status(struct platform_device *pdev, int po
 	return port_sts;
 }
 
+hssi_eth_port_attr hssiss_get_ethport_attr(struct platform_device *pdev, int port)
+{
+	struct hssiss_private *priv = platform_get_drvdata(pdev);
+	hssi_eth_port_attr port_attr;
+
+	/* E-tile and FGT in F-tile */
+	if (port >= 0 && port < 16) {
+		port_attr.full = csrrd32_withoffset(priv->sscsr,
+				priv->csr_addroff,
+				(HSSISS_CSR_INTER_ATTRIB_PORT + port * 4));
+		return port_attr;
+	}
+
+	/* For F-tile FHT only */
+	if (priv->ver == HSSISS_FTILE && (port >= 16 && port < 20)) {
+
+		port_attr.full = csrrd32(priv->sscsr,
+				(HSSISS_CSR_INTER_ATTRIB_PORT_FHT + port * 4));
+	}
+
+	return port_attr;
+}
+
 /* Enable/disable hotplug */
 void hssiss_hotplug_enable(struct platform_device *pdev, bool enable)
 {
