@@ -213,6 +213,7 @@ static void ftile_set_mac_flow_ctrl(intel_fpga_xtile_eth_private *priv)
 	if (netif_msg_ifup(priv))
 		netdev_info(priv->dev, "F-tile: pause_quanta0: 0x%08x\n", reg);
 }
+
 static u32 get_gb_66_110_occupancy(const u32 speed, const u32 rvld_lsb, const u32 rvld_msb)
 {
 	const u8 occ     = (rvld_msb & ETH_PHY_PTP_MSB_GB66TO110_OCC_MASK) >> ETH_PHY_PTP_MSB_GB66TO110_OCC_SHIFT;
@@ -323,6 +324,7 @@ static u32 get_gb_33_66_occupancy(const u32 speed, const u32 rvld_lsb, const u32
 	return 0;
 }
 
+// PTP Tx and Rx user flow
 static int eth_ftile_tx_rx_user_flow(intel_fpga_xtile_eth_private *priv)
 {
 	const u8 xcvr_top_lane = 15;
@@ -335,10 +337,9 @@ static int eth_ftile_tx_rx_user_flow(intel_fpga_xtile_eth_private *priv)
 	u32 tx_apulse_time[8], tx_apulse_time_max = 0;
 	u32 tx_am_actual_time[8], tx_am_actual_time_max = 0;
 	u8  tx_ref_pl = 0, pl;
-	u8  xcvr_sel = 0;
-	u32 init_pl =0;
+	u8  xcvr_sel = 0 /* hw_xcvr_sel */, init_pl;
 	u32 tx_extra_latency;
-	u32 tx_vl_offset[20];
+	u32 tx_vl_offset[20] = { 0 };
 	u32 tx_tam_adjust, tx_tam_adjust_sim;
 	u32 tx_pma_delay_ns;
 	u32 rx_const_delay;
@@ -363,23 +364,21 @@ static int eth_ftile_tx_rx_user_flow(intel_fpga_xtile_eth_private *priv)
 	u32 rx_fec_cw_pos[16];
 	u32 rx_xcvr_if_pulse_adj[16];
 	u32 ui_value;
-	struct platform_device *pdev = priv->pdev_hssi;
-	u32 chan = priv->tile_chan;
-	u32 tx_routing_adj = 0, rx_routing_adj = 0;
-	u8 tx_routing_adj_sign =0 , rx_routing_adj_sign =0;
-	u32 gui_option=0;
+	u32 tx_routing_adj, rx_routing_adj;
+	u8 tx_routing_adj_sign, rx_routing_adj_sign;
 
-	memset(tx_vl_offset,0,sizeof(tx_vl_offset));
+	struct platform_device *pdev = priv->pdev_hssi;
+  	u32 chan = priv->tile_chan;
+	u16 pma_type = priv->pma_type;
+	u8 eth_rate = priv->eth_rate;
 	speed = priv->link_speed;
-	gui_option =  hssi_csrrd32_ba(pdev, HSSI_ETH_RECONFIG, chan, eth_soft_csroffs(gui_option));
+
 	// TBD add other PHY modes
 	switch (priv->phy_iface) {
 	case PHY_INTERFACE_MODE_10GKR:
 	case PHY_INTERFACE_MODE_10GBASER:
 		ui_value = INTEL_FPGA_FTILE_UI_VALUE_10G;
-	
-		num_vl = 1; // VL value
-		if ((gui_option & XCVR_PMA_TYPE) == XCVR_PMA_TYPE_FGT) {
+		if ((pma_type) == XCVR_PMA_TYPE_FGT) {
 			tx_pma_delay_ui = INTEL_FPGA_TX_PMA_DELAY_25G_UX;
 			rx_pma_delay_ui = INTEL_FPGA_RX_PMA_DELAY_25G_UX;
 		} else { // XCVR_PMA_TYPE_FHT
@@ -390,8 +389,7 @@ static int eth_ftile_tx_rx_user_flow(intel_fpga_xtile_eth_private *priv)
 	case PHY_INTERFACE_MODE_25GKR:
 	case PHY_INTERFACE_MODE_25GBASER:
 		ui_value = INTEL_FPGA_FTILE_UI_VALUE_25G;
-		num_vl = 1; // VL value
-		if ((gui_option & XCVR_PMA_TYPE) == XCVR_PMA_TYPE_FGT) {
+		if ((pma_type) == XCVR_PMA_TYPE_FGT) {
 			tx_pma_delay_ui = INTEL_FPGA_TX_PMA_DELAY_25G_UX;
 			rx_pma_delay_ui = INTEL_FPGA_RX_PMA_DELAY_25G_UX;
 		} else { // XCVR_PMA_TYPE_FHT
@@ -403,9 +401,28 @@ static int eth_ftile_tx_rx_user_flow(intel_fpga_xtile_eth_private *priv)
 		netdev_err(priv->dev, "Unsupported PHY mode: %s\n", phy_modes(priv->phy_iface));
 		return -ENODEV;
 	}
-	/*TBD: num_Fl value for speeds other than 25G to be calculated**/
-	num_fl = 1;      // Fec Lanes
-	num_pl = priv->pma_lanes_used;// priv->num_lanes; // PL
+
+	num_fl = speed / SPEED_25000; // FL
+	// VL value:
+	if (speed <= SPEED_25000)
+	{
+		num_vl = 1;
+		num_fl = 1;
+	}
+	else if (speed == SPEED_50000)
+		num_vl = 4;
+	else if (speed == SPEED_100000)
+		num_vl = 20;
+	else if (speed == SPEED_200000)
+		num_vl = 8;
+	else if (speed == SPEED_400000)
+		num_vl = 16;
+	else {
+		netdev_err(priv->dev, "Unsupported speed: %u\n", speed);
+		return -ENODEV;
+	}
+	num_pl = priv->pma_lanes_used;      // PL
+	dev_info(priv->device, "DBG: %s speed=%u num_vl=%u num_fl=%u num_pl=%u\n", __func__, speed, num_vl, num_fl, num_pl);
 
 	/* TX User Flow */
 	/* Step 1 After power up or reset, wait until TX raw offset data are ready */
@@ -468,13 +485,14 @@ static int eth_ftile_tx_rx_user_flow(intel_fpga_xtile_eth_private *priv)
 			     (tx_apulse_offset_sign[tx_ref_pl] ? -tx_apulse_offset[tx_ref_pl] : tx_apulse_offset[tx_ref_pl]) -
 			     tx_apulse_wdelay[tx_ref_pl]);
 
-	tx_tam_adjust = tx_tam_adjust_sim; // tx_tam_adjust is a 32-bit two's complement number.			 
-	/* Hardware run with advanced accuracy mode:
-		Note: See Section 5.3.4 on how to obtain tx_routing_adj_sign and tx_routing_adj information.
+	tx_tam_adjust = tx_tam_adjust_sim; // tx_tam_adjust is a 32-bit two's complement number.
+
+	/* hardware run with advanced accuracy mode:
+
+	   Note: See Section 5.3.4 on how to obtain tx_routing_adj_sign and tx_routing_adj information.
 	   (routing delays for specific image, generated via steps outlined in Section 5.3.4 of "Towards a F-Tile.." doc.)
 	   Others: */
-	
-	if (strcasecmp(priv->ptp_accu_mode, "Advanced") == 0)
+    if (strcasecmp(priv->ptp_accu_mode, "Advanced") == 0)
 	{
 		tx_routing_adj = priv->ptp_tx_routing_adj;
 		tx_routing_adj_sign = tx_routing_adj >> 31;
@@ -520,19 +538,19 @@ static int eth_ftile_tx_rx_user_flow(intel_fpga_xtile_eth_private *priv)
 	/* Step 5 Write the determined TX reference lane into IP */
 	regval = hssi_csrrd32_ba(pdev, HSSI_ETH_RECONFIG, chan, eth_soft_csroffs(ptp_ref_lane));
 	regval = (regval & ~ETH_PTP_TX_REF_LANE_MASK) | (tx_ref_pl << ETH_PTP_TX_REF_LANE_SHIFT);
-	hssi_csrwr32_ba(pdev, HSSI_ETH_RECONFIG, chan, eth_soft_csroffs(ptp_ref_lane),regval);
+	hssi_csrwr32_ba(pdev, HSSI_ETH_RECONFIG, chan, eth_soft_csroffs(ptp_ref_lane), regval);
 
 	/* Step 6 Write the calculated TX offsets to IP */
 
 	/* Step 6a Write TX virtual lane offsets - must be skipped for 10G/25G */
 	if (speed > SPEED_25000) {
 		for (vl = 0; vl < num_vl; vl++) {
-			hssi_csrwr32_ba(pdev, HSSI_ETH_RECONFIG, chan, eth_mac_ptp_csroffs(0, tx_ptp_vl_offset[vl]), tx_vl_offset[vl]);
+			hssi_csrwr32_ba(pdev, HSSI_ETH_RECONFIG, chan, eth_mac_ptp_csroffs(eth_rate, tx_ptp_vl_offset[vl]), tx_vl_offset[vl]);
 		}
 	}
 
 	/* Step 6b Write TX extra latency */
-	hssi_csrwr32_ba(pdev, HSSI_ETH_RECONFIG, chan, eth_mac_ptp_csroffs(0, tx_ptp_extra_latency), tx_extra_latency);
+	hssi_csrwr32_ba(pdev, HSSI_ETH_RECONFIG, chan, eth_mac_ptp_csroffs(eth_rate, tx_ptp_extra_latency), tx_extra_latency);
 
 	/* Step 6c Write TX TAM adjust */
 	hssi_csrwr32_ba(pdev, HSSI_ETH_RECONFIG, chan, eth_soft_csroffs(ptp_tx_tam_adjust), tx_tam_adjust);
@@ -541,7 +559,7 @@ static int eth_ftile_tx_rx_user_flow(intel_fpga_xtile_eth_private *priv)
 	// Perform step 1 to 7 as specified in Table 90.
 	// Note: For simulation or hardware run with 0ppm setup, user is advised to skip measurement and program 0ppm UI value as stated in Table 89.
 	// Program 0ppm UI value here and later start a timer to do UI value measurements / adjustments
-	hssi_csrwr32_ba(pdev, HSSI_ETH_RECONFIG, chan, eth_mac_ptp_csroffs(0, tx_ptp_ui), ui_value);
+	hssi_csrwr32_ba(pdev, HSSI_ETH_RECONFIG, chan, eth_mac_ptp_csroffs(eth_rate, tx_ptp_ui), ui_value);
 
 	/* Step 8 Notify soft PTP that user flow configuration is completed */
 	regval = hssi_csrrd32_ba(pdev, HSSI_ETH_RECONFIG, chan, eth_soft_csroffs(ptp_tx_user_cfg_status));
@@ -556,7 +574,7 @@ static int eth_ftile_tx_rx_user_flow(intel_fpga_xtile_eth_private *priv)
 		netdev_err(priv->dev, "MAC Tx PTP not ready\n");
 		return -EINVAL;
 	}
-	dev_info(priv->device,"DBG: %s ETH_TX_PTP_READY - tx_ref_pl:%u tx_extra_latency:0x%08x tx_tam_adjust:%i\n", __func__, tx_ref_pl, tx_extra_latency, (int32_t)tx_tam_adjust);
+	dev_info(priv->device, "DBG: %s ETH_TX_PTP_READY - tx_ref_pl:%u tx_extra_latency:0x%08x tx_tam_adjust:%i\n", __func__, tx_ref_pl, tx_extra_latency, (int32_t)tx_tam_adjust);
 
 	/* Step 10 TX PTP is up and running */
 
@@ -565,41 +583,39 @@ static int eth_ftile_tx_rx_user_flow(intel_fpga_xtile_eth_private *priv)
 	// Done via timer_setup at end of this function
 
 	/* RX User Flow */
-	/*TBD for all FEC lane, here done only for FEC Lane 0 */
-	if (xtile_check_counter_complete(priv, HSSI_ETH_RECONFIG,
-					   eth_rsfec_csroffs(0, 0, rsfec_lane_rx_stat),
-					   RSFEC_RX_STATUS_LANE_NOT_LOCKED, false,
-					   INTEL_FPGA_WORD_ALIGN)) {
-			netdev_err(priv->dev, "RS FEC lane is not locked\n");
-			return -EINVAL;
+    // Check all FEC lanes are locked
+	if (strcasecmp(priv->fec_type, "no-fec") != 0) {
+		for (fl = 0; fl < num_fl; fl++) {
+			if (xtile_check_counter_complete(priv, HSSI_ETH_RECONFIG,
+							eth_rsfec_csroffs(eth_rate, fl, rsfec_lane_rx_stat),
+							RSFEC_RX_STATUS_LANE_NOT_LOCKED, false,
+							INTEL_FPGA_WORD_ALIGN)) {
+					netdev_err(priv->dev, "MAC Rx datapath not ready & RS FEC lane is not locked\n");
+					return -EINVAL;
+			}
+		}
 	}
 
 	/* Step 1 After power up, reset or link down, wait until RX PCS is fully aligned */
-	// 10G-400G No FEC variants, 25G FEC variants:
-	switch (priv->phy_iface) {
-	case PHY_INTERFACE_MODE_10GKR:
-	case PHY_INTERFACE_MODE_10GBASER:
-	case PHY_INTERFACE_MODE_25GKR:
-		// TBD more case PHY_INTERFACE_MODE_ ?
+	// 10G-100G No FEC variants, 25G FEC variants:
+	if (!strcasecmp(priv->fec_type, "no-fec") || speed == SPEED_25000) {
 		if (xtile_check_counter_complete(priv, HSSI_ETH_RECONFIG,
-					   eth_phy_csroffs(0, phy_pcs_stat_anlt),
+					   eth_phy_csroffs(eth_rate, phy_pcs_stat_anlt),
 					   ETH_PHY_RX_PCS_ALIGNED, true,
 					   INTEL_FPGA_WORD_ALIGN)) {
-			netdev_err(priv->dev, "MAC Rx datapath not ready\n");
+			netdev_err(priv->dev, "MAC Rx datapath not ready (PHY_RX_PCS_ALIGNED=0)\n");
 			return -EINVAL;
 		}
-		break;
-		// TBD use this for 50G-400G FEC variants:
-		/* if (check_counter_complete(pdev, HSSI_ETH_RECONFIG, chan,
-		   eth_rsfec_csroffs(priv->eth_rate, fl?, rsfec_aggr_rx_stat),
-		   RSFEC_AGGR_RX_STATUS_NOT_ALIGN, false,
-		   INTEL_FPGA_WORD_ALIGN)) {
-		   netdev_err(priv->dev, "MAC Rx datapath not ready\n");
-		   return -EINVAL;
-		   }*/
-	default:
-		netdev_err(priv->dev, "Unsupported PHY mode: %s\n", phy_modes(priv->phy_iface));
-		return -ENODEV;
+	} else {
+		// 50G-400G FEC variants:
+		for (fl = 0; fl < num_fl; fl++)
+			if (xtile_check_counter_complete(priv, HSSI_ETH_RECONFIG,
+						   eth_rsfec_csroffs(eth_rate, fl, rsfec_aggr_rx_stat),
+						   RSFEC_AGGR_RX_STATUS_NOT_ALIGN, false,
+						   INTEL_FPGA_WORD_ALIGN)) {
+				netdev_err(priv->dev, "MAC Rx datapath not ready (RSFEC_AGGR_RX_STATUS_NOT_ALIGN, fl=%u)\n", fl);
+				return -EINVAL;
+			}
 	}
 
 	// init_pl value obtained like this as per tcl scripts:
@@ -614,15 +630,14 @@ static int eth_ftile_tx_rx_user_flow(intel_fpga_xtile_eth_private *priv)
 		pl_fl_map = num_fl / num_pl;
 
 		for (fl = 0; fl < num_fl; fl++)
-			rx_fec_cw_pos[fl] = hssi_csrrd32_ba(pdev, HSSI_ETH_RECONFIG, chan, eth_rsfec_csroffs(0, fl, rsfec_cw_pos_rx)) & RSFEC_CW_POS_RX_num;
+			rx_fec_cw_pos[fl] = hssi_csrrd32_ba(pdev, HSSI_ETH_RECONFIG, chan, eth_rsfec_csroffs(eth_rate, fl, rsfec_cw_pos_rx)) & RSFEC_CW_POS_RX_num;
 
 		// Step 2b Calculate pulse adjustments
 		for (fl = 0; fl < num_fl; fl++)
 			rx_xcvr_if_pulse_adj[fl] = rx_fec_cw_pos[fl]; // hmm, not much calculation here..
-
 		// Step 2c Write the pulse adjustments into IP
 		// For multiple FEC lanes that interleave within single transceiver, we select adjustment value from FEC lane with lowest index
-		if ((gui_option & XCVR_PMA_TYPE) == XCVR_PMA_TYPE_FGT) {
+		if ((pma_type) == XCVR_PMA_TYPE_FGT) {
 			// FGT transceiver:
 			// Note: There are 4 FGT quads with 4 apl lanes each. User must ensure register of all active quad lanes are programmed.
 			// Please refer to AVMM2 or global AVMM User Guide on how to access different FGT quad.
@@ -640,10 +655,10 @@ static int eth_ftile_tx_rx_user_flow(intel_fpga_xtile_eth_private *priv)
 			n = 4;
 			for (pl = 0; pl < num_pl; pl++) {
 				apl = (3 - ((pl + init_pl) % 4));
-				regval = hssi_csrrd32_ba(pdev, HSSI_ETH_RECONFIG, chan, eth_pma_avmm_csroffs(fgt_q_dl_ctrl_a_l2, xcvr_sel) + apl * n);
+				regval = hssi_csrrd32_ba(pdev, HSSI_PHY_XCVR_PMACAP, chan, eth_pma_avmm_csroffs(fgt_q_dl_ctrl_a_l2, xcvr_sel) + apl * n);
 				regval &= ~XCVR_FHT_Q_DL_CTRL_RX_LAT_CNTRVAL_ASYNC;
 				regval |= rx_xcvr_if_pulse_adj[pl * pl_fl_map] & XCVR_FHT_Q_DL_CTRL_RX_LAT_CNTRVAL_ASYNC;
-				hssi_csrwr32_ba(pdev, HSSI_ETH_RECONFIG, chan, eth_pma_avmm_csroffs(fgt_q_dl_ctrl_a_l2, xcvr_sel) + apl * n,regval);
+				hssi_csrwr32_ba(pdev, HSSI_PHY_XCVR_PMACAP, chan, eth_pma_avmm_csroffs(fgt_q_dl_ctrl_a_l2, xcvr_sel) + apl * n, regval);
 			}
 			// Note: Both apl and pl are used in this step, see Table 84 for clarification.
 		}
@@ -651,15 +666,15 @@ static int eth_ftile_tx_rx_user_flow(intel_fpga_xtile_eth_private *priv)
 		// Step 2d Notify soft PTP that pulse adjustments have been configured
 		regval = hssi_csrrd32_ba(pdev, HSSI_ETH_RECONFIG, chan, eth_soft_csroffs(ptp_rx_user_cfg_status));
 		regval |= ETH_PTP_RX_FEC_CW_POS_CFG_DONE;
-		hssi_csrwr32_ba( pdev, HSSI_ETH_RECONFIG, chan, eth_soft_csroffs(ptp_rx_user_cfg_status),regval);
+		hssi_csrwr32_ba( pdev, HSSI_ETH_RECONFIG, chan, eth_soft_csroffs(ptp_rx_user_cfg_status), regval);
 	}
 
 	/* Step 3 Wait until RX raw offset data are ready */
-	if( xtile_check_counter_complete(priv, HSSI_ETH_RECONFIG,
+	if (xtile_check_counter_complete(priv, HSSI_ETH_RECONFIG,
 				   eth_soft_csroffs(ptp_status),
 				   ETH_RX_PTP_OFFSET_DATA_VALID, true,
 				   INTEL_FPGA_WORD_ALIGN)) {
-		netdev_err(priv->dev, "MAC Rx datapath not ready\n");
+		netdev_err(priv->dev, "MAC Rx datapath not ready (RX_PTP_OFFSET_DATA_VALID=0)\n");
 		return -EINVAL;
 	}
 
@@ -679,7 +694,7 @@ static int eth_ftile_tx_rx_user_flow(intel_fpga_xtile_eth_private *priv)
 	}
 	if (speed <= SPEED_25000 && strcasecmp(priv->fec_type, "no-fec") == 0) {
 		// 10G/25G No FEC variants:
-		regval = hssi_csrrd32_ba(pdev, HSSI_ETH_RECONFIG, chan, eth_phy_csroffs(0, phy_rx_bitslip_cnt));
+		regval = hssi_csrrd32_ba(pdev, HSSI_ETH_RECONFIG, chan, eth_phy_csroffs(eth_rate, phy_rx_bitslip_cnt));
 		rx_bitslip_cnt       = regval & ETH_PHY_RX_PCS_BITSLIP_CNT;
 		rx_dlpulse_alignment = (regval & ETH_PHY_RX_PCS_DLPULSE_ALIGNED) ? 33 : 0;
 	}
@@ -715,8 +730,8 @@ static int eth_ftile_tx_rx_user_flow(intel_fpga_xtile_eth_private *priv)
 		// PCS internal Alignment Marker to sync pulse of each virtual lane:
 		// (see https://www.intel.com/content/www/us/en/docs/programmable/683023/22-1/rx-virtual-lane-offset-calculation-for.html)
 		for (vl = 0; vl < num_vl; vl++) {
-			rvld_lsb[vl] = hssi_csrrd32_ba(pdev, HSSI_ETH_RECONFIG, chan, eth_phy_csroffs(0, ptp_vl_data_lsb[vl]));
-			rvld_msb[vl] = hssi_csrrd32_ba(pdev, HSSI_ETH_RECONFIG, chan, eth_phy_csroffs(0, ptp_vl_data_msb[vl]));
+			rvld_lsb[vl] = hssi_csrrd32_ba(pdev, HSSI_ETH_RECONFIG, chan, eth_phy_csroffs(eth_rate, ptp_vl_data_lsb[vl]));
+			rvld_msb[vl] = hssi_csrrd32_ba(pdev, HSSI_ETH_RECONFIG, chan, eth_phy_csroffs(eth_rate, ptp_vl_data_msb[vl]));
 			local_vl = (rvld_lsb[vl] & ETH_PHY_PTP_LSB_LOCAL_VL_MASK) >> ETH_PHY_PTP_LSB_LOCAL_VL_SHIFT;
 			if (speed == SPEED_50000) {
 				final_offs = (get_gb_33_66_occupancy(speed, rvld_lsb[vl], rvld_msb[vl]) +
@@ -855,13 +870,13 @@ static int eth_ftile_tx_rx_user_flow(intel_fpga_xtile_eth_private *priv)
 
 	rx_tam_adjust = rx_tam_adjust_sim; // rx_tam_adjust is a 32-bit two's complement number.
 
-	/* TBD For hardware run with advanced accuracy mode:
-	Note: See Section 10.3.5 on how to obtain rx_routing_adj_sign and rx_routing_adj information.
+	/* Hardware run with advanced accuracy mode:
+
+	   Note: See Section 10.3.5 on how to obtain rx_routing_adj_sign and rx_routing_adj information.
 	   (routing delays for specific image, generated via steps outlined in Section 10.3.5 of doc.)
 	   Others:
 	*/
-	
-	if (strcasecmp(priv->ptp_accu_mode, "Advanced") == 0)
+    if (strcasecmp(priv->ptp_accu_mode, "Advanced") == 0)
 	{
 		rx_routing_adj = priv->ptp_rx_routing_adj;
 		rx_routing_adj_sign = rx_routing_adj >> 31;
@@ -881,6 +896,7 @@ static int eth_ftile_tx_rx_user_flow(intel_fpga_xtile_eth_private *priv)
 
 	/* Step 6c Calculate RX virtual lane offsets - must be skipped for 10G/25G. */
 	if (speed > SPEED_25000) {
+
 		// Using determined reference virtual lane, assign RX virtual lane offset values as described in section 10.2.3.
 		/* Note: Format of UI is {4-bit ns, 28-bit frac ns}, while other variables are {N-bit ns, 16-bit frac ns},
 		   where N is the largest number to store max value from the calculation. Result of the multiplication
@@ -899,7 +915,7 @@ static int eth_ftile_tx_rx_user_flow(intel_fpga_xtile_eth_private *priv)
 			if (speed == SPEED_100000) {
 				for (vl = 0; vl < num_vl; vl++)
 					rx_vl_offset[vl] = ((u64)2 * ui_value) >> 12;
-			} else if (speed == SPEED_100000) {
+			} else if (speed == SPEED_50000) {
 				// No FEC 50G variants:
 				for (vl = 0; vl < num_vl; vl++)
 					rx_vl_offset[vl] = ui_value >> 13; // 0.5 * UI
@@ -911,7 +927,7 @@ static int eth_ftile_tx_rx_user_flow(intel_fpga_xtile_eth_private *priv)
 	if (speed > SPEED_25000) {
 		regval = hssi_csrrd32_ba(pdev, HSSI_ETH_RECONFIG, chan, eth_soft_csroffs(ptp_ref_lane));
 		regval = (regval & ~ETH_PTP_RX_REF_LANE_MASK) | (rx_ref_pl << ETH_PTP_RX_REF_LANE_SHIFT);
-		hssi_csrwr32_ba(pdev, HSSI_ETH_RECONFIG, chan, eth_soft_csroffs(ptp_ref_lane),regval);
+		hssi_csrwr32_ba(pdev, HSSI_ETH_RECONFIG, chan, eth_soft_csroffs(ptp_ref_lane), regval);
 	}
 
 	/* Step 8 Write the calculated RX offsets to IP */
@@ -919,31 +935,31 @@ static int eth_ftile_tx_rx_user_flow(intel_fpga_xtile_eth_private *priv)
 	/* Step 8a Write RX virtual lane offsets - skipped for 10G/25G. */
 	if (speed > SPEED_25000) {
 		for (vl = 0; vl < num_vl; vl++) {
-			hssi_csrwr32_ba(pdev, HSSI_ETH_RECONFIG, chan, eth_mac_ptp_csroffs(0, rx_ptp_vl_offset[vl]),rx_vl_offset[vl]);
+			hssi_csrwr32_ba(pdev, HSSI_ETH_RECONFIG, chan, eth_mac_ptp_csroffs(eth_rate, rx_ptp_vl_offset[vl]), rx_vl_offset[vl]);
 		}
 	}
 
 	/* Step 8b Write RX extra latency */
-	hssi_csrwr32_ba( pdev, HSSI_ETH_RECONFIG, chan, eth_mac_ptp_csroffs(0, rx_ptp_extra_latency), rx_extra_latency);
+	hssi_csrwr32_ba(pdev, HSSI_ETH_RECONFIG, chan, eth_mac_ptp_csroffs(eth_rate, rx_ptp_extra_latency), rx_extra_latency);
 
 	/* Step 8c Write RX TAM adjust */
-	hssi_csrwr32_ba( pdev, HSSI_ETH_RECONFIG, chan, eth_soft_csroffs(ptp_rx_tam_adjust), rx_tam_adjust);
+	hssi_csrwr32_ba(pdev, HSSI_ETH_RECONFIG, chan, eth_soft_csroffs(ptp_rx_tam_adjust), rx_tam_adjust);
 
 	/* Step 9 Continue UI value measurement */
 	// Program 0ppm UI value here and later start a timer to do UI value measurements / adjustments
-	hssi_csrwr32_ba( pdev, HSSI_ETH_RECONFIG, chan, eth_mac_ptp_csroffs(0, rx_ptp_ui), ui_value);
+	hssi_csrwr32_ba(pdev, HSSI_ETH_RECONFIG, chan, eth_mac_ptp_csroffs(eth_rate, rx_ptp_ui), ui_value);
 
 	/* Step 10 Notify soft PTP that user flow configuration is completed */
 	regval = hssi_csrrd32_ba(pdev, HSSI_ETH_RECONFIG, chan, eth_soft_csroffs(ptp_rx_user_cfg_status));
 	regval |= ETH_PTP_RX_USER_CFG_DONE;
-	hssi_csrwr32_ba( pdev, HSSI_ETH_RECONFIG, chan, eth_soft_csroffs(ptp_rx_user_cfg_status),regval);
+	hssi_csrwr32_ba(pdev, HSSI_ETH_RECONFIG, chan, eth_soft_csroffs(ptp_rx_user_cfg_status), regval);
 
 	/* Step 11 Wait until RX PTP is ready */
 	if (xtile_check_counter_complete(priv, HSSI_ETH_RECONFIG,
 				   eth_soft_csroffs(ptp_status),
 				   ETH_RX_PTP_READY, true,
 				   INTEL_FPGA_WORD_ALIGN)) {
-		netdev_err(priv->dev, "MAC Rx PTP not ready\n");
+	    netdev_err(priv->dev, "MAC Rx PTP not ready\n");
 		return -EINVAL;
 	}
 	dev_info(priv->device, "DBG: %s ETH_RX_PTP_READY - rx_ref_pl:%u rx_extra_latency:0x%08x rx_tam_adjust:%i\n", __func__, rx_ref_pl, rx_extra_latency, (int32_t)rx_tam_adjust);
@@ -956,7 +972,6 @@ static int eth_ftile_tx_rx_user_flow(intel_fpga_xtile_eth_private *priv)
 
 	/* Start timer to periodically adjust Rx+Tx UI value */
 	ftile_ui_adjustments_init_worker(priv);
-
 
 	return 0;
 }
@@ -986,9 +1001,9 @@ void ftile_pma_digital_reset(intel_fpga_xtile_eth_private *priv,
 int ftile_init_mac(intel_fpga_xtile_eth_private *priv)
 {
 	int ret;
-		//struct intel_fpga_etile_eth_private *priv = netdev_priv(dev);
-	struct platform_device *pdev = priv->pdev_hssi;
-	u32 chan = priv->tile_chan;
+	//struct intel_fpga_etile_eth_private *priv = netdev_priv(dev);
+	//struct platform_device *pdev = priv->pdev_hssi;
+	//u32 chan = priv->tile_chan;
 
 	/* Enable in E-tile Tx datapath */
 	ftile_set_mac(priv, true);
@@ -1108,7 +1123,7 @@ int ftile_init_mac(intel_fpga_xtile_eth_private *priv)
 	storage->tx_packets = priv->dev->stats.tx_packets;
 }
 
-void init_ptp_userflow(intel_fpga_xtile_eth_private *priv)
+void ftile_init_ptp_userflow(intel_fpga_xtile_eth_private *priv)
 {
 	bool is_set = true;
 
@@ -1118,4 +1133,33 @@ void init_ptp_userflow(intel_fpga_xtile_eth_private *priv)
 	{
 		(void)eth_ftile_tx_rx_user_flow(priv);
 	}
+}
+
+void ftile_convert_eth_speed_to_eth_rate(intel_fpga_xtile_eth_private *priv)
+{
+	u32 eth_speed = priv->link_speed;
+
+	switch(eth_speed) {
+		case SPEED_10000:
+		case SPEED_25000:
+			priv->eth_rate = INTEL_FPGA_FTILE_ETH_RATE_10G_25G;
+			break;
+		case SPEED_50000:
+			priv->eth_rate = INTEL_FPGA_FTILE_ETH_RATE_50G;
+			break;
+		case SPEED_40000:
+		case SPEED_100000:
+			priv->eth_rate = INTEL_FPGA_FTILE_ETH_RATE_40G_100G;
+			break;
+		case SPEED_200000:
+			priv->eth_rate = INTEL_FPGA_FTILE_ETH_RATE_200G;
+			break;
+		case SPEED_400000:
+			priv->eth_rate = INTEL_FPGA_FTILE_ETH_RATE_400G;
+			break;
+		default:
+			printk("invalid eth speed %d, Failed to convert to eth_rate\n", eth_speed);
+			break;
+	}
+
 }

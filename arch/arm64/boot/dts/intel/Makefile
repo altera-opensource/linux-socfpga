@@ -5,6 +5,8 @@ dtb-$(CONFIG_ARCH_INTEL_SOCFPGA) += socfpga_n6000_10G_ptp.dtb \
 				socfpga_agilex_socdk.dtb \
 				socfpga_agilex_socdk_atfboot.dtb \
 				socfpga_fm87_ftile_25g_ptp.dtb \
+				socfpga_fm87_ftile_10g_2port_ptp.dtb \
+				socfpga_fm87_ftile_25g_2port_ptp.dtb \
 				socfpga_agilex_socdk_nand.dtb \
 				socfpga_agilex3_socdk.dtb \
 				socfpga_agilex5_socdk.dtb \

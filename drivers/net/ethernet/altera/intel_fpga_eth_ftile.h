@@ -21,19 +21,8 @@
 
 #define INTEL_FPGA_FTILE_ETH_RESOURCE_NAME "intel_fpga_ftile"
 
-#include <linux/bitops.h>
-#include <linux/if_vlan.h>
-#include <linux/list.h>
-#include <linux/netdevice.h>
-#include <linux/phy.h>
-#include <linux/ptp_clock_kernel.h>
-#include <linux/timer.h>
-#include "intel_fpga_tod.h"
-#include "altera_eth_dma.h"
-#include "altera_msgdma.h"
-#include "altera_msgdma_prefetcher.h"
-#include "altera_sgdma.h"
 #include "intel_fpga_eth_main.h"
+
 //#include "intel_freq_control.h"
 #define INTEL_FPGA_BYTE_ALIGN	8
 #define INTEL_FPGA_WORD_ALIGN	32
@@ -601,7 +590,6 @@ enum intel_fpga_ftile_eth_rate {
 /* 0x25C TX Flow Control Feature Configuration */
 #define ETH_TX_EN_STD_FLOW_CTRL					BIT(0)
 #define ETH_TX_EN_PRIORITY_FLOW_CTRL				BIT(1)
-#define MAC_PAUSEFRAME_QUANTA					0xFFFF
 
 /* 0x260 Enable RX Pause Frame Processing Fields */
 #define ETH_EN_RX_PAUSE(queue)					BIT(queue)
@@ -1928,30 +1916,8 @@ struct intel_fpga_ftile_xcvr {
 #define eth_pma_avmm_csroffs(a, xcvr_num)		\
 	((xcvr_num) * 0x100000 + offsetof(struct intel_fpga_ftile_xcvr, a))
 
-
-
 /* Function prototypes */
-
-int ftile_init_mac(intel_fpga_xtile_eth_private *priv);
-void ftile_get_stats64(struct net_device *dev,
-                       struct rtnl_link_stats64 *storage);
-
-int ftile_ehip_reset(intel_fpga_xtile_eth_private *priv,
-			bool tx_reset, bool rx_reset, bool sys_reset);
-int ftile_ehip_deassert_reset(intel_fpga_xtile_eth_private *priv);
-int xtile_check_counter_complete(intel_fpga_xtile_eth_private *priv,
-                                 u32 regbank,
-                                 size_t offs,
-                                 u8 bit_mask,
-                                 bool set_bit,
-                                 int align);
-void ftile_update_mac_addr(intel_fpga_xtile_eth_private *priv);
-
 extern void ftile_ui_adjustments(struct work_struct *work);
 extern void ftile_ui_adjustments_init_worker(intel_fpga_xtile_eth_private *priv);
-
-extern void intel_fpga_ftile_set_ethtool_ops(struct net_device *dev);
-
-void init_ptp_userflow(intel_fpga_xtile_eth_private *priv);
 
 #endif	  

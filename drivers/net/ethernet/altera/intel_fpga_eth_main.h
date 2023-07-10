@@ -19,6 +19,7 @@
 #include "altera_msgdmahw_prefetcher.h"
 #include "altera_sgdma.h"
 #include "intel_freq_control.h"
+#include "intel_fpga_hssiss.h"
 #define INTEL_FPGA_XTILE_ETH_RESOURCE_NAME "intel_fpga_eth"
 
 #define INTEL_FPGA_RET_SUCCESS                          0
@@ -27,6 +28,9 @@
 #define FLOW_RX         1
 #define FLOW_TX         2
 #define FLOW_ON         (FLOW_TX | FLOW_RX)
+
+/* TX Flow Control */ 
+#define MAC_PAUSEFRAME_QUANTA					0xFFFF
 
 #define INTEL_FPGA_XTILE_SW_RESET_WATCHDOG_CNTR              1000000
 #define INTEL_FPGA_XTILE_ETH_RESOURCE_NAME "intel_fpga_eth"
@@ -69,10 +73,11 @@ typedef struct {
         u32 rsfec_cw_pos_rx;
         u32 tx_external_phy_delay_ns;
         u32 rx_external_phy_delay_ns;
-        u32 ptp_tx_ref_pl;
         u32 ptp_tx_routing_adj;
         u32 ptp_rx_routing_adj;
         u32 pma_lanes_used;
+        u16 pma_type;
+        u8  eth_rate;
 
         u8 duplex;
         u8 qsfp_lane;
@@ -92,6 +97,7 @@ typedef struct {
         struct altera_dma_private dma_priv;
         struct phylink_config phylink_config;
         struct intel_fpga_tod_private *ptp_priv;
+        hssi_eth_port_attr hssi_port_x_attr;
 
         phy_interface_t phy_iface;
 	u32 ptp_clockcleaner_enable;
@@ -112,5 +118,32 @@ struct intel_fpga_rx_fifo {
 #define rx_fifo_csroffs(a)	(offsetof(struct intel_fpga_rx_fifo, a))
 
 #define tx_fifo_csroffs(a)	(offsetof(struct intel_fpga_rx_fifo, a))
+
+// Function Prototypes
+int etile_init_mac(intel_fpga_xtile_eth_private *priv);
+void etile_get_stats64(struct net_device *dev,
+		       struct rtnl_link_stats64 *storage);
+void etile_update_mac_addr(intel_fpga_xtile_eth_private *priv);
+int etile_ehip_reset(intel_fpga_xtile_eth_private *priv,
+			bool tx, bool rx, bool sys);
+int etile_ehip_deassert_reset(intel_fpga_xtile_eth_private *priv);
+void intel_fpga_etile_set_ethtool_ops(struct net_device *netdev);
+
+int ftile_init_mac(intel_fpga_xtile_eth_private *priv);
+void ftile_get_stats64(struct net_device *dev,
+                       struct rtnl_link_stats64 *storage);
+int ftile_ehip_reset(intel_fpga_xtile_eth_private *priv,
+			bool tx_reset, bool rx_reset, bool sys_reset);
+int ftile_ehip_deassert_reset(intel_fpga_xtile_eth_private *priv);
+void ftile_update_mac_addr(intel_fpga_xtile_eth_private *priv);
+void ftile_init_ptp_userflow(intel_fpga_xtile_eth_private *priv);
+extern void intel_fpga_ftile_set_ethtool_ops(struct net_device *dev);
+void ftile_convert_eth_speed_to_eth_rate(intel_fpga_xtile_eth_private *priv);
+int xtile_check_counter_complete(intel_fpga_xtile_eth_private *priv, 
+				 u32 regbank,
+				 size_t offs, 
+				 u8 bit_mask, 
+				 bool set_bit,
+				 int align);
 
 #endif

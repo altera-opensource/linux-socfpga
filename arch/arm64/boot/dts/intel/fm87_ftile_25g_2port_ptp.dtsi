@@ -1,0 +1,198 @@
+// SPDX-License-Identifier: GPL-2.0
+/*
+ * Copyright(C) 2022, Intel Corporation
+ */
+
+/* Add this piece of dtsi fragment as #include "fm87_ftile_25g_ptp.dtsi"
+ * in the file socfpga_fm87_ftile_25g_ptp.dts. Compile it in the kernel along with
+ * socfpga_agilex.dtsi
+ */
+
+/{
+	soc {
+		agilex_hps_bridges: bus@80000000 {
+                compatible = "simple-bus";
+                reg = <0x80000000 0x60000000>,
+                       <0xf9000000 0x00100000>;
+                reg-names = "axi_h2f", "axi_h2f_lw";
+                #address-cells = <2>;
+                #size-cells = <1>;
+                ranges =    <0x00000000 0x00000000 0xf9000000 0x00001000>,
+                            <0x00000001 0x00000000 0x80000000 0x00040000>,
+                            <0x00000001 0x04040050 0x84040050 0x00000010>,
+                            <0x00000001 0x04040040 0x84040040 0x00000010>;
+
+
+                qsfp_eth0: qsfp-eth0 {
+                        compatible = "sff,qsfp";
+                        i2c-bus = <&i2c0>;
+                        qsfpdd_initmode-gpio = <&qsfpdd_ctrl_pio 1 GPIO_ACTIVE_HIGH>;
+                        qsfpdd_modseln-gpio = <&qsfpdd_ctrl_pio 2 GPIO_ACTIVE_LOW>;
+                        qsfpdd_modprsn-gpio = <&qsfpdd_status_pio 0 GPIO_ACTIVE_LOW>;
+                        qsfpdd_resetn-gpio = <&qsfpdd_ctrl_pio 0 GPIO_ACTIVE_HIGH>;
+                        qsfpdd_intn-gpio = <&qsfpdd_status_pio 1 GPIO_ACTIVE_LOW>;
+                        agilex_hps_spim = <&qsfpdd_ctrl_pio 3 GPIO_ACTIVE_HIGH>;
+                        maximum-power-milliwatt = <1000>;
+                        status = "okay";
+                };
+
+                qsfpdd_status_pio: gpio@4040050 {
+                        compatible = "altr,pio-1.0";
+                        reg = <0x00000001 0x04040050 0x10>;
+                        interrupt-parent = <&intc>;
+                        interrupts = <0 22 4>;
+                        altr,gpio-bank-width = <4>;
+                        altr,interrupt-type = <2>;
+
+                        altr,interrupt_type = <2>;
+                        #gpio-cells = <2>;
+                        gpio-controller;
+                        status = "okay";
+                };
+
+                qsfpdd_ctrl_pio: gpio@4040040 {
+                        compatible = "altr,pio-1.0";
+                        reg = <0x00000001 0x04040040 0x10>;
+                        interrupt-parent = <&intc>;
+                        interrupts = <0 23 4>;
+                        altr,gpio-bank-width = <4>;
+                        altr,interrupt-type = <2>;
+                        altr,interrupt_type = <2>;
+                        #gpio-cells = <2>;
+                        gpio-controller;
+                        status = "okay";
+                };
+
+		};
+                clocks {
+			tod_in_clock: tod_in_clock {
+				#clock-cells = <0>;
+				compatible = "fixed-clock";
+				clock-frequency = <156250000>;
+				clock-output-names = "tod_in_clock";
+			};
+		};
+
+                ptp_clockcleaner: ptp_clockcleaner {
+                        compatible = "intel, freq-steering-zl-i2c";
+			dpll-name = "zl30733";
+			interface  = "i2c";
+		        bus-num    = <1>;
+			bus-address = <0x70>;
+		};
+
+		tod_0_clk: tod_0_clk {
+			compatible = "intel, tod";
+			reg-names = "tod_ctrl";
+			reg = <0x84040000 0x00000040>;
+			clocks = <&tod_in_clock>;
+			clock-names = "tod_clock";
+			status = "okay";
+                        altr,has-ptp-clockcleaner;
+			clock-cleaner = <&ptp_clockcleaner>;
+		};
+
+		hssiss_0_hssiss: hssiss_0_hssiss {
+			compatible = "intel, hssiss-1.0";
+			reg-names = "sscsr";
+			reg = <0x80000000 0x04000000>;
+			reset-mode ="reg";
+        };
+	hssi_0_eth: hssi_0_eth {
+                    reg-names = "tx_pref"  ,
+                                "tx_csr"   ,
+                                "tx_fifo"  ,
+                                "rx_pref"  ,
+                                "rx_csr"   ,
+                                "rx_fifo"  ;
+
+                    reg =   <0x84480000 0x00000020>,
+                            <0x84480020 0x00000020>,
+                            <0x84480040 0x00000020>,
+                            <0x84480080 0x00000020>,
+                            <0x844800A0 0x00000020>,
+                            <0x844800C0 0x00000010>;
+
+                    compatible = "altr,hssi-ftile-1.0";
+                    tile_chan = <0x8>;
+                    hssi_port = <0x8>;
+                    phy-mode = "25gbase-kr";
+                    tod = <&tod_0_clk>;
+                    hssiss = <&hssiss_0_hssiss>;
+                    pma_type = <0x0>; // FGT - 0x00, FHT = 0x1000
+                    altr,tx-pma-delay-ns = <0xD>;
+                    altr,rx-pma-delay-ns = <0x8>;
+                    altr,tx-pma-delay-fns = <0x24D>;
+                    altr,rx-pma-delay-fns = <0x3E97>;
+                    altr,tx-external-phy-delay-ns = <0x0>;
+                    altr,rx-external-phy-delay-ns = <0x0>;
+                    fec-cw-pos-rx = <0x0>;
+                    fec-type="kr-fec";
+                    interrupt-parent = <&intc>;
+                    interrupt-names = "tx_irq", "rx_irq";
+                    interrupts = <0 24 4>, <0 25 4>;
+                    qsfp-lane = <0x0>;
+                    rx-fifo-depth = <0x4000>;
+                    tx-fifo-depth = <0x1000>;
+                    rx-fifo-almost-full = <0x2000>;
+                    rx-fifo-almost-empty = <0x1000>;
+                    altr,has-ptp;
+                    ptp_accu_mode = "Advanced";
+                    ptp_tx_routing_adj = <0xD296>; //53,910
+                    ptp_rx_routing_adj = <0xCFBF>; //53,183
+                    status = "okay";
+                    fixed-link {
+                            speed =<25000>;
+                            full-duplex;
+            };
+        };
+    	hssi_1_eth: hssi_1_eth {
+                    reg-names = "tx_pref"  ,
+                                "tx_csr"   ,
+                                "tx_fifo"  ,
+                                "rx_pref"  ,
+                                "rx_csr"   ,
+                                "rx_fifo"  ;
+
+                    reg =   <0x844C0000 0x00000020>,
+                            <0x844C0020 0x00000020>,
+                            <0x844C0040 0x00000020>,
+                            <0x844C0080 0x00000020>,
+                            <0x844C00A0 0x00000020>,
+                            <0x844C00C0 0x00000010>;
+
+                    compatible = "altr,hssi-ftile-1.0";
+                    tile_chan = <0x9>;
+                    hssi_port = <0x9>;
+                    phy-mode = "25gbase-kr";
+                    tod = <&tod_0_clk>;
+                    hssiss = <&hssiss_0_hssiss>;
+                    pma_type = <0x0>; // FGT - 0x00, FHT = 0x1000
+                    altr,tx-pma-delay-ns = <0xD>;
+                    altr,rx-pma-delay-ns = <0x8>;
+                    altr,tx-pma-delay-fns = <0x24D>;
+                    altr,rx-pma-delay-fns = <0x3E97>;
+                    altr,tx-external-phy-delay-ns = <0x0>;
+                    altr,rx-external-phy-delay-ns = <0x0>;
+                    fec-cw-pos-rx = <0x0>;
+                    fec-type="kr-fec";
+                    interrupt-parent = <&intc>;
+                    interrupt-names = "tx_irq", "rx_irq";
+                    interrupts = <0 26 4>, <0 27 4>;
+                    qsfp-lane = <0x0>;
+                    rx-fifo-depth = <0x4000>;
+                    tx-fifo-depth = <0x1000>;
+                    rx-fifo-almost-full = <0x2000>;
+                    rx-fifo-almost-empty = <0x1000>;
+                    altr,has-ptp;
+                    ptp_accu_mode = "Advanced";
+                    ptp_tx_routing_adj = <0xDC8B>; //56,459
+                    ptp_rx_routing_adj = <0xD1E5>; //53,733-
+                    status = "okay";
+                    fixed-link {
+                            speed =<25000>;
+                            full-duplex;
+                        };
+                };
+	};
+};
