@@ -3,5 +3,5 @@
  * Copyright (C) 2019, Intel Corporation
  */
 #include "socfpga_agilex.dtsi"
-#include "fm87_ftile_25g_ptp.dtsi"
+#include "fm87_ftile_10g_2port_ptp.dtsi"
 #include "fm87_agilex_ftile.dtsi"

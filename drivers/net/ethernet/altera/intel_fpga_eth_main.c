@@ -23,11 +23,7 @@
 #include <linux/phylink.h>
 #include <linux/skbuff.h>
 
-#include "altera_utils.h"
-#include "intel_fpga_tod.h"
-#include "intel_fpga_eth_ftile.h"
 #include "intel_fpga_eth_main.h"
-#include "intel_fpga_eth_etile.h"
 #include "intel_fpga_eth_hssi_itf.h"
 #include "intel_fpga_eth_tile_ops.h"
 /* Module parameters */
@@ -114,6 +110,42 @@ static int check_link_stable(intel_fpga_xtile_eth_private *priv)
 	return -ETIME;
 }
 
+static void xtile_read_hssi_port_x_attributes(intel_fpga_xtile_eth_private *priv)
+{
+	struct platform_device *pdev = priv->pdev_hssi;
+	u32 hssi_port = priv->hssi_port;
+
+	priv->hssi_port_x_attr = hssiss_get_ethport_attr(pdev, hssi_port);
+
+	/* Get Number of PMA lanes */
+	switch(priv->hssi_port_x_attr.part.profile) {
+	case HSSI_PORT_PROFILE_10GBE:
+	case HSSI_PORT_PROFILE_25GBE:
+	case HSSI_PORT_PROFILE_50GAUI_1:
+	case HSSI_PORT_PROFILE_100GAUI_1:
+		priv->pma_lanes_used = 1;
+		break;
+	case HSSI_PORT_PROFILE_50GAUI_2:
+	case HSSI_PORT_PROFILE_100GAUI_2:
+	case HSSI_PORT_PROFILE_200GAUI_2:
+		priv->pma_lanes_used = 2;
+		break;
+	case HSSI_PORT_PROFILE_40GCAUI_4:
+	case HSSI_PORT_PROFILE_100GCAUI_4:
+	case HSSI_PORT_PROFILE_200GAUI_4:
+	case HSSI_PORT_PROFILE_400GAUI_4:
+		priv->pma_lanes_used = 4;
+		break;
+	case HSSI_PORT_PROFILE_200GAUI_8:
+	case HSSI_PORT_PROFILE_400GAUI_8:
+		priv->pma_lanes_used = 8;
+		break;
+	default:
+		priv->pma_lanes_used = 0;
+		break;
+	}
+}
+
 static int xtile_fec_init(struct platform_device *pdev, intel_fpga_xtile_eth_private *priv)
 {
 	int ret;
@@ -138,8 +170,6 @@ static int xtile_fec_init(struct platform_device *pdev, intel_fpga_xtile_eth_pri
 
 	return 0;
 }
-
-
 
 static inline u32 xtile_tx_avail(intel_fpga_xtile_eth_private *priv)
 {
@@ -743,6 +773,14 @@ static int xtile_open(struct net_device *dev)
 	ret = check_link_stable(priv);
 	if (ret < 0)
 		goto phy_error;
+
+	/* Read HSSI Port X attributes */
+	xtile_read_hssi_port_x_attributes(priv);
+
+	/* Convert the eth speed into eth rate, to access register base
+	   according to eth speed */
+	if (priv->spec_ops->get_eth_rate)
+		priv->spec_ops->get_eth_rate(priv);
 
 	/* Create and initialize the TX/RX descriptors chains. */
 	priv->dma_priv.rx_ring_size = dma_rx_num;
@@ -1353,8 +1391,6 @@ static int intel_fpga_xtile_probe(struct platform_device *pdev)
 	intel_fpga_xtile_eth_private *priv;
 	struct device_node *dev_tod;
 	struct platform_device *pdev_tod;
-	struct fwnode_handle *ptp_node;
-	struct clock_cleaner *clockcleaner_data = NULL;
 	
 	np = pdev->dev.of_node;
 
@@ -1420,11 +1456,11 @@ static int intel_fpga_xtile_probe(struct platform_device *pdev)
 		goto err_free_netdev;
 	}
 	
-	if (of_property_read_u32(np, "pma_lanes_used",
-                                 &priv->pma_lanes_used)) {
+	if (of_property_read_u16(np, "pma_type",
+                                 &priv->pma_type)) {
 			
-		dev_warn(&pdev->dev, "cannot obtain pma lane count defaulting to be 1\n");
-		priv->pma_lanes_used =1;
+		dev_warn(&pdev->dev, "cannot obtain pma type defaulting to be FGT \n");
+		priv->pma_type = 0;
 	}
 	priv->spec_ops = (struct xtile_spec_ops *) op_ptr;
 
@@ -1441,13 +1477,6 @@ static int intel_fpga_xtile_probe(struct platform_device *pdev)
 	
 	if (priv->ptp_enable)
 	{
-		/* Tx reference physical lane */
-		if (of_property_read_u32(np, "ptp_tx_ref_pl",
-                                 &priv->ptp_tx_ref_pl)) {
-
-			priv->ptp_tx_ref_pl = 0;
-		}
-
 		/* PTP Timestamp Accuracy mode */
 		ret  = of_property_read_string(pdev->dev.of_node, "ptp_accu_mode",
 				       &priv->ptp_accu_mode);
@@ -1767,7 +1796,7 @@ static const struct xtile_spec_ops ftile_data = {
 	.link_down = eth_link_down,
 	.ehip_reset_deassert = ftile_ehip_deassert_reset,
 	.ehip_reset = ftile_ehip_reset,
-	.ptp_init = init_ptp_userflow,
+	.ptp_init = ftile_init_ptp_userflow,
         .mac_ops = {
                 .init_mac = ftile_init_mac,
                 .update_mac = ftile_update_mac_addr,
@@ -1776,6 +1805,7 @@ static const struct xtile_spec_ops ftile_data = {
                 .eth_reg_callback =
                         intel_fpga_ftile_set_ethtool_ops,
         },
+	.get_eth_rate = ftile_convert_eth_speed_to_eth_rate,
 };
 
 static const struct of_device_id intel_fpga_xtile_ll_ids[] = {

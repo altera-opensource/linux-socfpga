@@ -165,14 +165,13 @@ void intel_freq_control_zl30733(struct work_struct *work)
 		df_offset = 0 - df_offset;
 	
 	if (zl30733_dpll_wait_for_df_ctrl_readsem(i2c_cli) == 0) {
-		uint8_t rdbackdata  =0; 
 		// Write df_offset into DPLL_DF_OFFSET_0 register:
 		for (i = 0; i < 6; ++i)
 		{
 			data[i] = df_offset >> (40 - 8 * i);
 			(void)i2c_zl30733_write_byte_data(i2c_cli, ZL30733_REG_DPLL_DF_OFFSET_0_0 + i, &data[i], 1);
 		}
-		pr_devel("%s:ZL30733  scaled ppm %x -- writing data %x-%x-%x-%x-%x-%x in work queue",__func__,scaled_ppm,data[0],data[1],data[2],data[3],data[4],data[5]);
+		pr_devel("%s:ZL30733  scaled ppm %lx -- writing data %x-%x-%x-%x-%x-%x in work queue",__func__,scaled_ppm,data[0],data[1],data[2],data[3],data[4],data[5]);
 	}
 	//(void)i2c_zl30733_write_byte_data(i2c_cli, ZL30733_REG_DPLL_DF_OFFSET_0_0, data, 6);
 }
@@ -199,14 +198,11 @@ int i2c_dev_check_zl30733_clock(
 {		
 		struct i2c_client *i2c_cli =NULL;
         int ret = FREQ_CTRL_ERROR_SUCCESS;
-        u16 *buf;
-        u8 rx_data[2];
-        u16 exp_reply = 0x0ED1; // 0x0ED1: ZL30793
+		u8 rdbuf[2];
 		i2c_cli = priv->fc_acc_type.i2c_cli;
         if (!i2c_cli)
 			return FREQ_CTRL_ERROR_FAIL;
 
-				u8 rdbuf[2];
 				if (i2c_zl30733_read_byte_data(i2c_cli, ZL30733_REG_ID_0, rdbuf, sizeof(rdbuf)) == 0) {
 					pr_info("%s: i2c_zl30733_read_byte_data read ID:0x%02x%02x\n",__func__,
 						rdbuf[0], rdbuf[1]);

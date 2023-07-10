@@ -624,7 +624,6 @@
 /* 0x611 TX Flow Control Feature Configuration */
 #define ETH_TX_EN_STD_FLOW_CTRL					BIT(0)
 #define ETH_TX_EN_PRIORITY_FLOW_CTRL				BIT(1)
-#define MAC_PAUSEFRAME_QUANTA					0xFFFF
 
 /* 0x620 Pause Quanta 0 */
 #define ETH_PAUSE_QUANTA_0					0xFFFF
@@ -2527,26 +2526,10 @@ struct intel_fpga_etile_ethernet {
 
 /* Function prototypes */
 void ui_adjustments(struct timer_list *t);
-int etile_init_mac(intel_fpga_xtile_eth_private *priv);
-void etile_get_stats64(struct net_device *dev,
-		       struct rtnl_link_stats64 *storage);
 void etile_pma_digital_reset(intel_fpga_xtile_eth_private *priv, 
 		       bool tx_reset, 
 		       bool rx_reset);
-int xtile_check_counter_complete(intel_fpga_xtile_eth_private *priv, 
-				 u32 regbank,
-				 size_t offs, 
-				 u8 bit_mask, 
-				 bool set_bit,
-				 int align);
-void etile_update_mac_addr(intel_fpga_xtile_eth_private *priv);
-void intel_fpga_etile_set_ethtool_ops(struct net_device *netdev);
-
 int fec_init(struct platform_device *pdev, intel_fpga_xtile_eth_private *priv);
-
-int etile_ehip_reset(intel_fpga_xtile_eth_private *priv,
-			bool tx, bool rx, bool sys);
-int etile_ehip_deassert_reset(intel_fpga_xtile_eth_private *priv);
 
 #ifdef CONFIG_INTEL_FPGA_ETILE_DEBUG_FS
 int intel_fpga_etile_init_fs(struct net_device *dev);

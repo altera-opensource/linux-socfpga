@@ -119,7 +119,7 @@
                                 phy-mode = "25gbase-kr";
                                 tod = <&tod_0_clk>;
                                 hssiss = <&hssiss_0_hssiss>;
-                                pma_lanes_used = <0x1>;
+                                pma_type = <0x0>; // FGT - 0x00, FHT = 0x1000
                                 altr,tx-pma-delay-ns = <0xD>;
                                 altr,rx-pma-delay-ns = <0x8>;
                                 altr,tx-pma-delay-fns = <0x24D>;
@@ -137,7 +137,6 @@
                                 rx-fifo-almost-full = <0x2000>;
                                 rx-fifo-almost-empty = <0x1000>;
                                 altr,has-ptp;
-                                ptp_tx_ref_pl = <0x00>;
                                 ptp_accu_mode = "Advanced";
                                 ptp_tx_routing_adj = <0x12AF5>;
                                 ptp_rx_routing_adj = <0x12780>;

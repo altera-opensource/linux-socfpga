@@ -52,7 +52,7 @@ int determine_i2c_client(struct clock_cleaner *clockcleaner_info)
 		return 0;
 	} else {
 
-		pr_info("created i2c device %x\n", (uint32_t *)i2c_cli);
+		pr_info("created i2c device %p\n", (uint32_t *)i2c_cli);
 		priv->fc_acc_type.i2c_cli =i2c_cli;
 		return 1;
 	}

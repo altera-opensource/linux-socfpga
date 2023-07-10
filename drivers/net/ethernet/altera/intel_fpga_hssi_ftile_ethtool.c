@@ -84,8 +84,6 @@ static void ftile_fill_stats(struct net_device *dev, struct ethtool_stats *dummy
 	intel_fpga_xtile_eth_private *priv = netdev_priv(dev);
 	struct platform_device *pdev  = priv->pdev_hssi;
 	u32 hssi_port = priv->hssi_port;
-	u32 lsb;
-	u32 msb;
 
 	/* Tx packets */
 	buf[0] = hssi_read_mac_stats64(pdev, hssi_port , MACSTAT_TX_PACKETS);
@@ -713,7 +711,6 @@ static void ftile_get_regs(struct net_device *dev, struct ethtool_regs *regs,
 static void ftile_get_pauseparam(struct net_device *dev,
 				 struct ethtool_pauseparam *pauseparam)
 {
-	intel_fpga_xtile_eth_private *priv = netdev_priv(dev);
 
 	pauseparam->rx_pause = 0;
 	pauseparam->tx_pause = 0;

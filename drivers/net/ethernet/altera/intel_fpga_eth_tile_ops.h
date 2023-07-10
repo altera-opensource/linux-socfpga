@@ -20,6 +20,8 @@ struct xtile_spec_ops {
 	} eth_ops;
 
 	void (*ptp_init)(intel_fpga_xtile_eth_private *);
+
+	void (*get_eth_rate)(intel_fpga_xtile_eth_private *);
 };
 
 

@@ -518,6 +518,7 @@ static int intel_fpga_tod_probe(struct platform_device *pdev)
 					dev_get_drvdata(&pdev_fc->dev);
 					if(!priv->ptp_freq_priv)
 					{
+						dev_err(&pdev->dev, "Frequency steering not available\n");
 						ret = -EPROBE_DEFER;
 						goto err;
 					}

@@ -118,7 +118,6 @@ static void etile_set_mac_flow_ctrl(intel_fpga_xtile_eth_private *priv)
 
 static int eth_etile_tx_rx_user_flow(intel_fpga_xtile_eth_private *priv)
 {
-	int ret;
 	u32 ui_value;
 	u32 chan = priv->tile_chan;
 
@@ -265,7 +264,6 @@ int etile_ehip_reset(intel_fpga_xtile_eth_private *priv,
 	struct platform_device *pdev = priv->pdev_hssi;
 	u32 chan = priv->tile_chan;
 	u32 val;
-	int ret;
 
 	val = hssi_csrrd32(pdev, HSSI_ETH_RECONFIG, chan,
 			eth_phy_csroffs(phy_config));
