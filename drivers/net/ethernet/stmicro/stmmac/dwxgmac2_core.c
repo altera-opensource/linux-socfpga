@@ -128,6 +128,43 @@ static void dwxgmac2_tx_queue_prio(struct mac_device_info *hw, u32 prio,
 	writel(value, ioaddr + reg);
 }
 
+static void dwxgmac2_rx_queue_routing(struct mac_device_info *hw,
+				      u8 packet, u32 queue)
+{
+	void __iomem *ioaddr = hw->pcsr;
+	u32 value;
+
+	static const struct stmmac_rx_routing route_possibilities[] = {
+		{ XGMAC_RXQCTRL_AVCPQ_MASK, XGMAC_RXQCTRL_AVCPQ_SHIFT },
+		{ XGMAC_RXQCTRL_PTPQ_MASK, XGMAC_RXQCTRL_PTPQ_SHIFT },
+		{ XGMAC_RXQCTRL_DCBCPQ_MASK, XGMAC_RXQCTRL_DCBCPQ_SHIFT },
+		{ XGMAC_RXQCTRL_UPQ_MASK, XGMAC_RXQCTRL_UPQ_SHIFT },
+		{ XGMAC_RXQCTRL_MCBCQ_MASK, XGMAC_RXQCTRL_MCBCQ_SHIFT },
+	};
+
+	/* routing packet type not supported */
+	if (packet < PACKET_AVCPQ || packet > PACKET_MCBCQ) 
+		return;
+
+	value = readl(ioaddr + XGMAC_RXQ_CTRL1);
+
+	/* routing configuration */
+	value &= ~route_possibilities[packet - 1].reg_mask;
+	value |= (queue << route_possibilities[packet - 1].reg_shift) &
+		 route_possibilities[packet - 1].reg_mask;
+
+	/* some packets require extra ops */
+	if (packet == PACKET_AVCPQ) {
+		value &= ~XGMAC_RXQCTRL_TACPQE;
+		value |= 0x1 << XGMAC_RXQCTRL_TACPQE_SHIFT;
+	} else if (packet == PACKET_MCBCQ) {
+		value &= ~XGMAC_RXQCTRL_MCBCQEN;
+		value |= 0x1 << XGMAC_RXQCTRL_MCBCQEN_SHIFT;
+	}
+
+	writel(value, ioaddr + XGMAC_RXQ_CTRL1);
+}
+
 static void dwxgmac2_prog_mtl_rx_algorithms(struct mac_device_info *hw,
 					    u32 rx_alg)
 {
@@ -1767,7 +1804,7 @@ const struct stmmac_ops dwxgmac210_ops = {
 	.rx_queue_enable = dwxgmac2_rx_queue_enable,
 	.rx_queue_prio = dwxgmac2_rx_queue_prio,
 	.tx_queue_prio = dwxgmac2_tx_queue_prio,
-	.rx_queue_routing = NULL,
+	.rx_queue_routing = dwxgmac2_rx_queue_routing,
 	.prog_mtl_rx_algorithms = dwxgmac2_prog_mtl_rx_algorithms,
 	.prog_mtl_tx_algorithms = dwxgmac2_prog_mtl_tx_algorithms,
 	.set_mtl_tx_queue_weight = dwxgmac2_set_mtl_tx_queue_weight,
