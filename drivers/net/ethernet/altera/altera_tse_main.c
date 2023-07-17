@@ -893,6 +893,77 @@ static void tse_set_rx_mode(struct net_device *dev)
 	spin_unlock(&priv->mac_cfg_lock);
 }
 
+static struct phy_device *connect_local_phy(struct net_device *dev)
+{
+	struct altera_tse_private *priv = netdev_priv(dev);
+	struct phy_device *phydev = NULL;
+	char phy_id_fmt[MII_BUS_ID_SIZE + 3];
+	int addr = priv->phy_addr;
+
+	if (priv->phy_addr != POLL_PHY) {
+		snprintf(phy_id_fmt, MII_BUS_ID_SIZE + 3, PHY_ID_FMT,
+			 priv->mdio->id, priv->phy_addr);
+
+		netdev_dbg(dev, "trying to attach to %s\n", phy_id_fmt);
+
+		phydev = mdiobus_get_phy(priv->mdio, addr);
+		if (IS_ERR(phydev)) {
+			netdev_err(dev, "Could not attach to PHY\n");
+			phydev = NULL;
+		}
+	} else {
+		phydev = phy_find_first(priv->mdio);
+		if (!phydev) {
+			netdev_err(dev, "No PHY found\n");
+			return phydev;
+		}
+	}
+	return phydev;
+}
+
+/* Initialize driver's PHY state, and attach to the PHY
+ */
+static int init_phy(struct net_device *dev)
+{
+	struct altera_tse_private *priv = netdev_priv(dev);
+	struct phy_device *phydev = NULL;
+	int ret = 0;
+
+	/* Avoid init phy in case of no phy present */
+	if (!priv->phy_iface)
+		return 0;
+
+	priv->oldlink = 0;
+	priv->oldspeed = 0;
+	priv->oldduplex = -1;
+
+	ret = phylink_of_phy_connect(priv->phylink, priv->device->of_node, 0);
+
+	if (ret) {
+		netdev_dbg(dev, "no phy-handle found\n");
+		if (!priv->mdio) {
+			netdev_err(dev, "No phy-handle nor local mdio specified\n");
+			return -ENODEV;
+		}
+		phydev = connect_local_phy(dev);
+		if (phydev) {
+			ret = phylink_connect_phy(priv->phylink, phydev);
+			if (ret)
+				return -ENODEV;
+		}
+	}
+
+	if (!phydev) {
+		netdev_err(dev, "Could not find the PHY\n");
+		return -ENODEV;
+	}
+
+	netdev_dbg(dev, "attached to PHY %d UID 0x%08x Link = %d\n",
+		   phydev->mdio.addr, phydev->phy_id, phydev->link);
+
+	return 0;
+}
+
 /* Open and initialize the interface
  */
 static int tse_open(struct net_device *dev)
@@ -977,7 +1048,7 @@ static int tse_open(struct net_device *dev)
 
 	spin_unlock_irqrestore(&priv->rxdma_irq_lock, flags);
 
-	ret = phylink_of_phy_connect(priv->phylink, priv->device->of_node, 0);
+	ret = init_phy(dev);
 	if (ret) {
 		netdev_err(dev, "could not connect phylink (%d)\n", ret);
 		goto tx_request_irq_error;
@@ -1220,7 +1291,6 @@ static int altera_tse_probe(struct platform_device *pdev)
 	struct resource *control_port;
 	struct resource *pcs_res;
 	struct net_device *ndev;
-	void __iomem *descmap;
 	int pcs_reg_width = 2;
 	int ret = -ENODEV;
 
