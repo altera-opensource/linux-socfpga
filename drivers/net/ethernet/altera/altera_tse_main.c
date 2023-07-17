@@ -1347,7 +1347,8 @@ static int altera_tse_probe(struct platform_device *pdev)
 	ret = request_and_map(pdev, "pcs", &pcs_res,
 			      &priv->pcs_base);
 	if (ret) {
-		priv->pcs_base = priv->mac_dev + tse_csroffs(mdio_phy0);
+		priv->pcs_base = (void __iomem *)((uintptr_t)(priv->mac_dev) +
+				tse_csroffs(mdio_phy0));
 		pcs_reg_width = 4;
 	}
 
