@@ -83,7 +83,7 @@ u16 zl30733_reg_page_2[] = {
 0x0115,// dpll_mon_status_5 0x00 R
 0x0116,// dpll_mon_status_6 0x00 R
 0x0117,// dpll_mon_status_7 0x00 R
-0x0127,// dpll ns roll over status 
+0x0127,// dpll ns roll over status
 0x0130,// dpll_state_refsel__status_0 0x00 R
 0x0131,// dpll_state_refsel__status_1 0x00 R
 0x0132,// dpll_state_refsel_status_2 0x00 R
@@ -159,8 +159,8 @@ u16 zl30733_reg_page_3[] = {
 0x018B,//ref_mon_th_sticky_4p
 0x018C,//ref_dpll_freq_sticky_3_0 0x00 S
 0x018D,//ref_dpll_freq_sticky_4  0x00 S
-0x018E,//dpll_meas_ref_sticky_3_0 
-0x018F,//dpll_meas_ref_sticky_4 
+0x018E,//dpll_meas_ref_sticky_3_0
+0x018F,//dpll_meas_ref_sticky_4
 0x0190,//dpll_mon_th_sticky_0 0x00 S
 0x0191,//dpll_mon_th_sticky_1 0x00 S
 0x0192,//dpll_mon_th_sticky_2 0x00 S
@@ -180,7 +180,6 @@ u16 zl30733_reg_page_3[] = {
 0x01B9,//ref_mon_tl_sticky_3N 0x00 S
 0x01BA,//ref_mon_tl_sticky_4P 0x00 S
 0x01BB,//ref_mon_tl_sticky_4N 0x00 S
-
 
 0x01C0,//dpll_mon_tl_sticky_0 0x00 S
 0x01C1,//dpll_mon_tl_sticky_1 0x00 S
@@ -321,11 +320,7 @@ u16 zl30733_reg_page_4[] = {
 0x0279,
 0x027e, // uport
 0x027f,//pagesel
-
-
-
 };
-
 
 u16 zl30733_reg_page_5[] = {
 0x0280,// split xO_ref 0x00 R/W
@@ -367,8 +362,6 @@ u16 zl30733_reg_page_5[] = {
 0x02ad,// dpll_df_read_5 0x00 R/W
 0x02ae,// dpll_df_read_6 0x00 R/W
 0x02af,// dpll_df_read_7 0x00 R/W
-
-
 0x02b0,// dpll ti ctrl 0x00 R/W
 0x02b1,// dpll tie mask 0x00 R/W
 0x02b8,// dpll tod ctrl 0 0x00 R/W
@@ -384,46 +377,38 @@ u16 zl30733_reg_page_5[] = {
 0x02d2,// ref_los_3_0 0x00 R/W
 0x02d3,// ref_los_3_0 0x00 R/W
 0x02d4,// ref_los_3_0 0x00 R/W
-
 0x02d5,
 0x02d6,
 0x02d7,
 0x02d8,
 0x02d9,
 0x02da,
-
 0x02db,
 0x02dc,
 0x02dd,
 0x02de,
 0x02df,
 0x02e0,
-
-
 0x02e1,
 0x02e2,
 0x02e3,
 0x02e4,
 0x02e5,
 0x02e6,
-
 0x02e7,
 0x02e8,
 0x02e9,
 0x02ea,
 0x02eb,
 0x02ec,
-
 0x02ed,
 0x02ee,
 0x02ef,
 0x02f0,
 0x02f1,
 0x02f2,
-
 0x02fe, // uport
 0x02ff, //page sel
-
 };
 
 //Register Map Page 6, Status 0x300
@@ -434,67 +419,56 @@ u16 zl30733_reg_page_6[] = {
 0x0303,// dpll_df_offset_0 0x000000000000 R/W
 0x0304,// dpll_df_offset_0 0x000000000000 R/W
 0x0305,// dpll_df_offset_0 0x000000000000 R/W
-
 0x030c,// dpll_tie_data_0 0x000000000000 R/W
 0x030d,// dpll_tie_data_0 0x000000000000 R/W
 0x030e,// dpll_tie_data_0 0x000000000000 R/W
 0x030f,// dpll_tie_data_0 0x000000000000 R/W
 0x0310,// dpll_tie_data_0 0x000000000000 R/W
 0x0311,// dpll_tie_data_0 0x000000000000 R/W
-
 0x0312,// dpll_tod_sec_0 0x000000000000 R/W
 0x0313,// dpll_tod_sec_0 0x000000000000 R/W
 0x0314,// dpll_tod_sec_0 0x000000000000 R/W
 0x0315,// dpll_tod_sec_0 0x000000000000 R/W
 0x0316,// dpll_tod_sec_0 0x000000000000 R/W
 0x0317,// dpll_tod_sec_0 0x000000000000 R/W
-
 0x0318,// dpll_tod_ns_0 0x000000000000 R/W
 0x0319,// dpll_tod_ns_0 0x000000000000 R/W
 0x031a,// dpll_tod_ns_0 0x000000000000 R/W
 0x031b,// dpll_tod_ns_0 0x000000000000 R/W
-
 0x0320,//:0x0305 dpll_df_offset_1 0x000000000000 R/W
 0x0321,// dpll_df_offset_1 0x000000000000 R/W
 0x0322,// dpll_df_offset_1 0x000000000000 R/W
 0x0323,// dpll_df_offset_1 0x000000000000 R/W
 0x0324,// dpll_df_offset_1 0x000000000000 R/W
 0x0325,// dpll_df_offset_1 0x000000000000 R/W
-
 0x032c,// dpll_tie_data_1 0x000000000000 R/W
 0x032d,// dpll_tie_data_1 0x000000000000 R/W
 0x032e,// dpll_tie_data_1 0x000000000000 R/W
 0x032f,// dpll_tie_data_1 0x000000000000 R/W
 0x0330,// dpll_tie_data_1 0x000000000000 R/W
 0x0331,// dpll_tie_data_1 0x000000000000 R/W
-
 0x0332,// dpll_tod_sec_1 0x000000000000 R/W
 0x0333,// dpll_tod_sec_1 0x000000000000 R/W
 0x0334,// dpll_tod_sec_1 0x000000000000 R/W
 0x0335,// dpll_tod_sec_1 0x000000000000 R/W
 0x0336,// dpll_tod_sec_1 0x000000000000 R/W
 0x0337,// dpll_tod_sec_1 0x000000000000 R/W
-
 0x0338,// dpll_tod_ns_1 0x000000000000 R/W
 0x0339,// dpll_tod_ns_1 0x000000000000 R/W
 0x033a,// dpll_tod_ns_1 0x000000000000 R/W
 0x033b,// dpll_tod_ns_1 0x000000000000 R/W
-
-
 0x0340,//:0x0305 dpll_df_offset_2 0x000000000000 R/W
 0x0341,// dpll_df_offset_2 0x000000000000 R/W
 0x0342,// dpll_df_offset_2 0x000000000000 R/W
 0x0343,// dpll_df_offset_2 0x000000000000 R/W
 0x0344,// dpll_df_offset_2 0x000000000000 R/W
 0x0345,// dpll_df_offset_2 0x000000000000 R/W
-
 0x034c,// dpll_tie_data_2 0x000000000000 R/W
 0x034d,// dpll_tie_data_2 0x000000000000 R/W
 0x034e,// dpll_tie_data_2 0x000000000000 R/W
 0x034f,// dpll_tie_data_2 0x000000000000 R/W
 0x0350,// dpll_tie_data_2 0x000000000000 R/W
 0x0351,// dpll_tie_data_2 0x000000000000 R/W
-
 0x0352,// dpll_tod_sec_2 0x000000000000 R/W
 0x0353,// dpll_tod_sec_2 0x000000000000 R/W
 0x0354,// dpll_tod_sec_2 0x000000000000 R/W
@@ -535,8 +509,6 @@ u16 zl30733_reg_page_6[] = {
 
 0x037e, // uport
 0x037f,// page sel
-
-
 };
 
 /* manual offset correction based on ptp4l frequency offset in ppb
@@ -558,14 +530,12 @@ static ssize_t zl30733_dpll_manual_freq_offset_show(struct device *dev,
 	static u16 dpll_df_addr = 0x0300;
 	struct i2c_client *i2c = to_i2c_client(dev);
 
-
-
 	for (i = 0; i < 5; i++) {
 		ret = i2c_zl30733_read_byte_data(i2c, (dpll_df_addr + i),  &dpll_df_data[i], 1);
 
 		if (ret)
 			dev_err(&i2c->dev, "I2C read error %d\n", ret);
-		
+
 		dev_info(&i2c->dev, "%s:  dpll_df_manual_0 addr = 0x%x  data = 0x%x\n",
 			 __func__, (dpll_df_addr + i), dpll_df_data[i]);
 	}
@@ -579,23 +549,28 @@ zl30733_dpll_manual_freq_offset_store(struct device *dev,
 				      const char *buf, size_t len)
 {
 	int ret = 0, i = 0;
+	int sscanf_ret = 0;
 	u8 dpll_df_data[6] = {0};
 	u16 dpll_df_addr = 0;
 	struct i2c_client *i2c = to_i2c_client(dev);
 
-	sscanf(buf, "%hx %hhx %hhx %hhx %hhx %hhx %hhx", &dpll_df_addr,
-	       &dpll_df_data[0], &dpll_df_data[1], &dpll_df_data[2],
-	       &dpll_df_data[3], &dpll_df_data[4],&dpll_df_data[5]);
+	sscanf_ret = sscanf(buf, "%hx %hhx %hhx %hhx %hhx %hhx %hhx", &dpll_df_addr,
+			    &dpll_df_data[0], &dpll_df_data[1], &dpll_df_data[2],
+			    &dpll_df_data[3], &dpll_df_data[4], &dpll_df_data[5]);
 
+	if (sscanf_ret != 6) {
+		dev_err(&i2c->dev, "sscanf didn't read the inputs properly and read only %d\n",
+			sscanf_ret);
+		goto zl_dpll_err;
+	}
 
-		dev_info(&i2c->dev, "%s:  input <dpll_df_offset start address [%x]>  and <data is %x %x %x %x %x %x>\n",__func__,dpll_df_addr,
-	       dpll_df_data[0], dpll_df_data[1], dpll_df_data[2],
-	       dpll_df_data[3], dpll_df_data[4],dpll_df_data[5]);
-
-
+	dev_info(&i2c->dev, "%s:  input <dpll_df_offset start address [%x]>  and <data is %x %x %x %x %x %x>\n",
+		 __func__, dpll_df_addr, dpll_df_data[0],
+		 dpll_df_data[1], dpll_df_data[2],
+		 dpll_df_data[3], dpll_df_data[4], dpll_df_data[5]);
 
 	for (i = 0; i < 6; i++) {
-		ret =i2c_zl30733_write_byte_data(i2c, (dpll_df_addr + i), &dpll_df_data[i], 1);
+		ret = i2c_zl30733_write_byte_data(i2c, (dpll_df_addr + i), &dpll_df_data[i], 1);
 		if (ret) {
 			dev_err(&i2c->dev, "I2c write error %d\n", ret);
 			goto zl_dpll_err;
@@ -607,14 +582,12 @@ zl_dpll_err:
 }
 
 static ssize_t
-zl30733_reg_dump_show(struct device *dev,
-		      struct device_attribute *attr, char *buf)
+zl30733_register_dump_show(struct device *dev,
+			   struct device_attribute *attr, char *buf)
 {
 	int ret = 0, i;
 	u8  val;
 	struct i2c_client *i2c_cli = to_i2c_client(dev);
-
-
 
 	pr_info("\n\nzl30733_clock_reg_dump()  page 0 General Info\n");
 	for (i = 0 ; i < (sizeof(zl30733_reg_page_0) / sizeof(u16)); i++) {
@@ -656,7 +629,6 @@ zl30733_reg_dump_show(struct device *dev,
 		pr_info("page 4[%d] addr 0x%x  0x%x\n", i, zl30733_reg_page_4[i], val);
 	}
 
-	
 	pr_info("\n\nzl30733_clock_reg_dump()  page 5 dpll\n");
 	for (i = 0 ; i < (sizeof(zl30733_reg_page_5) / sizeof(u16)); i++) {
 		ret = i2c_zl30733_read_byte_data(i2c_cli, zl30733_reg_page_5[i],  &val, 1);
@@ -680,14 +652,20 @@ zl_reg_dump_err:
 	return ret;
 }
 
-static DEVICE_ATTR(zl30733_dpll_manual_freq_offset, 0644,
-		   zl30733_dpll_manual_freq_offset_show,
-		   zl30733_dpll_manual_freq_offset_store);
-static DEVICE_ATTR(zl30733_reg_dump, 0644, zl30733_reg_dump_show, NULL);
+static ssize_t
+zl30733_register_dump_store(struct device *dev,
+			    struct device_attribute *attr, const char *buf,
+			    size_t count)
+{
+	return 0;
+}
+
+static DEVICE_ATTR_RW(zl30733_dpll_manual_freq_offset);
+static DEVICE_ATTR_RW(zl30733_register_dump);
 
 static struct attribute *zl30733_sysfs_attrs[] = {
 	&dev_attr_zl30733_dpll_manual_freq_offset.attr,
-	&dev_attr_zl30733_reg_dump.attr,
+	&dev_attr_zl30733_register_dump.attr,
 	NULL
 };
 
