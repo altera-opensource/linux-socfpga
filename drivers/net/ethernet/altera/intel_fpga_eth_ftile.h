@@ -33,7 +33,7 @@
 /* Poll for PTP RX READY bit, If any disturbance on RX PCS, this can go low
  * So that time we need to rerun the PTP TX RX USER FLOW again.
  */
-#define PTP_TX_RX_USER_FLOW_POLL_TIMEOUT            500     
+#define PTP_TX_RX_USER_FLOW_POLL_TIMEOUT            500
 
 #define INTEL_FPGA_FTILE_SW_RESET_WATCHDOG_CNTR		1000000
 
@@ -1705,11 +1705,11 @@ struct intel_fpga_ftile_eth_mac_ptp {
 };
 
 /* F-Tile EHIP registers - address offset depends on Eth speed:
-   10G/25G:            0x1000
-   50G:                0x2000
-   40G/100G:           0x3000
-   200G:               0x4000
-   400G:               0x5000
+ * 10G/25G:            0x1000
+ * 50G:                0x2000
+ * 40G/100G:           0x3000
+ * 200G:               0x4000
+ * 400G:               0x5000
  */
 struct intel_fpga_ftile_eth_ehip {
 	struct intel_fpga_ftile_eth_phy     phy;			// 0x000 - 0x1FC
@@ -1731,7 +1731,7 @@ struct intel_fpga_ftile_eth_ehip {
  * 400GE: Lane Segment0: 0x7E00
  *        ...
  *        Lane Segment15: 0x9C00
-*/
+ */
 struct intel_fpga_ftile_rsfec_xcvr {
 	u32 reserved_0000[48];				// 0x0000 - 0x00BC
 	u32 e25g_s0_rsfec_top;				// 0x00C0
@@ -1785,14 +1785,14 @@ struct intel_fpga_ftile_ethernet {
 #define eth_soft_csroffs(a) \
 	(offsetof(struct intel_fpga_ftile_ethernet, soft_csr.a))
 #define eth_phy_csroffs(s, a)						\
-	((offsetof(struct intel_fpga_ftile_ethernet, ehip[s].phy.a))& 0xffff)
+	((offsetof(struct intel_fpga_ftile_ethernet, ehip[s].phy.a)) & 0xffff)
 #define eth_mac_ptp_csroffs(s, a)					\
-	((offsetof(struct intel_fpga_ftile_ethernet, ehip[s].mac_ptp.a))&0xffff)
+	((offsetof(struct intel_fpga_ftile_ethernet, ehip[s].mac_ptp.a)) & 0xffff)
 #define eth_rsfec_csroffs(s, ln, a)					\
 	(offsetof(struct intel_fpga_ftile_ethernet, rsfec_xcvr[(1 << (s)) - 1 + (ln)].a))
 
 /* F-Tile Transceiver Reconfiguration Interface Register Base Addresses FGT/FHT per lane
-   add 0x8000 for each lane (0-3)
+ * add 0x8000 for each lane (0-3)
  */
 struct intel_fpga_ftile_xcvr_fgt_fht {
 	u32 reserved_40000[15];				// 0x40000 - 0x40038
@@ -1917,7 +1917,7 @@ struct intel_fpga_ftile_xcvr {
 	((xcvr_num) * 0x100000 + offsetof(struct intel_fpga_ftile_xcvr, a))
 
 /* Function prototypes */
-extern void ftile_ui_adjustments(struct work_struct *work);
-extern void ftile_ui_adjustments_init_worker(intel_fpga_xtile_eth_private *priv);
+void ftile_ui_adjustments(struct work_struct *work);
+void ftile_ui_adjustments_init_worker(intel_fpga_xtile_eth_private *priv);
 
-#endif	  
+#endif
