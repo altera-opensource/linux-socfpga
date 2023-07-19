@@ -212,6 +212,8 @@ properties:
       contain the following properties
         * snps,tx-queues-to-use, number of TX queues to be used in the
           driver
+        * snps,tx-queues-with-coe, number of TX queues support TX checksum
+          offloading
         * Choose one of these TX scheduling algorithms
           * snps,tx-sched-wrr, Weighted Round Robin
           * snps,tx-sched-wfq, Weighted Fair Queuing
