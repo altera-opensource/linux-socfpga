@@ -191,6 +191,7 @@
 
 		mtl_tx_setup: tx-queues-config {
 			snps,tx-queues-to-use = <8>;
+			snps,tx-queues-with-coe = <2>;
 			snps,tx-sched-wrr;
 			queue0 {
 				snps,weight = <0x09>;
