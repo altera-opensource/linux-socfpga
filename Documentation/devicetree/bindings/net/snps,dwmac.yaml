@@ -96,34 +96,39 @@ properties:
 
   interrupts:
     minItems: 1
-    items:
-      - description: Combined signal for various interrupt events
-      - description: Individual signal for per channel interrupt events
-      - description: The interrupt to manage the remote wake-up packet detection
-      - description: The interrupt that occurs when Rx exits the LPI state
+    maxItems: 19
+    description:
+      DWMAC supports following interrupts,
+        * Combined signal for various interrupt events
+        * The interrupt to manage the remote wake-up packet detection
+        * The interrupt that occurs when Rx exits the LPI state
+        * Individual signal for per channel interrupt events
+      Except combined interrupt, all interrupts are optional. If per channel 
+      interrupts are enabled there should be interrupt entries for every tx and 
+      rx channels.
 
   interrupt-names:
     minItems: 1
     items:
       - const: macirq
-      - const: macirq_tx0
-      - const: macirq_tx1
-      - const: macirq_tx2
-      - const: macirq_tx3
-      - const: macirq_tx4
-      - const: macirq_tx5
-      - const: macirq_tx6
-      - const: macirq_tx7
-      - const: macirq_rx0
-      - const: macirq_rx1
-      - const: macirq_rx2
-      - const: macirq_rx3
-      - const: macirq_rx4
-      - const: macirq_rx5
-      - const: macirq_rx6
-      - const: macirq_rx7
-      - const: eth_wake_irq
-      - const: eth_lpi
+      - pattern: '^eth_wake_irq|eth_lpi|macirq_[tr]x[0-7]$'
+      - pattern: '^eth_lpi|macirq_[tr]x[0-7]$'
+      - pattern: '^macirq_[tr]x[0-7]$'
+      - pattern: '^macirq_[tr]x[0-7]$'
+      - pattern: '^macirq_[tr]x[0-7]$'
+      - pattern: '^macirq_[tr]x[0-7]$'
+      - pattern: '^macirq_[tr]x[0-7]$'
+      - pattern: '^macirq_[tr]x[0-7]$'
+      - pattern: '^macirq_[tr]x[0-7]$'
+      - pattern: '^macirq_[tr]x[0-7]$'
+      - pattern: '^macirq_[tr]x[0-7]$'
+      - pattern: '^macirq_[tr]x[0-7]$'
+      - pattern: '^macirq_[tr]x[0-7]$'
+      - pattern: '^macirq_[tr]x[0-7]$'
+      - pattern: '^macirq_[tr]x[0-7]$'
+      - pattern: '^macirq_[tr]x[0-7]$'
+      - pattern: '^macirq_[tr]x[0-7]$'
+      - pattern: '^macirq_[tr]x[0-7]$'
 
   clocks:
     minItems: 1
@@ -150,7 +155,7 @@ properties:
   resets:
     maxItems: 1
     description:
-      MAC Reset signal.
+      MAC Reset signal
 
   reset-names:
     const: stmmaceth
