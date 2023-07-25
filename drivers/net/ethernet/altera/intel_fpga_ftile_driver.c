@@ -1276,7 +1276,7 @@ void ftile_get_stats64(struct net_device *dev,
 	storage->tx_packets = priv->dev->stats.tx_packets;
 }
 
-void ftile_init_ptp_userflow(intel_fpga_xtile_eth_private *priv)
+bool ftile_ptp_rx_ready_bit_is_set(intel_fpga_xtile_eth_private *priv)
 {
 	bool is_set = true;
 
@@ -1284,8 +1284,12 @@ void ftile_init_ptp_userflow(intel_fpga_xtile_eth_private *priv)
 	// If not set rerun ptp tx rx user flow again
 	is_set = hssi_bit_is_set(priv->pdev_hssi, HSSI_ETH_RECONFIG, priv->tile_chan,
 				 eth_soft_csroffs(ptp_status), ETH_RX_PTP_READY, true);
-	if (!is_set)
-		(void)eth_ftile_tx_rx_user_flow(priv);
+	return is_set;
+}
+
+void ftile_init_ptp_userflow(intel_fpga_xtile_eth_private *priv)
+{
+	(void)eth_ftile_tx_rx_user_flow(priv);
 }
 
 void ftile_convert_eth_speed_to_eth_rate(intel_fpga_xtile_eth_private *priv)

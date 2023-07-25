@@ -40,6 +40,8 @@ void ftile_ui_adjustments_init_worker(intel_fpga_xtile_eth_private *priv)
 	ret = mod_timer(&priv->fec_timer, jiffies + msecs_to_jiffies(500));
 	if (ret)
 		netdev_err(priv->dev, "Timer failed to start UI adjustment\n");
+
+	priv->ui_enable = true;
 }
 
 /* Calculate Unit Interval Adjustments */
@@ -247,6 +249,11 @@ void ftile_ui_adjustments(struct work_struct *work)
 			rx_ui);
 
 ui_restart:
+
+	/* to avoid race condition where the timer is deleted and we are scheduled */
+	if (!priv->ui_enable)
+		return;
+
 	mod_timer(&priv->fec_timer, jiffies + msecs_to_jiffies(500));
 }
 

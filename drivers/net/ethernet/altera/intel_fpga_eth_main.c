@@ -683,10 +683,13 @@ static void eth_monitor_link_status(struct work_struct *work) {
 		 * because on ndo_open system has been prior initalized.
 		 * ptp_init required for f-tile.
 		 */
-		if ((priv->spec_ops->ptp_init) && curr_link_state)
-		{
-			del_timer_sync(&priv->fec_timer);
-			cancel_work_sync(&priv->ui_worker);
+		if ((priv->spec_ops->ptp_check) && (!(priv->spec_ops->ptp_check(priv))) &&
+		   ((priv->spec_ops->ptp_init) && curr_link_state)) {
+			if (priv->ui_enable) {
+				del_timer_sync(&priv->fec_timer);
+				cancel_work_sync(&priv->ui_worker);
+				priv->ui_enable = false;
+			}
 			priv->spec_ops->ptp_init(priv);
 		}
 
@@ -712,14 +715,16 @@ static void eth_monitor_link_status(struct work_struct *work) {
 			phylink_start(priv->phylink);
 		rtnl_unlock();
 
-		if (priv->spec_ops->ptp_init)
-		{
-			del_timer_sync(&priv->fec_timer);
-			cancel_work_sync(&priv->ui_worker);
+		if ((priv->spec_ops->ptp_check) && (!(priv->spec_ops->ptp_check(priv))) &&
+		    (priv->spec_ops->ptp_init)) {
+			if (priv->ui_enable) {
+				del_timer_sync(&priv->fec_timer);
+				cancel_work_sync(&priv->ui_worker);
+				priv->ui_enable = false;
+			}
 			priv->spec_ops->ptp_init(priv);
 		}
-        }
-        else {
+	} else {
 		netif_stop_queue(priv->dev);
 		napi_synchronize(&priv->napi);
 		napi_disable(&priv->napi);
@@ -729,6 +734,12 @@ static void eth_monitor_link_status(struct work_struct *work) {
 			phylink_stop(priv->phylink);
 		rtnl_unlock();
 		priv->dev->stats.tx_carrier_errors++;
+
+		if (priv->ui_enable) {
+			del_timer_sync(&priv->fec_timer);
+			cancel_work_sync(&priv->ui_worker);
+			priv->ui_enable = false;
+		}
         }
 
 	priv->curr_link_state = curr_link_state;
@@ -748,8 +759,12 @@ static void eth_link_up(intel_fpga_xtile_eth_private *priv)
 static void eth_link_down(intel_fpga_xtile_eth_private *priv)
 {
 	cancel_delayed_work_sync(&priv->dwork);
-	del_timer_sync(&priv->fec_timer);
-	cancel_work_sync(&priv->ui_worker);
+
+	if (priv->ui_enable) {
+		del_timer_sync(&priv->fec_timer);
+		cancel_work_sync(&priv->ui_worker);
+		priv->ui_enable = false;
+	}
 }
 
 /* Open and initialize the interface */
@@ -1796,6 +1811,7 @@ static const struct xtile_spec_ops ftile_data = {
 	.link_down = eth_link_down,
 	.ehip_reset_deassert = ftile_ehip_deassert_reset,
 	.ehip_reset = ftile_ehip_reset,
+	.ptp_check = ftile_ptp_rx_ready_bit_is_set,
 	.ptp_init = ftile_init_ptp_userflow,
         .mac_ops = {
                 .init_mac = ftile_init_mac,
