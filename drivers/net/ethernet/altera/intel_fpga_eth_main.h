@@ -85,6 +85,7 @@ typedef struct {
         bool ptp_enable;
         bool curr_link_state;
         bool cable_unplugged;
+        bool ui_enable;
 
         spinlock_t tx_lock;
         spinlock_t mac_cfg_lock;
@@ -136,6 +137,7 @@ int ftile_ehip_reset(intel_fpga_xtile_eth_private *priv,
 			bool tx_reset, bool rx_reset, bool sys_reset);
 int ftile_ehip_deassert_reset(intel_fpga_xtile_eth_private *priv);
 void ftile_update_mac_addr(intel_fpga_xtile_eth_private *priv);
+bool ftile_ptp_rx_ready_bit_is_set(intel_fpga_xtile_eth_private *priv);
 void ftile_init_ptp_userflow(intel_fpga_xtile_eth_private *priv);
 extern void intel_fpga_ftile_set_ethtool_ops(struct net_device *dev);
 void ftile_convert_eth_speed_to_eth_rate(intel_fpga_xtile_eth_private *priv);

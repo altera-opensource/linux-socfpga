@@ -19,6 +19,7 @@ struct xtile_spec_ops {
 		void (*eth_reg_callback) (struct net_device *netdev);
 	} eth_ops;
 
+	bool (*ptp_check)(intel_fpga_xtile_eth_private *);
 	void (*ptp_init)(intel_fpga_xtile_eth_private *);
 
 	void (*get_eth_rate)(intel_fpga_xtile_eth_private *);
