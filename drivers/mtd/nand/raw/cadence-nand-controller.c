@@ -2619,7 +2619,7 @@ static int cadence_nand_attach_chip(struct nand_chip *chip)
 
 	chip->bbt_options |= NAND_BBT_USE_FLASH;
 	chip->bbt_options |= NAND_BBT_NO_OOB;
-	chip->ecc.engine_type = NAND_ECC_ENGINE_TYPE_ON_HOST;
+	chip->ecc.engine_type = NAND_ECC_ENGINE_TYPE_NONE;
 
 	chip->options |= NAND_NO_SUBPAGE_WRITE;
 
