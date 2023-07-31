@@ -686,9 +686,9 @@ static void eth_monitor_link_status(struct work_struct *work) {
 		if ((priv->spec_ops->ptp_check) && (!(priv->spec_ops->ptp_check(priv))) &&
 		   ((priv->spec_ops->ptp_init) && curr_link_state)) {
 			if (priv->ui_enable) {
+				priv->ui_enable = false;
 				del_timer_sync(&priv->fec_timer);
 				cancel_work_sync(&priv->ui_worker);
-				priv->ui_enable = false;
 			}
 			priv->spec_ops->ptp_init(priv);
 		}
@@ -718,9 +718,9 @@ static void eth_monitor_link_status(struct work_struct *work) {
 		if ((priv->spec_ops->ptp_check) && (!(priv->spec_ops->ptp_check(priv))) &&
 		    (priv->spec_ops->ptp_init)) {
 			if (priv->ui_enable) {
+				priv->ui_enable = false;
 				del_timer_sync(&priv->fec_timer);
 				cancel_work_sync(&priv->ui_worker);
-				priv->ui_enable = false;
 			}
 			priv->spec_ops->ptp_init(priv);
 		}
@@ -736,34 +736,36 @@ static void eth_monitor_link_status(struct work_struct *work) {
 		priv->dev->stats.tx_carrier_errors++;
 
 		if (priv->ui_enable) {
+			priv->ui_enable = false;
 			del_timer_sync(&priv->fec_timer);
 			cancel_work_sync(&priv->ui_worker);
-			priv->ui_enable = false;
 		}
         }
 
 	priv->curr_link_state = curr_link_state;
 
 reshed:
-        schedule_delayed_work(&priv->dwork, msecs_to_jiffies(LINK_STS_POLL_TIMEOUT));
+	if (priv->monitor_thread_enable)
+		schedule_delayed_work(&priv->dwork, msecs_to_jiffies(LINK_STS_POLL_TIMEOUT));
 }
 
 
 static void eth_link_up(intel_fpga_xtile_eth_private *priv)
 {
-
 	priv->curr_link_state = true;
-        schedule_delayed_work(&priv->dwork, msecs_to_jiffies(LINK_STS_POLL_TIMEOUT));
+	priv->monitor_thread_enable = true;
+	schedule_delayed_work(&priv->dwork, msecs_to_jiffies(LINK_STS_POLL_TIMEOUT));
 }
 
 static void eth_link_down(intel_fpga_xtile_eth_private *priv)
 {
+	priv->monitor_thread_enable = false;
 	cancel_delayed_work_sync(&priv->dwork);
 
 	if (priv->ui_enable) {
+		priv->ui_enable = false;
 		del_timer_sync(&priv->fec_timer);
 		cancel_work_sync(&priv->ui_worker);
-		priv->ui_enable = false;
 	}
 }
 
@@ -865,7 +867,10 @@ static int xtile_open(struct net_device *dev)
 					  &priv->dma_priv.rx_ring[i]);
 
 	spin_unlock_irqrestore(&priv->rxdma_irq_lock, flags);
-	napi_enable(&priv->napi);
+	if (!priv->napi_state) {
+		napi_enable(&priv->napi);
+		priv->napi_state = true;
+	}
 	netif_start_queue(dev);
 
 	if (priv->spec_ops->dma_ops->start_txdma)
@@ -901,8 +906,11 @@ static int xtile_shutdown(struct net_device *dev)
 		phylink_stop(priv->phylink);
 
 	netif_stop_queue(dev);
-	napi_synchronize(&priv->napi);
-	napi_disable(&priv->napi);
+	if (priv->napi_state) {
+		napi_synchronize(&priv->napi);
+		napi_disable(&priv->napi);
+		priv->napi_state = false;
+	}
 
 	/* Disable DMA interrupts */
 	spin_lock_irqsave(&priv->rxdma_irq_lock, flags);
@@ -1673,6 +1681,9 @@ static int intel_fpga_xtile_probe(struct platform_device *pdev)
 
 	/* setup NAPI interface */
 	netif_napi_add(ndev, &priv->napi, xtile_poll, NAPI_POLL_WEIGHT);
+
+	/* tracks the current napi state whether enabled or disabled */
+	priv->napi_state = false;
 
 	spin_lock_init(&priv->tx_lock);
 	spin_lock_init(&priv->rxdma_irq_lock);
