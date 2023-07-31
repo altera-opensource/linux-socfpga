@@ -86,6 +86,8 @@ typedef struct {
         bool curr_link_state;
         bool cable_unplugged;
         bool ui_enable;
+        bool monitor_thread_enable;
+        bool napi_state;
 
         spinlock_t tx_lock;
         spinlock_t mac_cfg_lock;
