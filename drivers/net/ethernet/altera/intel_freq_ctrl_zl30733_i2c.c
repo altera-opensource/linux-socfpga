@@ -7,7 +7,7 @@
 #include <linux/workqueue.h>
 #include <linux/spi/spi.h>
 #include "intel_freq_control.h"
-#include "intel_freq_control_zl30733.h"
+#include "intel_freq_control_zl30733_debugfs.h"
 #include "intel_freq_ctrl_zl30733_i2c.h"
 
 
@@ -208,8 +208,9 @@ int i2c_dev_check_zl30733_clock(
 						rdbuf[0], rdbuf[1]);
 					if (((rdbuf[0] << 8) | rdbuf[1]) == ZL30733_ID_VALUE) {
 						zl30733_check_dpll(i2c_cli);
-
-						zl30733_sysfs_configure(i2c_cli);
+#ifdef CONFIG_DEBUG_FS
+						zl30733_dbgfs_init(i2c_cli);
+#endif
 					}
 				}
 			

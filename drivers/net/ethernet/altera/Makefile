@@ -8,15 +8,18 @@ altera_eth-objs := altera_utils.o altera_eth_dma.o \
 		   altera_sgdma.o altera_msgdma.o \
 		   altera_msgdma_prefetcher.o
 
+ifeq ($(CONFIG_DEBUG_FS),y)
+	obj-$(CONFIG_INTEL_FPGA_TOD)  += intel_freq_control_zl30733_debugfs.o
+endif
+
 obj-$(CONFIG_INTEL_FPGA_TOD) += altera_utils.o \
 				 intel_freq_ctrl_zl30793_spi.o \
 			     intel_freq_control_zl30793.o \
 				 intel_freq_ctrl_zl30733_i2c.o \
-				 intel_freq_control_zl30733.o\
 			     intel_freq_control.o \
 			     intel_freq_ctrl_common_spi.o \
 			     intel_freq_ctrl_common_i2c.o \
-			     intel_fpga_tod.o 
+			     intel_fpga_tod.o
 
 ifeq ($(CONFIG_ALTERA_TSE),y)
 	obj-$(CONFIG_ALTERA_TSE) += altera_tse.o
