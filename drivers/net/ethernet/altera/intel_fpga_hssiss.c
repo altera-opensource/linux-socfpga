@@ -156,8 +156,7 @@ static int enable_disable_loopback(struct platform_device *pdev, u32 cmdid,
 	u32 ctrl_addr = 0;
 	u32 cmd_sts = 0;
 
-	if ((port > priv->feature_list.part.num_ports) ||
-			(!test_reg_bits(priv->feature_list.part.port_enable_mask, port, 1)))
+	if (!test_reg_bits(priv->feature_list.part.port_enable_mask, port, 1))
 		return -EIO;
 
 	ctrl_addr |= cmdid;
