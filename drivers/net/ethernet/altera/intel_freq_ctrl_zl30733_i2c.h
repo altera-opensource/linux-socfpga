@@ -1,3 +1,12 @@
+/* SPDX-License-Identifier: GPL */
+/* Intel zarlink i2c driver
+ * Copyright (C) 2023 Intel Corporation. All rights reserved
+ *
+ * Contributors:
+ *
+ *	Inian Pavel Sakthi <inian.pavel.sakthi@intel.com>
+ */
+
 #ifndef HAVE_INTEL_FREQ_CONTROL_ZL30733_I2C_H
 #define HAVE_INTEL_FREQ_CONTROL_ZL30733_I2C_H
 // Register numbers and other defines for ZL30733
@@ -7,19 +16,16 @@
 #define ZL30733_REG_ID_0                0x0001
 #define ZL30733_REG_ID_1                0x0002
 #define ZL30733_REG_PAGE_SEL            0x007f
-#define ZL30733_REG_DPLL_MON_STATUS(x)  (0x0110 + x) // x=0-7
+#define ZL30733_REG_DPLL_MON_STATUS(x)  (0x0110 + (x)) // x=0-7
 #define ZL30733_REG_DPLL_MODE_REFSEL_0  0x0284
 #define ZL30733_REG_DPLL_CTRL_0         0x0285
 
-
-
- #define ZL30733_REG_DPLL_DF_OFFSET_0_0  0x0300 // bit 47:40
- #define ZL30733_REG_DPLL_DF_OFFSET_0_1  0x0301 // bit 39:32
- #define ZL30733_REG_DPLL_DF_OFFSET_0_2  0x0302 // bit 31:24
- #define ZL30733_REG_DPLL_DF_OFFSET_0_3  0x0303 // bit 23:16
- #define ZL30733_REG_DPLL_DF_OFFSET_0_4  0x0304 // bit 15:8
- #define ZL30733_REG_DPLL_DF_OFFSET_0_5  0x0305 // bit  7:0
-
+#define ZL30733_REG_DPLL_DF_OFFSET_0_0  0x0300 // bit 47:40
+#define ZL30733_REG_DPLL_DF_OFFSET_0_1  0x0301 // bit 39:32
+#define ZL30733_REG_DPLL_DF_OFFSET_0_2  0x0302 // bit 31:24
+#define ZL30733_REG_DPLL_DF_OFFSET_0_3  0x0303 // bit 23:16
+#define ZL30733_REG_DPLL_DF_OFFSET_0_4  0x0304 // bit 15:8
+#define ZL30733_REG_DPLL_DF_OFFSET_0_5  0x0305 // bit  7:0
 
 /* bit 15:8  :0x0001 bit  7:0  :0x0002 */
 #define ZL30733_PAGE0_REG_GENERAL_ID_0          0x0001
@@ -27,7 +33,6 @@
  * 2: FAST_LOCK         3: ACQUIRING            4: LOCK]
  */
 #define ZL30733_PAGE2_REG_DPLL_STATE_OFFSET_0   0x0120
-
 
 #define ZL30733_PAGE2_REG_DPLL_STATE_OFFSET_1   0x0121
 /* bit 2:0 mode */
@@ -52,14 +57,11 @@
 #define ZL30733_REG_READ_INTERVAL               (10)
 #define ZL30733_DPLL_DF_CTRL_SEM_GET(data)      (((data) & 0x10) >> 4)
 
-int i2c_dev_check_zl30733_clock(
-		struct intel_freq_control_private *priv);
+int i2c_dev_check_zl30733_clock(struct intel_freq_control_private *priv);
 
 void intel_freq_control_zl30733(struct work_struct *work);
 
 u8 i2c_zl30733_write_byte_data(const struct i2c_client *client, u16 reg, u8 data[], u8 data_len);
 u8 i2c_zl30733_read_byte_data(const struct i2c_client *client, u16 reg, u8 *buf, u8 data_len);
-
-
 
 #endif
