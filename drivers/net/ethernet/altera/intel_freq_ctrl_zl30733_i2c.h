@@ -57,6 +57,8 @@ int i2c_dev_check_zl30733_clock(
 
 void intel_freq_control_zl30733(struct work_struct *work);
 
+u8 i2c_zl30733_write_byte_data(const struct i2c_client *client, u16 reg, u8 data[], u8 data_len);
+u8 i2c_zl30733_read_byte_data(const struct i2c_client *client, u16 reg, u8 *buf, u8 data_len);
 
 
 
