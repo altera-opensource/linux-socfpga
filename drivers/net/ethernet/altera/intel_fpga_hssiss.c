@@ -460,6 +460,7 @@ hssi_eth_port_attr hssiss_get_ethport_attr(struct platform_device *pdev, int por
 	struct hssiss_private *priv = platform_get_drvdata(pdev);
 	hssi_eth_port_attr port_attr;
 
+	port_attr.full = 0;
 	/* E-tile and FGT in F-tile */
 	if (port >= 0 && port < 16) {
 		port_attr.full = csrrd32_withoffset(priv->sscsr,
