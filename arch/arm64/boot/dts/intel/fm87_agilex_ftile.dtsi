@@ -91,6 +91,10 @@
 	status = "okay";
 };
 
+&uart1 {
+	status = "okay";
+};
+
 &usb0 {
 	status = "okay";
 	disable-over-current;
