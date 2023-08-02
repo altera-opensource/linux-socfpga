@@ -3,6 +3,9 @@
 #include <linux/gcd.h>
 #include <linux/module.h>
 #include <linux/math64.h>
+#include <linux/irq.h>
+#include <linux/irqdesc.h>
+#include <linux/interrupt.h>
 #include <linux/net_tstamp.h>
 #include <linux/of_platform.h>
 #include <linux/platform_device.h>
@@ -85,6 +88,7 @@ static int intel_fpga_tod_adjust_fine(struct ptp_clock_info *ptp,
 {
 	struct intel_fpga_tod_private *priv =
 		container_of(ptp, struct intel_fpga_tod_private, ptp_clock_ops);
+	struct intel_freq_control_private *freq_priv = priv->ptp_freq_priv;
 	u32 tod_period, tod_rem, tod_drift_adjust_fns;
         u32 tod_drift_adjust_rate, gcd_out;
 	s64 ppb;
@@ -99,9 +103,10 @@ static int intel_fpga_tod_adjust_fine(struct ptp_clock_info *ptp,
 	if ( (priv->ptp_clockcleaner_enable) && (priv->ptp_freq_priv) &&
 			(priv->ptp_freq_priv->freqctrl_ops.freqctrl) ){
 		
-		priv->ptp_freq_priv->queued_work.scaled_ppm = scaled_ppm;
-		priv->ptp_freq_priv->freqctrl_ops.freqctrl(&priv->ptp_freq_priv->queued_work);
-		
+		if (scaled_ppm) {
+			priv->ptp_freq_priv->queued_work.scaled_ppm = scaled_ppm;
+			freq_priv->freqctrl_ops.freqctrl(&priv->ptp_freq_priv->queued_work);
+		}
 		ret = 0;
 		goto out;
 	}
@@ -286,44 +291,37 @@ static int intel_fpga_tod_enable_feature(struct ptp_clock_info *ptp,
 					 struct ptp_clock_request *request,
 					 int feature_on)
 {
-	struct intel_fpga_tod_private *priv =
-		container_of(ptp, struct intel_fpga_tod_private, ptp_clock_ops);
-	unsigned long flags;
 	int ret;
 
-	spin_lock_irqsave(&priv->tod_lock, flags);
 	
 	switch (request->type) {
-		case PTP_CLK_REQ_EXTTS:
-			ret = intel_fpga_tod_extts_configure(request);
-			break;
-		default:
+	case PTP_CLK_REQ_EXTTS:
+
+		ret = intel_fpga_tod_extts_configure(request);
+		break;
+
+	default:
 			return -EOPNOTSUPP;
 	}
 
-	spin_unlock_irqrestore(&priv->tod_lock, flags);
 	
-	return 0;
+	return ret;
 }
 
-static long intel_fpga_ts_work_delay(struct ptp_clock_info *ptp) {
-	
-	struct intel_fpga_tod_private *priv =
-		container_of(ptp, struct intel_fpga_tod_private, ptp_clock_ops);
+/* Note the interrupt is level triggered */
+static irqreturn_t intel_fpga_pps_isr(int irq, void *data)
+{
+	struct intel_fpga_tod_private *priv = (typeof(priv))data;
 	struct ptp_clock_event event;
 	unsigned long flags;
 	u32 nanosec, seconds_lsb, seconds_msb;
 	u64 seconds;
-
 	spin_lock_irqsave(&priv->tod_lock, flags);
-        
-	nanosec = csrrd32(priv->tod_ctrl, tod_csroffs(nanosec));
 
-	seconds_lsb = csrrd32(priv->tod_ctrl, tod_csroffs(seconds_lsb));
-	seconds_msb = csrrd32(priv->tod_ctrl, tod_csroffs(seconds_msb));
-
+	nanosec = csrrd32(priv->pps_ctrl, pps_csroffs(nanosec));
+	seconds_lsb = csrrd32(priv->pps_ctrl, pps_csroffs(seconds_lsb));
+	seconds_msb = csrrd32(priv->pps_ctrl, pps_csroffs(seconds_msb));
 	spin_unlock_irqrestore(&priv->tod_lock, flags);
-
 	/* Calculate new time */
 	seconds = (((u64)(seconds_msb & 0x0000ffff)) << 32) | seconds_lsb;
 
@@ -333,26 +331,7 @@ static long intel_fpga_ts_work_delay(struct ptp_clock_info *ptp) {
 	event.timestamp = seconds * NSEC_PER_SEC + nanosec;
 	ptp_clock_event(priv->ptp_clock, &event);
 
-	return priv->ptp_event_delay;
-}
-
-static int intel_fpga_phc_getcrosststamp(struct ptp_clock_info *ptp,
-                                     struct system_device_crosststamp *xtstamp) {
-
-	u64 devns = 0;	
-	struct timespec64 ts;
-
-        /* get system time */
-        xtstamp->sys_monoraw = ktime_get();
-	xtstamp->sys_realtime = ktime_get_real();
-
-        /* get ptp hardware time */
-        intel_fpga_tod_get_time(ptp, &ts);
-
-        devns = NSEC_PER_SEC * (u64)ts.tv_sec + (u64)ts.tv_nsec;
-        xtstamp->device  = ns_to_ktime(devns);
-
-        return 0;
+	return IRQ_HANDLED;
 }
 
 
@@ -369,8 +348,6 @@ static struct ptp_clock_info intel_fpga_tod_clock_ops = {
 	.gettime64 = intel_fpga_tod_get_time,
 	.settime64 = intel_fpga_tod_set_time,
 	.enable = intel_fpga_tod_enable_feature,
-    .do_aux_work = intel_fpga_ts_work_delay,
-    .getcrosststamp = intel_fpga_phc_getcrosststamp,
 };
 
 /* Register the PTP clock driver to kernel */
@@ -386,6 +363,7 @@ static int intel_fpga_tod_register(struct intel_fpga_tod_private *priv,
 	priv->ptp_clock_ops = intel_fpga_tod_clock_ops;
 
 	priv->ptp_clock = ptp_clock_register(&priv->ptp_clock_ops, device);
+
 	if (IS_ERR(priv->ptp_clock)) {
 		dev_err_probe(device, PTR_ERR(priv->ptp_clock), "cannot obtain ToD period clock\n");
 		priv->ptp_clock = NULL;
@@ -424,6 +402,7 @@ static int intel_fpga_tod_register(struct intel_fpga_tod_private *priv,
 		tod_drift_adjust_rate = 0;
 
 	spin_lock_irqsave(&priv->tod_lock, flags);
+
 	csrwr32(tod_period, priv->tod_ctrl, tod_csroffs(period));
 	csrwr32(0, priv->tod_ctrl, tod_csroffs(adjust_period));
 	csrwr32(0, priv->tod_ctrl, tod_csroffs(adjust_count));
@@ -431,6 +410,7 @@ static int intel_fpga_tod_register(struct intel_fpga_tod_private *priv,
 		tod_csroffs(drift_adjust));
 	csrwr32(tod_drift_adjust_rate, priv->tod_ctrl,
 		tod_csroffs(drift_adjust_rate));
+
 	spin_unlock_irqrestore(&priv->tod_lock, flags);
 
 out:
@@ -460,8 +440,11 @@ static int intel_fpga_tod_unregister(struct platform_device *pdev)
 /* Common PTP probe function */
 static int intel_fpga_tod_probe(struct platform_device *pdev)
 {
+	u32 pps_irq;
+	bool pps_support = false;
 	int ret = -ENODEV;
 	struct resource *ptp_res;
+	struct resource *pps_res;
 	struct device_node *dev_fc;
 	struct platform_device *pdev_fc;
 	struct intel_fpga_tod_private *priv;
@@ -469,7 +452,9 @@ static int intel_fpga_tod_probe(struct platform_device *pdev)
 
 	priv = devm_kzalloc(dev, sizeof(struct intel_fpga_tod_private), GFP_KERNEL);
 	if (!priv) {
-		dev_err_probe(dev, PTR_ERR(priv), "Could not allocate memory for ToD\n");
+		dev_err_probe(dev,
+			      PTR_ERR(priv),
+			      "Could not allocate memory for ToD\n");
 		ret = -ENOMEM;
 		goto err;
 	}
@@ -485,6 +470,17 @@ static int intel_fpga_tod_probe(struct platform_device *pdev)
 
 	priv->dev = dev;
 
+	ret = request_and_map(pdev, "pps_ctrl", &pps_res,
+			      (void __iomem **)&priv->pps_ctrl);
+
+	if (!ret) {
+		dev_info(&pdev->dev, "\tPPS Ctrl at 0x%08lx\n",
+			 (unsigned long)pps_res->start);
+	} else {
+		dev_info(&pdev->dev, "\tPPS Ctrl unmapped\n");
+		priv->pps_ctrl = NULL;
+	}
+
 	/* Time-of-Day (ToD) Clock period clock */
 	priv->tod_clk = devm_clk_get(&pdev->dev, "tod_clock");
 	if (IS_ERR(priv->tod_clk)) {
@@ -494,9 +490,25 @@ static int intel_fpga_tod_probe(struct platform_device *pdev)
 		goto err;
 	}
 
+	pps_irq = platform_get_irq_byname(pdev, "pps_irq");
+
+	if ((pps_irq > 0) && priv->pps_ctrl) {
+		/* pps interrupt is level triggered */
+		ret = devm_request_irq(&pdev->dev, pps_irq, intel_fpga_pps_isr,
+				       IRQF_TRIGGER_HIGH, "pps_ip", priv);
+
+		if (ret)
+			dev_err(&pdev->dev, "could not register pps irq\n");
+		else
+			pps_support = true;
+	}
+
+	if (!pps_support)
+		dev_err(&pdev->dev, "pps ctrl not supported");
+
 	priv->ptp_clockcleaner_enable =
 	    of_property_read_bool(pdev->dev.of_node,
-			    "altr,has-ptp-clockcleaner");
+				  "altr,has-ptp-clockcleaner");
 
 	priv->ptp_freq_priv = NULL;
 
@@ -505,13 +517,15 @@ static int intel_fpga_tod_probe(struct platform_device *pdev)
 
 		/* Get the Freq steering node device from the device tree node */
 		dev_fc = of_parse_phandle(pdev->dev.of_node,
-				"clock-cleaner", 0);
+					 "clock-cleaner", 0);
 
 		if (dev_fc) {
 			pdev_fc = of_find_device_by_node(dev_fc);
 			if (!pdev_fc) {
 				dev_err(&pdev->dev, "clock cleaner hw details not found\n");
 				of_node_put(dev_fc);
+
+				goto no_clock_cleaner;
 			}
 			else {
 				priv->ptp_freq_priv =
@@ -527,6 +541,7 @@ static int intel_fpga_tod_probe(struct platform_device *pdev)
 		}
 	}
 
+no_clock_cleaner:
 	ret = intel_fpga_tod_register(priv, dev);
 	if (ret)
 		goto err;

@@ -42,6 +42,17 @@ struct intel_fpga_tod {
 
 #define tod_csroffs(a)	(offsetof(struct intel_fpga_tod, a))
 
+struct intel_fpga_pps {
+	u32 reserved_1[3];
+	u32 pps_ctrl;
+	u32 reserved_2[15];
+	u32 seconds_msb;
+	u32 seconds_lsb;
+	u32 nanosec;
+};
+
+#define pps_csroffs(a)	(offsetof(struct intel_fpga_pps, a))
+
 struct intel_fpga_tod_private {
 	struct device *dev;
 
@@ -50,6 +61,9 @@ struct intel_fpga_tod_private {
 
 	/* Time-of-Day (ToD) Clock address space */
 	struct intel_fpga_tod __iomem *tod_ctrl;
+
+	/* PPS address space for TOD */
+	struct intel_fpga_pps __iomem *pps_ctrl;
 	struct clk *tod_clk;
 
 	/* ToD clock registers protection */
@@ -57,7 +71,6 @@ struct intel_fpga_tod_private {
 
 	bool ptp_clockcleaner_enable;
 
-	long  ptp_event_delay;
 	/* PTP Clock Cleaner structure */
 	struct intel_freq_control_private *ptp_freq_priv;
 

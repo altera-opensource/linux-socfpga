@@ -213,8 +213,8 @@ static void xtile_dma_regs(struct altera_dma_private *priv)
 	xtile_fifo_fill_level_rx(priv);
 }
 
-static ssize_t show_msgdma_reg_dump(struct device *dev,
-                struct device_attribute *attr, char *buf)
+static ssize_t msgdma_reg_dump_show(struct device *dev,
+				    struct device_attribute *attr, char *buf)
 {
 
         struct platform_device *pdev = to_platform_device(dev);
@@ -226,8 +226,8 @@ static ssize_t show_msgdma_reg_dump(struct device *dev,
         return sprintf(buf, "%x", 1);
 }
 
-static ssize_t show_msgdma_tx_desc_dump(struct device *dev,
-		struct device_attribute *attr, char *buf)
+static ssize_t msgdma_tx_desc_dump_show(struct device *dev,
+					struct device_attribute *attr, char *buf)
 {
 	struct platform_device *pdev = to_platform_device(dev);
         struct net_device *ndev = platform_get_drvdata(pdev);
@@ -238,8 +238,8 @@ static ssize_t show_msgdma_tx_desc_dump(struct device *dev,
 	return sprintf(buf, "%x", 1);
 }
 
-static ssize_t show_link_state(struct device *dev,
-                struct device_attribute *attr, char *buf)
+static ssize_t link_state_show(struct device *dev,
+			       struct device_attribute *attr, char *buf)
 {
         struct platform_device *pdev = to_platform_device(dev);
         struct net_device *ndev = platform_get_drvdata(pdev);
@@ -259,23 +259,47 @@ static ssize_t show_link_state(struct device *dev,
         return sprintf(buf, "%x", 1);
 }
 
-static DEVICE_ATTR(msgdma_reg_dump, 0644, show_msgdma_reg_dump, NULL);
-static DEVICE_ATTR(msgdma_tx_desc_dump, 0644, show_msgdma_tx_desc_dump, NULL);
-static DEVICE_ATTR(link_state, 0644, show_link_state, NULL);
+static ssize_t en_dis_sec_ip_store(struct device *dev,
+				   struct device_attribute *attr,
+				   const char *buf, size_t len)
+{
+	struct platform_device *pdev = to_platform_device(dev);
+	struct net_device *ndev = platform_get_drvdata(pdev);
+	intel_fpga_xtile_eth_private *priv = netdev_priv(ndev);
+	int value;
+	int ret;
+
+	ret = kstrtouint(buf, 10, &value);
+	if (ret < 0)
+		return ret;
+
+	if (priv->ptp_priv->pps_ctrl)
+		csrwr32(value, priv->ptp_priv->pps_ctrl, pps_csroffs(pps_ctrl));
+	else
+		netdev_info(priv->dev, "pps ctrl is not supported");
+
+	return len;
+}
+
+static DEVICE_ATTR(msgdma_reg_dump, 0644, msgdma_reg_dump_show, NULL);
+static DEVICE_ATTR(msgdma_tx_desc_dump, 0644, msgdma_tx_desc_dump_show, NULL);
+static DEVICE_ATTR(link_state, 0644, link_state_show, NULL);
+static DEVICE_ATTR(en_dis_sec_ip, 0644, NULL, en_dis_sec_ip_store);
 
 static struct attribute *msgdma_sysfs_attrs[] = {
-        &dev_attr_msgdma_reg_dump.attr,
+	&dev_attr_msgdma_reg_dump.attr,
 	&dev_attr_msgdma_tx_desc_dump.attr,
 	&dev_attr_link_state.attr,
-        NULL
+	&dev_attr_en_dis_sec_ip.attr,
+	NULL
 };
 
 static const struct attribute_group msgdma_attr_group = {
-        .attrs = msgdma_sysfs_attrs,
+	.attrs = msgdma_sysfs_attrs,
 };
 
 const struct attribute_group *msgdma_attr_groups[] = {
-        &msgdma_attr_group,
-        NULL
+	&msgdma_attr_group,
+	NULL
 };
 
