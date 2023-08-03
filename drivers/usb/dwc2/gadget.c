@@ -1777,6 +1777,7 @@ static int dwc2_hsotg_process_req_feature(struct dwc2_hsotg *hsotg,
 	struct dwc2_hsotg_ep *ep;
 	int ret;
 	bool halted;
+	u32 otgctl;
 	u32 recip;
 	u32 wValue;
 	u32 wIndex;
@@ -1806,6 +1807,39 @@ static int dwc2_hsotg_process_req_feature(struct dwc2_hsotg *hsotg,
 
 			hsotg->test_mode = wIndex >> 8;
 			break;
+		case USB_DEVICE_B_HNP_ENABLE:
+                        if (!hsotg->params.otg_caps.hnp_support) {
+                        	dev_info(hsotg->dev, "HNP requested but not supported\n");
+                        	return -ENOENT;
+                        } else {
+                        	otgctl = dwc2_readl(hsotg, GOTGCTL);
+                        	if (set){
+					hsotg->gadget.b_hnp_enable = 1;
+					otgctl |= GOTGCTL_DEVHNPEN;
+				}	
+                        	else{
+					hsotg->gadget.b_hnp_enable = 0;
+					otgctl &= ~GOTGCTL_DEVHNPEN;
+				}
+                        		
+                        	dwc2_writel(hsotg, otgctl, GOTGCTL);
+                        	dev_info(hsotg->dev, "HNP enabled\n");
+                        	break;
+                        }
+		case USB_DEVICE_A_HNP_SUPPORT:
+			if (set)
+				hsotg->gadget.a_hnp_support = 1;
+                        else
+				hsotg->gadget.a_hnp_support = 0;
+			dev_info(hsotg->dev,"a_hnp_support processing\n");
+                      	break;
+		case USB_DEVICE_A_ALT_HNP_SUPPORT:
+			if (set)
+				hsotg->gadget.a_alt_hnp_support = 1;
+                        else
+				hsotg->gadget.a_alt_hnp_support = 0;
+                        dev_info(hsotg->dev,"a_alt_hnp_support processing\n");
+                      	break;
 		default:
 			return -ENOENT;
 		}
