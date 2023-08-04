@@ -733,11 +733,13 @@
 					snps,weight = <0x0f>;
 					snps,coe-unsupported;
 					snps,dcb-algorithm;
+					snps,tbs-enable;
 				};
 				queue7 {
 					snps,weight = <0x10>;
 					snps,coe-unsupported;
 					snps,dcb-algorithm;
+					snps,tbs-enable;
 				};
 			};
 		};
@@ -883,11 +885,13 @@
 					snps,weight = <0x0f>;
 					snps,coe-unsupported;
 					snps,dcb-algorithm;
+					snps,tbs-enable;
 				};
 				queue7 {
 					snps,weight = <0x10>;
 					snps,coe-unsupported;
 					snps,dcb-algorithm;
+					snps,tbs-enable;
 				};
 			};
 		};
@@ -1033,11 +1037,13 @@
 					snps,weight = <0x0f>;
 					snps,coe-unsupported;
 					snps,dcb-algorithm;
+					snps,tbs-enable;
 				};
 				queue7 {
 					snps,weight = <0x10>;
 					snps,coe-unsupported;
 					snps,dcb-algorithm;
+					snps,tbs-enable;
 				};
 			};
 		};
