@@ -3833,22 +3833,6 @@ static int fcs_driver_probe(struct platform_device *pdev)
 	if (!priv->p_data)
 		goto cleanup;
 
-	/* only register the HW RNG if the platform supports it! */
-	if (priv->p_data->have_hwrng) {
-		/* register hwrng device */
-		priv->rng.name = "intel-rng";
-		priv->rng.read = fcs_rng_read;
-		priv->rng.priv = (unsigned long)priv;
-
-		ret = hwrng_register(&priv->rng);
-		if (ret) {
-			dev_err(dev, "can't register RNG device (%d)\n", ret);
-			return ret;
-		}
-	}
-
-	platform_set_drvdata(pdev, priv);
-
 	ret = of_property_read_string(dev->of_node, "platform", &platform);
 	if (ret) {
 		dev_err(dev, "can't find platform");
@@ -3922,6 +3906,32 @@ static int fcs_driver_probe(struct platform_device *pdev)
 		}
 	}
 
+	/* only register the HW RNG if the platform supports it! */
+	if (priv->p_data->have_hwrng) {
+		/* register hwrng device */
+		priv->rng.name = "intel-rng";
+		priv->rng.read = fcs_rng_read;
+		priv->rng.priv = (unsigned long)priv;
+
+		ret = hwrng_register(&priv->rng);
+		if (ret) {
+			dev_err(dev, "can't register RNG device (%d)\n", ret);
+			return ret;
+		}
+	} else {
+		/* Notes of registering /dev/hwrng:
+		 * 1 For now, /dev/hwrng is not supported on Agilex devices
+		 *   due to hardware implementation.
+		 * 2 It means On Agilex devices, /dev/hwrng is a dummy node
+		 *   without HW backend. You can get the HW RNG function by
+		 *   IOCTL command provided from this driver on Agilex devices.
+		 * 3 In the future, it may be implemented in a different way.
+		 */
+		dev_notice(dev, "/dev/hwrng is not supported on Agilex devices.\n");
+	}
+
+	platform_set_drvdata(pdev, priv);
+
 	return 0;
 
 cleanup:
@@ -3976,6 +3986,7 @@ no_platform:
 	stratix10_svc_free_channel(priv->chan);
 }
 
+/* Note: /dev/hwrng is not supported on Agilex devices now! */
 static const struct socfpga_fcs_data agilex_fcs_data = {
 	.have_hwrng	= false,
 };
