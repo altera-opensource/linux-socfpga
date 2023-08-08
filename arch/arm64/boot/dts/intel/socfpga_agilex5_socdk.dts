@@ -42,7 +42,7 @@
 
 &gmac2 {
 	status = "okay";
-	phy-mode = "rgmii-id";
+	phy-mode = "rgmii";
 	phy-handle = <&emac2_phy0>;
 	max-frame-size = <9000>;
 
@@ -64,7 +64,7 @@
 &gmac0 {
 	status = "disabled";
 	phy-mode = "rgmii";
-	phy-handle = <&phy0>;
+	phy-handle = <&emac0_phy0>;
 
 	max-frame-size = <9000>;
 
@@ -72,8 +72,8 @@
 		#address-cells = <1>;
 		#size-cells = <0>;
 		compatible = "snps,dwmac-mdio";
-		phy0: ethernet-phy@0 {
-			reg = <0>;
+		emac0_phy0: ethernet-phy@1 {
+			reg = <1>;
 		};
 	};
 };
