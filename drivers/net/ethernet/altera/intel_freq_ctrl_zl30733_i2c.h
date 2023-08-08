@@ -54,8 +54,14 @@
 
 #define ZL30733_PAGE5_REG_DPLL_DF_READ_1        0x02A9
 
+#define ZL30733_REG_DPLL_MODE_REFSEL_0		0x0284
+
 #define ZL30733_REG_READ_INTERVAL               (10)
 #define ZL30733_DPLL_DF_CTRL_SEM_GET(data)      (((data) & 0x10) >> 4)
+#define ZL30733_DPLL_NCO_MODE                   0x04
+#define ZL30733_DPLL_MODE_MASK                   0x07
+#define ZL30733_DPLL_CHECK_NCO_MODE(x)  (((x) & ZL30733_DPLL_MODE_MASK) == ZL30733_DPLL_NCO_MODE)
+#define ZL30733_DPLL_SET_NCO_MODE(x)      (((x) & 0xf8) | ZL30733_DPLL_NCO_MODE)
 
 int i2c_dev_check_zl30733_clock(struct intel_freq_control_private *priv);
 

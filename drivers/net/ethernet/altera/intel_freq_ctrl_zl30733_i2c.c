@@ -202,6 +202,39 @@ static void zl30733_check_dpll(struct i2c_client *i2c_cli)
 	       __func__, i, buf);
 }
 
+static int zl30733_dpll_nco_modeset(struct i2c_client *i2c_cli)
+{
+	u8 ctrl_val;
+	int ret;
+
+	if (!i2c_cli)
+		return FREQ_CTRL_ERROR_FAIL;
+
+	/* read : ZL30733 dpll_mode_refsel_0 - 0x284*/
+	ret = i2c_zl30733_read_byte_data(i2c_cli, ZL30733_REG_DPLL_MODE_REFSEL_0, &ctrl_val, 1);
+	if (ret) {
+		dev_err(&i2c_cli->dev, "I2c readt error %d\n", ret);
+		goto zl_ctrl_err;
+	}
+	if (ZL30733_DPLL_CHECK_NCO_MODE(ctrl_val)) {
+		dev_info(&i2c_cli->dev, "ZL30733 is already in NCO mode (0x%x)\n", ctrl_val);
+		ret = FREQ_CTRL_ERROR_SUCCESS;
+		goto zl_ctrl_err;
+	}
+
+	dev_info(&i2c_cli->dev, "ZL30733 is not in NCO mode(0x%x); set Dpll in NCO mode\n",
+		 ctrl_val);
+	ctrl_val = ZL30733_DPLL_SET_NCO_MODE(ctrl_val);
+	ret = i2c_zl30733_write_byte_data(i2c_cli, ZL30733_REG_DPLL_MODE_REFSEL_0, &ctrl_val, 1);
+	if (ret) {
+		dev_err(&i2c_cli->dev, "I2C write error %d\n", ret);
+		goto zl_ctrl_err;
+	}
+
+zl_ctrl_err:
+	return ret;
+}
+
 int i2c_dev_check_zl30733_clock(struct intel_freq_control_private *priv)
 {
 	struct i2c_client *i2c_cli = NULL;
@@ -219,6 +252,7 @@ int i2c_dev_check_zl30733_clock(struct intel_freq_control_private *priv)
 
 		if (((rdbuf[0] << 8) | rdbuf[1]) == ZL30733_ID_VALUE) {
 			zl30733_check_dpll(i2c_cli);
+			zl30733_dpll_nco_modeset(i2c_cli);
 #ifdef CONFIG_DEBUG_FS
 			zl30733_dbgfs_init(i2c_cli);
 #endif
