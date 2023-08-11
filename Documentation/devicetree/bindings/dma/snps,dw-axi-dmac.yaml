@@ -74,6 +74,11 @@ properties:
     $ref: /schemas/types.yaml#/definitions/uint32
     enum: [0, 1, 2, 3, 4, 5, 6]
 
+  snps,dma-40-bit-mask:
+    description: |
+      Sets dma bit-mask to 40 bits
+    type: boolean
+
   snps,priority:
     description: |
       Channel priority specifier associated with the DMA channels.
