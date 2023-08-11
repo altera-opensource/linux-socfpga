@@ -1559,6 +1559,9 @@ static void dwc3_get_properties(struct dwc3 *dwc)
 	dwc->dis_split_quirk = device_property_read_bool(dev,
 				"snps,dis-split-quirk");
 
+	dwc->dma_set_40_bit_mask_quirk = device_property_read_bool(dev,
+				"snps,dma_set_40_bit_mask_quirk");
+
 	dwc->lpm_nyet_threshold = lpm_nyet_threshold;
 	dwc->tx_de_emphasis = tx_de_emphasis;
 
@@ -1859,7 +1862,11 @@ static int dwc3_probe(struct platform_device *pdev)
 
 	if (!dwc->sysdev_is_parent &&
 	    DWC3_GHWPARAMS0_AWIDTH(dwc->hwparams.hwparams0) == 64) {
-		ret = dma_set_mask_and_coherent(dwc->sysdev, DMA_BIT_MASK(64));
+		if(dwc->dma_set_40_bit_mask_quirk)
+			ret = dma_set_mask_and_coherent(dwc->sysdev, DMA_BIT_MASK(40));
+		else
+			ret = dma_set_mask_and_coherent(dwc->sysdev, DMA_BIT_MASK(64));
+		
 		if (ret)
 			goto disable_clks;
 	}
