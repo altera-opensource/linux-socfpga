@@ -952,5 +952,17 @@
 			clocks = <&qspi_clk>;
 			status = "disabled";
 		};
+
+		firmware {
+			svc {
+				compatible = "intel,agilex-svc";
+				method = "smc";
+				memory-region = <&service_reserved>;
+
+				temp_volt: hwmon {
+					compatible = "intel,soc64-hwmon";
+				};
+			};
+		};
 	};
 };
