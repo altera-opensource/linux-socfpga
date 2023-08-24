@@ -143,8 +143,8 @@
                     rx-fifo-almost-empty = <0x1000>;
                     altr,has-ptp;
                     ptp_accu_mode = "Advanced";
-                    ptp_tx_routing_adj = <0xDF0E>; //57102
-                    ptp_rx_routing_adj = <0xD688>; //54920
+                    ptp_tx_routing_adj = <0xD952>; //55634
+                    ptp_rx_routing_adj = <0xCCEE>; //52462
                     status = "okay";
                     fixed-link {
                             speed =<25000>;
@@ -191,8 +191,8 @@
                     rx-fifo-almost-empty = <0x1000>;
                     altr,has-ptp;
                     ptp_accu_mode = "Advanced";
-                    ptp_tx_routing_adj = <0xD1A4>; //53668
-                    ptp_rx_routing_adj = <0xCBFC>; //52220
+                    ptp_tx_routing_adj = <0xDC29>; //56360
+                    ptp_rx_routing_adj = <0xD5A8>; //54696
                     status = "okay";
                     fixed-link {
                             speed =<25000>;
