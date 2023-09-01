@@ -354,6 +354,96 @@ struct altr_sdram_mc_data {
 #define S10_COLD_RESET_MASK               0x30002
 #define S10_WARM_RESET_WFI_FLAG           BIT(31)
 
+/************ IO96B Mailbox defines *******/
+#define IO96B_CMD_RESP_STATUS_OFFSET		0x45C
+#define IO96B_CMD_RESP_DATA_0_OFFSET		0x458
+#define IO96B_CMD_RESP_DATA_1_OFFSET		0x454
+#define IO96B_CMD_RESP_DATA_2_OFFSET		0x450
+#define IO96B_CMD_REQ_OFFSET			0x43C
+#define IO96B_CMD_PARAM_0_OFFSET		0x438
+#define IO96B_RING_BUF_PRODUCER_CNTR_OFFSET	0x550
+#define IO96B_RING_BUF_CONSUMER_CNTR_OFFSET	0x554
+#define IO96B_RING_BUF_ENTRIES_OFFSET		0x560
+
+#define IO96B_SBE_SYNDROME			0xF4
+#define IO96B_DBE_SYNDROME			0x03
+#define IO96B_CMD_RESP_READY_MASK		0xFFFE
+#define IO96B_CMD_RESP_DATA_SHORT_MASK		GENMASK(31, 16)
+#define IO96B_CMD_RESP_DATA_SHORT(data)		\
+	(((data) & IO96B_CMD_RESP_DATA_SHORT_MASK) >> 16)
+
+#define IO96B_CMD_RESP_READY			BIT(0)
+#define IO96B_MAX_MEM_INTERFACES_SUPPORTED	2
+#define IO96B_MB_POLL_US			100
+#define IO96B_MB_TIMEOUT_US			2000
+
+/* Size of each entry in ring buffer is 8 bytes */
+#define IO96B_ECC_RING_BUF_WORD0(entry)	\
+	(IO96B_RING_BUF_ENTRIES_OFFSET + ((entry) * 8))
+#define IO96B_ECC_RING_BUF_WORD1(entry)	\
+	(IO96B_RING_BUF_ENTRIES_OFFSET + ((entry) * 8) + 4)
+
+enum io96b_error_type {
+	ECC_RMW_READ_LINK_DBE = 1,
+	ECC_READ_LINK_DBE,
+	ECC_READ_LINK_SBE,
+	ECC_WRITE_LINK_DBE,
+	ECC_WRITE_LINK_SBE,
+	ECC_MULTI_DBE,
+	ECC_SINGLE_DBE,
+	ECC_MULTI_SBE,
+	ECC_SINGLE_SBE
+};
+
+#define IO96B_ERR_TYPE_SBE (ECC_READ_LINK_SBE | ECC_WRITE_LINK_SBE \
+			   | ECC_MULTI_SBE | ECC_SINGLE_SBE)
+
+#define IO96B_ERR_TYPE_DBE (ECC_RMW_READ_LINK_DBE | ECC_READ_LINK_DBE \
+			   | ECC_WRITE_LINK_DBE | ECC_MULTI_DBE | ECC_SINGLE_DBE)
+
+enum io96b_mailbox_cmd_type  {
+	CMD_NOP,
+	CMD_GET_SYS_INFO,
+	CMD_GET_MEM_INFO,
+	CMD_GET_MEM_CAL_INFO,
+	CMD_TRIG_CONTROLLER_OP,
+	CMD_TRIG_MEM_CAL_OP
+};
+
+enum io96b_mailbox_cmd_opcode {
+	GET_MEM_INTF_INFO = 0x1,
+	ECC_ENABLE_STATUS = 0x102,
+	ECC_INJECT_ERROR = 0x109
+};
+
+struct io96b_mb_resp {
+	u32 status;
+	u32 data_0;
+	u32 data_1;
+	u32 data_2;
+	u32 len;
+};
+
+struct io96b_cmd_param {
+	u32 param0;
+	u32 param1;
+	u32 param2;
+	u32 param3;
+	u32 param4;
+	u32 param5;
+	u32 param6;
+	u32 opcode;
+	u32 type;
+};
+
+struct io96b_info {
+	u32 num_mem_interface;
+	u32 ip_type[2];
+	u32 ip_instance_id[2];
+	int io96b0_irq;
+	int io96b1_irq;
+};
+
 struct altr_edac_device_dev;
 
 struct edac_device_prv_data {
@@ -386,6 +476,9 @@ struct altr_edac_device_dev {
 	struct edac_device_ctl_info *edac_dev;
 	struct device ddev;
 	int edac_idx;
+	int io96b0_irq;
+	int io96b1_irq;
+	struct io96b_info io96b;
 };
 
 struct altr_arria10_edac {
@@ -397,6 +490,13 @@ struct altr_arria10_edac {
 	struct irq_chip		irq_chip;
 	struct list_head	a10_ecc_devices;
 	struct notifier_block	panic_notifier;
+	int io96b0_irq;
+	int io96b1_irq;
 };
+
+int io96b_mb_init(struct altr_edac_device_dev *dev);
+int io96b_mb_req(void __iomem *base, u32 ip_type, u32 instance_id,
+		 struct io96b_cmd_param *cmd, struct io96b_mb_resp *resp);
+int io96b_ecc_inject_error(struct altr_edac_device_dev *dev, bool sbe);
 
 #endif	/* #ifndef _ALTERA_EDAC_H */
