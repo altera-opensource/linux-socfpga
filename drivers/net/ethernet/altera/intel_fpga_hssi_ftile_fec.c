@@ -24,6 +24,37 @@
 
 #define MAX_COUNT_OFFSET		64000
 
+#define FTILE_10G_RX_TX_MIN_UI		0x18CC73E
+#define FTILE_10G_RX_TX_MAX_UI		0x18D98F5
+
+#define FTILE_25G_RX_TX_MIN_UI		0x9EDC00
+#define FTILE_25G_RX_TX_MAX_UI		0x9EE420
+
+static void get_min_max_ui(intel_fpga_xtile_eth_private *priv, u64 *min_ui, u64 *max_ui)
+{
+	if (!priv || !min_ui || !max_ui) {
+		dev_warn(priv->device, "%s: Invalid params\n", __func__);
+		return;
+	}
+
+	switch (priv->link_speed) {
+	case SPEED_10000:
+				   *min_ui = FTILE_10G_RX_TX_MIN_UI;
+				   *max_ui = FTILE_10G_RX_TX_MAX_UI;
+				break;
+	case SPEED_25000:
+				   *min_ui = FTILE_25G_RX_TX_MIN_UI;
+				   *max_ui = FTILE_25G_RX_TX_MAX_UI;
+				break;
+	default:
+				   dev_warn(priv->device, "%s: Eth link speed  unknown\n",
+					    __func__);
+				   *min_ui = 0;
+				   *max_ui = 0;
+				break;
+	}
+}
+
 void ftile_ui_adjustments_worker_handle(struct timer_list *t)
 {
 	intel_fpga_xtile_eth_private *priv = from_timer(priv, t, fec_timer);
@@ -64,6 +95,7 @@ void ftile_ui_adjustments(struct work_struct *work)
 	u8  tx_tam_valid, rx_tam_valid;
 	u64 tx_tam_delta, rx_tam_delta;
 	u64 tx_ui, rx_ui;
+	u64 min_ui = 0, max_ui = 0;
 	u16 num_pl = priv->pma_lanes_used;
 	u8 eth_rate = priv->eth_rate;
 
@@ -232,15 +264,17 @@ void ftile_ui_adjustments(struct work_struct *work)
 	rx_ui = (rx_tam_delta << 12) / (((u64)rx_tam_count * rx_tam_interval) / num_pl);
 	dev_dbg(priv->device, "%s tx_ui:0x%08llx rx_ui:0x%08llx\n", __func__, tx_ui, rx_ui);
 
+	get_min_max_ui(priv, &min_ui, &max_ui);
 	// check new tx_ui / rx_ui against min./max. ui_value
-	if (tx_ui > 0x9EE420 || tx_ui < 0x9EDC00) {
-		dev_warn(priv->device, "%s: TX UI value (0x%llX) is not within 0x9EDC00 to 0x9EE420 range\n",
-			 __func__, tx_ui);
+	if (tx_ui > max_ui || tx_ui < min_ui) {
+		dev_warn(priv->device, "%s: TX UI value (0x%llX) is not within (0x%llx) to (0x%llx) range\n",
+			 __func__, tx_ui, min_ui, max_ui);
 		goto ui_restart;
 	}
-	if (rx_ui > 0x9EE420 || rx_ui < 0x9EDC00) {
-		dev_warn(priv->device, "%s: RX UI value (0x%llX) is not within 0x9EDC00 to 0x9EE420 range\n",
-			 __func__, rx_ui);
+
+	if (rx_ui > max_ui || rx_ui < min_ui) {
+		dev_warn(priv->device, "%s: RX UI value (0x%llX) is not within (0x%llx) to (0x%llx) range\n",
+			 __func__, rx_ui, min_ui, max_ui);
 		goto ui_restart;
 	}
 	hssi_csrwr32_ba(pdev, HSSI_ETH_RECONFIG, chan, eth_mac_ptp_csroffs(eth_rate, tx_ptp_ui),
