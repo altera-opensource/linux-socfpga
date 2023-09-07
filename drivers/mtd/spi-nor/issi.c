@@ -64,7 +64,7 @@ static const struct flash_info issi_nor_parts[] = {
 		PARSE_SFDP
 		FIXUP_FLAGS(SPI_NOR_4B_OPCODES)
 		.fixups = &is25lp256_fixups },
-	{ "is25wp01",  INFO(0x9d7021, 0, 0, 0)
+	{ "is25wp01gg",  INFO(0x9d7021, 0, 0, 0)
 		PARSE_SFDP },
 	{ "is25wp032",  INFO(0x9d7016, 0, 64 * 1024,  64)
 		NO_SFDP_FLAGS(SECT_4K | SPI_NOR_DUAL_READ | SPI_NOR_QUAD_READ) },
