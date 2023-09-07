@@ -1037,6 +1037,18 @@
 				reg = <0x108c4400 0x100>;
 				interrupts = <12 IRQ_TYPE_LEVEL_HIGH>;
 			};
+
+			io96b0-ecc {
+				compatible = "altr,socfpga-io96b-ecc";
+				reg = <0x18400000 0x1000>;
+				interrupts = <95 IRQ_TYPE_EDGE_RISING>;
+			};
+
+			io96b1-ecc {
+				compatible = "altr,socfpga-io96b-ecc";
+				reg = <0x18800000 0x1000>;
+				interrupts = <120 IRQ_TYPE_EDGE_RISING>;
+			};
 		};
 
 		watchdog0: watchdog@10d00200 {
