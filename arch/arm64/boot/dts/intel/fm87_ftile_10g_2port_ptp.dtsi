@@ -83,8 +83,13 @@
 
 		tod_0_clk: tod_0_clk {
 			compatible = "intel, tod";
-			reg-names = "tod_ctrl";
-			reg = <0x84040000 0x00000040>;
+			reg-names = "tod_ctrl",
+				    "pps_ctrl";
+			reg = <0x84040000 0x00000040>,
+			      <0x84040100 0x00000040>;
+			interrupt-parent = <&intc>;
+			interrupt-names = "pps_irq";
+			interrupts = <0 19 4>;
 			clocks = <&tod_in_clock>;
 			clock-names = "tod_clock";
 			status = "okay";
