@@ -1049,6 +1049,12 @@
 				reg = <0x18800000 0x1000>;
 				interrupts = <120 IRQ_TYPE_EDGE_RISING>;
 			};
+
+			sdm-qspi-ecc@10a22000 {
+				compatible = "altr,socfpga-sdm-qspi-ecc";
+				reg = <0x10a22000 0x100>;
+				interrupts = <8 IRQ_TYPE_LEVEL_HIGH>;
+			};
 		};
 
 		watchdog0: watchdog@10d00200 {
