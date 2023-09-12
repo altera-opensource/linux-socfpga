@@ -479,6 +479,9 @@ struct altr_edac_device_dev {
 	int io96b0_irq;
 	int io96b1_irq;
 	struct io96b_info io96b;
+	int sdm_qspi_sb_irq;
+	int sdm_qspi_db_irq;
+	u32 sdm_qspi_addr;
 };
 
 struct altr_arria10_edac {
@@ -492,6 +495,8 @@ struct altr_arria10_edac {
 	struct notifier_block	panic_notifier;
 	int io96b0_irq;
 	int io96b1_irq;
+	int sdm_qspi_sb_irq;
+	int sdm_qspi_db_irq;
 };
 
 int io96b_mb_init(struct altr_edac_device_dev *dev);
