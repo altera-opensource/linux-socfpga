@@ -127,7 +127,7 @@ properties:
     items:
       oneOf:
         - description: Combined signal for various interrupt events
-          const: macirq
+          pattern: '^macirq$|^macirq_tx[0-7]$|^macirq_rx[0-7]$'
         - description: The interrupt to manage the remote wake-up packet detection
           const: eth_wake_irq
         - description: The interrupt that occurs when Rx exits the LPI state
@@ -508,6 +508,11 @@ properties:
     deprecated: true
     description:
       Enable gating of the MAC TX clock during TX low-power mode
+
+  snps,multi-irq-en:
+    $ref: /schemas/types.yaml#/definitions/flag
+    description:
+      Enable interrupt for each TX or RX channel.
 
   snps,multicast-filter-bins:
     $ref: /schemas/types.yaml#/definitions/uint32
