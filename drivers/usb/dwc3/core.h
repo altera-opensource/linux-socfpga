@@ -1134,6 +1134,7 @@ struct dwc3_scratchpad_array {
  * @num_ep_resized: carries the current number endpoints which have had its tx
  *		    fifo resized.
  * @debug_root: root debugfs directory for this device to put its files in.
+ * @dma_set_40_bit_mask_quirk: set if we want to set dma bit mask to 40 bits.
  */
 struct dwc3 {
 	struct work_struct	drd_work;
@@ -1349,6 +1350,8 @@ struct dwc3 {
 	unsigned		sys_wakeup:1;
 	unsigned		wakeup_configured:1;
 	unsigned		suspended:1;
+
+	unsigned		dma_set_40_bit_mask_quirk:1;
 
 	u16			imod_interval;
 
