@@ -354,6 +354,10 @@ struct altr_sdram_mc_data {
 #define S10_COLD_RESET_MASK               0x30002
 #define S10_WARM_RESET_WFI_FLAG           BIT(31)
 
+/* Single Event Upset Defines */
+#define SEU_SAFE_INJECT_SB_CE			0x50000
+#define SEU_SAFE_INJECT_DB_UE			0x002000050001
+
 /************ IO96B Mailbox defines *******/
 #define IO96B_CMD_RESP_STATUS_OFFSET		0x45C
 #define IO96B_CMD_RESP_DATA_0_OFFSET		0x458
@@ -482,6 +486,7 @@ struct altr_edac_device_dev {
 	int sdm_qspi_sb_irq;
 	int sdm_qspi_db_irq;
 	u32 sdm_qspi_addr;
+	int seu_irq;
 };
 
 struct altr_arria10_edac {

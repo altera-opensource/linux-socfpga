@@ -665,6 +665,16 @@ static const struct file_operations altr_edac_a10_device_inject_fops __maybe_unu
 	.llseek = generic_file_llseek,
 };
 
+static ssize_t __maybe_unused
+altr_edac_seu_trig(struct file *file, const char __user *user_buf,
+		   size_t count, loff_t *ppos);
+
+static const struct file_operations
+altr_edac_cram_inject_fops __maybe_unused = {
+	.open = simple_open,
+	.write = altr_edac_seu_trig,
+};
+
 #ifdef CONFIG_EDAC_ALTERA_IO96B
 static ssize_t __maybe_unused
 altr_edac_io96b_device_trig(struct file *file, const char __user *user_buf,
@@ -1671,6 +1681,55 @@ static const struct edac_device_prv_data a10_usbecc_data = {
 
 #endif	/* CONFIG_EDAC_ALTERA_USB */
 
+static irqreturn_t seu_irq_handler(int irq, void *dev_id)
+{
+	struct altr_edac_device_dev *dci = dev_id;
+	struct arm_smccc_res result;
+
+	/* Read SEU ERROR - This mailbox command may take longer time to get
+	 * SEU error info and could cause delay/problem to other mailbox
+	 * command if seu interrupt is getting trigger in-between any
+	 * operation. E.g. FPGA configuration.
+	 */
+	arm_smccc_smc(INTEL_SIP_SMC_SEU_ERR_STATUS, 0,
+		      0, 0, 0, 0, 0, 0, &result);
+
+	if ((u32)result.a0) {
+		if ((u32)result.a2 & BIT(28))
+			edac_device_handle_ue(dci->edac_dev, 0, 0, dci->edac_dev_name);
+		else
+			edac_device_handle_ce(dci->edac_dev, 0, 0, dci->edac_dev_name);
+
+		edac_printk(KERN_ERR, EDAC_DEVICE,
+			    "SEU %s: Count=0x%X, SecAddr=0x%X, ErrData=0x%X\n",
+			    (u32)result.a2 & BIT(28) == 0 ? "SBE" : "DBE",
+			    (u32)result.a0, (u32)result.a1, (u32)result.a2);
+	}
+	return IRQ_HANDLED;
+}
+
+static ssize_t __maybe_unused
+altr_edac_seu_trig(struct file *file, const char __user *user_buf,
+		   size_t count, loff_t *ppos)
+{
+	u8 trig_type;
+	struct arm_smccc_res result;
+
+	if (!user_buf || get_user(trig_type, user_buf))
+		return -EFAULT;
+
+	if (trig_type == ALTR_UE_TRIGGER_CHAR)
+		arm_smccc_smc(INTEL_SIP_SMC_SAFE_INJECT_SEU_ERR,
+			      SEU_SAFE_INJECT_DB_UE, 2, 0, 0, 0,
+			      0, 0, &result);
+	else
+		arm_smccc_smc(INTEL_SIP_SMC_SAFE_INJECT_SEU_ERR,
+			      SEU_SAFE_INJECT_SB_CE, 2, 0, 0, 0,
+			      0, 0, &result);
+
+	return count;
+}
+
 /********************** QSPI Device Functions **********************/
 
 #ifdef CONFIG_EDAC_ALTERA_QSPI
@@ -2296,6 +2355,83 @@ static int get_s10_sdram_edac_resource(struct device_node *np,
 	return ret;
 }
 
+static int altr_edac_device_add(struct altr_arria10_edac *edac,
+				struct platform_device *pdev, char *ecc_name)
+{
+	struct edac_device_ctl_info *dci;
+	struct altr_edac_device_dev *altdev;
+	int edac_idx;
+	int seu_irq;
+	int rc = 0;
+
+	seu_irq = platform_get_irq_byname(pdev, "seu");
+	if (seu_irq < 0) {
+		dev_warn(&pdev->dev, "no %s IRQ defined\n", "seu");
+		return 0;
+	}
+
+	edac_idx = edac_device_alloc_index();
+	dci = edac_device_alloc_ctl_info(sizeof(*altdev), ecc_name,
+					 1, ecc_name, 1, 0, NULL, 0,
+					 edac_idx);
+	if (!dci) {
+		edac_printk(KERN_ERR, EDAC_DEVICE,
+			    "%s: Unable to allocate EDAC device\n", ecc_name);
+		rc = -ENOMEM;
+		goto err_release_group;
+	}
+
+	altdev = dci->pvt_info;
+	dci->dev = edac->dev;
+	altdev->edac_dev_name = ecc_name;
+	altdev->edac_idx = edac_idx;
+	altdev->edac = edac;
+	altdev->edac_dev = dci;
+	altdev->ddev = *edac->dev;
+	dci->dev = &altdev->ddev;
+	dci->ctl_name = "Altera ECC Manager";
+	dci->mod_name = ecc_name;
+	dci->dev_name = ecc_name;
+
+	altdev->seu_irq = seu_irq;
+	rc = devm_request_threaded_irq(edac->dev, altdev->seu_irq, NULL,
+				       seu_irq_handler,	IRQF_ONESHOT,
+				       ecc_name, altdev);
+	if (rc) {
+		edac_printk(KERN_ERR, EDAC_DEVICE, "No SEU IRQ resource\n");
+		goto err_release_group1;
+	}
+
+	rc = edac_device_add_device(dci);
+	if (rc) {
+		dev_err(edac->dev, "edac_device_add_device failed\n");
+		rc = -ENOMEM;
+		goto err_release_group1;
+	}
+
+	if (IS_ENABLED(CONFIG_EDAC_DEBUG)) {
+		altdev->debugfs_dir = edac_debugfs_create_dir(ecc_name);
+		if (!altdev->debugfs_dir) {
+			rc = -EBUSY;
+			goto err_release_group1;
+		}
+
+		if (!edac_debugfs_create_file("altr_trigger", 0200,
+					      altdev->debugfs_dir, dci,
+					      &altr_edac_cram_inject_fops))
+			debugfs_remove_recursive(altdev->debugfs_dir);
+	}
+	return 0;
+
+err_release_group1:
+	edac_device_free_ctl_info(dci);
+err_release_group:
+	edac_printk(KERN_ERR, EDAC_DEVICE,
+		    "%s:Error setting up EDAC device: %d\n", ecc_name, rc);
+
+	return rc;
+}
+
 static int altr_edac_a10_device_add(struct altr_arria10_edac *edac,
 				    struct device_node *np)
 {
@@ -2713,7 +2849,7 @@ static int altr_edac_a10_probe(struct platform_device *pdev)
 					     NULL, &pdev->dev);
 #endif
 	}
-
+	altr_edac_device_add(edac, pdev, "cram");
 	return 0;
 }
 
