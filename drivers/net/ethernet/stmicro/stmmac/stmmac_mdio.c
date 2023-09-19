@@ -65,9 +65,9 @@ static void stmmac_xgmac2_c22_format(struct stmmac_priv *priv, int phyaddr,
 	u32 tmp = 0;
 
 	if (priv->synopsys_id < DWXGMAC_CORE_2_20) {
-		/* Until ver 2.20 XGMAC does not support C22 addr > 3 */
-		if (phyaddr > MII_XGMAC_MAX_C22ADDR)
-			return -ENODEV;
+		/* Until ver 2.20 XGMAC does not support C22 addr >= 4. Those
+		 * bits above bit 3 of XGMAC_MDIO_C22P register are reserved.
+		 */
 
 		tmp = readl(priv->ioaddr + XGMAC_MDIO_C22P);
 		tmp &= ~MII_XGMAC_C22P_MASK;
@@ -138,8 +138,9 @@ static int stmmac_xgmac2_mdio_read_c22(struct mii_bus *bus, int phyaddr,
 
 	priv = netdev_priv(ndev);
 
-	/* HW does not support C22 addr >= 4 */
-	if (phyaddr > MII_XGMAC_MAX_C22ADDR)
+	/* Until ver 2.20 XGMAC does not support C22 addr >= 4 */
+	if (priv->synopsys_id < DWXGMAC_CORE_2_20 &&
+	    phyaddr > MII_XGMAC_MAX_C22ADDR)
 		return -ENODEV;
 
 	stmmac_xgmac2_c22_format(priv, phyaddr, phyreg, &addr);
@@ -215,8 +216,9 @@ static int stmmac_xgmac2_mdio_write_c22(struct mii_bus *bus, int phyaddr,
 
 	priv = netdev_priv(ndev);
 
-	/* HW does not support C22 addr >= 4 */
-	if (phyaddr > MII_XGMAC_MAX_C22ADDR)
+	/* Until ver 2.20 XGMAC does not support C22 addr >= 4 */
+	if (priv->synopsys_id < DWXGMAC_CORE_2_20 &&
+	    phyaddr > MII_XGMAC_MAX_C22ADDR)
 		return -ENODEV;
 
 	stmmac_xgmac2_c22_format(priv, phyaddr, phyreg, &addr);
