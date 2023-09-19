@@ -378,6 +378,9 @@ struct altera_tse_private {
 	/* Shared PTP structure */
 	struct intel_fpga_tod_private ptp_priv;
 	u32 ptp_enable;
+	/* SGMII PCS address space */
+	void __iomem *pcs_base;
+
 
 	/* Interrupts */
 	u32 tx_irq;
