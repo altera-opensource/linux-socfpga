@@ -29,6 +29,8 @@
 #include <linux/phy.h>
 #include <linux/phylink.h>
 
+#include "intel_fpga_tod.h"
+
 #define ALTERA_TSE_SW_RESET_WATCHDOG_CNTR	10000
 #define ALTERA_TSE_MAC_FIFO_WIDTH		4	/* TX/RX FIFO width in
 							 * bytes
@@ -406,6 +408,12 @@ struct altera_tse_private {
 
 	/* TSE Revision */
 	u32	revision;
+
+	/* Shared PTP structure */
+	struct intel_fpga_tod_private ptp_priv;
+	int hwts_tx_en;
+	int hwts_rx_en;
+	u32 ptp_enable;
 
 	/* mSGDMA Rx Dispatcher address space */
 	void __iomem *rx_dma_csr;
