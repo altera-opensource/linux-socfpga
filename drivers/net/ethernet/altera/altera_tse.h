@@ -357,45 +357,11 @@ struct altera_tse_mac {
 #define ALTERA_TSE_TX_CMD_STAT_TX_SHIFT16	BIT(18)
 #define ALTERA_TSE_RX_CMD_STAT_RX_SHIFT16	BIT(25)
 
-/* Wrapper around a pointer to a socket buffer,
- * so a DMA handle can be stored along with the buffer
- */
-struct tse_buffer {
-	struct list_head lh;
-	struct sk_buff *skb;
-	dma_addr_t dma_addr;
-	u32 len;
-	int mapped_as_page;
-};
-
 struct altera_tse_private;
 
 #define ALTERA_DTYPE_SGDMA 1
 #define ALTERA_DTYPE_MSGDMA 2
 #define ALTERA_DTYPE_MSGDMA_PREF 3
-
-/* standard DMA interface for SGDMA and MSGDMA */
-struct altera_dmaops {
-	int altera_dtype;
-	int dmamask;
-	void (*reset_dma)(struct altera_tse_private *priv);
-	void (*enable_txirq)(struct altera_tse_private *priv);
-	void (*enable_rxirq)(struct altera_tse_private *priv);
-	void (*disable_txirq)(struct altera_tse_private *priv);
-	void (*disable_rxirq)(struct altera_tse_private *priv);
-	void (*clear_txirq)(struct altera_tse_private *priv);
-	void (*clear_rxirq)(struct altera_tse_private *priv);
-	netdev_tx_t (*tx_buffer)(struct altera_tse_private *priv,
-				 struct tse_buffer *buffer);
-	u32 (*tx_completions)(struct altera_tse_private *priv);
-	void (*add_rx_desc)(struct altera_tse_private *priv,
-			    struct tse_buffer *buffer);
-	u32 (*get_rx_status)(struct altera_tse_private *priv);
-	int (*init_dma)(struct altera_tse_private *priv);
-	void (*uninit_dma)(struct altera_tse_private *priv);
-	void (*start_rxdma)(struct altera_tse_private *priv);
-	void (*start_txdma)(struct altera_tse_private *priv);
-};
 
 /* This structure is private to each device.
  */
@@ -407,49 +373,15 @@ struct altera_tse_private {
 	/* MAC address space */
 	struct altera_tse_mac __iomem *mac_dev;
 
+	/* Shared DMA structure */
+	struct altera_dma_private dma_priv;
+
 	/* TSE Revision */
 	u32	revision;
 
 	/* Shared PTP structure */
 	struct intel_fpga_tod_private ptp_priv;
-	int hwts_tx_en;
-	int hwts_rx_en;
 	u32 ptp_enable;
-
-	/* mSGDMA Rx Dispatcher address space */
-	void __iomem *rx_dma_csr;
-	void __iomem *rx_dma_desc;
-	void __iomem *rx_dma_resp;
-
-	/* mSGDMA Tx Dispatcher address space */
-	void __iomem *tx_dma_csr;
-	void __iomem *tx_dma_desc;
-
-	/* mSGDMA Rx Prefecher address space */
-	void __iomem *rx_pref_csr;
-	struct msgdma_pref_extended_desc *pref_rxdesc;
-	dma_addr_t pref_rxdescphys;
-	u32 pref_rx_prod;
-
-	/* mSGDMA Tx Prefecher address space */
-	void __iomem *tx_pref_csr;
-	struct msgdma_pref_extended_desc *pref_txdesc;
-	dma_addr_t pref_txdescphys;
-	u32 rx_poll_freq;
-	u32 tx_poll_freq;
-
-	/* Rx buffers queue */
-	struct tse_buffer *rx_ring;
-	u32 rx_cons;
-	u32 rx_prod;
-	u32 rx_ring_size;
-	u32 rx_dma_buf_sz;
-
-	/* Tx ring buffer */
-	struct tse_buffer *tx_ring;
-	u32 tx_prod;
-	u32 tx_cons;
-	u32 tx_ring_size;
 
 	/* Interrupts */
 	u32 tx_irq;
