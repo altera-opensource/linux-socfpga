@@ -3761,7 +3761,7 @@ static int fcs_mmap(struct file *filp, struct vm_area_struct *vma)
 	size = vma->vm_end - vma->vm_start;
 
 	vma->vm_page_prot = pgprot_noncached(vma->vm_page_prot);
-	vma->vm_flags |= VM_DONTEXPAND;
+	vm_flags_set(vma, VM_DONTEXPAND);
 	for (off = 0; off < size; off += PAGE_SIZE) {
 		page = vmalloc_to_page(source_ptr + off);
 		if (vm_insert_page(vma, vma->vm_start + off, page))
