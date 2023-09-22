@@ -161,15 +161,18 @@ properties:
 
   resets:
     minItems: 1
+    maxItems: 8
+    additionalItems: true
     items:
-      - description: GMAC stmmaceth reset
-      - description: AHB reset
+      - description: MAC Reset signal
 
   reset-names:
     minItems: 1
-    items:
-      - const: stmmaceth
-      - const: ahb
+    maxItems: 8
+    additionalItems: true
+    contains:
+      enum:
+        - stmmaceth
 
   power-domains:
     maxItems: 1
