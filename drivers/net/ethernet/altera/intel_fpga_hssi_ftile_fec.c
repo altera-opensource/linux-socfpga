@@ -68,7 +68,7 @@ void ftile_ui_adjustments_init_worker(intel_fpga_xtile_eth_private *priv)
 
 	INIT_WORK(&priv->ui_worker, ftile_ui_adjustments);
 	timer_setup(&priv->fec_timer, ftile_ui_adjustments_worker_handle, 0);
-	ret = mod_timer(&priv->fec_timer, jiffies + msecs_to_jiffies(500));
+	ret = mod_timer(&priv->fec_timer, jiffies + msecs_to_jiffies(250));
 	if (ret)
 		netdev_err(priv->dev, "Timer failed to start UI adjustment\n");
 
@@ -288,7 +288,7 @@ ui_restart:
 	if (!priv->ui_enable)
 		return;
 
-	mod_timer(&priv->fec_timer, jiffies + msecs_to_jiffies(500));
+	mod_timer(&priv->fec_timer, jiffies + msecs_to_jiffies(250));
 }
 
 MODULE_LICENSE("GPL");
