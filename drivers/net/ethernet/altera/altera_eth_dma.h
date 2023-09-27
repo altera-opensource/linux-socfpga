@@ -112,7 +112,10 @@ struct altera_dma_resp {
 struct altera_dmaops {
 	enum altera_dma_type altera_dtype;
 	int dmamask;
+	void (*quiese_pref)(struct altera_dma_private *priv);
 	void (*reset_dma)(struct altera_dma_private *priv);
+	bool (*is_txirq_set)(struct altera_dma_private *priv);
+	bool (*is_rxirq_set)(struct altera_dma_private *priv);
 	void (*enable_txirq)(struct altera_dma_private *priv);
 	void (*enable_rxirq)(struct altera_dma_private *priv);
 	void (*disable_txirq)(struct altera_dma_private *priv);

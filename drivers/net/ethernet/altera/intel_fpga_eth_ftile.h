@@ -1919,5 +1919,6 @@ struct intel_fpga_ftile_xcvr {
 /* Function prototypes */
 void ftile_ui_adjustments(struct work_struct *work);
 void ftile_ui_adjustments_init_worker(intel_fpga_xtile_eth_private *priv);
+void ui_adjustments_cancel_worker(intel_fpga_xtile_eth_private *priv);
 
 #endif

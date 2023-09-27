@@ -17,7 +17,10 @@
 #ifndef __ALTERA_PREF_MSGDMA_H__
 #define __ALTERA_PREF_MSGDMA_H__
 
+void msgdma_pref_quiese(struct altera_dma_private *priv);
 void msgdma_pref_reset(struct altera_dma_private *priv);
+bool msgdma_pref_is_txirq(struct altera_dma_private *priv);
+bool msgdma_pref_is_rxirq(struct altera_dma_private *priv);
 void msgdma_pref_enable_txirq(struct altera_dma_private *priv);
 void msgdma_pref_enable_rxirq(struct altera_dma_private *priv);
 void msgdma_pref_disable_rxirq(struct altera_dma_private *priv);

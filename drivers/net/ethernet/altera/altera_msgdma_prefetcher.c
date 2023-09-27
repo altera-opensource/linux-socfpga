@@ -127,6 +127,18 @@ void msgdma_pref_uninitialize(struct altera_dma_private *priv)
 				  priv->pref_txdesc, priv->pref_txdescphys);
 }
 
+bool msgdma_pref_is_txirq(struct altera_dma_private *priv)
+{
+       return tse_bit_is_set(priv->tx_pref_csr,
+		       msgdma_pref_csroffs(status), MSGDMA_PREF_STAT_IRQ);
+}
+
+bool msgdma_pref_is_rxirq(struct altera_dma_private *priv)
+{
+       return tse_bit_is_set(priv->rx_pref_csr,
+		       msgdma_pref_csroffs(status), MSGDMA_PREF_STAT_IRQ);
+}
+
 void msgdma_pref_enable_txirq(struct altera_dma_private *priv)
 {
 	tse_set_bit(priv->tx_pref_csr, msgdma_pref_csroffs(control),
@@ -275,6 +287,96 @@ u32 msgdma_pref_tx_completions(struct altera_dma_private *priv)
 	return ready;
 }
 
+static void msgdma_confirm_fill_levels(struct altera_dma_private *priv)
+{
+	int counter;
+	int ret;
+
+	/* Look at the prefill level and wait for it to become 0 */
+
+	/* 1. Tx Read write fill level */
+	counter = 0;
+	while (counter++ < ALTERA_TSE_SW_RESET_WATCHDOG_CNTR) {
+		ret = csrrd32(priv->tx_dma_csr, msgdma_csroffs(rw_fill_level));
+		ret &= MSGDMA_CSR_FILL_LEVEL_VALID;
+
+		if (ret == 0)
+			break;
+
+		udelay(1);
+	}
+
+	if (counter >= ALTERA_TSE_SW_RESET_WATCHDOG_CNTR)
+		netdev_err(priv->dev,
+			   "Tx DMA RW Fill level never cleared! 0x%X\n", ret);
+
+	/* 2. TX response fill level */
+	counter = 0;
+	while (counter++ < ALTERA_TSE_SW_RESET_WATCHDOG_CNTR) {
+		ret = MSGDMA_CSR_RESP_FILL_LEVEL_GET(csrrd32(priv->tx_dma_csr,
+						     msgdma_csroffs(resp_fill_level)));
+		if (ret == 0)
+			break;
+
+		udelay(1);
+	}
+
+	if (counter >= ALTERA_TSE_SW_RESET_WATCHDOG_CNTR)
+		netdev_err(priv->dev,
+			   "Rx DMA RW Fill level never cleared! 0x%X\n", ret);
+
+	/* 3. RX response fill level */
+	counter = 0;
+	while (counter++ < ALTERA_TSE_SW_RESET_WATCHDOG_CNTR) {
+		ret = MSGDMA_CSR_RESP_FILL_LEVEL_GET(csrrd32(priv->rx_dma_csr,
+						     msgdma_csroffs(resp_fill_level)));
+		if (ret == 0)
+			break;
+
+		udelay(1);
+	}
+
+	if (counter >= ALTERA_TSE_SW_RESET_WATCHDOG_CNTR)
+		netdev_err(priv->dev,
+			   "Rx DMA RW Fill level never cleared! 0x%X\n", ret);
+
+	return;
+}
+
+void msgdma_pref_quiese(struct altera_dma_private *priv) {
+
+	int counter;
+
+	/* Stop the dispatcher from processing any descriptor */
+	tse_set_bit(priv->tx_dma_csr, msgdma_csroffs(control),MSGDMA_CSR_CTL_STOP_DESCS);
+	tse_set_bit(priv->rx_dma_csr, msgdma_csroffs(control),MSGDMA_CSR_CTL_STOP_DESCS);
+
+        /* wait for the stop */
+	counter = 0;
+	while (counter++ < ALTERA_TSE_SW_RESET_WATCHDOG_CNTR) {
+		if (tse_bit_is_set(priv->tx_dma_csr,
+				   msgdma_csroffs(status),
+				   MSGDMA_CSR_STAT_STOPPED))
+			break;
+
+		udelay(1);
+        }
+
+	if (counter >= ALTERA_TSE_SW_RESET_WATCHDOG_CNTR)
+		netdev_err(priv->dev,
+			   "TX DMA stop bit not set");
+
+	counter = 0;
+	while (counter++ < ALTERA_TSE_SW_RESET_WATCHDOG_CNTR) {
+		if (tse_bit_is_set(priv->rx_dma_csr,
+				   msgdma_csroffs(status),
+				   MSGDMA_CSR_STAT_STOPPED))
+			break;
+
+            udelay(1);
+	}
+}
+
 void msgdma_pref_reset(struct altera_dma_private *priv)
 {
 	int counter;
@@ -284,6 +386,11 @@ void msgdma_pref_reset(struct altera_dma_private *priv)
 		      MSGDMA_PREF_CTL_DESC_POLL_EN);
 	tse_clear_bit(priv->tx_pref_csr, msgdma_pref_csroffs(control),
 		      MSGDMA_PREF_CTL_DESC_POLL_EN);
+
+	msgdma_pref_quiese(priv);
+
+	//Look at the prefill level and wait for it to become 0
+	msgdma_confirm_fill_levels(priv);
 
 	/* Reset the RX Prefetcher */
 	csrwr32(MSGDMA_PREF_STAT_IRQ, priv->rx_pref_csr,

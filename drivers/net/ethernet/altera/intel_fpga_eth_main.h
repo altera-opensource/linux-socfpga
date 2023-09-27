@@ -29,7 +29,7 @@
 #define FLOW_TX         2
 #define FLOW_ON         (FLOW_TX | FLOW_RX)
 
-/* TX Flow Control */ 
+/* TX Flow Control */
 #define MAC_PAUSEFRAME_QUANTA					0xFFFF
 
 #define INTEL_FPGA_XTILE_SW_RESET_WATCHDOG_CNTR              1000000
@@ -39,6 +39,13 @@
 #define INTEL_FPGA_WORD_ALIGN   32
 
 #define MOD_PARAM_PERM  0644
+
+typedef enum {
+	ETH_LINK_STATE_RESET = 0,
+	ETH_LINK_STATE_START,
+	ETH_LINK_STATE_STOP,
+	ETH_LINK_STATE_RUN
+} xtile_eth_link_state;
 
 typedef struct {
 
@@ -83,13 +90,21 @@ typedef struct {
         u8 qsfp_lane;
         bool autoneg;
         bool ptp_enable;
-        bool curr_link_state;
+        xtile_eth_link_state link_state;
         bool cable_unplugged;
         bool ui_enable;
         bool monitor_thread_enable;
         bool napi_state;
+	bool netque_state;
+	bool tx_irq_enabled;
+	bool rx_irq_enabled;
+	u64 irq_tx_enable_cntr;
+	u64 irq_rx_enable_cntr;
+	u64 irq_tx_disable_cntr;
+	u64 irq_rx_disable_cntr;
 
-        spinlock_t tx_lock;
+	rwlock_t wr_lock;
+	spinlock_t tx_lock;
         spinlock_t mac_cfg_lock;
         spinlock_t rxdma_irq_lock;
 
@@ -132,22 +147,26 @@ int etile_ehip_reset(intel_fpga_xtile_eth_private *priv,
 int etile_ehip_deassert_reset(intel_fpga_xtile_eth_private *priv);
 void intel_fpga_etile_set_ethtool_ops(struct net_device *netdev);
 
-int ftile_init_mac(intel_fpga_xtile_eth_private *priv);
-void ftile_get_stats64(struct net_device *dev,
-                       struct rtnl_link_stats64 *storage);
-int ftile_ehip_reset(intel_fpga_xtile_eth_private *priv,
-			bool tx_reset, bool rx_reset, bool sys_reset);
-int ftile_ehip_deassert_reset(intel_fpga_xtile_eth_private *priv);
-void ftile_update_mac_addr(intel_fpga_xtile_eth_private *priv);
-bool ftile_ptp_rx_ready_bit_is_set(intel_fpga_xtile_eth_private *priv);
-void ftile_init_ptp_userflow(intel_fpga_xtile_eth_private *priv);
-extern void intel_fpga_ftile_set_ethtool_ops(struct net_device *dev);
-void ftile_convert_eth_speed_to_eth_rate(intel_fpga_xtile_eth_private *priv);
-int xtile_check_counter_complete(intel_fpga_xtile_eth_private *priv, 
-				 u32 regbank,
-				 size_t offs, 
-				 u8 bit_mask, 
-				 bool set_bit,
-				 int align);
 
+
+extern int ftile_ehip_reset(intel_fpga_xtile_eth_private *priv,
+                        bool tx_reset, bool rx_reset, bool sys_reset);
+extern int ftile_ehip_deassert_reset(intel_fpga_xtile_eth_private *priv);
+extern int ftile_init(intel_fpga_xtile_eth_private *priv);
+extern int ftile_uninit(intel_fpga_xtile_eth_private *priv);
+extern int ftile_start(intel_fpga_xtile_eth_private *priv);
+extern int ftile_stop(intel_fpga_xtile_eth_private *priv);
+extern int ftile_run_check(intel_fpga_xtile_eth_private *priv);
+extern void ftile_update_mac_addr(intel_fpga_xtile_eth_private *priv);
+extern bool ftile_get_link_fault_status(intel_fpga_xtile_eth_private *priv);
+extern void intel_fpga_ftile_set_ethtool_ops(struct net_device *dev);
+extern void ftile_get_stats64(struct net_device *dev,
+			      struct rtnl_link_stats64 *storage);
+
+int xtile_check_counter_complete(intel_fpga_xtile_eth_private *priv,
+                                 u32 regbank,
+                                 size_t offs,
+                                 u8 bit_mask,
+                                 bool set_bit,
+                                 int align);
 #endif
