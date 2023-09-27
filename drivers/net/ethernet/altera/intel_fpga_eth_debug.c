@@ -244,14 +244,13 @@ static ssize_t link_state_show(struct device *dev,
         struct platform_device *pdev = to_platform_device(dev);
         struct net_device *ndev = platform_get_drvdata(pdev);
         intel_fpga_xtile_eth_private *priv=  netdev_priv(ndev);
-	u32 port = priv->hssi_port;
 	bool link_sts;
 
 	netdev_info(priv->dev,
 			"Cable is %s\n", priv->cable_unplugged ?
 			"not connected":"connected");
 
-	link_sts = hssi_ethport_is_stable(pdev, port, false);
+	link_sts = hssi_ethport_is_stable(priv->pdev_hssi, priv->hssi_port, false);
 	netdev_info(priv->dev,
 			"Eth link %s\n", link_sts ?
 			"stable" : "not stable");

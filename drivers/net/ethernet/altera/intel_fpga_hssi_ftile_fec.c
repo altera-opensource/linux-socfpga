@@ -62,6 +62,22 @@ void ftile_ui_adjustments_worker_handle(struct timer_list *t)
 	schedule_work(&priv->ui_worker);
 }
 
+void ui_adjustments_cancel_worker(intel_fpga_xtile_eth_private *priv)
+{
+
+        /* if the ui adjustment timer is already cancelled and we request
+         * cancel again, case should be avoided
+         */
+        if (priv->ui_enable) {
+		/*  we cancel the timer so that it doesn't schedule new
+		 * worker thread execution
+		 */
+		priv->ui_enable = false;
+		del_timer_sync(&priv->fec_timer);
+		cancel_work_sync(&priv->ui_worker);
+	}
+}
+
 void ftile_ui_adjustments_init_worker(intel_fpga_xtile_eth_private *priv)
 {
 	int ret;
