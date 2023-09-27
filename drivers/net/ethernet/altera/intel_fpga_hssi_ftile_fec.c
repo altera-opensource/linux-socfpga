@@ -32,7 +32,7 @@
 
 static void get_min_max_ui(intel_fpga_xtile_eth_private *priv, u64 *min_ui, u64 *max_ui)
 {
-	if (!priv || !min_ui || !max_ui) {
+	if (!min_ui || !max_ui) {
 		dev_warn(priv->device, "%s: Invalid params\n", __func__);
 		return;
 	}
