@@ -2656,17 +2656,12 @@ int usb_authorize_device(struct usb_device *usb_dev)
 	}
 
 	if (usb_dev->wusb) {
-		struct usb_device_descriptor *descr;
-
-		descr = usb_get_device_descriptor(usb_dev);
-		if (IS_ERR(descr)) {
-			result = PTR_ERR(descr);
+		result = usb_get_device_descriptor(usb_dev, sizeof(usb_dev->descriptor));
+		if (result < 0) {
 			dev_err(&usb_dev->dev, "can't re-read device descriptor for "
 				"authorization: %d\n", result);
 			goto error_device_descriptor;
 		}
-		usb_dev->descriptor = *descr;
-		kfree(descr);
 	}
 
 	usb_dev->authorized = 1;
@@ -4752,7 +4747,7 @@ hub_port_init(struct usb_hub *hub, struct usb_device *udev, int port1,
 	const char		*driver_name;
 	bool			do_new_scheme;
 	int			maxp0;
-	struct usb_device_descriptor	*buf, *descr;
+	struct usb_device_descriptor	*buf;
 
 	buf = kmalloc(GET_DESCRIPTOR_BUFSIZE, GFP_NOIO);
 	if (!buf)
@@ -4989,16 +4984,15 @@ hub_port_init(struct usb_hub *hub, struct usb_device *udev, int port1,
 		usb_ep0_reinit(udev);
 	}
 
-	descr = usb_get_device_descriptor(udev);
-	if (IS_ERR(descr)) {
-		retval = PTR_ERR(descr);
+	retval = usb_get_device_descriptor(udev, USB_DT_DEVICE_SIZE);
+	if (retval < (signed)sizeof(udev->descriptor)) {
 		if (retval != -ENODEV)
 			dev_err(&udev->dev, "device descriptor read/all, error %d\n",
 					retval);
+		if (retval >= 0)
+			retval = -ENOMSG;
 		goto fail;
 	}
-	udev->descriptor = *descr;
-	kfree(descr);
 
 	/*
 	 * Some superspeed devices have finished the link training process
@@ -5117,7 +5111,7 @@ hub_power_remaining(struct usb_hub *hub)
 
 
 static int descriptors_changed(struct usb_device *udev,
-		struct usb_device_descriptor *new_device_descriptor,
+		struct usb_device_descriptor *old_device_descriptor,
 		struct usb_host_bos *old_bos)
 {
 	int		changed = 0;
@@ -5128,8 +5122,8 @@ static int descriptors_changed(struct usb_device *udev,
 	int		length;
 	char		*buf;
 
-	if (memcmp(&udev->descriptor, new_device_descriptor,
-			sizeof(*new_device_descriptor)) != 0)
+	if (memcmp(&udev->descriptor, old_device_descriptor,
+			sizeof(*old_device_descriptor)) != 0)
 		return 1;
 
 	if ((old_bos && !udev->bos) || (!old_bos && udev->bos))
@@ -5449,8 +5443,9 @@ static void hub_port_connect_change(struct usb_hub *hub, int port1,
 {
 	struct usb_port *port_dev = hub->ports[port1 - 1];
 	struct usb_device *udev = port_dev->child;
-	struct usb_device_descriptor *descr;
+	struct usb_device_descriptor descriptor;
 	int status = -ENODEV;
+	int retval;
 
 	dev_dbg(&port_dev->dev, "status %04x, change %04x, %s\n", portstatus,
 			portchange, portspeed(hub, portstatus));
@@ -5477,20 +5472,23 @@ static void hub_port_connect_change(struct usb_hub *hub, int port1,
 			 * changed device descriptors before resuscitating the
 			 * device.
 			 */
-			descr = usb_get_device_descriptor(udev);
-			if (IS_ERR(descr)) {
+			descriptor = udev->descriptor;
+			retval = usb_get_device_descriptor(udev,
+					sizeof(udev->descriptor));
+			if (retval < 0) {
 				dev_dbg(&udev->dev,
-						"can't read device descriptor %ld\n",
-						PTR_ERR(descr));
+						"can't read device descriptor %d\n",
+						retval);
 			} else {
-				if (descriptors_changed(udev, descr,
+				if (descriptors_changed(udev, &descriptor,
 						udev->bos)) {
 					dev_dbg(&udev->dev,
 							"device descriptor has changed\n");
+					/* for disconnect() calls */
+					udev->descriptor = descriptor;
 				} else {
 					status = 0; /* Nothing to do */
 				}
-				kfree(descr);
 			}
 #ifdef CONFIG_PM
 		} else if (udev->state == USB_STATE_SUSPENDED &&
