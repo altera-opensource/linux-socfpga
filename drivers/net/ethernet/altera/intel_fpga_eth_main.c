@@ -1957,6 +1957,10 @@ static int intel_fpga_xtile_probe(struct platform_device *pdev)
 
 	/* Default, Need to change this */
 	priv->pma_lanes_used = 1;
+
+	/* make the carrier off by default */
+	netif_carrier_off(ndev);
+
 	return 0;
 
 err_init_fec:
