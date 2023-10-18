@@ -147,6 +147,13 @@
 		interrupt-parent = <&intc>;
 		ranges = <0 0 0 0xffffffff>;
 
+		base_fpga_region {
+			#address-cells = <0x2>;
+			#size-cells = <0x2>;
+			compatible = "fpga-region";
+			fpga-mgr = <&fpga_mgr>;
+		};
+
 		clkmgr: clock-controller@10d10000 {
 			compatible = "intel,agilex5-clkmgr";
 			reg = <0x10d10000 0x1000>;
@@ -795,7 +802,7 @@
 			interrupt-names = "eventq", "gerror", "priq";
 			dma-coherent;
 			#iommu-cells = <1>;
-			status = "disabled";
+			status = "okay";
 		};
 
 		spi0: spi@10da4000 {
@@ -1117,12 +1124,18 @@
 
 		firmware {
 			svc {
-				compatible = "intel,agilex-svc";
+				compatible = "intel,agilex5-svc";
 				method = "smc";
 				memory-region = <&service_reserved>;
+				iommus = <&smmu 10>;
 
-				temp_volt: hwmon {
-					compatible = "intel,soc64-hwmon";
+				fpga_mgr: fpga-mgr {
+					compatible = "intel,agilex-soc-fpga-mgr";
+				};
+
+				fcs: fcs {
+					compatible = "intel,agilex-soc-fcs";
+					platform = "agilex";
 				};
 			};
 		};
