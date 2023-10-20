@@ -10254,7 +10254,7 @@ F:	drivers/infiniband/hw/irdma/
 F:	include/uapi/rdma/irdma-abi.h
 
 INTEL FPGA QUAD SPEED ETHERNET DRIVER
-M:      Joyce Ooi <joyce.ooi@intel.com>
+M:	Jim Swee <leong.ching.swee@intel.com>
 L:      netdev@vger.kernel.org
 S:      Maintained
 F:      Documentation/devicetree/bindings/net/intel_fpga_qse.txt
