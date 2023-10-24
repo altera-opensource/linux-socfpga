@@ -1752,7 +1752,7 @@ void *stratix10_svc_allocate_memory(struct stratix10_svc_chan *chan,
 	struct gen_pool *genpool = chan->ctrl->genpool;
 	size_t s;
 	void *va;
-	unsigned int ret;
+	int ret;
 	struct iova *alloc;
 	dma_addr_t dma_addr;
 
@@ -1924,6 +1924,7 @@ static int stratix10_svc_drv_probe(struct platform_device *pdev)
 					pr_debug("Intel Service Layer Driver: IOVA cache failed\n");
 					iommu_domain_free(controller->domain);
 					ret = -ENODEV;
+					goto err_destroy_pool;
 				}
 				ret = iommu_attach_device(controller->domain, dev);
 				if (ret) {
