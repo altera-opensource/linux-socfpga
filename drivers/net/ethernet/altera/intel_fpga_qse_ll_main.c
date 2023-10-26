@@ -1623,7 +1623,8 @@ static int intel_fpga_qse_ll_remove(struct platform_device *pdev)
 	if (priv->ptp_enable)
 		intel_fpga_tod_unregister(&priv->ptp_priv);
 
-	phylink_destroy(priv->phylink);
+	if (priv->phylink)
+		phylink_destroy(priv->phylink);
 
 	platform_set_drvdata(pdev, NULL);
 	unregister_netdev(ndev);
