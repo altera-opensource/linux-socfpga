@@ -996,22 +996,12 @@ static int __init fpga_mgr_class_init(void)
 {
 	pr_info("FPGA manager framework\n");
 
-	fpga_mgr_class = class_create("fpga_manager");
-	if (IS_ERR(fpga_mgr_class))
-		return PTR_ERR(fpga_mgr_class);
-
-	fpga_mgr_class->dev_groups = fpga_mgr_groups;
-	fpga_mgr_class->dev_release = fpga_mgr_dev_release;
-
-	fpga_mgr_debugfs_init();
-
-	return 0;
+	return class_register(&fpga_mgr_class);
 }
 
 static void __exit fpga_mgr_class_exit(void)
 {
-	fpga_mgr_debugfs_uninit();
-	class_destroy(fpga_mgr_class);
+	class_unregister(&fpga_mgr_class);
 	ida_destroy(&fpga_mgr_ida);
 }
 
