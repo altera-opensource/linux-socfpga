@@ -45,7 +45,7 @@ static int create_overlay(struct cfs_overlay_item *overlay, const void *blob,
 {
 	int err;
 
-	err = of_overlay_fdt_apply(blob, size, &overlay->ov_id);
+	err = of_overlay_fdt_apply(blob, size, &overlay->ov_id, NULL);
 	if (err < 0)
 		pr_err("%s: Failed to create overlay (err=%d)\n", __func__,
 		       err);
