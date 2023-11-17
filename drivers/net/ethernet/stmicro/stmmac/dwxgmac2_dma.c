@@ -372,17 +372,17 @@ static int dwxgmac2_dma_interrupt(struct stmmac_priv *priv,
 	}
 
 	/* TX/RX NORMAL interrupts */
-	if (likely(intr_status & XGMAC_NIS))
-		x->normal_irq_n++;
-
 	if (likely(intr_status & XGMAC_RI)) {
-		x->rx_normal_irq_n++;
-		x->rxq_stats[chan].rx_normal_irq_n++;
-		ret |= handle_rx;
+		u64_stats_update_begin(&rxq_stats->syncp);
+		rxq_stats->rx_normal_irq_n++;
+		u64_stats_update_end(&rxq_stats->syncp);
+	    ret |= handle_rx;
 	}
+
 	if (likely(intr_status & (XGMAC_TI | XGMAC_TBU))) {
-		x->tx_normal_irq_n++;
-		x->txq_stats[chan].tx_normal_irq_n++;
+		u64_stats_update_begin(&txq_stats->syncp);
+		txq_stats->tx_normal_irq_n++;
+		u64_stats_update_end(&txq_stats->syncp);
 		ret |= handle_tx;
 	}
 
