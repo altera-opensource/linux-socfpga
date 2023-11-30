@@ -35,6 +35,8 @@
 
 #define ETHTOOL_DMA_OFFSET	55
 
+#define STMMAC_QBV_STATS_CNT	2
+
 struct stmmac_stats {
 	char stat_string[ETH_GSTRING_LEN];
 	int sizeof_stat;
@@ -563,6 +565,19 @@ static void stmmac_get_per_qstats(struct stmmac_priv *priv, u64 *data)
 			p += sizeof(unsigned long);
 		}
 	}
+	for (q = 0; q < tx_cnt; q++) {
+		p = (char *)priv +
+		    offsetof(struct stmmac_priv, xstats.max_sdu_txq_drop[q]);
+		*data = (*(unsigned long *)p);
+		p = (char *)priv +
+		    offsetof(struct stmmac_priv, xstats.mtl_est_txq_hlbf[q]);
+		*data++ += (*(unsigned long *)p);
+	}
+	for (q = 0; q < tx_cnt; q++) {
+		p = (char *)priv + offsetof(struct stmmac_priv,
+					    xstats.est_tx_overrun[q]);
+		*data++ = (*(unsigned long *)p);
+	}
 }
 
 static void stmmac_get_ethtool_stats(struct net_device *dev,
@@ -629,7 +644,7 @@ static int stmmac_get_sset_count(struct net_device *netdev, int sset)
 	case ETH_SS_STATS:
 		len = STMMAC_STATS_LEN +
 		      STMMAC_TXQ_STATS * tx_cnt +
-		      STMMAC_RXQ_STATS * rx_cnt;
+		      STMMAC_RXQ_STATS * rx_cnt + STMMAC_QBV_STATS_CNT * tx_cnt;
 
 		if (priv->dma_cap.rmon)
 			len += STMMAC_MMC_STATS_LEN;
@@ -671,6 +686,14 @@ static void stmmac_get_qstats_string(struct stmmac_priv *priv, u8 *data)
 				 stmmac_qstats_rx_string[stat]);
 			data += ETH_GSTRING_LEN;
 		}
+	}
+	for (q = 0; q < tx_cnt; q++) {
+		snprintf(data, ETH_GSTRING_LEN, "q%d_est_window_drops", q);
+		data += ETH_GSTRING_LEN;
+	}
+	for (q = 0; q < tx_cnt; q++) {
+		snprintf(data, ETH_GSTRING_LEN, "q%d_est_tx_overruns", q);
+		data += ETH_GSTRING_LEN;
 	}
 }
 
