@@ -1119,6 +1119,15 @@ static int tc_setup_taprio(struct stmmac_priv *priv,
 
 	priv->plat->est->ter = qopt->cycle_time_extension;
 
+	for (i = 0; i < plat->tx_queues_to_use; i++) {
+		if (qopt->max_sdu[i])
+			plat->est->max_sdu[i] = qopt->max_sdu[i] +
+						priv->dev->hard_header_len -
+						ETH_TLEN;
+		else
+			plat->est->max_sdu[i] = 0;
+	}
+
 	if (fpe && !priv->dma_cap.fpesel) {
 		mutex_unlock(&priv->plat->est->lock);
 		return -EOPNOTSUPP;
@@ -1220,6 +1229,25 @@ static int tc_setup_preempt(struct stmmac_priv *priv,
 	return 0;
 }
 
+static int tc_query_caps(struct stmmac_priv *priv,
+			 struct tc_query_caps_base *base)
+{
+	switch (base->type) {
+	case TC_SETUP_QDISC_TAPRIO: {
+		struct tc_taprio_caps *caps = base->caps;
+
+		if (!priv->dma_cap.estsel)
+			return -EOPNOTSUPP;
+
+		caps->supports_queue_max_sdu = true;
+
+		return 0;
+	}
+	default:
+		return -EOPNOTSUPP;
+	}
+}
+
 const struct stmmac_tc_ops dwmac510_tc_ops = {
 	.init = tc_init,
 	.setup_cls_u32 = tc_setup_cls_u32,
@@ -1228,4 +1256,5 @@ const struct stmmac_tc_ops dwmac510_tc_ops = {
 	.setup_taprio = tc_setup_taprio,
 	.setup_etf = tc_setup_etf,
 	.setup_preempt = tc_setup_preempt,
+	.query_caps = tc_query_caps,
 };
