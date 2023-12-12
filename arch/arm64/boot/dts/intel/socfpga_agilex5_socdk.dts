@@ -73,7 +73,7 @@
 };
 
 &gmac2 {
-	status = "disabled";
+	status = "okay";
 	phy-mode = "rgmii";
 	phy-handle = <&emac2_phy0>;
 
@@ -83,8 +83,8 @@
 		#address-cells = <1>;
 		#size-cells = <0>;
 		compatible = "snps,dwmac-mdio";
-		emac2_phy0: ethernet-phy@1 {
-			reg = <1>;
+		emac2_phy0: ethernet-phy@0 {
+			reg = <0>;
 		};
 	};
 };
