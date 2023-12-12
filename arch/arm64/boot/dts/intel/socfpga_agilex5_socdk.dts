@@ -22,6 +22,7 @@
 			panic=-1 nosmp rootfstype=ext3";
 	};
 
+/*
 	leds {
 		compatible = "gpio-leds";
 		hps0 {
@@ -39,6 +40,7 @@
 			gpios = <&portb 21 GPIO_ACTIVE_HIGH>;
 		};
 	};
+*/
 
 	memory {
 		device_type = "memory";
@@ -50,11 +52,11 @@
 };
 
 &gpio1 {
-	status = "okay";
+	status = "disabled";
 };
 
 &gmac0 {
-	status = "okay";
+	status = "disabled";
 	phy-mode = "rgmii";
 	phy-handle = <&emac0_phy0>;
 
@@ -71,7 +73,7 @@
 };
 
 &gmac2 {
-	status = "okay";
+	status = "disabled";
 	phy-mode = "rgmii";
 	phy-handle = <&emac2_phy0>;
 
@@ -142,7 +144,7 @@
 };
 
 &usb0 {
-	status = "okay";
+	status = "disabled";
 	disable-over-current;
 };
 
@@ -151,23 +153,23 @@
 };
 
 &watchdog0 {
-	status = "okay";
+	status = "disabled";
 };
 &watchdog1 {
-	status = "okay";
+	status = "disabled";
 };
 &watchdog2 {
-	status = "okay";
+	status = "disabled";
 };
 &watchdog3 {
-	status = "okay";
+	status = "disabled";
 };
 &watchdog4 {
-	status = "okay";
+	status = "disabled";
 };
 
 &qspi {
-	status = "okay";
+	status = "disabled";
 	flash@0 {
 		#address-cells = <1>;
 		#size-cells = <1>;
