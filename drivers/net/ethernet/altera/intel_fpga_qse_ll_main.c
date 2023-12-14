@@ -1634,7 +1634,7 @@ static int intel_fpga_qse_ll_remove(struct platform_device *pdev)
 
 static const struct altera_dmaops altera_dtype_prefetcher = {
 	.altera_dtype = ALTERA_DTYPE_MSGDMA_PREF,
-	.dmamask = 64,
+	.dmamask = 32,
 	.reset_dma = msgdma_pref_reset,
 	.enable_txirq = msgdma_pref_enable_txirq,
 	.enable_rxirq = msgdma_pref_enable_rxirq,
