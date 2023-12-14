@@ -102,6 +102,10 @@ static int intel_fpga_tod_adjust_fine(struct ptp_clock_info *ptp,
 	u64 new_ppb;
 
 	rate = clk_get_rate(priv->tod_clk);
+	if (!rate) {
+		ret = -ERANGE;
+		goto out;
+	}
 
 	/* From scaled_ppm_to_ppb */
 	ppb = 1 + scaled_ppm;
