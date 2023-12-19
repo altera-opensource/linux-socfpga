@@ -19,6 +19,7 @@
 #include <linux/spinlock.h>
 #include <linux/timer.h>
 #include <linux/workqueue.h>
+#include <linux/qsfp.h>
 
 #include "sfp.h"
 #include "swphy.h"
@@ -76,10 +77,15 @@ struct phylink {
 	bool using_mac_select_pcs;
 
 	struct sfp_bus *sfp_bus;
+	struct qsfp_bus *qsfp_bus;
 	bool sfp_may_have_phy;
+	bool qsfp_may_have_phy;
 	DECLARE_PHY_INTERFACE_MASK(sfp_interfaces);
+	DECLARE_PHY_INTERFACE_MASK(qsfp_interfaces);
 	__ETHTOOL_DECLARE_LINK_MODE_MASK(sfp_support);
+	__ETHTOOL_DECLARE_LINK_MODE_MASK(qsfp_support);
 	u8 sfp_port;
+	u8 qsfp_port;
 };
 
 #define phylink_printk(level, pl, fmt, ...) \
@@ -1407,6 +1413,7 @@ static void phylink_fixed_poll(struct timer_list *t)
 }
 
 static const struct sfp_upstream_ops sfp_phylink_ops;
+static const struct qsfp_upstream_ops qsfp_phylink_ops;
 
 static int phylink_register_sfp(struct phylink *pl,
 				struct fwnode_handle *fwnode)
@@ -1427,6 +1434,29 @@ static int phylink_register_sfp(struct phylink *pl,
 
 	ret = sfp_bus_add_upstream(bus, pl, &sfp_phylink_ops);
 	sfp_bus_put(bus);
+
+	return ret;
+}
+
+static int phylink_register_qsfp(struct phylink *pl,
+				 struct fwnode_handle *fwnode)
+{
+	struct qsfp_bus *bus;
+	int ret;
+
+	if (!fwnode)
+		return 0;
+
+	bus = qsfp_bus_find_fwnode(fwnode);
+	if (IS_ERR(bus)) {
+		phylink_err(pl, "unable to attach QSFP bus: %pe\n", bus);
+		return PTR_ERR(bus);
+	}
+
+	pl->qsfp_bus = bus;
+
+	ret = qsfp_bus_add_upstream(bus, pl, &qsfp_phylink_ops);
+	qsfp_bus_put(bus);
 
 	return ret;
 }
@@ -1524,6 +1554,7 @@ struct phylink *phylink_create(struct phylink_config *config,
 	pl->cur_link_an_mode = pl->cfg_link_an_mode;
 
 	ret = phylink_register_sfp(pl, fwnode);
+	ret = phylink_register_qsfp(pl, fwnode);
 	if (ret < 0) {
 		kfree(pl);
 		return ERR_PTR(ret);
@@ -1545,6 +1576,7 @@ EXPORT_SYMBOL_GPL(phylink_create);
 void phylink_destroy(struct phylink *pl)
 {
 	sfp_bus_del_upstream(pl->sfp_bus);
+	qsfp_bus_del_upstream(pl->qsfp_bus);
 	if (pl->link_gpio)
 		gpiod_put(pl->link_gpio);
 
@@ -1702,7 +1734,7 @@ static int phylink_attach_phy(struct phylink *pl, struct phy_device *phy,
 {
 	if (WARN_ON(pl->cfg_link_an_mode == MLO_AN_FIXED ||
 		    (pl->cfg_link_an_mode == MLO_AN_INBAND &&
-		     phy_interface_mode_is_8023z(interface) && !pl->sfp_bus)))
+		     phy_interface_mode_is_8023z(interface) && !(pl->qsfp_bus || pl->sfp_bus))))
 		return -EINVAL;
 
 	if (pl->phydev)
@@ -1943,6 +1975,8 @@ void phylink_start(struct phylink *pl)
 		phy_start(pl->phydev);
 	if (pl->sfp_bus)
 		sfp_upstream_start(pl->sfp_bus);
+	if (pl->qsfp_bus)
+		qsfp_upstream_start(pl->qsfp_bus);
 }
 EXPORT_SYMBOL_GPL(phylink_start);
 
@@ -1964,6 +1998,8 @@ void phylink_stop(struct phylink *pl)
 
 	if (pl->sfp_bus)
 		sfp_upstream_stop(pl->sfp_bus);
+	if (pl->qsfp_bus)
+		qsfp_upstream_stop(pl->qsfp_bus);
 	if (pl->phydev)
 		phy_stop(pl->phydev);
 	del_timer_sync(&pl->link_poll);
@@ -2793,6 +2829,8 @@ int phylink_speed_down(struct phylink *pl, bool sync)
 
 	if (!pl->sfp_bus && pl->phydev)
 		ret = phy_speed_down(pl->phydev, sync);
+	if (!pl->qsfp_bus && pl->phydev)
+		ret = phy_speed_down(pl->phydev, sync);
 
 	return ret;
 }
@@ -2815,6 +2853,8 @@ int phylink_speed_up(struct phylink *pl)
 	ASSERT_RTNL();
 
 	if (!pl->sfp_bus && pl->phydev)
+		ret = phy_speed_up(pl->phydev);
+	if (!pl->qsfp_bus && pl->phydev)
 		ret = phy_speed_up(pl->phydev);
 
 	return ret;
@@ -3158,6 +3198,324 @@ static const struct sfp_upstream_ops sfp_phylink_ops = {
 	.link_down = phylink_sfp_link_down,
 	.connect_phy = phylink_sfp_connect_phy,
 	.disconnect_phy = phylink_sfp_disconnect_phy,
+};
+
+/* Helpers for qsfp operation assigned to qsfp upstream ops structure
+ *in registration of qsfp bus in phy-link creation
+ */
+static void phylink_qsfp_attach(void *upstream, struct qsfp_bus *bus)
+{
+	struct phylink *pl = upstream;
+
+	pl->netdev->qsfp_bus = bus;
+}
+
+static void phylink_qsfp_detach(void *upstream, struct qsfp_bus *bus)
+{
+	struct phylink *pl = upstream;
+
+	pl->netdev->qsfp_bus = NULL;
+}
+
+static const phy_interface_t phylink_qsfp_interface_preference[] = {
+	PHY_INTERFACE_MODE_25GBASER,
+	PHY_INTERFACE_MODE_USXGMII,
+	PHY_INTERFACE_MODE_10GBASER,
+	PHY_INTERFACE_MODE_5GBASER,
+	PHY_INTERFACE_MODE_2500BASEX,
+	PHY_INTERFACE_MODE_SGMII,
+	PHY_INTERFACE_MODE_1000BASEX,
+	PHY_INTERFACE_MODE_100BASEX,
+};
+
+static DECLARE_PHY_INTERFACE_MASK(phylink_qsfp_interfaces);
+
+static void phylink_qsfp_set_config(struct phylink *pl, u8 mode,
+				    unsigned long *supported,
+				    struct phylink_link_state *state)
+{
+	bool changed = false;
+
+	phylink_dbg(pl, "requesting link mode %s/%s with support %*pb\n",
+		    phylink_an_mode_str(mode), phy_modes(state->interface),
+		    __ETHTOOL_LINK_MODE_MASK_NBITS, supported);
+
+	if (!linkmode_equal(pl->supported, supported)) {
+		linkmode_copy(pl->supported, supported);
+		changed = true;
+	}
+
+	if (!linkmode_equal(pl->link_config.advertising, state->advertising)) {
+		linkmode_copy(pl->link_config.advertising, state->advertising);
+		changed = true;
+	}
+
+	if (pl->cur_link_an_mode != mode ||
+	    pl->link_config.interface != state->interface) {
+		pl->cur_link_an_mode = mode;
+		pl->link_config.interface = state->interface;
+
+		changed = true;
+
+		phylink_info(pl, "switched to %s/%s link mode\n",
+			     phylink_an_mode_str(mode),
+			     phy_modes(state->interface));
+	}
+
+	if (changed && !test_bit(PHYLINK_DISABLE_STOPPED,
+				 &pl->phylink_disable_state))
+		phylink_mac_initial_config(pl, false);
+}
+
+static int phylink_qsfp_config_phy(struct phylink *pl, u8 mode,
+				   struct phy_device *phy)
+{
+	__ETHTOOL_DECLARE_LINK_MODE_MASK(support1);
+	__ETHTOOL_DECLARE_LINK_MODE_MASK(support);
+	struct phylink_link_state config;
+	phy_interface_t iface;
+	int ret;
+
+	linkmode_copy(support, phy->supported);
+
+	memset(&config, 0, sizeof(config));
+	linkmode_copy(config.advertising, phy->advertising);
+	config.interface = PHY_INTERFACE_MODE_NA;
+	config.speed = SPEED_UNKNOWN;
+	config.duplex = DUPLEX_UNKNOWN;
+	config.pause = MLO_PAUSE_AN;
+	config.an_enabled = pl->link_config.an_enabled;
+
+	/* Ignore errors if we're expecting a PHY to attach later */
+	ret = phylink_validate(pl, support, &config);
+	if (ret) {
+		phylink_err(pl, "validation with support %*pb failed: %pe\n",
+			    __ETHTOOL_LINK_MODE_MASK_NBITS, support,
+			    ERR_PTR(ret));
+		return ret;
+	}
+
+	iface = qsfp_select_interface(pl->qsfp_bus, config.advertising);
+	if (iface == PHY_INTERFACE_MODE_NA) {
+		phylink_err(pl,
+			    "selection of interface failed, advertisement %*pb\n",
+			    __ETHTOOL_LINK_MODE_MASK_NBITS, config.advertising);
+		return -EINVAL;
+	}
+
+	config.interface = iface;
+	linkmode_copy(support1, support);
+	ret = phylink_validate(pl, support1, &config);
+	if (ret) {
+		phylink_err(pl,
+			    "validation of %s/%s with support %*pb failed: %pe\n",
+			    phylink_an_mode_str(mode),
+			    phy_modes(config.interface),
+			    __ETHTOOL_LINK_MODE_MASK_NBITS, support,
+			    ERR_PTR(ret));
+		return ret;
+	}
+
+	pl->link_port = pl->qsfp_port;
+
+	phylink_qsfp_set_config(pl, mode, support, &config);
+
+	return 0;
+}
+
+static int phylink_qsfp_config_optical(struct phylink *pl)
+{
+	__ETHTOOL_DECLARE_LINK_MODE_MASK(support);
+	DECLARE_PHY_INTERFACE_MASK(interfaces);
+	struct phylink_link_state config;
+	phy_interface_t interface;
+	int ret;
+
+	phylink_dbg(pl, "optical QSFP: interfaces=[mac=%*pbl, qsfp=%*pbl]\n",
+		    (int)PHY_INTERFACE_MODE_MAX,
+		    pl->config->supported_interfaces,
+		    (int)PHY_INTERFACE_MODE_MAX,
+		    pl->qsfp_interfaces);
+
+	/* Find the union of the supported interfaces by the PCS/MAC and
+	 * the SFP module.
+	 */
+	phy_interface_and(interfaces, pl->config->supported_interfaces,
+			  pl->qsfp_interfaces);
+	if (phy_interface_empty(interfaces)) {
+		phylink_err(pl, "unsupported QSFP module: no common interface modes\n");
+		return -EINVAL;
+	}
+
+	memset(&config, 0, sizeof(config));
+	linkmode_copy(support, pl->qsfp_support);
+	linkmode_copy(config.advertising, pl->qsfp_support);
+	config.speed = SPEED_UNKNOWN;
+	config.duplex = DUPLEX_UNKNOWN;
+	config.pause = MLO_PAUSE_AN;
+	config.an_enabled = true;
+
+	/* For all the interfaces that are supported, reduce the qsfp_support
+	 * mask to only those link modes that can be supported.
+	 */
+	ret = phylink_validate_mask(pl, pl->qsfp_support, &config, interfaces);
+	if (ret) {
+		phylink_err(pl, "unsupported QSFP module: validation with support %*pb failed\n",
+			    __ETHTOOL_LINK_MODE_MASK_NBITS, support);
+		return ret;
+	}
+
+	linkmode_copy(config.advertising, pl->qsfp_support);
+	interface = qsfp_select_interface(pl->qsfp_bus, config.advertising);
+	if (interface == PHY_INTERFACE_MODE_NA) {
+		phylink_err(pl, "failed to select QSFP interface\n");
+		return -EINVAL;
+	}
+
+	phylink_dbg(pl, "optical QSFP: chosen %s interface\n",
+		    phy_modes(interface));
+
+	config.interface = interface;
+
+	/* Ignore errors if we're expecting a PHY to attach later */
+	ret = phylink_validate(pl, support, &config);
+	if (ret) {
+		phylink_err(pl, "validation with support %*pb failed: %pe\n",
+			    __ETHTOOL_LINK_MODE_MASK_NBITS, support,
+			    ERR_PTR(ret));
+		return ret;
+	}
+
+	pl->link_port = pl->qsfp_port;
+
+	phylink_qsfp_set_config(pl, MLO_AN_INBAND, pl->qsfp_support, &config);
+
+	return 0;
+}
+
+static int phylink_qsfp_module_insert(void *upstream,
+				      const struct qsfp_eeprom_id *id)
+{
+	struct phylink *pl = upstream;
+
+	ASSERT_RTNL();
+
+	linkmode_zero(pl->qsfp_support);
+	phy_interface_zero(pl->qsfp_interfaces);
+	qsfp_parse_support(pl->qsfp_bus, id, pl->qsfp_support, pl->qsfp_interfaces);
+	pl->qsfp_port = qsfp_parse_port(pl->qsfp_bus, id, pl->qsfp_support);
+
+	/* If this module may have a PHY connecting later, defer until later */
+	pl->qsfp_may_have_phy = qsfp_may_have_phy(pl->qsfp_bus, id);
+	if (pl->qsfp_may_have_phy)
+		return 0;
+
+	return phylink_qsfp_config_optical(pl);
+}
+
+static int phylink_qsfp_module_start(void *upstream)
+{
+	struct phylink *pl = upstream;
+
+	/* If this QSFP module has a PHY, start the PHY now. */
+	if (pl->phydev) {
+		phy_start(pl->phydev);
+		return 0;
+	}
+
+	/* If the module may have a PHY but we didn't detect one we
+	 * need to configure the MAC here.
+	 */
+	if (!pl->qsfp_may_have_phy)
+		return 0;
+
+	return phylink_qsfp_config_optical(pl);
+}
+
+static void phylink_qsfp_module_stop(void *upstream)
+{
+	struct phylink *pl = upstream;
+
+	/* If this SFP module has a PHY, stop it. */
+	if (pl->phydev)
+		phy_stop(pl->phydev);
+}
+
+static void phylink_qsfp_link_down(void *upstream)
+{
+	struct phylink *pl = upstream;
+
+	ASSERT_RTNL();
+
+	phylink_run_resolve_and_disable(pl, PHYLINK_DISABLE_LINK);
+}
+
+static void phylink_qsfp_link_up(void *upstream)
+{
+	struct phylink *pl = upstream;
+
+	ASSERT_RTNL();
+
+	phylink_enable_and_run_resolve(pl, PHYLINK_DISABLE_LINK);
+}
+
+static int phylink_qsfp_connect_phy(void *upstream, struct phy_device *phy)
+{
+	struct phylink *pl = upstream;
+	phy_interface_t interface;
+	u8 mode;
+	int ret;
+
+	/*
+	 * This is the new way of dealing with flow control for PHYs,
+	 * as described by Timur Tabi in commit 529ed1275263 ("net: phy:
+	 * phy drivers should not set SUPPORTED_[Asym_]Pause") except
+	 * using our validate call to the MAC, we rely upon the MAC
+	 * clearing the bits from both supported and advertising fields.
+	 */
+	phy_support_asym_pause(phy);
+
+	if (phylink_phy_no_inband(phy))
+		mode = MLO_AN_PHY;
+	else
+		mode = MLO_AN_INBAND;
+
+	/* Set the PHY's host supported interfaces */
+	phy_interface_and(phy->host_interfaces, phylink_qsfp_interfaces,
+			  pl->config->supported_interfaces);
+
+	/* Do the initial configuration */
+	ret = phylink_qsfp_config_phy(pl, mode, phy);
+	if (ret < 0)
+		return ret;
+
+	interface = pl->link_config.interface;
+	ret = phylink_attach_phy(pl, phy, interface);
+	if (ret < 0)
+		return ret;
+
+	ret = phylink_bringup_phy(pl, phy, interface);
+	if (ret)
+		phy_detach(phy);
+
+	return ret;
+}
+
+static void phylink_qsfp_disconnect_phy(void *upstream)
+{
+	phylink_disconnect_phy(upstream);
+}
+
+static const struct qsfp_upstream_ops qsfp_phylink_ops = {
+	.attach = phylink_qsfp_attach,
+	.detach = phylink_qsfp_detach,
+	.module_insert = phylink_qsfp_module_insert,
+	.module_start = phylink_qsfp_module_start,
+	.module_stop = phylink_qsfp_module_stop,
+	.link_up = phylink_qsfp_link_up,
+	.link_down = phylink_qsfp_link_down,
+	.connect_phy = phylink_qsfp_connect_phy,
+	.disconnect_phy = phylink_qsfp_disconnect_phy,
 };
 
 /* Helpers for MAC drivers */
@@ -3521,6 +3879,10 @@ static int __init phylink_init(void)
 	for (int i = 0; i < ARRAY_SIZE(phylink_sfp_interface_preference); ++i)
 		__set_bit(phylink_sfp_interface_preference[i],
 			  phylink_sfp_interfaces);
+
+	for (int i = 0; i < ARRAY_SIZE(phylink_qsfp_interface_preference); ++i)
+		__set_bit(phylink_qsfp_interface_preference[i],
+			  phylink_qsfp_interfaces);
 
 	return 0;
 }
