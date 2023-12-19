@@ -65,6 +65,7 @@ struct macsec_ops;
 struct netdev_name_node;
 struct sd_flow_limit;
 struct sfp_bus;
+struct qsfp_bus;
 /* 802.11 specific */
 struct wireless_dev;
 /* 802.15.4 specific */
@@ -2356,6 +2357,7 @@ struct net_device {
 	struct phy_link_topology	*link_topo;
 	struct phy_device	*phydev;
 	struct sfp_bus		*sfp_bus;
+	struct qsfp_bus		*qsfp_bus;
 	struct lock_class_key	*qdisc_tx_busylock;
 	bool			proto_down;
 	bool			threaded;

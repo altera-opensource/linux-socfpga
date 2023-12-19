@@ -33,6 +33,10 @@ obj-$(CONFIG_SFP)		+= sfp.o
 sfp-obj-$(CONFIG_SFP)		+= sfp-bus.o
 obj-y				+= $(sfp-obj-y) $(sfp-obj-m)
 
+obj-$(CONFIG_QSFP)		+= qsfp.o
+qsfp-obj-$(CONFIG_QSFP)		+= qsfp_bus.o
+obj-y				+= $(qsfp-obj-y) $(qsfp-obj-m)
+
 obj-$(CONFIG_ADIN_PHY)		+= adin.o
 obj-$(CONFIG_ADIN1100_PHY)	+= adin1100.o
 obj-$(CONFIG_AIR_EN8811H_PHY)   += air_en8811h.o
