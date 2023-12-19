@@ -219,6 +219,7 @@
 			snps,rx-vlan-offload;
 			altr,sysmgr-syscon = <&sysmgr 0x44 0>;
 			altr,smtg-hub;
+			iommus = <&smmu 1>;
 
 			status = "disabled";
 
@@ -365,6 +366,7 @@
 			snps,rx-vlan-offload;
 			altr,sysmgr-syscon = <&sysmgr 0x48 0>;
 			altr,smtg-hub;
+			iommus = <&smmu 2>;
 
 			status = "disabled";
 
@@ -511,6 +513,7 @@
 			snps,rx-vlan-offload;
 			altr,sysmgr-syscon = <&sysmgr 0x4c 0>;
 			altr,smtg-hub;
+			iommus = <&smmu 3>;
 
 			status = "disabled";
 
@@ -726,7 +729,7 @@
 			reset-names = "reset";
 			clocks = <&clkmgr AGILEX5_L4_MP_CLK>, <&clkmgr AGILEX5_SDMCLK>;
 			clock-names = "biu", "ciu";
-			/*iommus = <&smmu 5>;*/
+			iommus = <&smmu 5>;
 			status = "disabled";
 		};
 
@@ -741,6 +744,7 @@
 			clocks = <&clkmgr AGILEX5_NAND_NF_CLK>;
 			clock-names = "nf_clk";
 			cdns,board-delay-ps = <4830>;
+			iommus = <&smmu 4>;
 			status = "disabled";
 		};
 
@@ -765,6 +769,7 @@
 			snps,priority = <0 1 2 3>;
 			snps,axi-max-burst-len = <8>;
 			snps,dma-40-bit-mask;
+			iommus = <&smmu 8>;
 			status = "okay";
 		};
 
@@ -784,6 +789,7 @@
 			snps,priority = <0 1 2 3>;
 			snps,axi-max-burst-len = <8>;
 			snps,dma-40-bit-mask;
+			iommus = <&smmu 9>;
 			status = "okay";
 		};
 
@@ -922,6 +928,7 @@
 			reset-names = "dwc2", "dwc2-ecc";
 			clocks = <&clkmgr AGILEX5_USB2OTG_HCLK>;
 			clock-names = "otg";
+			iommus = <&smmu 6>;
 			status = "disabled";
 		};
 
@@ -935,6 +942,7 @@
 				 <&clkmgr AGILEX5_USB31_BUS_CLK_EARLY>;
 			resets = <&rst USB1_RESET>, <&rst USB1_OCP_RESET>;
 			reset-names = "dwc3", "dwc3-ecc";
+			iommus = <&smmu 7>;
 			status = "disabled";
 
 			usb@11000000{
