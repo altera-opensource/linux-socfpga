@@ -1126,6 +1126,10 @@
 					compatible = "intel,agilex-soc-fcs";
 					platform = "agilex";
 				};
+
+				temp_volt: hwmon {
+					compatible = "intel,soc64-hwmon";
+				};
 			};
 		};
 	};
