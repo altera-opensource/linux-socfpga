@@ -1218,6 +1218,8 @@ static int stmmac_phy_setup(struct stmmac_priv *priv)
 		if (!max_speed || max_speed >= 2500)
 			priv->phylink_config.mac_capabilities |= MAC_2500FD;
 	} else if (priv->plat->has_xgmac) {
+		/* XGMAC doesn't support 1000HD */
+		priv->phylink_config.mac_capabilities &= ~MAC_1000HD;
 		if (!max_speed || max_speed >= 2500)
 			priv->phylink_config.mac_capabilities |= MAC_2500FD;
 		if (!max_speed || max_speed >= 5000)
@@ -1234,8 +1236,8 @@ static int stmmac_phy_setup(struct stmmac_priv *priv)
 			priv->phylink_config.mac_capabilities |= MAC_100000FD;
 	}
 
-	/* Half-Duplex can only work with single queue */
-	if (priv->plat->tx_queues_to_use > 1)
+	/* Other than XGMAC IP, half-Duplex can only work with single queue */
+	if (!priv->plat->has_xgmac && priv->plat->tx_queues_to_use > 1)
 		priv->phylink_config.mac_capabilities &=
 			~(MAC_10HD | MAC_100HD | MAC_1000HD);
 	priv->phylink_config.mac_managed_pm = true;
