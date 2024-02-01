@@ -146,7 +146,7 @@
 };
 
 &dwc3_0 {
-	dr_mode = "host";
+	dr_mode = "peripheral";
 };
 
 &smmu {
