@@ -2,7 +2,7 @@
 /*
  * Copyright (C) 2023, Intel Corporation
  */
-#include "socfpga_agilex5.dtsi"
+#include "../intel/socfpga_agilex5.dtsi"
 
 / {
 	model = "SoCFPGA Agilex5 Arrow AXE5-Eagle";
@@ -46,7 +46,7 @@
 };
 
 &gmac0 {
-	status = "okay";
+	status = "disabled";
 	phy-mode = "rgmii-id";
 	phy-handle = <&emac0_phy0>;
 
@@ -148,6 +148,10 @@
 	status = "okay";
 };
 
+&dwc3_0 {
+	dr_mode = "host";
+};
+
 &smmu {
 	status = "okay";
 };
@@ -169,7 +173,7 @@
 };
 
 &qspi {
-	status = "disabled";
+	status = "okay";
 	flash@0 {
 		#address-cells = <1>;
 		#size-cells = <1>;
@@ -190,15 +194,16 @@
 			compatible = "fixed-partitions";
 			#address-cells = <1>;
 			#size-cells = <1>;
+			rsu-handle = <&qspi_boot>;
 
 			qspi_boot: partition@0 {
-				label = "Boot and fpga data";
-				reg = <0x0 0x03FE0000>;
+				label = "u-boot";
+				reg = <0x0 0x04200000>;
 			};
 
-			qspi_rootfs: partition@3FE0000 {
-				label = "Root Filesystem - JFFS2";
-				reg = <0x03FE0000 0x0C020000>;
+			root: partition@4200000 {
+				label = "root";
+				reg = <0x04200000 0x0BE00000>;
 			};
 		};
 	};
