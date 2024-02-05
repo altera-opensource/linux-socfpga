@@ -577,6 +577,7 @@ static int cadence_nand_wait_for_value(struct cdns_nand_ctrl *cdns_ctrl,
 	return ret;
 }
 
+/*
 static int cadence_nand_set_ecc_enable(struct cdns_nand_ctrl *cdns_ctrl,
 				       bool enable)
 {
@@ -598,6 +599,7 @@ static int cadence_nand_set_ecc_enable(struct cdns_nand_ctrl *cdns_ctrl,
 
 	return 0;
 }
+*/
 
 static void cadence_nand_set_ecc_strength(struct cdns_nand_ctrl *cdns_ctrl,
 					  u8 corr_str_idx)
@@ -1280,7 +1282,16 @@ cadence_nand_cdma_transfer(struct cdns_nand_ctrl *cdns_ctrl, u8 chip_nr,
 	else
 		ctype = CDMA_CT_WR;
 
-	cadence_nand_set_ecc_enable(cdns_ctrl, with_ecc);
+	/* Workaround to force disable ECC while using the Command DMA mode.
+	 * if chip->ecc.engine_type=NAND_ECC_ENGINE_TYPE_NONE is used to disable
+	 * the ECC then Generic work mode and Slave DMA interface is used by nand
+	 * framework for page read/write and we don't want that because Agilex5
+	 * A0 silicon NAND SDMA address range is 4K, while the page size on some
+	 * NAND Flash device could be more.
+	 * So keeping chip->ecc.engine_type = NAND_ECC_ENGINE_TYPE_ON_HOST to
+	 * use Command DMA mode for page read/write and do not enable ecc here.
+	 */
+	//cadence_nand_set_ecc_enable(cdns_ctrl, with_ecc);
 
 	dma_buf = dma_map_single(cdns_ctrl->dev, buf, buf_size, dir);
 	if (dma_mapping_error(cdns_ctrl->dev, dma_buf)) {
