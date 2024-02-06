@@ -159,6 +159,10 @@
 	status = "okay";
 };
 
+&dwc3_0 {
+	dr_mode = "host";
+};
+
 &watchdog0 {
 	status = "okay";
 };
