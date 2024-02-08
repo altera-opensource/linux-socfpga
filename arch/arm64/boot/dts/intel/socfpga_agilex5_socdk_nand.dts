@@ -22,17 +22,12 @@
 		compatible = "gpio-leds";
 		hps0 {
 			label = "hps_led0";
-			gpios = <&portb 20 GPIO_ACTIVE_HIGH>;
+			gpios = <&porta 6 GPIO_ACTIVE_HIGH>;
 		};
 
 		hps1 {
 			label = "hps_led1";
-			gpios = <&portb 19 GPIO_ACTIVE_HIGH>;
-		};
-
-		hps2 {
-			label = "hps_led2";
-			gpios = <&portb 21 GPIO_ACTIVE_HIGH>;
+			gpios = <&porta 7 GPIO_ACTIVE_HIGH>;
 		};
 	};
 
@@ -45,7 +40,7 @@
 	};
 };
 
-&gpio1 {
+&gpio0 {
 	status = "okay";
 };
 
@@ -118,7 +113,7 @@
 		#address-cells = <1>;
 		#size-cells = <1>;
 		reg = <0>;
-		nand-bus-width = <16>;
+		nand-bus-width = <8>;
 
 		partition@0 {
 			label = "u-boot";
@@ -126,7 +121,68 @@
 		};
 		partition@200000 {
 			label = "root";
-			reg = <0x200000 0x3fe00000>;
+			reg = <0x200000 0xffe00000>;
 		};
 	};
+};
+
+&temp_volt {
+        voltage {
+                #address-cells = <1>;
+                #size-cells = <0>;
+                input@2 {
+                        label = "0.8V VCC";
+                        reg = <2>;
+                };
+
+                input@3 {
+                        label = "1.8V VCCIO_SDM";
+                        reg = <3>;
+                };
+
+                input@4 {
+                        label = "1.8V VCCPT";
+                        reg = <4>;
+                };
+
+                input@5 {
+                        label = "1.2V VCCCRCORE";
+                        reg = <5>;
+                };
+
+                input@6 {
+                        label = "0.9V VCCH";
+                        reg = <6>;
+                };
+
+                input@7 {
+                        label = "0.8V VCCL";
+                        reg = <7>;
+                };
+        };
+
+        temperature {
+                #address-cells = <1>;
+                #size-cells = <0>;
+
+                input@0 {
+                        label = "Main Die SDM";
+                        reg = <0x0>;
+                };
+
+                input@10001 {
+                        label = "Main Die corner bottom left max";
+                        reg = <0x10001>;
+                };
+
+                input@30001 {
+                        label = "Main Die corner bottom right max";
+                        reg = <0x30001>;
+                };
+
+                input@40001 {
+                        label = "Main Die corner top right max";
+                        reg = <0x40001>;
+                };
+        };
 };
