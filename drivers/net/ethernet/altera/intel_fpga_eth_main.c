@@ -1678,7 +1678,6 @@ static int intel_fpga_xtile_probe(struct platform_device *pdev)
 		goto err_free_netdev;
 	}
 
-
 	if (priv->ptp_enable)
 	{
 		/* PTP Timestamp Accuracy mode */
@@ -1707,7 +1706,8 @@ static int intel_fpga_xtile_probe(struct platform_device *pdev)
 	}
 	priv->ptp_clockcleaner_enable = of_property_read_bool(pdev->dev.of_node,
 							      "altr,has-ptp-clockcleaner");
-	if (!priv->ptp_enable && !priv->ptp_clockcleaner_enable ) {
+	/* ptp clock cleaner is not applicable for Ethernet only design */
+	if (priv->ptp_clockcleaner_enable && !priv->ptp_enable) {
 		dev_err(&pdev->dev, "Hardware Clock Frequency adjustment requires PTP\n");
 		ret = -ENODEV;
 		goto err_free_netdev;
