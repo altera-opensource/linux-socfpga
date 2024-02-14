@@ -56,8 +56,8 @@
 		#address-cells = <1>;
 		#size-cells = <0>;
 		compatible = "snps,dwmac-mdio";
-		emac0_phy0: ethernet-phy@1 {
-			reg = <1>;
+		emac0_phy0: ethernet-phy@0 {
+			reg = <0>;
 		};
 	};
 };
