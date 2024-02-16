@@ -2375,7 +2375,16 @@ int phylink_ethtool_ksettings_set(struct phylink *pl,
 	ASSERT_RTNL();
 
 	if (pl->phydev) {
+		__ETHTOOL_DECLARE_LINK_MODE_MASK(req_mode) = { 0, };
 		struct ethtool_link_ksettings phy_kset = *kset;
+		unsigned long req_caps;
+
+		req_caps = phylink_cap_from_speed_duplex(kset->base.speed,
+							 kset->base.duplex);
+		phylink_caps_to_linkmodes(req_mode, req_caps);
+		linkmode_and(req_mode, req_mode, pl->supported);
+		if (linkmode_empty(req_mode))
+			return -EINVAL;
 
 		linkmode_and(phy_kset.link_modes.advertising,
 			     phy_kset.link_modes.advertising,
