@@ -765,7 +765,7 @@
 
 		ocram: sram@00000000 {
 			compatible = "mmio-sram";
-			reg = <0x00000000 0x40000>;
+			reg = <0x00000000 0x80000>;
 		};
 
 		dmac0: dma-controller@10DB0000 {
