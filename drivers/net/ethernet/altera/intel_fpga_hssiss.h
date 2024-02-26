@@ -413,6 +413,7 @@ int hssiss_execute_sal_cmd(struct platform_device *pdev,
 		enum hssiss_salcmd cmd, void *data);
 int hssiss_execute_sal_cmd_atomic(struct platform_device *pdev,
 		enum hssiss_salcmd cmd, void *data);
+int hssiss_set_ethport_status(struct platform_device *pdev, int port, u32 data);
 hssi_eth_port_sts hssiss_get_ethport_status(struct platform_device *pdev, int port);
 hssi_eth_port_attr hssiss_get_ethport_attr(struct platform_device *pdev, int port);
 int hssiss_cold_rst(struct platform_device *pdev);
