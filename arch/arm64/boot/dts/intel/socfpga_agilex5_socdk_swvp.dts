@@ -45,6 +45,11 @@
 		/* We expect the bootloader to fill in the reg */
 		reg = <0x0 0x0 0x0 0x0>;
 	};
+
+	extcon_usb1: extcon_usb1 {
+		compatible = "linux,extcon-usb-gpio";
+		id-gpio = <&portb 23 GPIO_ACTIVE_HIGH>;
+	};
 };
 
 &gpio1 {
@@ -173,6 +178,11 @@
 
 &usb31 {
 	status = "okay";
+};
+
+&dwc3_0 {
+	extcon = <&extcon_usb1>;
+	dr_mode = "otg";
 };
 
 &watchdog0 {
