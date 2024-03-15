@@ -2890,6 +2890,7 @@ static int cadence_nand_init(struct cdns_nand_ctrl *cdns_ctrl)
 		goto free_buf_desc;
 	}
 
+	writel(0, cdns_ctrl->reg + INTR_ENABLE);
 	if (devm_request_irq(cdns_ctrl->dev, cdns_ctrl->irq, cadence_nand_isr,
 			     IRQF_SHARED, "cadence-nand-controller",
 			     cdns_ctrl)) {
