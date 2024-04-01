@@ -311,6 +311,7 @@
 			reset-names = "reset";
 			clocks = <&clkmgr AGILEX5_L4_MP_CLK>, <&clkmgr AGILEX5_SDMCLK>;
 			clock-names = "biu", "ciu";
+			iommus = <&smmu 5>;
 			status = "disabled";
 		};
 
@@ -498,7 +499,6 @@
 			iommus = <&smmu 6>;
 			clocks = <&clkmgr AGILEX5_USB2OTG_HCLK>;
 			clock-names = "otg";
-			otg-rev = <0x0200>;
 			status = "disabled";
 		};
 
@@ -512,6 +512,7 @@
 				 <&clkmgr AGILEX5_USB31_BUS_CLK_EARLY>;
 			resets = <&rst USB1_RESET>, <&rst USB1_OCP_RESET>;
 			reset-names = "dwc3", "dwc3-ecc";
+			iommus = <&smmu 7>;
 			status = "disabled";
 
 			usb@11000000{
@@ -644,6 +645,7 @@
 			snps,rx-vlan-offload;
 			altr,sysmgr-syscon = <&sysmgr 0x44 0>;
 			altr,smtg-hub;
+			iommus = <&smmu 1>;
 			snps,clk-csr = <0>;
 			status = "disabled";
 
@@ -795,6 +797,7 @@
 			snps,rx-vlan-offload;
 			altr,sysmgr-syscon = <&sysmgr 0x48 0>;
 			altr,smtg-hub;
+			iommus = <&smmu 2>;
 			snps,clk-csr = <0>;
 			status = "disabled";
 
@@ -946,6 +949,7 @@
 			snps,rx-vlan-offload;
 			altr,sysmgr-syscon = <&sysmgr 0x4c 0>;
 			altr,smtg-hub;
+			iommus = <&smmu 3>;
 			snps,clk-csr = <0>;
 			status = "disabled";
 
