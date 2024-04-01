@@ -55,6 +55,7 @@
 #define FPGA_CONFIG_POLL_INTERVAL_MS_SLOW	500
 #define FPGA_CONFIG_POLL_COUNT_FAST		50
 #define FPGA_CONFIG_POLL_COUNT_SLOW		58
+#define AGILEX5_SDM_DMA_ADDR_OFFSET		0x80000000
 #define BYTE_TO_WORD_SIZE				4
 #define IOMMU_LIMIT_ADDR			0x20000000
 #define IOMMU_STARTING_ADDR			0x0
@@ -293,6 +294,7 @@ struct stratix10_svc_controller {
 	struct mutex *sdm_lock;
 	struct iommu_domain *domain;
 	bool is_smmu_enabled;
+	dma_addr_t sdm_dma_addr_offset;
 	struct {
 		struct iova_domain domain;
 		unsigned long shift;
@@ -2391,6 +2393,8 @@ int stratix10_svc_send(struct stratix10_svc_chan *chan, void *msg)
 				if (p_mem->vaddr == p_msg->payload) {
 					p_data->paddr = p_mem->paddr;
 					p_data->size = p_msg->payload_length;
+					if(p_msg->command == COMMAND_RECONFIG_DATA_SUBMIT && chan->ctrl->is_smmu_enabled)
+						p_data->paddr += chan->ctrl->sdm_dma_addr_offset;
 				}
 			if (p_msg->payload_output) {
 				list_for_each_entry(p_mem, &svc_data_mem, node)
@@ -2638,6 +2642,7 @@ static int stratix10_svc_drv_probe(struct platform_device *pdev)
 	controller->chans = chans;
 	controller->genpool = genpool;
 	controller->invoke_fn = invoke_fn;
+	controller->sdm_dma_addr_offset = 0x0;
 	init_completion(&controller->complete_status);
 
 	ret = stratix10_svc_async_init(controller);
@@ -2650,6 +2655,7 @@ static int stratix10_svc_drv_probe(struct platform_device *pdev)
 	if (of_device_is_compatible(node, "intel,agilex5-svc")) {
 		if (device_iommu_mapped(&pdev->dev)) {
 			controller->is_smmu_enabled = true;
+			controller->sdm_dma_addr_offset = AGILEX5_SDM_DMA_ADDR_OFFSET;
 			pr_debug("Intel Service Layer Driver: IOMMU Present\n");
 			controller->domain = iommu_get_dma_domain(dev);
 
