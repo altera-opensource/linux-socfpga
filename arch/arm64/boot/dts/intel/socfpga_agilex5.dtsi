@@ -140,6 +140,13 @@
 		cpus = <&cpu0>, <&cpu1>, <&cpu2>, <&cpu3>;
 	};
 
+	fpga-region {
+		compatible = "fpga-region";
+		#address-cells = <0x2>;
+		#size-cells = <0x2>;
+		fpga-mgr = <&fpga_mgr>;
+	};
+
 	soc: soc@0 {
 		compatible = "simple-bus";
 		ranges = <0 0 0 0xffffffff>;
@@ -1003,6 +1010,24 @@
 					snps,coe-unsupported;
 					snps,dcb-algorithm;
 					snps,tbs-enable;
+				};
+			};
+		};
+
+		firmware {
+			svc {
+				compatible = "intel,agilex5-svc";
+				method = "smc";
+				memory-region = <&service_reserved>;
+				iommus = <&smmu 10>;
+
+				fpga_mgr: fpga-mgr {
+					compatible = "intel,agilex-soc-fpga-mgr";
+				};
+
+				fcs: fcs {
+					compatible = "intel,agilex-soc-fcs";
+					platform = "agilex";
 				};
 			};
 		};
