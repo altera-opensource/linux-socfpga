@@ -169,6 +169,13 @@
 		interrupts = <GIC_PPI 7 IRQ_TYPE_LEVEL_LOW>;
 	};
 
+	fpga-region {
+		compatible = "fpga-region";
+		#address-cells = <0x2>;
+		#size-cells = <0x2>;
+		fpga-mgr = <&fpga_mgr>;
+	};
+
 	soc: soc@0 {
 		compatible = "simple-bus";
 		ranges = <0 0 0 0xffffffff>;
@@ -1096,6 +1103,24 @@
 				<0x160F2000 0x1000>;
 			interrupt-parent = <&intc>;
 			interrupts = <GIC_SPI 150 IRQ_TYPE_EDGE_RISING>;
+		};
+
+		firmware {
+			svc {
+				compatible = "intel,agilex5-svc";
+				method = "smc";
+				memory-region = <&service_reserved>;
+				iommus = <&smmu 10>;
+
+				fpga_mgr: fpga-mgr {
+					compatible = "intel,agilex-soc-fpga-mgr";
+				};
+
+				fcs: fcs {
+					compatible = "intel,agilex-soc-fcs";
+					platform = "agilex";
+				};
+			};
 		};
 	};
 };
