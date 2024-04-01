@@ -172,6 +172,10 @@
 	disable-over-current;
 };
 
+&smmu {
+	status = "okay";
+};
+
 &watchdog0 {
 	status = "okay";
 };
