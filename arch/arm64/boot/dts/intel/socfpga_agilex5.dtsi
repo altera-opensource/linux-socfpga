@@ -311,6 +311,7 @@
 			reset-names = "reset";
 			clocks = <&clkmgr AGILEX5_L4_MP_CLK>, <&clkmgr AGILEX5_SDMCLK>;
 			clock-names = "biu", "ciu";
+			iommus = <&smmu 5>;
 			status = "disabled";
 		};
 
@@ -518,6 +519,7 @@
 				 <&clkmgr AGILEX5_USB31_BUS_CLK_EARLY>;
 			resets = <&rst USB1_RESET>, <&rst USB1_OCP_RESET>;
 			reset-names = "dwc3", "dwc3-ecc";
+			iommus = <&smmu 7>;
 			status = "disabled";
 
 			usb@11000000{
