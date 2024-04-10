@@ -563,6 +563,7 @@ static int qsfp_i2c_mdiobus_create(struct qsfp *qsfp)
 	int ret;
 
 	i2c_mii = mdio_i2c_alloc(qsfp->dev, qsfp->i2c, qsfp->mdio_protocol);
+	
 	if (IS_ERR(i2c_mii))
 		return PTR_ERR(i2c_mii);
 

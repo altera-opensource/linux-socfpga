@@ -1129,7 +1129,8 @@ static int xtile_change_mac(struct net_device *dev, void *inet_ds) {
 	if (!is_valid_ether_addr(addr->sa_data))
                 return -EADDRNOTAVAIL;
 
-	memcpy(dev->dev_addr, addr->sa_data, ETH_ALEN);
+	dev_addr_set(dev, addr->sa_data);
+	//memcpy(dev->dev_addr, addr->sa_data, ETH_ALEN);
 
 	if (priv->spec_ops->tile.update_mac_addr)
 		priv->spec_ops->tile.update_mac_addr(priv);
@@ -1884,7 +1885,7 @@ static int intel_fpga_xtile_probe(struct platform_device *pdev)
 	ndev->features |= NETIF_F_HW_VLAN_CTAG_RX;
 
 	/* setup NAPI interface */
-	netif_napi_add(ndev, &priv->napi, xtile_poll, NAPI_POLL_WEIGHT);
+	netif_napi_add(ndev, &priv->napi, xtile_poll);
 
 	/* tracks the current napi state whether enabled or disabled */
 	priv->napi_state = false;
