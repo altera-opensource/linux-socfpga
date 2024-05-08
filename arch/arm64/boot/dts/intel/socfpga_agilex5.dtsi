@@ -235,6 +235,7 @@
 			altr,sysmgr-syscon = <&sysmgr 0x44 0>;
 			altr,smtg-hub;
 			iommus = <&smmu 1>;
+			snps,clk-csr = <0>;
 			dma-coherent;
 
 			status = "disabled";
@@ -383,6 +384,7 @@
 			altr,sysmgr-syscon = <&sysmgr 0x48 0>;
 			altr,smtg-hub;
 			iommus = <&smmu 2>;
+			snps,clk-csr = <0>;
 			dma-coherent;
 
 			status = "disabled";
@@ -531,6 +533,7 @@
 			altr,sysmgr-syscon = <&sysmgr 0x4c 0>;
 			altr,smtg-hub;
 			iommus = <&smmu 3>;
+			snps,clk-csr = <0>;
 			dma-coherent;
 
 			status = "disabled";
