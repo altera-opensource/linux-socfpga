@@ -55,6 +55,10 @@ properties:
       reserved memory region for the service layer driver to
       communicate with the secure device manager.
 
+  altr,smmu_enable_quirk:
+    type: boolean
+    description: set when SMMU is enabled for the platform.
+
   fpga-mgr:
     $ref: /schemas/fpga/intel,stratix10-soc-fpga-mgr.yaml
     description: Optional child node for fpga manager to perform fabric configuration.
