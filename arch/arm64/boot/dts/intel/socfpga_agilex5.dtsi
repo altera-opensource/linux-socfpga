@@ -1139,6 +1139,7 @@
 				method = "smc";
 				memory-region = <&service_reserved>;
 				iommus = <&smmu 10>;
+				altr,smmu_enable_quirk;
 
 				fpga_mgr: fpga-mgr {
 					compatible = "intel,agilex5-soc-fpga-mgr";
