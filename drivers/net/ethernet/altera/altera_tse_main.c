@@ -28,17 +28,15 @@
 #include <linux/kernel.h>
 #include <linux/module.h>
 #include <linux/mii.h>
-#include <linux/mdio/mdio-regmap.h>
 #include <linux/net_tstamp.h>
 #include <linux/netdevice.h>
 #include <linux/of_device.h>
 #include <linux/of_mdio.h>
 #include <linux/of_net.h>
 #include <linux/of_platform.h>
-#include <linux/pcs-lynx.h>
+#include <linux/pcs-altera-tse.h>
 #include <linux/phy.h>
 #include <linux/ptp_classify.h>
-#include <linux/regmap.h>
 #include <linux/skbuff.h>
 #include <asm/cacheflush.h>
 
@@ -1217,10 +1215,6 @@ static struct net_device_ops altera_tse_netdev_ops = {
 	.ndo_eth_ioctl		= tse_do_ioctl,
 };
 
-static void alt_tse_mac_an_restart(struct phylink_config *config)
-{
-}
-
 static void alt_tse_mac_config(struct phylink_config *config, unsigned int mode,
 			       const struct phylink_link_state *state)
 {
@@ -1278,7 +1272,6 @@ static struct phylink_pcs *alt_tse_select_pcs(struct phylink_config *config,
 
 static const struct phylink_mac_ops alt_tse_phylink_ops = {
 	.validate = phylink_generic_validate,
-	.mac_an_restart = alt_tse_mac_an_restart,
 	.mac_config = alt_tse_mac_config,
 	.mac_link_down = alt_tse_mac_link_down,
 	.mac_link_up = alt_tse_mac_link_up,
@@ -1289,14 +1282,10 @@ static const struct phylink_mac_ops alt_tse_phylink_ops = {
 static int altera_tse_probe(struct platform_device *pdev)
 {
 	const struct of_device_id *of_id = NULL;
-	struct regmap_config pcs_regmap_cfg;
 	struct altera_tse_private *priv;
-	struct mdio_regmap_config mrc;
 	struct resource *control_port;
 	struct resource *pcs_res;
 	struct net_device *ndev;
-	struct regmap *pcs_regmap;
-	struct mii_bus *pcs_bus;
 	int pcs_reg_width = 2;
 	int ret = -ENODEV;
 
@@ -1346,11 +1335,6 @@ static int altera_tse_probe(struct platform_device *pdev)
 	if (ret)
 		goto err_free_netdev;
 
-	/* xSGDMA Rx Dispatcher address space */
-	ret = request_and_map(pdev, "rx_csr", &dma_res,
-			      &priv->rx_dma_csr);
-	if (ret)
-		goto err_free_netdev;
 	/* SGMII PCS address space. The location can vary depending on how the
 	 * IP is integrated. We can have a resource dedicated to it at a specific
 	 * address space, but if it's not the case, we fallback to the mdiophy0
@@ -1486,17 +1470,10 @@ static int altera_tse_probe(struct platform_device *pdev)
 			 (unsigned long) control_port->start, priv->rx_irq,
 			 priv->tx_irq);
 
-	snprintf(mrc.name, MII_BUS_ID_SIZE, "%s-pcs-mii", ndev->name);
-	pcs_bus = devm_mdio_regmap_register(&pdev->dev, &mrc);
-	if (IS_ERR(pcs_bus)) {
-		ret = PTR_ERR(pcs_bus);
-		goto err_init_pcs;
-	}
-
-	priv->pcs = lynx_pcs_create_mdiodev(pcs_bus, 0);
+	priv->pcs = alt_tse_pcs_create(ndev, priv->pcs_base, pcs_reg_width);
 	if (IS_ERR(priv->pcs)) {
 		ret = PTR_ERR(priv->pcs);
-		goto err_init_pcs;
+		goto err_init_phy;
 	}
 
 	priv->phylink_config.dev = &ndev->dev;
@@ -1520,7 +1497,7 @@ static int altera_tse_probe(struct platform_device *pdev)
 	if (IS_ERR(priv->phylink)) {
 		dev_err(&pdev->dev, "failed to create phylink\n");
 		ret = PTR_ERR(priv->phylink);
-		goto err_init_phylink;
+		goto err_init_phy;
 	}
 
 	priv->ptp_enable = of_property_read_bool(pdev->dev.of_node,
@@ -1544,9 +1521,7 @@ static int altera_tse_probe(struct platform_device *pdev)
 	}
 
 	return 0;
-err_init_phylink:
-	lynx_pcs_destroy(priv->pcs);
-err_init_pcs:
+err_init_phy:
 	unregister_netdev(ndev);
 err_register_netdev:
 	netif_napi_del(&priv->napi);
@@ -1569,7 +1544,6 @@ static int altera_tse_remove(struct platform_device *pdev)
 	altera_tse_mdio_destroy(ndev);
 	unregister_netdev(ndev);
 	phylink_destroy(priv->phylink);
-	lynx_pcs_destroy(priv->pcs);
 
 	free_netdev(ndev);
 
