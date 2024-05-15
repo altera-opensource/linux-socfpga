@@ -317,14 +317,11 @@ struct drm_encoder *axi_hdmi_encoder_create(struct drm_device *dev)
 	axi_hdmi_encoder = kzalloc(sizeof(*axi_hdmi_encoder), GFP_KERNEL);
 	if (!axi_hdmi_encoder)
 		return NULL;
-
 	encoder = &axi_hdmi_encoder->encoder.base;
 	encoder->possible_crtcs = 1;
-
 	drm_encoder_init(dev, encoder, &axi_hdmi_encoder_funcs,
 			DRM_MODE_ENCODER_TMDS, NULL);
 	drm_encoder_helper_add(encoder, &axi_hdmi_encoder_helper_funcs);
-
 	bridge = of_drm_find_bridge(priv->encoder_slave->dev.of_node);
 	if (bridge) {
 		bridge->encoder = encoder;
@@ -340,9 +337,7 @@ struct drm_encoder *axi_hdmi_encoder_create(struct drm_device *dev)
 		}
 	}
 
-
 	axi_hdmi_debugfs_init(axi_hdmi_encoder);
-
 	writel(AXI_HDMI_SOURCE_SEL_NORMAL, priv->base + AXI_HDMI_REG_SOURCE_SEL);
 	if (priv->is_rgb) {
 		writel(AXI_HDMI_CTRL_CSC_BYPASS, priv->base + AXI_HDMI_REG_CTRL);
@@ -350,6 +345,5 @@ struct drm_encoder *axi_hdmi_encoder_create(struct drm_device *dev)
 	} else {
 		axi_hdmi_set_color_range(priv, 0x101010, 0xf0ebf0);
 	}
-
 	return encoder;
 }

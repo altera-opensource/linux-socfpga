@@ -60,15 +60,12 @@ static int axi_hdmi_init(struct drm_driver *ddrv, struct device *dev)
 	struct drm_device *ddev;
 	struct drm_encoder *encoder;
 	int ret;
-
 	ddev = drm_dev_alloc(ddrv, dev);
 	if (IS_ERR(ddev))
 		return PTR_ERR(ddev);
-
 	private->drm_dev = ddev;
 
 	ddev->dev_private = private;
-
 	axi_hdmi_mode_config_init(ddev);
 
 	private->crtc = axi_hdmi_crtc_create(ddev);
@@ -76,13 +73,11 @@ static int axi_hdmi_init(struct drm_driver *ddrv, struct device *dev)
 		ret = PTR_ERR(private->crtc);
 		goto err_crtc;
 	}
-
 	encoder = axi_hdmi_encoder_create(ddev);
 	if (IS_ERR(encoder)) {
 	    ret = PTR_ERR(encoder);
 	    goto err_crtc;
 	}
-
 	drm_mode_config_reset(ddev);
 
 	/* init kms poll for handling hpd */
@@ -91,9 +86,7 @@ static int axi_hdmi_init(struct drm_driver *ddrv, struct device *dev)
 	ret = drm_dev_register(ddev, 0);
 	if (ret)
 		goto err_crtc;
-
 	drm_fbdev_generic_setup(ddev, 32);
-
 	return 0;
 err_crtc:
 	drm_mode_config_cleanup(ddev);
@@ -197,8 +190,9 @@ static int axi_hdmi_platform_probe(struct platform_device *pdev)
 		return -EPROBE_DEFER;
 
 	private->dma = dma_request_slave_channel(&pdev->dev, "video");
-	if (private->dma == NULL)
+	if (private->dma == NULL) {
 		return -EPROBE_DEFER;
+	}
 
 	platform_set_drvdata(pdev, private);
 
