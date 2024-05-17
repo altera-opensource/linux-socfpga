@@ -1483,24 +1483,24 @@ static int ftile_set_pauseparam(struct net_device *dev,
 
 	if (pauseparam->rx_pause) {
 		new_pause |= FLOW_RX;
-		hssi_set_bit(pdev, HSSI_ETH_RECONFIG, chan,
-			     eth_mac_ptp_csroffs(0, rx_flow_control_feature_cfg),
-			    ETH_RX_EN_STD_FLOW_CTRL, true);
+		hssi_set_bit_ba(pdev, HSSI_ETH_RECONFIG, chan,
+				eth_mac_ptp_csroffs(0, rx_flow_control_feature_cfg),
+				ETH_RX_EN_STD_FLOW_CTRL);
 	} else {
-		hssi_clear_bit(pdev, HSSI_ETH_RECONFIG, chan,
-			       eth_mac_ptp_csroffs(0, rx_flow_control_feature_cfg),
-			      ETH_RX_EN_STD_FLOW_CTRL, true);
+		hssi_clear_bit_ba(pdev, HSSI_ETH_RECONFIG, chan,
+				  eth_mac_ptp_csroffs(0, rx_flow_control_feature_cfg),
+				  ETH_RX_EN_STD_FLOW_CTRL);
 	}
 
 	if (pauseparam->tx_pause) {
 		new_pause |= FLOW_TX;
-		hssi_set_bit(pdev, HSSI_ETH_RECONFIG, chan,
-			     eth_mac_ptp_csroffs(0, tx_flow_control_feature_cfg),
-			    ETH_TX_EN_STD_FLOW_CTRL, true);
+		hssi_set_bit_ba(pdev, HSSI_ETH_RECONFIG, chan,
+				eth_mac_ptp_csroffs(0, tx_flow_control_feature_cfg),
+				ETH_TX_EN_STD_FLOW_CTRL);
 	} else {
-		hssi_clear_bit(pdev, HSSI_ETH_RECONFIG, chan,
-			       eth_mac_ptp_csroffs(0, tx_flow_control_feature_cfg),
-			      ETH_TX_EN_STD_FLOW_CTRL, true);
+		hssi_clear_bit_ba(pdev, HSSI_ETH_RECONFIG, chan,
+				  eth_mac_ptp_csroffs(0, tx_flow_control_feature_cfg),
+				  ETH_TX_EN_STD_FLOW_CTRL);
 	}
 
 	hssi_csrwr32_ba(pdev, HSSI_ETH_RECONFIG, chan,

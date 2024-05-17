@@ -113,15 +113,13 @@ void ftile_enable_mac(intel_fpga_xtile_eth_private *priv)
 	u32 chan = priv->tile_chan;
 
 	/* Enable Tx MAC datapath */
-	hssi_clear_bit(pdev, HSSI_ETH_RECONFIG, chan,
-		       eth_mac_ptp_csroffs(0, tx_mac_conf),
-		       ETH_TX_MAC_DISABLE_TXMAC,
-		       true);
+	hssi_clear_bit_ba(pdev, HSSI_ETH_RECONFIG, chan,
+			  eth_mac_ptp_csroffs(0, tx_mac_conf),
+			  ETH_TX_MAC_DISABLE_TXMAC);
 
-	hssi_clear_bit(pdev, HSSI_ETH_RECONFIG, chan,
-		       eth_mac_ptp_csroffs(0, rx_mac_frwd_rx_crc),
-		       ETH_RX_MAC_CRC_FORWARD,
-		       true);
+	hssi_clear_bit_ba(pdev, HSSI_ETH_RECONFIG, chan,
+			  eth_mac_ptp_csroffs(0, rx_mac_frwd_rx_crc),
+			  ETH_RX_MAC_CRC_FORWARD);
 }
 
 void ftile_disable_mac(intel_fpga_xtile_eth_private *priv)
@@ -130,15 +128,15 @@ void ftile_disable_mac(intel_fpga_xtile_eth_private *priv)
 	u32 chan = priv->tile_chan;
 
 	/* Disable Tx MAC datapath */
-	hssi_set_bit(pdev, HSSI_ETH_RECONFIG, chan,
-		     eth_mac_ptp_csroffs(0, tx_mac_conf),
-		     ETH_TX_MAC_DISABLE_TXMAC,
-		     true);
+	hssi_set_bit_ba(pdev, HSSI_ETH_RECONFIG, chan,
+			eth_mac_ptp_csroffs(0, tx_mac_conf),
+			ETH_TX_MAC_DISABLE_TXMAC);
 
-	hssi_clear_bit(pdev, HSSI_ETH_RECONFIG, chan,
-		       eth_mac_ptp_csroffs(0, tx_mac_conf),
-		       ETH_TX_MAC_ENABLE_S_ADDR_EN,
-		       true);
+	hssi_clear_bit_ba(pdev, HSSI_ETH_RECONFIG, chan,
+			  eth_mac_ptp_csroffs(0, tx_mac_conf),
+			  ETH_TX_MAC_ENABLE_S_ADDR_EN);
+
+	netif_warn(priv, drv, priv->dev, "Tx and Rx datapath stop done\n");
 }
 
 void ftile_update_mac_addr(intel_fpga_xtile_eth_private *priv)
@@ -159,8 +157,8 @@ void ftile_update_mac_addr(intel_fpga_xtile_eth_private *priv)
 			eth_mac_ptp_csroffs(0, tx_mac_source_addr_higher_bytes), msb);
 
 	/* Enable Source address insertion */
-	hssi_set_bit(pdev, HSSI_ETH_RECONFIG, chan,
-		     eth_mac_ptp_csroffs(0, tx_mac_conf), ETH_TX_MAC_ENABLE_S_ADDR_EN, true);
+	hssi_set_bit_ba(pdev, HSSI_ETH_RECONFIG, chan,
+			eth_mac_ptp_csroffs(0, tx_mac_conf), ETH_TX_MAC_ENABLE_S_ADDR_EN);
 
 	netdev_info(priv->dev, "Device MAC address %pM\n", priv->dev->dev_addr);
 }
@@ -173,9 +171,9 @@ static void ftile_enable_mac_flow_ctrl(intel_fpga_xtile_eth_private *priv)
 
 	/* Rx MAC flow control */
 	if ((priv->flow_ctrl & FLOW_RX)) {
-		hssi_set_bit(pdev, HSSI_ETH_RECONFIG, chan,
-			     eth_mac_ptp_csroffs(0, rx_flow_control_feature_cfg),
-			     ETH_RX_EN_STD_FLOW_CTRL, true);
+		hssi_set_bit_ba(pdev, HSSI_ETH_RECONFIG, chan,
+				eth_mac_ptp_csroffs(0, rx_flow_control_feature_cfg),
+				ETH_RX_EN_STD_FLOW_CTRL);
 
 		reg = hssi_csrrd32_ba(pdev, HSSI_ETH_RECONFIG, chan,
 				      eth_mac_ptp_csroffs(0, rx_flow_control_feature_cfg));
@@ -186,9 +184,9 @@ static void ftile_enable_mac_flow_ctrl(intel_fpga_xtile_eth_private *priv)
 
 	/* Tx MAC flow control */
 	if ((priv->flow_ctrl & FLOW_TX)) {
-		hssi_set_bit(pdev, HSSI_ETH_RECONFIG, chan,
-			     eth_mac_ptp_csroffs(0, tx_flow_control_feature_cfg),
-			     ETH_TX_EN_PRIORITY_FLOW_CTRL, true);
+		hssi_set_bit_ba(pdev, HSSI_ETH_RECONFIG, chan,
+				eth_mac_ptp_csroffs(0, tx_flow_control_feature_cfg),
+				ETH_TX_EN_PRIORITY_FLOW_CTRL);
 
 		reg = hssi_csrrd32_ba(pdev, HSSI_ETH_RECONFIG, chan,
 				      eth_mac_ptp_csroffs(0, tx_flow_control_feature_cfg));
@@ -217,16 +215,16 @@ static void ftile_disable_mac_flow_ctrl(intel_fpga_xtile_eth_private *priv)
 
 	/* Disable Rx MAC flow control */
 	if ((priv->flow_ctrl & FLOW_RX)) {
-		hssi_clear_bit(pdev, HSSI_ETH_RECONFIG, chan,
-			       eth_mac_ptp_csroffs(0, rx_flow_control_feature_cfg),
-			       ETH_RX_EN_STD_FLOW_CTRL, true);
+		hssi_clear_bit_ba(pdev, HSSI_ETH_RECONFIG, chan,
+				  eth_mac_ptp_csroffs(0, rx_flow_control_feature_cfg),
+				  ETH_RX_EN_STD_FLOW_CTRL);
 	}
 
 	/* Disable Tx MAC flow control */
 	if ((priv->flow_ctrl & FLOW_TX)) {
-		hssi_clear_bit(pdev, HSSI_ETH_RECONFIG, chan,
-			       eth_mac_ptp_csroffs(0, tx_flow_control_feature_cfg),
-			       ETH_TX_EN_PRIORITY_FLOW_CTRL, true);
+		hssi_clear_bit_ba(pdev, HSSI_ETH_RECONFIG, chan,
+				  eth_mac_ptp_csroffs(0, tx_flow_control_feature_cfg),
+				  ETH_TX_EN_PRIORITY_FLOW_CTRL);
 	}
 }
 
@@ -340,6 +338,44 @@ static u32 get_gb_33_66_occupancy(const u32 speed, const u32 rvld_lsb, const u32
 
 	if (occ > 1) /* nfor values 0 & 1 return 0 , for 2&3 return 33 */
 		return 33;
+
+	return 0;
+}
+
+int ftile_check_counter_complete(intel_fpga_xtile_eth_private *priv, u32 regbank,
+				 size_t offs, u8 bit_mask, bool set_bit,
+				 int align)
+{
+	int counter;
+	u32 chan = priv->tile_chan;
+	struct platform_device *pdev = priv->pdev_hssi;
+	(void)align;
+	counter = 0;
+
+	while (counter++ < INTEL_FPGA_XTILE_SW_RESET_WATCHDOG_CNTR) {
+		if (set_bit) {
+			if (hssi_bit_is_set_ba(pdev, regbank, chan,
+					       offs, bit_mask))
+				break;
+		} else {
+			if (hssi_bit_is_clear_ba(pdev, regbank, chan,
+						 offs, bit_mask))
+				break;
+		}
+		udelay(1);
+	}
+
+	if (counter >= INTEL_FPGA_XTILE_SW_RESET_WATCHDOG_CNTR) {
+		if (set_bit) {
+			if (hssi_bit_is_clear_ba(pdev, regbank, chan,
+						 offs, bit_mask))
+				return -EINVAL;
+		} else {
+			if (hssi_bit_is_set_ba(pdev, regbank, chan,
+					       offs, bit_mask))
+				return -EINVAL;
+		}
+	}
 
 	return 0;
 }
@@ -1272,8 +1308,8 @@ static bool ftile_ptp_rx_ready_bit_is_set(intel_fpga_xtile_eth_private *priv)
 	if (priv->ptp_enable) {
 		// Check PTP RX ready bit set or not set,
 		// If not, we need rerun ptp tx rx user flow again
-		is_set = hssi_bit_is_set(priv->pdev_hssi, HSSI_ETH_RECONFIG, priv->tile_chan,
-					 eth_soft_csroffs(ptp_status), ETH_RX_PTP_READY, true);
+		is_set = hssi_bit_is_set_ba(priv->pdev_hssi, HSSI_ETH_RECONFIG, priv->tile_chan,
+					    eth_soft_csroffs(ptp_status), ETH_RX_PTP_READY);
 	}
 
 	return is_set;
@@ -1343,7 +1379,7 @@ int ftile_start(intel_fpga_xtile_eth_private *priv)
 ptp_error:
 	ftile_disable_mac(priv);
 	ftile_disable_mac_flow_ctrl(priv);
-        return ret;
+	return ret;
 }
 
 int ftile_stop(intel_fpga_xtile_eth_private *priv)
@@ -1355,7 +1391,8 @@ int ftile_stop(intel_fpga_xtile_eth_private *priv)
 	ftile_disable_mac_flow_ctrl(priv);
 
 	/* Stop UI thread */
-        ui_adjustments_cancel_worker(priv);
+	if (priv->ptp_enable)
+		ftile_ui_adjustments_cancel_worker(priv);
 
 	return 0;
 }
@@ -1370,33 +1407,92 @@ int ftile_run_check(intel_fpga_xtile_eth_private *priv)
 {
 	int ret;
 
+	if (!priv->ptp_enable)
+		return 0;
+
 	/* Check ptp rx ready bit is toggled,
 	 * if yes, stop UI and rerun ptp tx rx user flow
 	 */
 	if (ftile_ptp_rx_ready_bit_is_set(priv)) {
 		//do nothing
 	} else {
-		ui_adjustments_cancel_worker(priv);
+		ftile_ui_adjustments_cancel_worker(priv);
 
-		if ((ret = eth_ftile_tx_rx_user_flow(priv)))
+		ret = eth_ftile_tx_rx_user_flow(priv);
+		if (ret)
 			return ret;
-		else
-			ftile_ui_adjustments_init_worker(priv);
+
+		ftile_ui_adjustments_init_worker(priv);
 	}
 
 	return 0;
 }
 
+/* WA : Remove check for local_fault and remote_fault from etile driver once fixed in HSSI IP */
+static bool ftile_check_local_remote_fault_status(intel_fpga_xtile_eth_private *priv)
+{
+	bool curr_link_state = true;
+
+	u32 rx_mac_link_fault = hssi_csrrd32_ba(priv->pdev_hssi,
+						HSSI_ETH_RECONFIG,
+						priv->tile_chan,
+						eth_soft_csroffs(link_fault_status));
+#if 0
+	if ((rx_mac_link_fault & ETH_RX_MAC_REMOTE_FAULT) ||
+	    (rx_mac_link_fault & ETH_RX_MAC_LOCAL_FAULT)) {
+		curr_link_state = false;
+	}
+#endif
+
+	if (rx_mac_link_fault & ETH_RX_MAC_REMOTE_FAULT) {
+		curr_link_state = false;
+	}
+
+	return curr_link_state;
+}
+
+bool ftile_check_dts_param(intel_fpga_xtile_eth_private *priv)
+{
+	struct platform_device *pdev;
+	struct device_node *np;
+	int ret;
+
+	pdev = to_platform_device(priv->device);
+	np = pdev->dev.of_node;
+
+        if (of_property_read_u16(np, "pma_type",
+                                 &priv->pma_type)) {
+                dev_warn(&pdev->dev, "cannot obtain pma type defaulting to be FGT\n");
+                priv->pma_type = 0;
+        }
+
+        if (priv->ptp_enable) {
+                /* PTP Timestamp Accuracy mode */
+                ret  = of_property_read_string(pdev->dev.of_node, "ptp_accu_mode",
+                                               &priv->ptp_accu_mode);
+                if (ret < 0)
+                        priv->ptp_accu_mode = "Basic";
+
+                if (strcasecmp(priv->ptp_accu_mode, "Advanced") == 0) {
+                        /* Tx Routing adjustment delay */
+                        if (of_property_read_u32(np, "ptp_tx_routing_adj",
+                                                 &priv->ptp_tx_routing_adj)) {
+                                priv->ptp_tx_routing_adj = 0;
+                        }
+
+                        /* Rx Routing adjustment delay */
+                        if (of_property_read_u32(np, "ptp_rx_routing_adj",
+                                                 &priv->ptp_rx_routing_adj)) {
+                                priv->ptp_rx_routing_adj = 0;
+                        }
+                }
+        }
+
+	return true;
+}
+
 bool ftile_get_link_fault_status(intel_fpga_xtile_eth_private *priv)
 {
-	int link_fault;
-
-	link_fault = hssi_csrrd32_ba(priv->pdev_hssi, HSSI_ETH_RECONFIG, priv->tile_chan,
-				     eth_soft_csroffs(link_fault_status));
-
-	/* Check for remote link fault */
-	if (link_fault & 0x2)
-		return true;
-	else
-		return false;
+	return  hssi_ethport_is_stable(priv->pdev_hssi, priv->hssi_port, false) &&
+		ftile_check_local_remote_fault_status(priv);
 }

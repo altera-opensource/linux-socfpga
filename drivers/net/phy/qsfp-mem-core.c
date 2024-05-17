@@ -73,9 +73,9 @@ static void qsfp_init_i2c(struct qsfp *qsfp)
 }
 
 static const struct regmap_config mmio_cfg = {
-	.reg_bits = 64,
-	.reg_stride = 8,
-	.val_bits = 64,
+	.reg_bits = 32,
+	.reg_stride = 4,
+	.val_bits = 32,
 	.fast_io = true,
 	.rd_table = &qsfp_mem_access_table,
 	.max_register = QSFP_SHADOW_CSRS_BASE_END,
@@ -107,7 +107,7 @@ int check_qsfp_plugin(struct qsfp *qsfp)
 }
 EXPORT_SYMBOL_GPL(check_qsfp_plugin);
 
-ssize_t qsfp_connected_show(struct device *dev, struct device_attribute *attr, char *buf)
+static ssize_t qsfp_connected_show(struct device *dev, struct device_attribute *attr, char *buf)
 {
 	struct qsfp *qsfp = dev_get_drvdata(dev);
 	u32 plugin;
@@ -135,7 +135,7 @@ const struct attribute_group *qsfp_mem_groups[] = {
 };
 EXPORT_SYMBOL_GPL(qsfp_mem_groups);
 
-void qsfp_check_hotplug(struct work_struct *work)
+static void qsfp_check_hotplug(struct work_struct *work)
 {
 	struct delayed_work *dwork;
 	struct qsfp *qsfp;

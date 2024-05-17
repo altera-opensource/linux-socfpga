@@ -337,7 +337,7 @@ static ssize_t zl30793_dpll_manual_freq_offset_show(struct device *dev,
 	struct spi_device *spi = to_spi_device(dev);
 
 	// Allocate DMA-safe buffer for transfers
-	dma_buf = kmalloc(16, GFP_KERNEL);
+	dma_buf = kmalloc(PLL_SPI_MAX_FRAME_SIZE, GFP_KERNEL);
 	if (!dma_buf)
 		return ret;
 
@@ -363,23 +363,26 @@ zl30793_dpll_manual_freq_offset_store(struct device *dev,
 	u8 dpll_df_data[5] = {0};
 	s32 freq_offset = 0;
 	s64 manual_offset = 0;
-	s8* man_ptr = NULL;
+	s8 *man_ptr = NULL;
 	s8  pres_sign = 1;
 	u16 dpll_df_addr = 0x307;
 	u16 *dma_buf;
+	int res_out;
 	struct spi_device *spi = to_spi_device(dev);
 
-	sscanf(buf, "%d", &freq_offset);
+	res_out = kstrtouint(buf, 10, &freq_offset);
+	if (res_out < 0)
+		return res_out;
 
 	if (freq_offset < 0)
-		/* preserve the sign of the number */	
+		/* preserve the sign of the number */
 		pres_sign = -1;
 
 	/* if the sign is negative, overturn it prior to perform the arithmetic */
 	manual_offset = pres_sign *
-		( ((unsigned long)(freq_offset * pres_sign ) << 48 )/ 1000000000L);
-	
-	man_ptr = (s8*)&manual_offset + 4;
+		(((unsigned long)(freq_offset * pres_sign) << 48) / 1000000000L);
+
+	man_ptr = (s8 *)&manual_offset + 4;
 
 	// Allocate DMA-safe buffer for transfers
 	dma_buf = kmalloc(PLL_SPI_MAX_FRAME_SIZE, GFP_KERNEL);
@@ -412,7 +415,7 @@ zl30793_reg_dump_show(struct device *dev,
 	struct spi_device *spi = to_spi_device(dev);
 
 	// Allocate DMA-safe buffer for transfers
-	dma_buf = kmalloc(16, GFP_KERNEL);
+	dma_buf = kmalloc(PLL_SPI_MAX_FRAME_SIZE, GFP_KERNEL);
 	if (!dma_buf)
 		return ret;
 
@@ -474,7 +477,8 @@ zl_reg_dump_err:
 static DEVICE_ATTR(zl30793_dpll_manual_freq_offset, 0644,
 		   zl30793_dpll_manual_freq_offset_show,
 		   zl30793_dpll_manual_freq_offset_store);
-static DEVICE_ATTR(zl30793_reg_dump, 0644, zl30793_reg_dump_show, NULL);
+
+static DEVICE_ATTR(zl30793_reg_dump, 0444, zl30793_reg_dump_show, NULL);
 
 static struct attribute *zl30793_sysfs_attrs[] = {
 	&dev_attr_zl30793_dpll_manual_freq_offset.attr,

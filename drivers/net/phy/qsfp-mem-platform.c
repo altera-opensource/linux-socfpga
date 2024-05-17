@@ -12,8 +12,11 @@
 #include <linux/phy/qsfp-mem.h>
 #include <linux/processor.h>
 #include <linux/slab.h>
+#include <linux/platform_device.h>
 
 #define INTEL_QSFP_MEM_CONTROLLER_NAME "qsfp-mem-ctrl"
+
+struct platform_device;
 
 static int qsfp_platform_probe(struct platform_device *pdev)
 {
@@ -71,14 +74,13 @@ exit:
 	return ret;
 }
 
-static int qsfp_platform_remove(struct platform_device *pdev)
+static void qsfp_platform_remove(struct platform_device *pdev)
 {
 	struct device *dev = &pdev->dev;
 	struct qsfp *qsfp = dev_get_drvdata(dev);
 
 	qsfp_remove_device(qsfp);
 	mutex_destroy(&qsfp->lock);
-	return 0;
 }
 
 static const struct of_device_id intel_fpga_qsfp_mem_ids[] = {

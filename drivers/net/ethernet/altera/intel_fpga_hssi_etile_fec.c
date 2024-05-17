@@ -25,96 +25,127 @@
 
 #define MAX_COUNT_OFFSET		64000
 
-/* Init FEC */
-int fec_init(struct platform_device *pdev, intel_fpga_xtile_eth_private *priv)
+/* write protected read for the ui enable status */
+static inline bool wpr_get_uienable_status(intel_fpga_xtile_eth_private *priv)
 {
-	int ret;
+	bool value = false;
 
-	/* get FEC type from device tree */
-	ret  = of_property_read_string(pdev->dev.of_node, "fec-type",
-				       &priv->fec_type);
-	if (ret < 0) {
-		dev_err(&pdev->dev, "cannot obtain fec-type\n");
-		return ret;
-	}
-	dev_info(&pdev->dev, "\tFEC type is %s\n", priv->fec_type);
+	read_lock(&priv->wr_lock);
+	value = priv->ui_enable;
+	read_unlock(&priv->wr_lock);
 
-	/* get FEC channel from device tree */
-	if (of_property_read_u32(pdev->dev.of_node, "fec-cw-pos-rx",
-				 &priv->rsfec_cw_pos_rx)) {
-		dev_err(&pdev->dev, "cannot obtain fec codeword bit position!\n");
-		return -ENXIO;
-	}
-	dev_info(&pdev->dev, "\trsfec rx codeword bit position is 0x%x\n",
-		 priv->rsfec_cw_pos_rx);
+	return value;
+}
 
-	return 0;
+/* read protected write for the ui enable status */
+static inline void rpw_set_uienable_status(bool value,
+					   intel_fpga_xtile_eth_private *priv) {
+	write_lock(&priv->wr_lock);
+	priv->ui_enable = value;
+	write_unlock(&priv->wr_lock);
+}
+
+void etile_ui_adjustments_worker_handle(struct timer_list *t) //timer handler
+{
+	intel_fpga_xtile_eth_private *priv = from_timer(priv, t, fec_timer);
+
+	schedule_work(&priv->ui_worker);
+}
+
+void etile_ui_adjustments_cancel_worker(intel_fpga_xtile_eth_private *priv)
+{
+	/* if the ui adjustment timer is already cancelled and we request
+	 * cancel again, case should be avoided
+	 */
+	if (!wpr_get_uienable_status(priv))
+		return;
+
+	/* we cancel the timer so that it doesn't schedule new
+	 * worker thread execution
+	 */
+	rpw_set_uienable_status(false, priv);
+	del_timer_sync(&priv->fec_timer);
+	cancel_work_sync(&priv->ui_worker);
 }
 
 /* Calculate Unit Interval Adjustments */
-void ui_adjustments(struct timer_list *t)
+static void etile_ui_adjustments(struct work_struct *work)
 {
-	intel_fpga_xtile_eth_private *priv = from_timer(priv, t, fec_timer);
-	struct platform_device *pdev = priv->pdev_hssi;
-	u32 chan = priv->tile_chan;
-
+	intel_fpga_xtile_eth_private *priv;
+	struct platform_device *pdev;
+	u32 chan;
 	u32 tx_tam_l_initial, tx_tam_h_initial, tx_tam_count_initial;
 	u32 rx_tam_l_initial, rx_tam_h_initial, rx_tam_count_initial;
 	u32 tx_tam_l_nth, tx_tam_h_nth, tx_tam_count_nth;
 	u32 rx_tam_l_nth, rx_tam_h_nth, rx_tam_count_nth;
 	u64 tx_tam_initial, rx_tam_initial, tx_tam_nth, rx_tam_nth;
 	u32 tx_tam_interval = 0, rx_tam_interval = 0;
-	u32 tx_tam_count_est = 0, rx_tam_count_est = 0, ui_value, tx_tam_count, rx_tam_count;
+	u32 tx_tam_count_est = 0, rx_tam_count_est = 0;
+	u32 ui_value = 0, tx_tam_count = 0, rx_tam_count = 0;
 	u64 tx_tam_delta, rx_tam_delta;
 	u64 tx_ui = 0, rx_ui = 0;
 	u64 start_jiffies;
-	u32 ui_value_16bit_fns;
+	u32 ui_value_16bit_fns = 0;
+
+	priv = container_of(work, intel_fpga_xtile_eth_private, ui_worker);
+	pdev = priv->pdev_hssi;
+	chan = priv->tile_chan;
+
+	if (priv->ui_adjust_interval == 0)
+		goto ui_restart;
+
+	/* to avoid race condition where the timer is deleted and we are scheduled */
+	if (!wpr_get_uienable_status(priv))
+		return;
 
 	start_jiffies = get_jiffies_64();
+
 	/* Set tam_snapshot to 1 to take the first snapshot of the Time of
 	 * Alignment marker (TAM)
 	 */
-	hssi_set_bit_atomic(pdev, HSSI_ETH_RECONFIG, chan, eth_ptp_csroffs(tam_snapshot),
-		    ETH_TAM_SNAPSHOT,false);
+	hssi_set_bit(pdev, HSSI_ETH_RECONFIG, chan, eth_ptp_csroffs(tam_snapshot),
+		     ETH_TAM_SNAPSHOT);
 
 	/* Read snapshotted initial TX TAM and counter values */
-	tx_tam_l_initial = hssi_csrrd32_atomic(pdev, HSSI_ETH_RECONFIG, chan, eth_ptp_csroffs(tx_tam_l));
-	tx_tam_h_initial = hssi_csrrd32_atomic(pdev, HSSI_ETH_RECONFIG, chan, eth_ptp_csroffs(tx_tam_h));
+	tx_tam_l_initial = hssi_csrrd32(pdev, HSSI_ETH_RECONFIG, chan, eth_ptp_csroffs(tx_tam_l));
+	tx_tam_h_initial = hssi_csrrd32(pdev, HSSI_ETH_RECONFIG, chan, eth_ptp_csroffs(tx_tam_h));
 	tx_tam_initial = ((u64)tx_tam_h_initial << 32) | tx_tam_l_initial;
-	tx_tam_count_initial = hssi_csrrd32_atomic(pdev, HSSI_ETH_RECONFIG, chan, eth_ptp_csroffs(tx_count));
+	tx_tam_count_initial = hssi_csrrd32(pdev, HSSI_ETH_RECONFIG,
+					    chan, eth_ptp_csroffs(tx_count));
 
 	/* Read snapshotted initial RX TAM and counter values */
-	rx_tam_l_initial = hssi_csrrd32_atomic(pdev, HSSI_ETH_RECONFIG, chan, eth_ptp_csroffs(rx_tam_l));
-	rx_tam_h_initial = hssi_csrrd32_atomic(pdev, HSSI_ETH_RECONFIG, chan, eth_ptp_csroffs(rx_tam_h));
+	rx_tam_l_initial = hssi_csrrd32(pdev, HSSI_ETH_RECONFIG, chan, eth_ptp_csroffs(rx_tam_l));
+	rx_tam_h_initial = hssi_csrrd32(pdev, HSSI_ETH_RECONFIG, chan, eth_ptp_csroffs(rx_tam_h));
 	rx_tam_initial = ((u64)rx_tam_h_initial << 32) | rx_tam_l_initial;
-	rx_tam_count_initial = hssi_csrrd32_atomic(pdev, HSSI_ETH_RECONFIG, chan, eth_ptp_csroffs(rx_count));
+	rx_tam_count_initial = hssi_csrrd32(pdev, HSSI_ETH_RECONFIG,
+					    chan, eth_ptp_csroffs(rx_count));
 
 	/* Clear snapshot */
-	hssi_clear_bit_atomic(pdev, HSSI_ETH_RECONFIG, chan, eth_ptp_csroffs(tam_snapshot),
-		      ETH_TAM_SNAPSHOT,false);
+	hssi_clear_bit(pdev, HSSI_ETH_RECONFIG, chan, eth_ptp_csroffs(tam_snapshot),
+		       ETH_TAM_SNAPSHOT);
 
 	/* Wait for a few TAM interval */
 	udelay(5300);
 
 	/* Request snapshot of Nth TX TAM and RX TAM */
-	hssi_set_bit_atomic(pdev, HSSI_ETH_RECONFIG, chan, eth_ptp_csroffs(tam_snapshot),
-		    ETH_TAM_SNAPSHOT,false);
+	hssi_set_bit(pdev, HSSI_ETH_RECONFIG, chan, eth_ptp_csroffs(tam_snapshot),
+		     ETH_TAM_SNAPSHOT);
 
 	/* Read snapshotted of Nth TX TAM and counter values */
-	tx_tam_l_nth = hssi_csrrd32_atomic(pdev, HSSI_ETH_RECONFIG, chan, eth_ptp_csroffs(tx_tam_l));
-	tx_tam_h_nth = hssi_csrrd32_atomic(pdev, HSSI_ETH_RECONFIG, chan, eth_ptp_csroffs(tx_tam_h));
+	tx_tam_l_nth = hssi_csrrd32(pdev, HSSI_ETH_RECONFIG, chan, eth_ptp_csroffs(tx_tam_l));
+	tx_tam_h_nth = hssi_csrrd32(pdev, HSSI_ETH_RECONFIG, chan, eth_ptp_csroffs(tx_tam_h));
 	tx_tam_nth = ((u64)tx_tam_h_nth << 32) | tx_tam_l_nth;
-	tx_tam_count_nth = hssi_csrrd32_atomic(pdev, HSSI_ETH_RECONFIG, chan, eth_ptp_csroffs(tx_count));
+	tx_tam_count_nth = hssi_csrrd32(pdev, HSSI_ETH_RECONFIG, chan, eth_ptp_csroffs(tx_count));
 
 	/* Read snapshotted of Nth RX TAM and counter values */
-	rx_tam_l_nth = hssi_csrrd32_atomic(pdev, HSSI_ETH_RECONFIG, chan, eth_ptp_csroffs(rx_tam_l));
-	rx_tam_h_nth = hssi_csrrd32_atomic(pdev, HSSI_ETH_RECONFIG, chan, eth_ptp_csroffs(rx_tam_h));
+	rx_tam_l_nth = hssi_csrrd32(pdev, HSSI_ETH_RECONFIG, chan, eth_ptp_csroffs(rx_tam_l));
+	rx_tam_h_nth = hssi_csrrd32(pdev, HSSI_ETH_RECONFIG, chan, eth_ptp_csroffs(rx_tam_h));
 	rx_tam_nth = ((u64)rx_tam_h_nth << 32) | rx_tam_l_nth;
-	rx_tam_count_nth = hssi_csrrd32_atomic(pdev, HSSI_ETH_RECONFIG, chan, eth_ptp_csroffs(rx_count));
+	rx_tam_count_nth = hssi_csrrd32(pdev, HSSI_ETH_RECONFIG, chan, eth_ptp_csroffs(rx_count));
 
 	/* Clear snapshot */
-	hssi_clear_bit_atomic(pdev, HSSI_ETH_RECONFIG, chan, eth_ptp_csroffs(tam_snapshot),
-		      ETH_TAM_SNAPSHOT,false);
+	hssi_clear_bit(pdev, HSSI_ETH_RECONFIG, chan, eth_ptp_csroffs(tam_snapshot),
+		       ETH_TAM_SNAPSHOT);
 
 	if ((get_jiffies_64() - start_jiffies) > HZ) {
 		netdev_warn(priv->dev,
@@ -177,22 +208,26 @@ void ui_adjustments(struct timer_list *t)
 	 * offset), discard the snapshot and repeat steps
 	 */
 	if (tx_tam_count_est > MAX_COUNT_OFFSET) {
-		netdev_warn(priv->dev,
-			    "Est count exceeded:tx_tam_count_est: %u = tx_tam_delta:%llu / (tx_tam_interval:%u * ui_value_16bit_fns:0x%x)\n",
-			    tx_tam_count_est, tx_tam_delta, tx_tam_interval,
-			    ui_value_16bit_fns);
-		netdev_warn(priv->dev, "tx_tam_nth: %llu, tx_tam_initial: %llu\n",
-			    tx_tam_nth, tx_tam_initial);
+		if (unlikely(netif_msg_hw(priv))) {
+			netdev_warn(priv->dev,
+				    "Est count exceeded:tx_tam_count_est: %u = tx_tam_delta:%llu / (tx_tam_interval:%u * ui_value_16bit_fns:0x%x)\n",
+				    tx_tam_count_est, tx_tam_delta, tx_tam_interval,
+				    ui_value_16bit_fns);
+			netdev_warn(priv->dev, "tx_tam_nth: %llu, tx_tam_initial: %llu\n",
+				    tx_tam_nth, tx_tam_initial);
+		}
 		goto ui_restart;
 	}
 
 	if (rx_tam_count_est > MAX_COUNT_OFFSET) {
-		netdev_warn(priv->dev,
-			    "Est count exceeded:rx_tam_count_est: %u = rx_tam_delta:%llu / (rx_tam_interval:%u * ui_value_16bit_fns:0x%x)\n",
-			    rx_tam_count_est, rx_tam_delta, rx_tam_interval,
-			    ui_value_16bit_fns);
-		netdev_warn(priv->dev, "rx_tam_nth: %llu, rx_tam_initial: %llu\n",
-			    rx_tam_nth, rx_tam_initial);
+		if (unlikely(netif_msg_hw(priv))) {
+			netdev_warn(priv->dev,
+				    "Est count exceeded:rx_tam_count_est: %u = rx_tam_delta:%llu / (rx_tam_interval:%u * ui_value_16bit_fns:0x%x)\n",
+				    rx_tam_count_est, rx_tam_delta, rx_tam_interval,
+				    ui_value_16bit_fns);
+			netdev_warn(priv->dev, "rx_tam_nth: %llu, rx_tam_initial: %llu\n",
+				    rx_tam_nth, rx_tam_initial);
+		}
 		goto ui_restart;
 	}
 
@@ -217,37 +252,65 @@ void ui_adjustments(struct timer_list *t)
 	/* UI Adjustment for 25G kr-fec */
 	if (priv->link_speed == SPEED_25000) {
 		if (tx_ui > 0x9EE42 || tx_ui < 0x9EDC0) {
-			netdev_warn(priv->dev,
-				    "%s: TX UI value(0x%llx) is not within 0x9EDC0 to 0x9EE42 range\n",
-				    __func__, tx_ui);
+			if (unlikely(netif_msg_hw(priv))) {
+				netdev_warn(priv->dev,
+					    "%s: TX UI value(0x%llx) is not within 0x9EDC0 to 0x9EE42 range\n",
+					    __func__, tx_ui);
+			}
 			goto ui_restart;
 		}
 		if (rx_ui > 0x9EE42 || rx_ui < 0x9EDC0) {
-			netdev_warn(priv->dev,
-				    "%s: RX UI value(0x%llx) is not within 0x9EDC0 to 0x9EE42 range\n",
-				    __func__, rx_ui);
+			if (unlikely(netif_msg_hw(priv))) {
+				netdev_warn(priv->dev,
+					    "%s: RX UI value(0x%llx) is not within 0x9EDC0 to 0x9EE42 range\n",
+					    __func__, rx_ui);
+			}
 			goto ui_restart;
 		}
 	} else {
 		if (tx_ui > 0x18D3A4 || tx_ui < 0x18D25F) {
-			netdev_warn(priv->dev,
-				    "%s: TX UI value (0x%llx) is not within 0x18D25F to 0x18D3A4 range\n",
-				    __func__, tx_ui);
+			if (unlikely(netif_msg_hw(priv))) {
+				netdev_warn(priv->dev,
+					    "%s: TX UI value (0x%llx) is not within 0x18D25F to 0x18D3A4 range\n",
+					    __func__, tx_ui);
+			}
 			goto ui_restart;
 		}
 		if (rx_ui > 0x18D3A4 || rx_ui < 0x18D25F) {
-			netdev_warn(priv->dev,
-				    "%s: RX UI value (0x%llx) is not within 0x18D25F to 0x18D3A4 range\n",
-				    __func__, rx_ui);
+			if (unlikely(netif_msg_hw(priv))) {
+				netdev_warn(priv->dev,
+					    "%s: RX UI value (0x%llx) is not within 0x18D25F to 0x18D3A4 range\n",
+					    __func__, rx_ui);
+			}
 			goto ui_restart;
 		}
 	}
 
-	hssi_csrwr32_atomic(pdev, HSSI_ETH_RECONFIG, chan, eth_ptp_csroffs(tx_ui_reg), tx_ui);
-	hssi_csrwr32_atomic(pdev, HSSI_ETH_RECONFIG, chan, eth_ptp_csroffs(rx_ui_reg), rx_ui);
+	hssi_csrwr32(pdev, HSSI_ETH_RECONFIG, chan, eth_ptp_csroffs(tx_ui_reg), tx_ui);
+	hssi_csrwr32(pdev, HSSI_ETH_RECONFIG, chan, eth_ptp_csroffs(rx_ui_reg), rx_ui);
 
 ui_restart:
-	mod_timer(&priv->fec_timer, jiffies + msecs_to_jiffies(1000));
+
+	/* to avoid race condition where the timer is deleted and we are scheduled */
+	if (!wpr_get_uienable_status(priv))
+		return;
+
+	if (priv->ui_adjust_interval == 0)
+		mod_timer(&priv->fec_timer, jiffies + msecs_to_jiffies(20000));
+	else
+		mod_timer(&priv->fec_timer, jiffies + msecs_to_jiffies(priv->ui_adjust_interval));
+}
+
+void etile_ui_adjustments_init_worker(intel_fpga_xtile_eth_private *priv)
+{
+	int ret;
+
+	rpw_set_uienable_status(true, priv);
+	INIT_WORK(&priv->ui_worker, etile_ui_adjustments);
+	timer_setup(&priv->fec_timer, etile_ui_adjustments_worker_handle, 0);
+	ret = mod_timer(&priv->fec_timer, jiffies + msecs_to_jiffies(5000));
+	if (ret)
+		netdev_err(priv->dev, "Timer failed to start UI adjustment\n");
 }
 
 MODULE_LICENSE("GPL");

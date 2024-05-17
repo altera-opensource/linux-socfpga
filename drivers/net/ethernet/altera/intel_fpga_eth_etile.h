@@ -1,6 +1,6 @@
 /* SPDX-License-Identifier: GPL-2.0 */
 /* Intel FPGA E-tile Ethernet MAC driver
- * Copyright (C) 2020-2022 Intel Corporation. All rights reserved.
+ * Copyright (C) 2020-2024 Intel Corporation. All rights reserved.
  *
  * Contributors:
  *   Roman Bulgakov
@@ -16,7 +16,6 @@
 #define __INTEL_FPGA_ETILE_ETH_H__
 
 #include "intel_fpga_eth_main.h"
-
 
 #define INTEL_FPGA_ETILE_UI_VALUE_10G			0x0018D302
 #define INTEL_FPGA_ETILE_UI_VALUE_25G			0x0009EE01
@@ -624,6 +623,7 @@
 /* 0x611 TX Flow Control Feature Configuration */
 #define ETH_TX_EN_STD_FLOW_CTRL					BIT(0)
 #define ETH_TX_EN_PRIORITY_FLOW_CTRL				BIT(1)
+#define MAC_PAUSEFRAME_QUANTA					0xFFFF
 
 /* 0x620 Pause Quanta 0 */
 #define ETH_PAUSE_QUANTA_0					0xFFFF
@@ -1546,6 +1546,9 @@
 #define XCVR_PMA_CTRL_STAT_RCP_LOAD_TIMEOUT			BIT(1)
 #define XCVR_PMA_CTRL_STAT_RCP_LOAD_BUSY			BIT(2)
 
+/* link stability check interval */
+#define PRELOAD_LINK_STABILITY_COUNT 10
+
 /* Ethernet Reconfiguration Interface Register Base Addresses
  * Word Offset	Register Type
  * 0x0B0-0x0E8	Auto Negotiation and Link Training registers
@@ -1697,7 +1700,7 @@ struct intel_fpga_etile_eth_rx_mac_10_25G {
 	u32 reserved_502[4];				//0x502-0x505
 	u32 rx_mac_max_frm_size;			//0x506
 	u32 rx_mac_frwd_rx_crc;				//0x507
-	u32 rx_max_link_fault;				//0x508
+	u32 link_fault_status;				//0x508
 	u32 reserved_509;				//0x509
 	u32 rx_mac_conf;				//0x50A
 	u32 rx_mac_ehip_conf;				//0x50B
@@ -2487,10 +2490,6 @@ union intel_fpga_etile_xcvr {
 	(offsetof(union intel_fpga_etile_xcvr, pma_avmm.a))
 #define eth_pma_capability_csroffs(a) \
 	(offsetof(union intel_fpga_etile_xcvr, pma_capability.a))
-#if 0
-#define eth_pma_ctrl_status_csroffs(a) \
-	(offsetof(struct intel_fpga_etile_xcvr, pma_ctrl_status.a))
-#endif
 
 struct intel_fpga_etile_ethernet {
 	u32 reserved_0[176];						//0x000-0x0AF
@@ -2505,31 +2504,51 @@ struct intel_fpga_etile_ethernet {
 	struct intel_fpga_etile_eth_1588_ptp ptp;			//0xA00-0xBFF
 };
 
-#define eth_csroffs(a)	(offsetof(struct intel_fpga_etile_ethernet, a)/sizeof(u32))
+#define eth_csroffs(a)	(offsetof(struct intel_fpga_etile_ethernet, a) / sizeof(u32))
 #define eth_auto_neg_link_csroffs(a) \
-	(offsetof(struct intel_fpga_etile_ethernet, auto_neg_link.a)/sizeof(u32))
+	(offsetof(struct intel_fpga_etile_ethernet, auto_neg_link.a) / sizeof(u32))
 #define eth_phy_csroffs(a) \
-	(offsetof(struct intel_fpga_etile_ethernet, phy.a)/sizeof(u32))
+	(offsetof(struct intel_fpga_etile_ethernet, phy.a) / sizeof(u32))
 #define eth_tx_mac_csroffs(a) \
-	(offsetof(struct intel_fpga_etile_ethernet, tx_mac.a)/sizeof(u32))
+	(offsetof(struct intel_fpga_etile_ethernet, tx_mac.a) / sizeof(u32))
 #define eth_rx_mac_csroffs(a) \
-	(offsetof(struct intel_fpga_etile_ethernet, rx_mac.a)/sizeof(u32))
+	(offsetof(struct intel_fpga_etile_ethernet, rx_mac.a) / sizeof(u32))
 #define eth_pause_and_priority_csroffs(a) \
-	(offsetof(struct intel_fpga_etile_ethernet, pause_priority.a)/sizeof(u32))
+	(offsetof(struct intel_fpga_etile_ethernet, pause_priority.a) / sizeof(u32))
 #define eth_tx_stats_csroffs(a) \
-	(offsetof(struct intel_fpga_etile_ethernet, tx_stats.a)/sizeof(u32))
+	(offsetof(struct intel_fpga_etile_ethernet, tx_stats.a) / sizeof(u32))
 #define eth_rx_stats_csroffs(a) \
-	(offsetof(struct intel_fpga_etile_ethernet, rx_stats.a)/sizeof(u32))
+	(offsetof(struct intel_fpga_etile_ethernet, rx_stats.a) / sizeof(u32))
 #define eth_ptp_csroffs(a) \
-	(offsetof(struct intel_fpga_etile_ethernet, ptp.a)/sizeof(u32))
+	(offsetof(struct intel_fpga_etile_ethernet, ptp.a) / sizeof(u32))
 
+#define rx_fifo_csroffs(a)	(offsetof(struct intel_fpga_rx_fifo, a))
+#define tx_fifo_csroffs(a)	(offsetof(struct intel_fpga_rx_fifo, a))
 
 /* Function prototypes */
-void ui_adjustments(struct timer_list *t);
-void etile_pma_digital_reset(intel_fpga_xtile_eth_private *priv, 
-		       bool tx_reset, 
+void etile_get_link_state(intel_fpga_xtile_eth_private *priv, bool *curr);
+void ui_adjustment_start(intel_fpga_xtile_eth_private *priv);
+void ui_adjustment_stop(intel_fpga_xtile_eth_private *priv);
+void etile_pre_eth_link_up(intel_fpga_xtile_eth_private *priv);
+void etile_post_eth_link_up(intel_fpga_xtile_eth_private *priv);
+void etile_pre_eth_link_down(intel_fpga_xtile_eth_private *priv);
+void etile_post_eth_link_down(intel_fpga_xtile_eth_private *priv);
+void etile_ui_adjustments_init_worker(intel_fpga_xtile_eth_private *priv);
+void etile_ui_adjustments_cancel_worker(intel_fpga_xtile_eth_private *priv);
+int etile_init_mac(intel_fpga_xtile_eth_private *priv);
+void etile_get_stats64(struct net_device *dev,
+		       struct rtnl_link_stats64 *storage);
+void etile_pma_digital_reset(intel_fpga_xtile_eth_private *priv,
+			     bool tx_reset,
 		       bool rx_reset);
+void etile_update_mac_addr(intel_fpga_xtile_eth_private *priv);
+void intel_fpga_etile_set_ethtool_ops(struct net_device *netdev);
+
 int fec_init(struct platform_device *pdev, intel_fpga_xtile_eth_private *priv);
+
+int etile_ehip_reset(intel_fpga_xtile_eth_private *priv,
+		     bool tx, bool rx, bool sys);
+int etile_ehip_deassert_reset(intel_fpga_xtile_eth_private *priv);
 
 #ifdef CONFIG_INTEL_FPGA_ETILE_DEBUG_FS
 int intel_fpga_etile_init_fs(struct net_device *dev);

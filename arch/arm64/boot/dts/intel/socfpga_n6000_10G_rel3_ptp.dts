@@ -79,7 +79,7 @@
 	         hssiss_0_hssiss: hssiss_0_hssiss {
 			compatible = "intel, hssiss-1.0";
 			reg-names = "sscsr";
-			reg = <0x80160000 0x00001000>;
+			reg = < 0x80114000 0x00001000>;
                         reset-mode ="reg";
                         cold-reset {
                                 ofs = <0x7B8>;

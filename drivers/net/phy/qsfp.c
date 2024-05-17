@@ -284,7 +284,8 @@ static bool qsfp_module_supported(const struct qsfp_eeprom_id *id)
 {
 	if (id->base.etile_qsfp_identifier == SFF8024_ID_QSFP ||
 	    id->base.etile_qsfp_identifier == SFF8024_ID_QSFP_PLUS ||
-	    id->base.etile_qsfp_identifier == SFF8024_ID_QSFP_28)
+	    id->base.etile_qsfp_identifier == SFF8024_ID_QSFP_28 ||
+	    id->base.etile_qsfp_identifier == SFF8024_ID_QSFP_DD_INF_8628)
 		return true;
 
 	/* QSFP GPON module Ubiquiti U-Fiber Instant has in its EEPROM stored

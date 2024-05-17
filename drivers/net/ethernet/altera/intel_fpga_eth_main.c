@@ -1,9 +1,9 @@
-// SPDX-License-Identifier: GPL
+// SPDX-License-Identifier: GPL-2.0
 /* Intel FPGA Ethernet MAC driver
- * Copyright (C) 2022,2023 Intel Corporation. All rights reserved
+ * Copyright (C) 2022,2024 Intel Corporation. All rights reserved
  *
  * Contributors:
- * 	Preetam Narayan
+ *	Preetam Narayan
  *
  */
 
@@ -24,6 +24,8 @@
 #include <linux/skbuff.h>
 
 #include "intel_fpga_eth_main.h"
+#include "intel_fpga_ftile_driver.h"
+#include "intel_fpga_etile_driver.h"
 #include "intel_fpga_eth_hssi_itf.h"
 #include "intel_fpga_eth_tile_ops.h"
 /* Module parameters */
@@ -33,15 +35,14 @@ module_param(debug, int, MOD_PARAM_PERM);
 MODULE_PARM_DESC(debug,
 		 "Message Level (-1: default, 0: no output, 16: all)");
 
-static const u32 default_msg_level =  NETIF_MSG_DRV    |
-				      NETIF_MSG_PROBE  |
+static const u32 default_msg_level =  NETIF_MSG_PROBE  |
 				      NETIF_MSG_LINK   |
 				      NETIF_MSG_IFUP   |
 				      NETIF_MSG_RX_ERR |
 				      NETIF_MSG_TX_ERR |
 				      NETIF_MSG_IFDOWN;
 
-static int flow_ctrl = FLOW_OFF;
+static int flow_ctrl = FLOW_TX | FLOW_RX;
 
 module_param(flow_ctrl, int, MOD_PARAM_PERM);
 MODULE_PARM_DESC(flow_ctrl,
@@ -70,7 +71,6 @@ MODULE_PARM_DESC(dma_tx_num, "Number of descriptors in the TX list");
  */
 #define INTEL_FPGA_RXDMABUFFER_SIZE	2048
 #define INTEL_FPGA_COAL_TIMER(x)	(jiffies + usecs_to_jiffies(x))
-
 
 /* Allow network stack to resume queueing packets after we've
  * finished transmitting at least 1/4 of the packets in the queue.
@@ -106,7 +106,6 @@ static inline void xtile_modify_cpu_txintr_state(intel_fpga_xtile_eth_private *p
 	}
 }
 
-
 /* Enable/Disable the Rx interrupt to avoid interrupt disable stacking */
 static inline void xtile_modify_cpu_rxintr_state(intel_fpga_xtile_eth_private *priv, bool enable)
 {
@@ -133,66 +132,61 @@ static inline void xtile_modify_cpu_rxintr_state(intel_fpga_xtile_eth_private *p
 	}
 }
 
-static inline void xtile_enable_cpu_interrupts(intel_fpga_xtile_eth_private *priv)
+/* Wrapper API to be used for the CPU interrupt management to avoid interrupt disable stacking */
+static inline void xtile_modify_cpu_intr_state(intel_fpga_xtile_eth_private *priv, bool enable)
 {
-	xtile_modify_cpu_txintr_state(priv, true);
-	xtile_modify_cpu_rxintr_state(priv, true);
+	xtile_modify_cpu_txintr_state(priv, enable);
+	xtile_modify_cpu_rxintr_state(priv, enable);
 }
 
-static inline void xtile_disable_cpu_interrupts(intel_fpga_xtile_eth_private *priv)
+static inline void xtile_modify_cpu_enable_intr(intel_fpga_xtile_eth_private *priv)
 {
-	xtile_modify_cpu_txintr_state(priv, false);
-	xtile_modify_cpu_rxintr_state(priv, false);
+	xtile_modify_cpu_intr_state(priv, true);
 }
 
-static inline void xtile_enable_disable_dma_interrupts(intel_fpga_xtile_eth_private *priv,
-						       bool enable)
+static inline void xtile_modify_cpu_disable_intr(intel_fpga_xtile_eth_private *priv)
+{
+	xtile_modify_cpu_intr_state(priv, false);
+}
+
+static inline void xtile_txdmaintr_modify(intel_fpga_xtile_eth_private *priv,
+					  bool enable)
 {
 	unsigned long flags;
 
 	spin_lock_irqsave(&priv->rxdma_irq_lock, flags);
-
 	priv->spec_ops->dma_ops->clear_txirq(&priv->dma_priv);
-	priv->spec_ops->dma_ops->clear_rxirq(&priv->dma_priv);
-
-	if (enable) {
+	if (enable)
 		priv->spec_ops->dma_ops->enable_txirq(&priv->dma_priv);
-		priv->spec_ops->dma_ops->enable_rxirq(&priv->dma_priv);
-	} else {
+	else
 		priv->spec_ops->dma_ops->disable_txirq(&priv->dma_priv);
-		priv->spec_ops->dma_ops->disable_rxirq(&priv->dma_priv);
-	}
-
 	spin_unlock_irqrestore(&priv->rxdma_irq_lock, flags);
 }
 
-#define PORT_STS_TIMEOUT		20000	/* in us*/
-#define PORT_STS_STABILITY_COUNT	10 /* in us*/
-static int check_link_stable(intel_fpga_xtile_eth_private *priv)
+static inline void xtile_rxdmaintr_modify(intel_fpga_xtile_eth_private *priv,
+					  bool enable)
 {
-	struct platform_device *pdev = priv->pdev_hssi;
-	u32 hssi_port = priv->hssi_port;
-	unsigned long timeout, start;
-	u32 counter = 0;
-	bool eth_portstatus;
+	unsigned long flags;
 
-	start = jiffies;
-	timeout = start + usecs_to_jiffies(PORT_STS_TIMEOUT);
-	do
-	{
-		udelay(1);
-		eth_portstatus = hssi_ethport_is_stable(pdev, hssi_port, false);
-		if (!eth_portstatus)
-			counter = 0;
-		else
-			counter++;
+	spin_lock_irqsave(&priv->rxdma_irq_lock, flags);
+	priv->spec_ops->dma_ops->clear_rxirq(&priv->dma_priv);
+	if (enable)
+		priv->spec_ops->dma_ops->enable_rxirq(&priv->dma_priv);
+	else
+		priv->spec_ops->dma_ops->disable_rxirq(&priv->dma_priv);
+	spin_unlock_irqrestore(&priv->rxdma_irq_lock, flags);
+}
 
-		if (counter == PORT_STS_STABILITY_COUNT)
-			return 0;
+static inline void xtile_dmaintr_enable(intel_fpga_xtile_eth_private *priv)
+{
+	xtile_txdmaintr_modify(priv, true);
+	xtile_rxdmaintr_modify(priv, true);
+}
 
-	} while(time_before(jiffies, timeout));
-
-	return -ETIME;
+static inline void xtile_dmaintr_disable(intel_fpga_xtile_eth_private *priv)
+{
+	xtile_txdmaintr_modify(priv, false);
+	xtile_rxdmaintr_modify(priv, false);
 }
 
 static int xtile_fec_init(struct platform_device *pdev, intel_fpga_xtile_eth_private *priv)
@@ -217,6 +211,15 @@ static int xtile_fec_init(struct platform_device *pdev, intel_fpga_xtile_eth_pri
 	dev_info(&pdev->dev, "\trsfec rx codeword bit position is 0x%x\n",
 		 priv->rsfec_cw_pos_rx);
 
+	/* get UI adjust interval from device tree */
+	if (of_property_read_u32(pdev->dev.of_node, "ui-adj-interval",
+				 &priv->ui_adjust_interval)) {
+		dev_err(&pdev->dev, "cannot obtain UI adjust interval value!\n");
+		priv->ui_adjust_interval =  1000;
+	}
+	dev_info(&pdev->dev, "\tui_adjust interval gap is %d\n",
+		 priv->ui_adjust_interval);
+
 	return 0;
 }
 
@@ -239,7 +242,6 @@ static int xtile_init_rx_buffer(intel_fpga_xtile_eth_private *priv,
 					    len, DMA_FROM_DEVICE);
 
 	if (dma_mapping_error(priv->device, rxbuffer->dma_addr)) {
-
 		netdev_err(priv->dev,
 			   "%s: DMA mapping error\n", __func__);
 
@@ -418,9 +420,8 @@ static int xtile_rx(intel_fpga_xtile_eth_private *priv, int limit)
 	u16 pktstatus;
 
 	while ((count < limit) &&
-	        ((rxstatus =
-		  priv->spec_ops->dma_ops->get_rx_status(&priv->dma_priv)) != 0) ) {
-
+	       ((rxstatus =
+		  priv->spec_ops->dma_ops->get_rx_status(&priv->dma_priv)) != 0)) {
 		pktstatus = rxstatus >> 16;
 		pktlength = rxstatus & 0xffff;
 
@@ -521,9 +522,8 @@ static int xtile_tx_complete(intel_fpga_xtile_eth_private *priv)
 	return txcomplete;
 }
 
-/* NAPI polling function
- * Ref: from napi_schedule to poll call = 20us
-*/
+/* NAPI polling function */
+/* Ref: from napi_schedule to poll call = 20us */
 static int xtile_poll(struct napi_struct *napi, int budget)
 {
 	intel_fpga_xtile_eth_private *priv =
@@ -558,14 +558,13 @@ static int xtile_poll(struct napi_struct *napi, int budget)
 	spin_lock_irqsave(&priv->rxdma_irq_lock, flags);
 
 	irq_state = priv->spec_ops->dma_ops->is_txirq_set(&priv->dma_priv) ||
-		priv->spec_ops->dma_ops->is_rxirq_set(&priv->dma_priv);
+		    priv->spec_ops->dma_ops->is_rxirq_set(&priv->dma_priv);
 
 	spin_unlock_irqrestore(&priv->rxdma_irq_lock, flags);
 
 	if (irq_state) {
 		priv->spec_ops->dma_ops->clear_txirq(&priv->dma_priv);
 		priv->spec_ops->dma_ops->clear_rxirq(&priv->dma_priv);
-		/* request to repoll */
 		goto repoll;
 	}
 
@@ -576,16 +575,15 @@ static int xtile_poll(struct napi_struct *napi, int budget)
 		goto repoll;
 
 	/* enable the interrupt to CPU only if the napi complete done */
-	if (napi_complete_done(napi, min_run)) {
-		xtile_enable_cpu_interrupts(priv);
-	} else {
+	if (napi_complete_done(napi, min_run))
+		xtile_modify_cpu_enable_intr(priv);
+	else
 		netdev_dbg(priv->dev, "napi complete failed");
-	}
 
 	/* Amount of Rx work done is returned */
 	if (unlikely(netif_msg_intr(priv)))
 		netdev_info(priv->dev, "TX/RX complete: %d/%d %d/%d\n",
-				txcomplete, rxcomplete, min_run, budget);
+			    txcomplete, rxcomplete, min_run, budget);
 
 	return min_run;
 
@@ -615,17 +613,17 @@ static irqreturn_t intel_fpga_xtile_isr(int irq, void *dev_id)
 
 	if (unlikely(netif_msg_intr(priv)))
 		netdev_info(dev, "%s interrupt\n",
-			(irq == priv->rx_irq) ? "RX" : "TX");
+			    (irq == priv->rx_irq) ? "RX" : "TX");
 
 	spin_lock(&priv->rxdma_irq_lock);
 
 	if (likely(napi_schedule_prep(&priv->napi))) {
-		if (priv->rx_irq_enabled == true) {
+		if (priv->rx_irq_enabled) {
 			priv->rx_irq_enabled = false;
 			disable_irq_nosync(priv->rx_irq);
 			priv->irq_rx_disable_cntr++;
 		}
-		if (priv->tx_irq_enabled == true) {
+		if (priv->tx_irq_enabled) {
 			priv->tx_irq_enabled = false;
 			disable_irq_nosync(priv->tx_irq);
 			priv->irq_tx_disable_cntr++;
@@ -648,7 +646,6 @@ int xtile_check_counter_complete(intel_fpga_xtile_eth_private *priv, u32 regbank
 	int counter;
 	u32 chan = priv->tile_chan;
 	struct platform_device *pdev = priv->pdev_hssi;
-	struct hssiss_private *priv_hssi = platform_get_drvdata(pdev);
 
 	counter = 0;
 	switch (align) {
@@ -672,61 +669,10 @@ int xtile_check_counter_complete(intel_fpga_xtile_eth_private *priv, u32 regbank
 			}
 		}
 		break;
-	default: /* default is word aligned */
-
-	if(priv_hssi->ver == HSSISS_ETILE)
-	{
-		while (counter++ < INTEL_FPGA_XTILE_SW_RESET_WATCHDOG_CNTR) {
-			if (set_bit) {
-				if (hssi_bit_is_set(pdev, regbank, chan,
-						   offs, bit_mask,false))
-					break;
-			} else {
-				if (hssi_bit_is_clear(pdev, regbank, chan,
-						     offs, bit_mask,false))
-					break;
-			}
-			udelay(1);
-		}
-		if (counter >= INTEL_FPGA_XTILE_SW_RESET_WATCHDOG_CNTR) {
-			if (set_bit) {
-				if (hssi_bit_is_clear(pdev, regbank, chan,
-						     offs, bit_mask,false))
-					return -EINVAL;
-			} else {
-				if (hssi_bit_is_set(pdev, regbank, chan,
-						   offs, bit_mask,false))
-					return -EINVAL;
-			}
-		}
-	}
-	else
-	{
-		 while (counter++ < INTEL_FPGA_XTILE_SW_RESET_WATCHDOG_CNTR) {
-                        if (set_bit) {
-                                if (hssi_bit_is_set(pdev, regbank, chan,
-                                                   offs, bit_mask,true))
-                                        break;
-                        } else {
-                                if (hssi_bit_is_clear(pdev, regbank, chan,
-                                                     offs, bit_mask,true))
-                                        break;
-                        }
-                        udelay(1);
-                }
-                if (counter >= INTEL_FPGA_XTILE_SW_RESET_WATCHDOG_CNTR) {
-                        if (set_bit) {
-                                if (hssi_bit_is_clear(pdev, regbank, chan,
-                                                     offs, bit_mask,true))
-                                        return -EINVAL;
-                        } else {
-                                if (hssi_bit_is_set(pdev, regbank, chan,
-                                                   offs, bit_mask,true))
-                                        return -EINVAL;
-                        }
-                }
-
-	}
+	default:
+	/* default is word aligned */
+		priv->spec_ops->tile.check_counter_complete(priv, regbank, offs,
+							    bit_mask, set_bit, align);
 		break;
 	}
 	return 0;
@@ -743,38 +689,64 @@ static void xtile_clear_mac_statistics(struct platform_device *pdev, u32 port)
 
 static bool xtile_get_link_status(intel_fpga_xtile_eth_private *priv)
 {
-	if ((!(check_link_stable(priv))) && (!((priv->spec_ops->tile.link_fault_status) &&
-					     (priv->spec_ops->tile.link_fault_status(priv)))))
-		return true;
-	else
-		return false;
+	bool curr_link_state = priv->spec_ops->tile.link_fault_status &&
+			       priv->spec_ops->tile.link_fault_status(priv);
 
+	/* if the link is down then we reload the stability check count to be
+	 * used in the next link up case
+	 */
+	if (curr_link_state) {
+		if (--priv->link_stability_check > 0)
+			curr_link_state = false;
+	} else {
+		priv->link_stability_check = PRELOAD_LINK_STABILITY_COUNT;
+	}
+
+	return curr_link_state;
+}
+
+static const char *phylink_pause_to_str(int pause)
+{
+	switch (pause & MLO_PAUSE_TXRX_MASK) {
+	case MLO_PAUSE_TX | MLO_PAUSE_RX:
+		return "rx/tx";
+	case MLO_PAUSE_TX:
+		return "tx";
+	case MLO_PAUSE_RX:
+		return "rx";
+	default:
+		return "off";
+	}
 }
 
 static void eth_link_up(intel_fpga_xtile_eth_private *priv)
 {
-        /* In case there is issue and packet forwarded to DMA engine
-         * but are not being consumed by it then the DMA ring wouldn't
-         * be freed resulting in the depeletion of the ring buffers.
-         * When the buffer threshold has reached we shouldn't wake the
-         * queue back again
-         */
-        if (netif_queue_stopped(priv->dev)) {
-                if (!(xtile_tx_avail(priv) <= TXQUEUESTOP_THRESHOLD)) {
-                        netif_wake_queue(priv->dev);
-			priv->netque_state = true;
-		}
+	/* In case there is issue and packet forwarded to DMA engine
+	 * but are not being consumed by it then the DMA ring wouldn't
+	 * be freed resulting in the depeletion of the ring buffers.
+	 * When the buffer threshold has reached we shouldn't wake the
+	 * queue back again
+	 */
+	if (netif_queue_stopped(priv->dev)) {
+		if (!(xtile_tx_avail(priv) <= TXQUEUESTOP_THRESHOLD))
+			netif_wake_queue(priv->dev);
 	} else {
 		netif_start_queue(priv->dev);
-		priv->netque_state = true;
 	}
 
 	/* Make sure carrier is on */
-	if (!(netif_carrier_ok(priv->dev)))
+	if (!(netif_carrier_ok(priv->dev))) {
 		netif_carrier_on(priv->dev);
+		netdev_info(priv->dev, "Link is Up - %s/%s - flow control %s\n",
+			    phy_speed_to_str(priv->link_speed),
+			    phy_duplex_to_str(priv->duplex),
+			    phylink_pause_to_str(priv->flow_ctrl));
+	}
 
-	/* Enable cpu interrupts */
-	xtile_enable_cpu_interrupts(priv);
+	/* My L1 is declared UP now we should be receiving data so start
+	 * data transfer by enabling the interrupts
+	 */
+	xtile_modify_cpu_enable_intr(priv);
 
 	/* case to handle where the prods have filled up the ring we need to
 	 * clear the ring so that the packet processing can happen.
@@ -784,7 +756,6 @@ static void eth_link_up(intel_fpga_xtile_eth_private *priv)
 		if (netif_msg_hw(priv)) {
 			netdev_err(priv->dev,
 				   " __napi_schedule invoked in non ISR context\n");
-
 		}
 		__napi_schedule(&priv->napi);
 	} else {
@@ -794,57 +765,31 @@ static void eth_link_up(intel_fpga_xtile_eth_private *priv)
 		}
 	}
 
-	/* Enable dma interrupts */
-	//xtile_enable_disable_dma_interrupts(priv, true);
+	xtile_dmaintr_enable(priv);
 
-	netdev_info(priv->dev, "Link is UP\n");
+	/* Enable the Tx send */
+	priv->napi_state = NAPI_ENABLED_TXREADY;
 }
 
 static void eth_link_down(intel_fpga_xtile_eth_private *priv)
 {
-        if (!netif_queue_stopped(priv->dev)) {
-                netif_tx_disable(priv->dev);
-		priv->netque_state = false;
-	}
+	priv->napi_state = NAPI_ENABLED_TXBLOCKED;
 
-	/* Disable DMA interrupts */
-	//xtile_enable_disable_dma_interrupts(priv, false);
+	if (!netif_queue_stopped(priv->dev))
+		netif_tx_disable(priv->dev);
 
-	if (netif_carrier_ok(priv->dev))
+	/* stop the interrupts so that xtile poll doesn't get scheduled */
+	xtile_dmaintr_disable(priv);
+
+	if (netif_carrier_ok(priv->dev)) {
 		netif_carrier_off(priv->dev);
-
-	netdev_info(priv->dev, "Link is Down\n");
-}
-
-/* make sure this function only called from xtile open */
-static void xtile_start_phy(intel_fpga_xtile_eth_private *priv)
-{
-	rtnl_lock();
-	if (priv->phylink)
-		phylink_start(priv->phylink);
-	rtnl_unlock();
-}
-
-/* make sure this function only called from xtile shutdown */
-static void xtile_stop_phy(intel_fpga_xtile_eth_private *priv, bool rtnl_lock_available)
-{
-	if (priv->phylink) {
-		if (rtnl_lock_available) {
-			phylink_stop(priv->phylink);
-		} else {
-			if (rtnl_trylock()) {
-				phylink_stop(priv->phylink);
-				rtnl_unlock();
-			} else {
-				if (netif_msg_ifdown(priv))
-					netdev_info(priv->dev, "Link is Down\n");
-			}
-		}
+		netdev_info(priv->dev, "Link is Down\n");
 	}
 }
 
 /* write protected read for the monitor link status */
-static inline bool wpr_get_monitor_link_status(intel_fpga_xtile_eth_private *priv) {
+static inline bool wpr_get_monitor_link_status(intel_fpga_xtile_eth_private *priv)
+{
 	bool value = false;
 
 	read_lock(&priv->wr_lock);
@@ -856,13 +801,13 @@ static inline bool wpr_get_monitor_link_status(intel_fpga_xtile_eth_private *pri
 
 /* read protected write for the monitor link status */
 static inline void rpw_set_monitor_link_status(bool value,
-					       intel_fpga_xtile_eth_private *priv) {
+					       intel_fpga_xtile_eth_private *priv)
+{
 	write_lock(&priv->wr_lock);
 	priv->monitor_thread_enable = value;
 	write_unlock(&priv->wr_lock);
 }
 
-#define LINK_STS_POLL_TIMEOUT		10	/* 10 ms*/
 static void eth_monitor_link_status(struct work_struct *work)
 {
 	bool link = false;
@@ -879,17 +824,16 @@ static void eth_monitor_link_status(struct work_struct *work)
 		return;
 
 	/* Get link status */
-	if (priv->spec_ops->link_check)
-		if (priv->spec_ops->link_check(priv))
-			link = true;
+	if (xtile_get_link_status(priv))
+		link = true;
 
 	/* Forcly change state to STOP after RUN,
 	 * once link is detected as low
 	 */
-	if ((ETH_LINK_STATE_RUN == priv->link_state) && !link)
+	if ((priv->link_state == ETH_LINK_STATE_RUN) && !link)
 		priv->link_state = ETH_LINK_STATE_STOP;
 
-	switch(priv->link_state) {
+	switch (priv->link_state) {
 	case ETH_LINK_STATE_RESET:
 		priv->link_state = ETH_LINK_STATE_START;
 		break;
@@ -902,7 +846,6 @@ static void eth_monitor_link_status(struct work_struct *work)
 			if (!tile_error) {
 				/* Start napi, netif queue, enable interrupts and phy */
 				eth_link_up(priv);
-				//xtile_start_phy(priv);
 
 				priv->link_state = ETH_LINK_STATE_RUN;
 			}
@@ -915,35 +858,31 @@ static void eth_monitor_link_status(struct work_struct *work)
 
 		if (!tile_error) {
 			/* Stop napi, netif queue, enable interrupts and phy */
-			//xtile_stop_phy(priv, false);
 			eth_link_down(priv);
 
 			priv->link_state = ETH_LINK_STATE_RESET;
 		}
 		break;
 	case ETH_LINK_STATE_RUN:
-                if (priv->spec_ops->tile.run_check)
-                        tile_error = priv->spec_ops->tile.run_check(priv);
+		if (priv->spec_ops->tile.run_check)
+			tile_error = priv->spec_ops->tile.run_check(priv);
 
 		if (tile_error)
 			priv->link_state = ETH_LINK_STATE_STOP;
 		break;
 	}
 
-	/* Error handling */
-	if (!tile_error) {
-		// change the poll timeout if required
-	}
-
 	if (wpr_get_monitor_link_status(priv))
-		schedule_delayed_work(&priv->dwork, msecs_to_jiffies(LINK_STS_POLL_TIMEOUT));
+		schedule_delayed_work(&priv->dwork, msecs_to_jiffies(priv->monitor_poll_interval));
 }
 
+#define PRELOAD_LINK_STABILITY_COUNT 10
 static void start_link_monitoring_thread(intel_fpga_xtile_eth_private *priv)
 {
 	rpw_set_monitor_link_status(true, priv);
 
-	priv->link_state = ETH_LINK_STATE_START;
+	priv->link_stability_check = PRELOAD_LINK_STABILITY_COUNT;
+	priv->link_state = ETH_LINK_STATE_RESET;
 	INIT_DELAYED_WORK(&priv->dwork, eth_monitor_link_status);
 	eth_monitor_link_status(&priv->dwork.work);
 }
@@ -966,19 +905,16 @@ static int xtile_open(struct net_device *dev)
 	int ret = 0;
 	int i;
 
-	/*
-	 * deassert reset:
+	/* deassert reset:
 	 * emib interface, mac, pcs, fec, pma, stat for both tx and rx
 	 * different for etile aand  ftile
 	 */
 	if (priv->spec_ops->tile.deassert_reset)
 		priv->spec_ops->tile.deassert_reset(priv);
 
-	priv->spec_ops->dma_ops->quiese_pref(&priv->dma_priv);
-
-        /* Reset the mSGDMA engine and configure the mSGDMA register to           */
-        /* provide information of the Tx and Rx DMA ring start address in memory  */
-        priv->spec_ops->dma_ops->reset_dma(&priv->dma_priv);
+	/* Reset the mSGDMA engine and configure the mSGDMA register to           */
+	/* provide information of the Tx and Rx DMA ring start address in memory  */
+	priv->spec_ops->dma_ops->reset_dma(&priv->dma_priv);
 
 	/* Create and initialize the TX/RX descriptors chains. */
 	priv->dma_priv.rx_ring_size = dma_rx_num;
@@ -998,8 +934,8 @@ static int xtile_open(struct net_device *dev)
 		goto dma_error;
 	}
 
-	/* Safe start, enable interrupts */
-	xtile_enable_disable_dma_interrupts(priv, true);
+	/* Disable DMA interrupts */
+	xtile_dmaintr_disable(priv);
 
 	/* Acquire spin lock */
 	spin_lock_irqsave(&priv->rxdma_irq_lock, flags);
@@ -1012,6 +948,8 @@ static int xtile_open(struct net_device *dev)
 	/* Release spin lock */
 	spin_unlock_irqrestore(&priv->rxdma_irq_lock, flags);
 
+	xtile_modify_cpu_enable_intr(priv);
+
 	/* Start/Prepare DMA */
 	if (priv->spec_ops->dma_ops->start_txdma)
 		priv->spec_ops->dma_ops->start_txdma(&priv->dma_priv);
@@ -1020,15 +958,16 @@ static int xtile_open(struct net_device *dev)
 		priv->spec_ops->dma_ops->start_rxdma(&priv->dma_priv);
 
 	/* Pre link, tile initialization */
-	if (priv->spec_ops->tile.init)
-		if ((ret = (priv->spec_ops->tile.init(priv))))
+	if (priv->spec_ops->tile.init) {
+		ret  = priv->spec_ops->tile.init(priv);
+
+		if (ret)
 			goto tile_init_error;
+	}
 
 	/* clear the MAC layer statistics to start afresh */
-        xtile_clear_mac_statistics(pdev, hssi_port);
+	xtile_clear_mac_statistics(pdev, hssi_port);
 
-	/* Enable CPU interrupts and reset counters */
-	xtile_enable_cpu_interrupts(priv);
 	priv->irq_rx_enable_cntr = 0;
 	priv->irq_tx_enable_cntr = 0;
 	priv->irq_rx_disable_cntr = 0;
@@ -1043,7 +982,7 @@ static int xtile_open(struct net_device *dev)
 	/* Enable NAPI so that driver is ready to poll when there is napi_schedule call */
 	if (!priv->napi_state) {
 		napi_enable(&priv->napi);
-		priv->napi_state = true;
+		priv->napi_state = NAPI_ENABLED_TXBLOCKED;
 	}
 
 	if (!wpr_get_monitor_link_status(priv)) {
@@ -1056,7 +995,7 @@ static int xtile_open(struct net_device *dev)
 	return 0;
 
 tile_init_error:
-	xtile_enable_disable_dma_interrupts(priv, false);
+	xtile_modify_cpu_disable_intr(priv);
 	/* Deallocate SKBuffer */
 	xtile_free_skbufs(dev);
 dma_error:
@@ -1074,41 +1013,33 @@ static int xtile_shutdown(struct net_device *dev)
 	if (priv->spec_ops->tile.uninit)
 		priv->spec_ops->tile.uninit(priv);
 
-	/* Stop the phylink */
-	//xtile_stop_phy(priv, true);
 	eth_link_down(priv);
 
-	/* Disable DMA interrupts */
-	xtile_enable_disable_dma_interrupts(priv, false);
+	/* Disable CPU interrupts.DMA intrs are already disabled in eth_link_down */
+	xtile_modify_cpu_disable_intr(priv);
 
-	/* Disable CPU interrupts */
-	xtile_disable_cpu_interrupts(priv);
-
-	/* stop napi */
-	if (priv->napi_state) {
+	if (priv->napi_state != NAPI_DISABLED) {
 		napi_synchronize(&priv->napi);
 		napi_disable(&priv->napi);
-		priv->napi_state = false;
+		priv->napi_state = NAPI_DISABLED;
 	}
 
-        /* we are ensuring we get the lock so that any pending activity */
-        /* if any is done */
-        spin_lock(&priv->tx_lock);
-        spin_unlock(&priv->tx_lock);
+	/* we are ensuring we get the lock so that any pending activity */
+	/* if any is done */
+	spin_lock(&priv->tx_lock);
+	spin_unlock(&priv->tx_lock);
 
-        spin_lock(&priv->mac_cfg_lock);
-        spin_unlock(&priv->mac_cfg_lock);
+	spin_lock(&priv->mac_cfg_lock);
+	spin_unlock(&priv->mac_cfg_lock);
 
-	priv->spec_ops->dma_ops->quiese_pref(&priv->dma_priv);
-
-        /* Reset the mSGDMA engine */
+	/* Reset the mSGDMA engine */
 	priv->spec_ops->dma_ops->reset_dma(&priv->dma_priv);
 
 	/* Clear the allocate skbuffers */
 	xtile_free_skbufs(dev);
 
 	/* Uninitialize mSGDMA */
-        priv->spec_ops->dma_ops->uninit_dma(&priv->dma_priv);
+	priv->spec_ops->dma_ops->uninit_dma(&priv->dma_priv);
 
 	/* reset: emib interface, mac, pcs, fec, pma, stat for both tx and rx */
 	if (priv->spec_ops->tile.reset)
@@ -1121,13 +1052,13 @@ static int xtile_shutdown(struct net_device *dev)
 	return 0;
 }
 
-static int xtile_change_mac(struct net_device *dev, void *inet_ds) {
-
+static int xtile_change_mac(struct net_device *dev, void *inet_ds)
+{
 	struct sockaddr *addr = inet_ds;
 	intel_fpga_xtile_eth_private *priv = netdev_priv(dev);
 
 	if (!is_valid_ether_addr(addr->sa_data))
-                return -EADDRNOTAVAIL;
+		return -EADDRNOTAVAIL;
 
 	dev_addr_set(dev, addr->sa_data);
 	//memcpy(dev->dev_addr, addr->sa_data, ETH_ALEN);
@@ -1157,19 +1088,26 @@ static int xtile_start_xmit(struct sk_buff *skb, struct net_device *dev)
 	intel_fpga_xtile_eth_private *priv = netdev_priv(dev);
 	unsigned int txsize = priv->dma_priv.tx_ring_size;
 
-	if (netif_queue_stopped(dev) || (priv->netque_state == false))
-		return NETDEV_TX_BUSY;
-
 	// pad with dummy bytes, DMA irq will stop otherwise
 	if (nopaged_len < 60)
 		nopaged_len = 60;
+
+	/* at start up or in the case the queue is stopped (i.e. L1 down)
+	 * we do not send the packet down the DMA
+	 * If the napi is not started then we wouldn't get txcompletion for the
+	 * packet sent to DMA so better to not send and ignore the packet
+	 * NOTE: netdev at least transmits one packet even if queue is stopped
+	 * hence an additional check on napi_state to avoid the packet leak to DMA
+	 */
+	if (netif_queue_stopped(dev) || (priv->napi_state != NAPI_ENABLED_TXREADY))
+		return NETDEV_TX_BUSY;
 
 	spin_lock_bh(&priv->tx_lock);
 
 	if (unlikely(xtile_tx_avail(priv) < nfrags + 1)) {
 		/* This is a hard error, log it. */
 		netdev_err(priv->dev,
-				"Tx list full when queue awake\n");
+			   "Tx list full when queue awake\n");
 		goto err;
 	}
 
@@ -1177,8 +1115,7 @@ static int xtile_start_xmit(struct sk_buff *skb, struct net_device *dev)
 		netdev_info(dev, "sending skb of len=%d\n", skb->len);
 
 		print_hex_dump(KERN_ERR, "data: ", DUMP_PREFIX_OFFSET,
-				16, 1, skb->data, skb->len, true);
-
+			       16, 1, skb->data, skb->len, true);
 	}
 
 	/* Map the first skb fragment */
@@ -1187,16 +1124,15 @@ static int xtile_start_xmit(struct sk_buff *skb, struct net_device *dev)
 
 	/* buffer is created prior just to keep the spin lock section short */
 	dma_addr = dma_map_single(priv->device, skb->data,
-			nopaged_len,
+				  nopaged_len,
 			DMA_TO_DEVICE);
 
 	/* Ref: https://www.kernel.org/doc/html/latest/core-api/dma-api-howto.html */
 	if (dma_mapping_error(priv->device, dma_addr)) {
-
 		netdev_err(priv->dev, "DMA mapping error\n");
 
-	        dma_unmap_single(priv->device, dma_addr,
-				nopaged_len,
+		dma_unmap_single(priv->device, dma_addr,
+				 nopaged_len,
 				DMA_TO_DEVICE);
 
 		dev->stats.tx_dropped++;
@@ -1211,7 +1147,7 @@ static int xtile_start_xmit(struct sk_buff *skb, struct net_device *dev)
 
 	/* Push data out of the cache hierarchy into main memory */
 	dma_sync_single_for_device(priv->device, buffer->dma_addr,
-				buffer->len, DMA_TO_DEVICE);
+				   buffer->len, DMA_TO_DEVICE);
 
 	/* Provide a hardware time stamp if requested.  */
 	if (unlikely((skb_shinfo(skb)->tx_flags & SKBTX_HW_TSTAMP) &&
@@ -1225,17 +1161,15 @@ static int xtile_start_xmit(struct sk_buff *skb, struct net_device *dev)
 	if (!priv->dma_priv.hwts_tx_en)
 		skb_tx_timestamp(skb);
 
-	if (unlikely( NETDEV_TX_BUSY ==
-		      priv->spec_ops->dma_ops->tx_buffer(&priv->dma_priv, buffer)) ) {
-
+	if (unlikely(NETDEV_TX_BUSY ==
+		      priv->spec_ops->dma_ops->tx_buffer(&priv->dma_priv, buffer))) {
 		/* In order to avoid skb to be freed
 		 * Ref: https://www.kernel.org/doc/html/latest/networking/driver.html
 		 */
 		buffer->skb = NULL;
 		xtile_free_tx_buffer(priv, buffer);
 		goto err;
-	}
-	else {
+	} else {
 		priv->dma_priv.tx_prod++;
 		dev->stats.tx_bytes += nopaged_len;
 	}
@@ -1261,7 +1195,7 @@ err:
 	dev->stats.tx_errors++;
 	netdev_err(priv->dev, "xmit NETDEV_TX_BUSY\n");
 
-  return NETDEV_TX_BUSY;
+	return NETDEV_TX_BUSY;
 }
 
 /* Control hardware timestamping.
@@ -1344,7 +1278,6 @@ static int xtile_change_mtu(struct net_device *dev, int new_mtu)
 	return 0;
 }
 
-
 /* Entry point for the ioctl.
  */
 static int xtile_do_ioctl(struct net_device *dev, struct ifreq *ifr, int cmd)
@@ -1366,7 +1299,7 @@ static int xtile_do_ioctl(struct net_device *dev, struct ifreq *ifr, int cmd)
 }
 
 static void drv_get_stats64(struct net_device *dev,
-		       struct rtnl_link_stats64 *storage)
+			    struct rtnl_link_stats64 *storage)
 {
 	/* a. All the blocking calls are avoided and only driver
 	 * gathered statistics are populated. This is to avoid
@@ -1390,10 +1323,10 @@ static void drv_get_stats64(struct net_device *dev,
 		storage->rx_crc_errors;
 
 	/* tx stats */
-	storage->tx_errors 	         = 0;
+	storage->tx_errors	         = 0;
 	storage->tx_dropped          = 0;
-	storage->rx_compressed 	     = 0;
-	storage->tx_compressed 	     = 0;
+	storage->rx_compressed	     = 0;
+	storage->tx_compressed	     = 0;
 	storage->tx_fifo_errors      = 0;
 	storage->tx_window_errors    = 0;
 	storage->tx_aborted_errors   = 0;
@@ -1403,7 +1336,7 @@ static void drv_get_stats64(struct net_device *dev,
 }
 
 static void xtile_get_stats64(struct net_device *dev,
-			struct rtnl_link_stats64 *storage)
+			      struct rtnl_link_stats64 *storage)
 {
 	intel_fpga_xtile_eth_private *priv = netdev_priv(dev);
 
@@ -1429,15 +1362,14 @@ static void intel_fpga_xtile_validate(struct phylink_config *config,
 				      unsigned long *supported,
 				      struct phylink_link_state *state)
 {
-        intel_fpga_xtile_eth_private *priv =
-                netdev_priv(to_net_dev(config->dev));
-
+	intel_fpga_xtile_eth_private *priv =
+		netdev_priv(to_net_dev(config->dev));
 
 	__ETHTOOL_DECLARE_LINK_MODE_MASK(mac_supported) = { 0, };
 	__ETHTOOL_DECLARE_LINK_MODE_MASK(mask) = { 0, };
 
 	if (!priv)
-                return;
+		return;
 
 	if (state->interface != PHY_INTERFACE_MODE_NA &&
 	    state->interface != PHY_INTERFACE_MODE_10GKR &&
@@ -1447,23 +1379,20 @@ static void intel_fpga_xtile_validate(struct phylink_config *config,
 		return;
 	}
 
-        if (priv->autoneg == true)
-        {
-                phylink_set(mask, Autoneg);
-                phylink_set(mac_supported, Autoneg);
-        }
-        else
-        {
-                phylink_clear(mask, Autoneg);
-                phylink_clear(mac_supported, Autoneg);
-        }
+	if (priv->autoneg) {
+		phylink_set(mask, Autoneg);
+		phylink_set(mac_supported, Autoneg);
+	} else {
+		phylink_clear(mask, Autoneg);
+		phylink_clear(mac_supported, Autoneg);
+	}
 
 	phylink_set(mask, Pause);
-        phylink_set(mac_supported, Pause);
-        phylink_set(mask, Asym_Pause);
-        phylink_set(mac_supported, Asym_Pause);
-        phylink_set_port_modes(mask);
-        phylink_set_port_modes(mac_supported);
+	phylink_set(mac_supported, Pause);
+	phylink_set(mask, Asym_Pause);
+	phylink_set(mac_supported, Asym_Pause);
+	phylink_set_port_modes(mask);
+	phylink_set_port_modes(mac_supported);
 
 	switch (state->interface) {
 	case PHY_INTERFACE_MODE_10GKR:
@@ -1509,16 +1438,15 @@ static void intel_fpga_xtile_mac_pcs_get_state(struct phylink_config *config,
 					       struct phylink_link_state *state)
 {
 	/* fixed speed for now */
-        intel_fpga_xtile_eth_private *priv =
-                netdev_priv(to_net_dev(config->dev));
+	intel_fpga_xtile_eth_private *priv =
+		netdev_priv(to_net_dev(config->dev));
 
-        if (!priv)
-                return;
+	if (!priv)
+		return;
 
-        state->speed = priv->link_speed;
+	state->speed = priv->link_speed;
 	state->duplex = DUPLEX_FULL;
 	state->link = 1;
-
 }
 
 static void intel_fpga_xtile_mac_an_restart(struct phylink_config *config)
@@ -1537,7 +1465,7 @@ static void intel_fpga_xtile_get_pcs_fixed_state(struct phylink_config *config,
 
 	state->speed = priv->link_speed;
 	state->duplex = DUPLEX_FULL;
-	if (priv->autoneg == false)
+	if (priv->autoneg)
 		state->an_enabled = AUTONEG_DISABLE;
 }
 
@@ -1624,7 +1552,7 @@ static int intel_fpga_xtile_probe(struct platform_device *pdev)
 
 	op_ptr = of_device_get_match_data(&pdev->dev);
 
-	if (op_ptr == NULL) {
+	if (!op_ptr) {
 		dev_err(&pdev->dev, "No matching data field found\n");
 		ret = -ENODEV;
 		goto err_free_netdev;
@@ -1632,9 +1560,8 @@ static int intel_fpga_xtile_probe(struct platform_device *pdev)
 
 	/* Get the HSSI node device from the device tree node */
 	dev_hssi = of_parse_phandle(pdev->dev.of_node, "hssiss", 0);
-	if (!dev_hssi) {
+	if (!dev_hssi)
 		return -ENOENT;
-	}
 
 	pdev_hssi = of_find_device_by_node(dev_hssi);
 	if (!pdev_hssi) {
@@ -1647,27 +1574,33 @@ static int intel_fpga_xtile_probe(struct platform_device *pdev)
 	/* get hssi port no from device tree */
 	if (of_property_read_u32(np, "hssi_port",
 				 &priv->hssi_port)) {
-
 		dev_err(&pdev->dev, "cannot obtain hssi port info\n");
 		ret = -ENXIO;
 		goto err_free_netdev;
 	}
 
 	if (of_property_read_u32(np, "tile_chan",
-                                 &priv->tile_chan)) {
-
+				 &priv->tile_chan)) {
 		dev_err(&pdev->dev, "cannot obtain tile channel info\n");
 		ret = -ENXIO;
 		goto err_free_netdev;
 	}
 
+	if (of_property_read_u32(np, "monitor_poll_interval",
+				 &priv->monitor_poll_interval)) {
+		dev_err(&pdev->dev, "cannot obtain monitor poll interval\n");
+		ret = -ENXIO;
+		goto err_free_netdev;
+	}
+#if 0
 	if (of_property_read_u16(np, "pma_type",
-                                 &priv->pma_type)) {
-
-		dev_warn(&pdev->dev, "cannot obtain pma type defaulting to be FGT \n");
+				 &priv->pma_type)) {
+		dev_warn(&pdev->dev, "cannot obtain pma type defaulting to be FGT\n");
 		priv->pma_type = 0;
 	}
-	priv->spec_ops = (struct xtile_spec_ops *) op_ptr;
+#endif
+
+	priv->spec_ops = (struct xtile_spec_ops *)op_ptr;
 
 	/* PTP is only supported with a modified MSGDMA */
 	priv->ptp_enable = of_property_read_bool(pdev->dev.of_node,
@@ -1679,32 +1612,36 @@ static int intel_fpga_xtile_probe(struct platform_device *pdev)
 		goto err_free_netdev;
 	}
 
-	if (priv->ptp_enable)
-	{
+	if (priv->spec_ops->tile.check_dts_param) {
+		if (!priv->spec_ops->tile.check_dts_param(priv)) {
+			ret = -ENXIO;
+			goto err_free_netdev;
+		}
+	}	
+#if 0
+	if (priv->ptp_enable) {
 		/* PTP Timestamp Accuracy mode */
 		ret  = of_property_read_string(pdev->dev.of_node, "ptp_accu_mode",
-				       &priv->ptp_accu_mode);
-		if (ret < 0) {
+					       &priv->ptp_accu_mode);
+		if (ret < 0)
 			priv->ptp_accu_mode = "Basic";
-		}
 
-		if (strcasecmp(priv->ptp_accu_mode, "Advanced") == 0)
-		{
+		if (strcasecmp(priv->ptp_accu_mode, "Advanced") == 0) {
 			/* Tx Routing adjustment delay */
 			if (of_property_read_u32(np, "ptp_tx_routing_adj",
-								&priv->ptp_tx_routing_adj)) {
-
+						 &priv->ptp_tx_routing_adj)) {
 				priv->ptp_tx_routing_adj = 0;
 			}
 
 			/* Rx Routing adjustment delay */
 			if (of_property_read_u32(np, "ptp_rx_routing_adj",
-									&priv->ptp_rx_routing_adj)) {
-
+						 &priv->ptp_rx_routing_adj)) {
 				priv->ptp_rx_routing_adj = 0;
 			}
 		}
 	}
+#endif
+
 	priv->ptp_clockcleaner_enable = of_property_read_bool(pdev->dev.of_node,
 							      "altr,has-ptp-clockcleaner");
 	/* ptp clock cleaner is not applicable for Ethernet only design */
@@ -1722,14 +1659,13 @@ static int intel_fpga_xtile_probe(struct platform_device *pdev)
 	}
 
 	/* Register TX interrupt */
-        ret = devm_request_irq(priv->device, priv->tx_irq, intel_fpga_xtile_isr,
-                               IRQF_SHARED, ndev->name, ndev);
-        if (ret)
-        {
-                dev_err(&pdev->dev, "Unable to register TX interrupt %d\n",
-                           priv->tx_irq);
-                goto err_free_netdev;
-        }
+	ret = devm_request_irq(priv->device, priv->tx_irq, intel_fpga_xtile_isr,
+			       IRQF_SHARED, ndev->name, ndev);
+	if (ret) {
+		dev_err(&pdev->dev, "Unable to register TX interrupt %d\n",
+			priv->tx_irq);
+		goto err_free_netdev;
+	}
 	disable_irq(priv->tx_irq);
 	priv->tx_irq_enabled = false;
 
@@ -1746,7 +1682,7 @@ static int intel_fpga_xtile_probe(struct platform_device *pdev)
 			       IRQF_SHARED, ndev->name, ndev);
 	if (ret) {
 		dev_err(&pdev->dev, "Unable to register RX interrupt %d\n",
-			   priv->rx_irq);
+			priv->rx_irq);
 		goto err_free_netdev;
 	}
 	disable_irq(priv->rx_irq);
@@ -1769,15 +1705,15 @@ static int intel_fpga_xtile_probe(struct platform_device *pdev)
 		dev_info(&pdev->dev, "\tRX FIFO  at 0x%08lx\n",
 			 (unsigned long)rx_fifo->start);
 
-        /* Tx Fifo */
-        ret = request_and_map(pdev, "tx_fifo", &tx_fifo,
-                              (void __iomem **)&priv->tx_fifo);
-        if (ret)
-                goto err_free_netdev;
+	/* Tx Fifo */
+	ret = request_and_map(pdev, "tx_fifo", &tx_fifo,
+			      (void __iomem **)&priv->tx_fifo);
+	if (ret)
+		goto err_free_netdev;
 
-        if (netif_msg_probe(priv))
-                dev_info(&pdev->dev, "\tTX FIFO  at 0x%08lx\n",
-	 			(unsigned long)tx_fifo->start);
+	if (netif_msg_probe(priv))
+		dev_info(&pdev->dev, "\tTX FIFO  at 0x%08lx\n",
+			 (unsigned long)tx_fifo->start);
 
 	if (dma_set_mask_and_coherent(priv->device,
 				      DMA_BIT_MASK(priv->spec_ops->dma_ops->dmamask))) {
@@ -1788,14 +1724,14 @@ static int intel_fpga_xtile_probe(struct platform_device *pdev)
 	}
 
 	if (of_property_read_u32(pdev->dev.of_node,
-				"rx-fifo-almost-full",
+				 "rx-fifo-almost-full",
 				 &priv->rx_fifo_almost_full)) {
 		dev_err(&pdev->dev, "cannot obtain rx-fifo-almost-full\n");
 		priv->rx_fifo_almost_full = 0x4000;
 	}
 
 	if (of_property_read_u32(pdev->dev.of_node,
-				"rx-fifo-almost-empty",
+				 "rx-fifo-almost-empty",
 				 &priv->rx_fifo_almost_empty)) {
 		dev_err(&pdev->dev, "cannot obtain rx-fifo-almost-empty\n");
 		priv->rx_fifo_almost_empty = 0x3000;
@@ -1855,12 +1791,10 @@ static int intel_fpga_xtile_probe(struct platform_device *pdev)
 		priv->rx_external_phy_delay_ns = 0;
 	}
 
-	if(of_get_mac_address(pdev->dev.of_node,macaddr)){
-		dev_info(&pdev->dev, "cannot obtain MAC address using random HW addresss\n");
+	if (of_get_mac_address(pdev->dev.of_node, macaddr)) {
+		dev_info(&pdev->dev, "cannot obtain MAC address using random HW address\n");
 		eth_hw_addr_random(ndev);
-
-	}
-	else{
+	} else {
 		ether_addr_copy(ndev->dev_addr, macaddr);
 	}
 
@@ -1928,10 +1862,11 @@ static int intel_fpga_xtile_probe(struct platform_device *pdev)
 		dev_err(&pdev->dev, "fixed link property undefined\n");
 		goto err_free_netdev;
 	}
+
 	if (priv->ptp_enable) {
 		dev_tod  = of_parse_phandle(pdev->dev.of_node, "tod", 0);
 		pdev_tod = of_find_device_by_node(dev_tod);
-		if(pdev_tod)
+		if (pdev_tod)
 			priv->ptp_priv = dev_get_drvdata(&pdev_tod->dev);
 		if (!pdev_tod || !priv->ptp_priv) {
 			dev_err(&pdev->dev, "PTP clock not available\n");
@@ -1985,12 +1920,6 @@ static int intel_fpga_xtile_remove(struct platform_device *pdev)
 	/* perform the proper cleaning up */
 	xtile_shutdown(ndev);
 
-	/* Unregister RX interrupt */
-	devm_free_irq(priv->device, priv->rx_irq, ndev);
-
-	/* Unregister TX interrupt */
-	devm_free_irq(priv->device, priv->tx_irq, ndev);
-
 	platform_set_drvdata(pdev, NULL);
 	unregister_netdev(ndev);
 	free_netdev(ndev);
@@ -2023,10 +1952,24 @@ static const struct altera_dmaops altera_dtype_prefetcher = {
 
 static const struct xtile_spec_ops etile_data = {
 	.dma_ops   = &altera_dtype_prefetcher,
+	.tile = {
+		.reset            = etile_ehip_reset,
+		.deassert_reset   = etile_ehip_deassert_reset,
+		.init             = etile_init,
+		.uninit           = etile_uninit,
+		.start            = etile_start,
+		.stop             = etile_stop,
+		.update_mac_addr  = etile_update_mac_addr,
+		.link_fault_status = etile_get_link_fault_status,
+		.reg_ethtool_ops  =
+			intel_fpga_etile_set_ethtool_ops,
+		.check_counter_complete =
+			etile_check_counter_complete,
+	},
 };
 
 static const struct xtile_spec_ops ftile_data = {
-        .dma_ops   = &altera_dtype_prefetcher,
+	.dma_ops   = &altera_dtype_prefetcher,
 	.tile = {
 		.reset            = ftile_ehip_reset,
 		.deassert_reset   = ftile_ehip_deassert_reset,
@@ -2039,8 +1982,10 @@ static const struct xtile_spec_ops ftile_data = {
 		.link_fault_status = ftile_get_link_fault_status,
 		.reg_ethtool_ops  =
 			intel_fpga_ftile_set_ethtool_ops,
+		.check_counter_complete =
+			ftile_check_counter_complete,
+		.check_dts_param = ftile_check_dts_param,
 	},
-	.link_check       = xtile_get_link_status,
 };
 
 static const struct of_device_id intel_fpga_xtile_ll_ids[] = {
@@ -2048,8 +1993,8 @@ static const struct of_device_id intel_fpga_xtile_ll_ids[] = {
 	 .data = &etile_data,
 	},
 	{.compatible = "altr,hssi-ftile-1.0",
-         .data = &ftile_data,
-        },
+	 .data = &ftile_data,
+	},
 
 };
 

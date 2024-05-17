@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: GPL-2.0
+/* SPDX-License-Identifier: GPL-2.0 */
 /* Intel FPGA Clock Cleaner Frequency Adjustment Driver
  * Copyright (C) 2023 Intel Corporation. All rights reserved.
  *

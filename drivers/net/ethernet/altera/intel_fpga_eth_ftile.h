@@ -1,6 +1,6 @@
 /* SPDX-License-Identifier: GPL-2.0 */
 /* Intel FPGA F-tile Ethernet MAC driver
- * Copyright (C) 2020-2022 Intel Corporation. All rights reserved.
+ * Copyright (C) 2020-2024 Intel Corporation. All rights reserved.
  *
  * Contributors:
  *   Roman Bulgakov
@@ -28,7 +28,6 @@
 #define INTEL_FPGA_WORD_ALIGN	32
 
 #define MOD_PARAM_PERM  0644
-
 
 /* Poll for PTP RX READY bit, If any disturbance on RX PCS, this can go low
  * So that time we need to rerun the PTP TX RX USER FLOW again.
@@ -76,7 +75,7 @@ enum intel_fpga_ftile_eth_rate {
 #define ETH_ANLT_SEQ_CONF_DISABLE_AN_TIMER			BIT(1)
 #define ETH_ANLT_SEQ_CONF_DISABLE_LF_TIMER			BIT(2)
 #define ETH_ANLT_SEQ_CONF_SEQ_FORCE_MODE_NONE			(0 << 4)
-#define ETH_ANLT_SEQ_CONF_SEQ_FORCE_MODE_10G_R1			(1 << 4)
+#define ETH_ANLT_SEQ_CONF_SEQ_FORCE_MODE_10G_R1			BIT(4)
 #define ETH_ANLT_SEQ_CONF_SEQ_FORCE_MODE_25G_R1			(2 << 4)
 #define ETH_ANLT_SEQ_CONF_SEQ_FORCE_MODE_50G_R2			(3 << 4)
 #define ETH_ANLT_SEQ_CONF_SEQ_FORCE_MODE_100G_R4		(4 << 4)
@@ -239,7 +238,7 @@ enum intel_fpga_ftile_eth_rate {
 #define ETH_LNK_CONF_LT_EN					BIT(0)
 #define ETH_LNK_CONF_LT_MAX_WAIT_TMR_DIS			BIT(1)
 #define ETH_LNK_CONF_LT_MAX_WAIT_TMR_SCALE_NONE			(0 << 2)
-#define ETH_LNK_CONF_LT_MAX_WAIT_TMR_SCALE_1E3			(1 << 2)
+#define ETH_LNK_CONF_LT_MAX_WAIT_TMR_SCALE_1E3			BIT(2)
 #define ETH_LNK_CONF_LT_MAX_WAIT_TMR_SCALE_1E4			(2 << 2)
 #define ETH_LNK_CONF_LT_MAX_WAIT_TMR_SCALE_1E6			(3 << 2)
 #define ETH_LNK_CONF_LT_ADAPT_DIS				BIT(4)
@@ -248,20 +247,20 @@ enum intel_fpga_ftile_eth_rate {
 #define ETH_LNK_CONF_LT_RESTART_LN(x)				BIT(x) // x:0-7
 
 /* 0x0348: Link training Status 1 */
-#define ETH_LNK_TR_STAT_LN(x)					BIT(0+4*(x)) // x:0-7
-#define ETH_LNK_TR_STAT_FRM_LN0					BIT(1+4*(x)) // x:0-7
-#define ETH_LNK_TR_STAT_STARTUP_LN0				BIT(2+4*(x)) // x:0-7
-#define ETH_LNK_TR_STAT_FAIL_LN0				BIT(3+4*(x)) // x:0-7
+#define ETH_LNK_TR_STAT_LN(x)					BIT(0 + 4 * (x)) // x:0-7
+#define ETH_LNK_TR_STAT_FRM_LN0					BIT(1 + 4 * (x)) // x:0-7
+#define ETH_LNK_TR_STAT_STARTUP_LN0				BIT(2 + 4 * (x)) // x:0-7
+#define ETH_LNK_TR_STAT_FAIL_LN0				BIT(3 + 4 * (x)) // x:0-7
 
 /* 0x0100: Device and IP variant */
 #define ETH_GUI_OPTION_DEVICE_NAME				3
-#define ETH_GUI_OPTION_DEVICE_NAME_INTEL_AGILEX			(1 << 0)
+#define ETH_GUI_OPTION_DEVICE_NAME_INTEL_AGILEX			BIT(0)
 #define ETH_GUI_OPTION_TILE_NAME				(3 << 2)
 #define ETH_GUI_OPTION_TILE_NAME_F_TILE				(3 << 2)
 #define ETH_GUI_OPTION_ETH_RATE					(7 << 5)
 #define ETH_GUI_OPTION_ETH_RATE_SHIFT				5
 #define ETH_GUI_OPTION_ETH_RATE_10G				(0 << 5)
-#define ETH_GUI_OPTION_ETH_RATE_25G				(1 << 5)
+#define ETH_GUI_OPTION_ETH_RATE_25G				BIT(5)
 #define ETH_GUI_OPTION_ETH_RATE_40G				(2 << 5)
 #define ETH_GUI_OPTION_ETH_RATE_50G				(3 << 5)
 #define ETH_GUI_OPTION_ETH_RATE_100G				(4 << 5)
@@ -271,14 +270,14 @@ enum intel_fpga_ftile_eth_rate {
 #define ETH_GUI_OPTION_MODULATION_TYPE				BIT(9)
 #define ETH_GUI_OPTION_RSFEC_TYPE				(7 << 10)
 #define ETH_GUI_OPTION_RSFEC_TYPE_NONE				(0 << 10)
-#define ETH_GUI_OPTION_RSFEC_TYPE_FIRECODE			(1 << 10)
+#define ETH_GUI_OPTION_RSFEC_TYPE_FIRECODE			BIT(10)
 #define ETH_GUI_OPTION_RSFEC_TYPE_RS_528_514			(2 << 10)
 #define ETH_GUI_OPTION_RSFEC_TYPE_RS_544_514			(3 << 10)
 #define ETH_GUI_OPTION_RSFEC_TYPE_RS_272_258			(4 << 10)
 #define ETH_GUI_OPTION_PTP_ENABLE				BIT(13)
 #define ETH_GUI_OPTION_FLOW_CTRL_MODE				(7 << 14)
 #define ETH_GUI_OPTION_FLOW_CTRL_MODE_DISABLED			(0 << 14)
-#define ETH_GUI_OPTION_FLOW_CTRL_MODE_SFC			(1 << 14)
+#define ETH_GUI_OPTION_FLOW_CTRL_MODE_SFC			BIT(14)
 #define ETH_GUI_OPTION_FLOW_CTRL_MODE_SFC_NO_XOFF		(2 << 14)
 #define ETH_GUI_OPTION_FLOW_CTRL_MODE_PFC			(3 << 14)
 #define ETH_GUI_OPTION_FLOW_CTRL_MODE_PFC_NO_XOFF		(4 << 14)
@@ -286,14 +285,14 @@ enum intel_fpga_ftile_eth_rate {
 #define ETH_GUI_OPTION_FLOW_CTRL_MODE_SFC_PFC_NO_XOFF		(6 << 14)
 #define ETH_GUI_OPTION_CLIENT_INTF				(7 << 17)
 #define ETH_GUI_OPTION_CLIENT_INTF_MAC_SEG			(0 << 17)
-#define ETH_GUI_OPTION_CLIENT_INTF_MAC_AVALON			(1 << 17)
+#define ETH_GUI_OPTION_CLIENT_INTF_MAC_AVALON			BIT(17)
 #define ETH_GUI_OPTION_CLIENT_INTF_PCS				(2 << 17)
 #define ETH_GUI_OPTION_CLIENT_INTF_OTN				(3 << 17)
 #define ETH_GUI_OPTION_CLIENT_INTF_FLEXE			(4 << 17)
 #define ETH_GUI_OPTION_XCVR_TYPE				BIT(20)
 #define ETH_GUI_OPTION_NUM_LANES				(0xF << 21)
 #define ETH_GUI_OPTION_NUM_LANES_SHIFT				21
-#define ETH_GUI_OPTION_NUM_LANES_1				(1 << 21)
+#define ETH_GUI_OPTION_NUM_LANES_1				BIT(21)
 #define ETH_GUI_OPTION_NUM_LANES_2				(2 << 21)
 #define ETH_GUI_OPTION_NUM_LANES_4				(4 << 21)
 #define ETH_GUI_OPTION_NUM_LANES_8				(8 << 21)
@@ -895,12 +894,12 @@ enum intel_fpga_ftile_eth_rate {
 #define XCVR_PMA_LINE_RATE					0xFFF
 #define XCVR_PMA_TYPE						BIT(12)
 #define XCVR_PMA_TYPE_FGT					(0 << 12)
-#define XCVR_PMA_TYPE_FHT					(1 << 12)
+#define XCVR_PMA_TYPE_FHT					BIT(12)
 #define XCVR_PMA_MODULATION_TYPE				BIT(13)
 #define XCVR_PMA_MODULATION_TYPE_NRZ				(0 << 13)
-#define XCVR_PMA_MODULATION_TYPE_PAM4				(1 << 13)
+#define XCVR_PMA_MODULATION_TYPE_PAM4				BIT(13)
 #define XCVR_PMA_MODE						0xC000
-#define XCVR_PMA_MODE_RX_SIMPLEX				(1 << 14)
+#define XCVR_PMA_MODE_RX_SIMPLEX				BIT(14)
 #define XCVR_PMA_MODE_TX_SIMPLEX				(2 << 14)
 #define XCVR_PMA_MODE_DUPLEX					(3 << 14)
 #define XCVR_PMA_NUM_LANES					0x1F0000
@@ -994,7 +993,7 @@ enum intel_fpga_ftile_eth_rate {
 /* 0x42930: XCVR Serdes FHT control PRBS verifier (RX) */
 #define XCVR_SRDS_CFG_DFT_RX_PRBS_COMMON_EN			BIT(0)
 #define XCVR_SRDS_CFG_DFT_RX_PRBS_SEL_PRBS7			(0 << 1)
-#define XCVR_SRDS_CFG_DFT_RX_PRBS_SEL_PRBS9			(1 << 1)
+#define XCVR_SRDS_CFG_DFT_RX_PRBS_SEL_PRBS9			BIT(1)
 #define XCVR_SRDS_CFG_DFT_RX_PRBS_SEL_PRBS11			(2 << 1)
 #define XCVR_SRDS_CFG_DFT_RX_PRBS_SEL_PRBS23			(3 << 1)
 #define XCVR_SRDS_CFG_DFT_RX_PRBS_SEL_PRBS31			(4 << 1)
@@ -1007,7 +1006,7 @@ enum intel_fpga_ftile_eth_rate {
 /* 0x42934: XCVR Serdes FHT control PRBS generator (TX) */
 #define XCVR_SRDS_CFG_DFT_TX_PRBS_EN				BIT(0)
 #define XCVR_SRDS_CFG_DFT_TX_PRBS_MODE_PRBS7			(0 << 1)
-#define XCVR_SRDS_CFG_DFT_TX_PRBS_MODE_PRBS9			(1 << 1)
+#define XCVR_SRDS_CFG_DFT_TX_PRBS_MODE_PRBS9			BIT(1)
 #define XCVR_SRDS_CFG_DFT_TX_PRBS_MODE_PRBS11			(2 << 1)
 #define XCVR_SRDS_CFG_DFT_TX_PRBS_MODE_PRBS23			(3 << 1)
 #define XCVR_SRDS_CFG_DFT_TX_PRBS_MODE_PRBS31			(4 << 1)
@@ -1053,7 +1052,7 @@ enum intel_fpga_ftile_eth_rate {
 /* 0x4485C: XCVR Serdes FHT register to specify user clock divide ratio */
 #define XCVR_SRDS_CFG_PCS3334_DIVSEL_MASK			(3 << 5)
 #define XCVR_SRDS_CFG_PCS3334_DIVSEL_DIV33			(0 << 5)
-#define XCVR_SRDS_CFG_PCS3334_DIVSEL_DIV34			(1 << 5)
+#define XCVR_SRDS_CFG_PCS3334_DIVSEL_DIV34			BIT(5)
 #define XCVR_SRDS_CFG_PCS3334_DIVSEL_DIV66			(2 << 5)
 #define XCVR_SRDS_CFG_PCS3334_DIVSEL_DIV68			(3 << 5)
 
@@ -1159,6 +1158,9 @@ enum intel_fpga_ftile_eth_rate {
 
 #define XCVR_FHT_Q_DL_CTRL_RX_LAT_CNTRVAL_ASYNC			0x3FFFF
 
+#define ETH_RX_MAC_LOCAL_FAULT                                  BIT(0)
+#define ETH_RX_MAC_REMOTE_FAULT                                 BIT(1)
+
 /* Ethernet Reconfiguration Interface Register Base Addresses
  * Word Offset	Register Type
  * 0x0000 - 0x00FC  F-Tile AIB Config
@@ -1175,7 +1177,7 @@ enum intel_fpga_ftile_eth_rate {
 
 // F-Tile AIB Config : 0x0000 - 0x00FC
 struct intel_fpga_ftile_eth_aib_config {
-	u32 reserved[256/4];						// 0x0000 - 0x00FC
+	u32 reserved[256 / 4];						// 0x0000 - 0x00FC
 };
 
 // F-Tile Soft CSRs : 0x0100 - 0x0FFC
@@ -1919,6 +1921,5 @@ struct intel_fpga_ftile_xcvr {
 /* Function prototypes */
 void ftile_ui_adjustments(struct work_struct *work);
 void ftile_ui_adjustments_init_worker(intel_fpga_xtile_eth_private *priv);
-void ui_adjustments_cancel_worker(intel_fpga_xtile_eth_private *priv);
-
+void ftile_ui_adjustments_cancel_worker(intel_fpga_xtile_eth_private *priv);
 #endif

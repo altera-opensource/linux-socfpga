@@ -1,3 +1,10 @@
+/* SPDX-License-Identifier: GPL-2.0 */
+/* Intel FPGA Net driver common header file
+ * Copyright (C) 2022-2024 Intel Corporation. All rights reserved
+ *
+ * Contributors:
+ *   Preetam Narayan
+ */
 
 #ifndef __INTEL_FPGA_ETH_MAIN_H__
 #define __INTEL_FPGA_ETH_MAIN_H__
@@ -40,6 +47,9 @@
 
 #define MOD_PARAM_PERM  0644
 
+/* Link Stability check */
+#define PRELOAD_LINK_STABILITY_COUNT 10
+
 typedef enum {
 	ETH_LINK_STATE_RESET = 0,
 	ETH_LINK_STATE_START,
@@ -47,54 +57,62 @@ typedef enum {
 	ETH_LINK_STATE_RUN
 } xtile_eth_link_state;
 
+enum {
+	NAPI_DISABLED,
+	NAPI_ENABLED_TXBLOCKED,
+	NAPI_ENABLED_TXREADY,
+};
+
 typedef struct {
+	const char *fec_type;
+	const char *ptp_accu_mode;
+	struct net_device *dev;
+	struct device     *device;
+	struct phylink    *phylink;
+	struct xtile_spec_ops *spec_ops;
+	struct platform_device *pdev_hssi;
+	struct intel_fpga_rx_fifo __iomem *rx_fifo;
+	struct intel_fpga_rx_fifo __iomem *tx_fifo;
 
-        const char *fec_type;
-        const char *ptp_accu_mode;
-        struct net_device *dev;
-        struct device     *device;
-        struct phylink    *phylink;
-        struct xtile_spec_ops *spec_ops;
-        struct platform_device *pdev_hssi;
-        struct intel_fpga_rx_fifo __iomem *rx_fifo;
-        struct intel_fpga_rx_fifo __iomem *tx_fifo;
+	u32 tile_chan;
+	u32 hssi_port;
+	u32 tx_irq;
+	u32 rx_irq;
+	u32 max_mtu;
+	u32 tx_fifo_depth;
+	u32 rx_fifo_depth;
+	u32 rx_fifo_almost_full;
+	u32 rx_fifo_almost_empty;
+	u32 rxdma_buffer_size;
+	u32 flow_ctrl;
+	u32 pause;
+	u32 msg_enable;
+	u32 link_speed;
+	u32 tx_pma_delay_ns;
+	u32 rx_pma_delay_ns;
+	u32 tx_pma_delay_fns;
+	u32 rx_pma_delay_fns;
+	u32 rsfec_cw_pos_rx;
+	u32 tx_external_phy_delay_ns;
+	u32 rx_external_phy_delay_ns;
+	u32 ptp_tx_routing_adj;
+	u32 ptp_rx_routing_adj;
+	u32 ui_adjust_interval;
+	u32 monitor_poll_interval;
+	s32 link_stability_check;
+	u32 pma_lanes_used;
+	u16 pma_type;
+	u8  eth_rate;
 
-        u32 tile_chan;
-        u32 hssi_port;
-        u32 tx_irq;
-        u32 rx_irq;
-        u32 max_mtu;
-        u32 tx_fifo_depth;
-        u32 rx_fifo_depth;
-        u32 rx_fifo_almost_full;
-        u32 rx_fifo_almost_empty;
-        u32 rxdma_buffer_size;
-        u32 flow_ctrl;
-        u32 pause;
-        u32 msg_enable;
-        u32 link_speed;
-        u32 tx_pma_delay_ns;
-        u32 rx_pma_delay_ns;
-        u32 tx_pma_delay_fns;
-        u32 rx_pma_delay_fns;
-        u32 rsfec_cw_pos_rx;
-        u32 tx_external_phy_delay_ns;
-        u32 rx_external_phy_delay_ns;
-        u32 ptp_tx_routing_adj;
-        u32 ptp_rx_routing_adj;
-        u32 pma_lanes_used;
-        u16 pma_type;
-        u8  eth_rate;
-
-        u8 duplex;
-        u8 qsfp_lane;
-        bool autoneg;
-        bool ptp_enable;
-        xtile_eth_link_state link_state;
-        bool cable_unplugged;
-        bool ui_enable;
-        bool monitor_thread_enable;
-        bool napi_state;
+	u8 duplex;
+	u8 qsfp_lane;
+	bool autoneg;
+	bool ptp_enable;
+	xtile_eth_link_state link_state;
+	bool cable_unplugged;
+	bool ui_enable;
+	bool monitor_thread_enable;
+	u8   napi_state;
 	bool netque_state;
 	bool tx_irq_enabled;
 	bool rx_irq_enabled;
@@ -102,22 +120,19 @@ typedef struct {
 	u64 irq_rx_enable_cntr;
 	u64 irq_tx_disable_cntr;
 	u64 irq_rx_disable_cntr;
-
 	rwlock_t wr_lock;
-	spinlock_t tx_lock;
-        spinlock_t mac_cfg_lock;
-        spinlock_t rxdma_irq_lock;
-
-        struct napi_struct napi;
-        struct delayed_work dwork;
+	spinlock_t tx_lock;/* Tx lock */
+	spinlock_t mac_cfg_lock;   /* Configuration lock */
+	spinlock_t rxdma_irq_lock; /* Rx lock */
+	struct napi_struct napi;
+	struct delayed_work dwork;
 	struct work_struct  ui_worker;
-        struct timer_list fec_timer;
-        struct altera_dma_private dma_priv;
-        struct phylink_config phylink_config;
-        struct intel_fpga_tod_private *ptp_priv;
-        hssi_eth_port_attr hssi_port_x_attr;
-
-        phy_interface_t phy_iface;
+	struct timer_list fec_timer;
+	struct altera_dma_private dma_priv;
+	struct phylink_config phylink_config;
+	struct intel_fpga_tod_private *ptp_priv;
+	hssi_eth_port_attr hssi_port_x_attr;
+	phy_interface_t phy_iface;
 	u32 ptp_clockcleaner_enable;
 
 } intel_fpga_xtile_eth_private;
@@ -134,7 +149,6 @@ struct intel_fpga_rx_fifo {
 };
 
 #define rx_fifo_csroffs(a)	(offsetof(struct intel_fpga_rx_fifo, a))
-
 #define tx_fifo_csroffs(a)	(offsetof(struct intel_fpga_rx_fifo, a))
 
 // Function Prototypes
@@ -143,30 +157,14 @@ void etile_get_stats64(struct net_device *dev,
 		       struct rtnl_link_stats64 *storage);
 void etile_update_mac_addr(intel_fpga_xtile_eth_private *priv);
 int etile_ehip_reset(intel_fpga_xtile_eth_private *priv,
-			bool tx, bool rx, bool sys);
+		     bool tx, bool rx, bool sys);
 int etile_ehip_deassert_reset(intel_fpga_xtile_eth_private *priv);
 void intel_fpga_etile_set_ethtool_ops(struct net_device *netdev);
 
-
-
-extern int ftile_ehip_reset(intel_fpga_xtile_eth_private *priv,
-                        bool tx_reset, bool rx_reset, bool sys_reset);
-extern int ftile_ehip_deassert_reset(intel_fpga_xtile_eth_private *priv);
-extern int ftile_init(intel_fpga_xtile_eth_private *priv);
-extern int ftile_uninit(intel_fpga_xtile_eth_private *priv);
-extern int ftile_start(intel_fpga_xtile_eth_private *priv);
-extern int ftile_stop(intel_fpga_xtile_eth_private *priv);
-extern int ftile_run_check(intel_fpga_xtile_eth_private *priv);
-extern void ftile_update_mac_addr(intel_fpga_xtile_eth_private *priv);
-extern bool ftile_get_link_fault_status(intel_fpga_xtile_eth_private *priv);
-extern void intel_fpga_ftile_set_ethtool_ops(struct net_device *dev);
-extern void ftile_get_stats64(struct net_device *dev,
-			      struct rtnl_link_stats64 *storage);
-
 int xtile_check_counter_complete(intel_fpga_xtile_eth_private *priv,
-                                 u32 regbank,
-                                 size_t offs,
-                                 u8 bit_mask,
-                                 bool set_bit,
-                                 int align);
+				 u32 regbank,
+				 size_t offs,
+				 u8 bit_mask,
+				 bool set_bit,
+				 int align);
 #endif

@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: GPL
+/* SPDX-License-Identifier: GPL-2.0 */
 /* Intel FPGA Clock Cleaner Frequency Adjustment Driver
  * Copyright (C) 2015-2016 Altera Corporation. All rights reserved.
  * Copyright (C) 2017-2023 Intel Corporation. All rights reserved.
@@ -19,6 +19,9 @@
 #include <linux/i2c.h>
 #include <linux/workqueue.h>
 
+#define FREQ_CTRL_ERROR_SUCCESS 0
+#define FREQ_CTRL_ERROR_FAIL    1
+
 struct clock_cleaner {
 	const char *clock_name;		/* Eg. si5518 or lmk05028 */
 	const char *interface;		/* Eg. spi or i2c*/
@@ -33,7 +36,7 @@ struct intel_freq_control_private;
 
 struct freq_work;
 struct ptp_freq_ctrl_info {
-	void (*freqctrl)(struct freq_work *);
+	void (*freqctrl)(struct freq_work *fw);
 };
 
 struct freq_work {
@@ -48,10 +51,10 @@ struct intf_type {
 };
 
 struct xtile_intf_ops {
-	int (*client_validator)(struct clock_cleaner *);
-	void (*clock_cleaner)(struct work_struct *);
-	int (*clock_check)(struct spi_device *, struct intel_freq_control_private*);
-	int (*zl30733_clock_check)(struct intel_freq_control_private*);
+	int (*client_validator)(struct clock_cleaner *cc);
+	void (*clock_cleaner)(struct work_struct *ws);
+	int (*clock_check)(struct intel_freq_control_private *fq);
+	int (*reset_pll_state)(struct intel_freq_control_private *priv);
 };
 
 struct intel_freq_control_private {
@@ -61,9 +64,9 @@ struct intel_freq_control_private {
 	struct xtile_intf_ops  *intf_ops;
 	struct clock_cleaner clockcleaner_info;
 	struct ptp_freq_ctrl_info freqctrl_ops;
+	struct delayed_work pll_lock_dwork;
+	int pll_lock_check_ctr;
 };
 
-#define FREQ_CTRL_ERROR_SUCCESS 0
-#define FREQ_CTRL_ERROR_FAIL    1
-
+void schedule_pll_lock_check(struct intel_freq_control_private *priv);
 #endif

@@ -125,6 +125,7 @@
                     tod = <&tod_0_clk>;
                     hssiss = <&hssiss_0_hssiss>;
                     pma_type = <0x0>; // FGT - 0x00, FHT = 0x1000
+		    monitor_poll_interval = <10>;
                     altr,tx-pma-delay-ns = <0xD>;
                     altr,rx-pma-delay-ns = <0x8>;
                     altr,tx-pma-delay-fns = <0x24D>;
@@ -173,6 +174,7 @@
                     tod = <&tod_0_clk>;
                     hssiss = <&hssiss_0_hssiss>;
                     pma_type = <0x0>; // FGT - 0x00, FHT = 0x1000
+		    monitor_poll_interval = <10>;
                     altr,tx-pma-delay-ns = <0xD>;
                     altr,rx-pma-delay-ns = <0x8>;
                     altr,tx-pma-delay-fns = <0x24D>;

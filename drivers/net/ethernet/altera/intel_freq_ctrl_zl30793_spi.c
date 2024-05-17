@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: GPL
+// SPDX-License-Identifier: GPL-2.0
 /* Intel zarlink spi driver
  * Copyright (C) 2023 Intel Corporation. All rights reserved
  *
@@ -12,7 +12,7 @@
 #include "intel_freq_ctrl_common_spi.h"
 
 static u8 zl30793_page_write(struct spi_device *spi, u16 *dma_safe_buf,
-                             u16 addr)
+			     u16 addr)
 {
 	u8 ret;
 
@@ -21,7 +21,7 @@ static u8 zl30793_page_write(struct spi_device *spi, u16 *dma_safe_buf,
 	 * __func__, dma_safe_buf[0]);
 	 */
 	ret = spi_msg_transfer(spi, &dma_safe_buf[0], NULL);
-		
+
 	/* dev_info(&spi->dev,"%s: pll: page reply : 0x%x\n",
 	 * __func__, dma_safe_buf[1]);
 	 */
@@ -29,15 +29,15 @@ static u8 zl30793_page_write(struct spi_device *spi, u16 *dma_safe_buf,
 }
 
 u8 zl30793_spi_write(struct spi_device *spi, u16 *dma_safe_buf,
-                     u16 addr, u8 *val)
+		     u16 addr, u8 *val)
 {
 	u8 ret;
-	
+
 	if (!dma_safe_buf)
 		return FREQ_CTRL_ERROR_FAIL;
 
 	memset(dma_safe_buf, 0, PLL_SPI_MAX_FRAME_SIZE);
-	
+
 	ret = zl30793_page_write(spi,  dma_safe_buf, addr);
 	if (ret)
 		return FREQ_CTRL_ERROR_FAIL;
@@ -52,7 +52,7 @@ u8 zl30793_spi_write(struct spi_device *spi, u16 *dma_safe_buf,
 }
 
 u8 zl30793_spi_read(struct spi_device *spi,  u16 *dma_safe_buf,
-                    u16 addr, u8 *val)
+		    u16 addr, u8 *val)
 {
 	u8 ret;
 
@@ -68,14 +68,14 @@ u8 zl30793_spi_read(struct spi_device *spi,  u16 *dma_safe_buf,
 	/*dev_info(&spi->dev,"%s: pll: send : 0x%x\n",
 	 *__func__,dma_safe_buf[0]);
 	 */
-	
+
 	ret = spi_msg_transfer(spi, &dma_safe_buf[0], &dma_safe_buf[2]);
 
 	*val = (dma_safe_buf[2] & 0xff);
 	/*dev_info(&spi->dev,"%s: pll: reply val: 0x%x\n",
 	 *__func__, *val);
 	 */
-	
+
 	return ret;
 }
 
@@ -86,13 +86,13 @@ static int zl30793_dpll_wait_for_df_ctrl_readsem(struct spi_device *spi)
 	u8 ctrl_val;
 	int ret = 0;
 	u8 attempts = 0;
-	
+
 	/*Short timeout when accessing registers that should return quickly*/
 	u32 zl30793_short_timeout = 100;
 
 	if (!spi)
 		return FREQ_CTRL_ERROR_FAIL;
-	
+
 	/* Allocate DMA-safe buffer for transfers */
 	buf = kmalloc(PLL_SPI_MAX_FRAME_SIZE, GFP_KERNEL);
 	if (!buf)
@@ -101,7 +101,7 @@ static int zl30793_dpll_wait_for_df_ctrl_readsem(struct spi_device *spi)
 	do {
 		// read : ZL30793_PAGE6_REG_DPLL_DF_CTRL_0
 		ret = zl30793_spi_read(spi,
-				buf,
+				       buf,
 				ZL30793_PAGE6_REG_DPLL_DF_CTRL_0,
 				&ctrl_val);
 		if (ret) {
@@ -141,14 +141,45 @@ zl_dpll_readsem_err:
 	return ret;
 }
 
+static void zl30793_dco_centering(struct spi_device *spi)
+{
+	int ret, i;
+	u16 *buf;
+	u8 offset_val = 0;
+
+	if (!spi)
+		return;
+
+	/* Allocate DMA-safe buffer for transfers */
+	buf = kmalloc(PLL_SPI_MAX_FRAME_SIZE, GFP_KERNEL);
+	if (!buf)
+		return;
+
+	memset(buf, 0, PLL_SPI_MAX_FRAME_SIZE);
+
+	if (zl30793_dpll_wait_for_df_ctrl_readsem(spi) == 0) {
+		for (i = 0; i < 6; i++) {
+			ret = zl30793_spi_write(spi, buf,
+						ZL30793_PAGE6_REG_DPLL_DF_OFFSET_0_0 + i,
+					&offset_val);
+			if (ret) {
+				dev_err(&spi->dev, "SPI write error %d\n", ret);
+				break;
+			}
+		}
+	}
+
+	kfree(buf);
+}
+
 void intel_freq_control_zl30793(struct work_struct *work)
 {
 	struct freq_work *p_work;
-	s64 scaled_ppm;
+	long scaled_ppm;
 	short int i;
 	u8 offset_val = 0;
 	int ret;
-	u16 *buf;
+	u16 *buf = NULL;
 	u64 step_val = 0;
 	struct intel_freq_control_private *priv;
 	struct spi_device *spi_dev;
@@ -221,6 +252,76 @@ zl_offset_err:
 	kfree(buf);
 }
 
+int reset_dpll_mode(struct intel_freq_control_private *priv)
+{
+	u8 ctrl_val;
+	int ret;
+	u16 *buf;
+	struct spi_device *spi;
+
+	spi = priv->fc_acc_type.spi_dev;
+
+	if (!spi)
+		return FREQ_CTRL_ERROR_FAIL;
+
+	/* Allocate DMA-safe buffer for transfers */
+	buf = kmalloc(PLL_SPI_MAX_FRAME_SIZE, GFP_KERNEL);
+	if (!buf)
+		return FREQ_CTRL_ERROR_FAIL;
+
+	memset(buf, 0, PLL_SPI_MAX_FRAME_SIZE);
+	/* Rset pll state */
+	ctrl_val = 0x03;
+	dev_info(&spi->dev, "pll: ZL30793_PAGE4_REG_DPLL_CTRL_0[0x%x] write: 0x%x\n",
+		 ZL30793_PAGE4_REG_DPLL_CTRL_0, ctrl_val);
+
+	ret = zl30793_spi_write(spi, buf, ZL30793_PAGE4_REG_DPLL_CTRL_0,
+				&ctrl_val);
+	if (ret) {
+		dev_err(&spi->dev, "SPI select error %d\n", ret);
+		goto zl_ctrl_err;
+	}
+
+	/* read : ZL30793_PAGE4_REG_DPLL_CTRL_0 */
+	ret = zl30793_spi_read(spi,
+			       buf,
+			ZL30793_PAGE4_REG_DPLL_CTRL_0,
+			&ctrl_val);
+	if (ret) {
+		dev_err(&spi->dev, "SPI select error %d\n", ret);
+		goto zl_ctrl_err;
+	}
+	dev_info(&spi->dev, "pll: ZL30793_PAGE4_REG_DPLL_CTRL_0[0x%x] read : 0x%x\n",
+		 ZL30793_PAGE4_REG_DPLL_CTRL_0, ctrl_val);
+
+	 /* read : ZL30793_PAGE4_REG_DPLL_CTRL_0 */
+	ret = zl30793_spi_read(spi,
+			       buf,
+			ZL30793_PAGE4_REG_DPLL_MODE_REFSEL_0,
+			&ctrl_val);
+	if (ret) {
+		dev_err(&spi->dev, "SPI select error %d\n", ret);
+		goto zl_ctrl_err;
+	}
+	dev_info(&spi->dev, "pll: ZL30793_PAGE4_REG_DPLL_MODE_REFSEL_0[0x%x] read : 0x%x\n",
+		 ZL30793_PAGE4_REG_DPLL_MODE_REFSEL_0, ctrl_val);
+	 /* Rset pll state */
+	ctrl_val = SET_DPLL_MODE_AUTOMATIC(ctrl_val);
+	dev_info(&spi->dev, "pll: ZL30793_PAGE4_REG_DPLL_MODE_REFSEL_0[0x%x] write: 0x%x\n",
+		 ZL30793_PAGE4_REG_DPLL_MODE_REFSEL_0, ctrl_val);
+
+	ret = zl30793_spi_write(spi, buf, ZL30793_PAGE4_REG_DPLL_MODE_REFSEL_0,
+				&ctrl_val);
+	if (ret) {
+		dev_err(&spi->dev, "SPI select error %d\n", ret);
+		goto zl_ctrl_err;
+	}
+
+zl_ctrl_err:
+	kfree(buf);
+	return ret;
+}
+
 /* zl30793_Dpll_NCO_ModeSet : Sets the current DPLL mode of operation */
 static int zl30793_dpll_nco_modeset(struct spi_device *spi)
 {
@@ -247,13 +348,13 @@ static int zl30793_dpll_nco_modeset(struct spi_device *spi)
 	}
 
 	dev_info(&spi->dev,
-		"pll: ZL30793_PAGE2_REG_DPLL_STATE_OFFSET_0[0x%x] read : 0x%x\n",
+		 "pll: ZL30793_PAGE2_REG_DPLL_STATE_OFFSET_0[0x%x] read : 0x%x\n",
 		 ZL30793_PAGE2_REG_DPLL_STATE_OFFSET_0,
 		 ctrl_val);
 
-	if (!(ctrl_val & 0x3)) {
+	if (!(ctrl_val & ZL30793_PLL_STATE_MASK)) {
 		dev_info(&spi->dev,
-			"ZL30793 is already in NCO mode (0x%x)\n", ctrl_val);
+			 "ZL30793 is already in NCO mode (0x%x)\n", ctrl_val);
 
 		ret = FREQ_CTRL_ERROR_SUCCESS;
 		goto zl_ctrl_err;
@@ -264,7 +365,7 @@ static int zl30793_dpll_nco_modeset(struct spi_device *spi)
 
 	/* read : ZL30793_PAGE4_REG_DPLL_CTRL_0 */
 	ret = zl30793_spi_read(spi,
-			buf,
+			       buf,
 			ZL30793_PAGE4_REG_DPLL_CTRL_0,
 			&ctrl_val);
 	if (ret) {
@@ -273,13 +374,13 @@ static int zl30793_dpll_nco_modeset(struct spi_device *spi)
 	}
 
 	dev_info(&spi->dev,
-		"pll: ZL30793_PAGE4_REG_DPLL_CTRL_0[0x%x] read: 0x%x\n",
+		 "pll: ZL30793_PAGE4_REG_DPLL_CTRL_0[0x%x] read: 0x%x\n",
 		ZL30793_PAGE4_REG_DPLL_CTRL_0, ctrl_val);
 
 	/* write : ZL30793_PAGE4_REG_DPLL_CTRL_0 */
 	ctrl_val |= (1 << 3);
 	dev_info(&spi->dev, "pll: ZL30793_PAGE4_REG_DPLL_CTRL_0[0x%x] write: 0x%x\n",
-		ZL30793_PAGE4_REG_DPLL_CTRL_0, ctrl_val);
+		 ZL30793_PAGE4_REG_DPLL_CTRL_0, ctrl_val);
 
 	ret = zl30793_spi_write(spi, buf, ZL30793_PAGE4_REG_DPLL_CTRL_0,
 				&ctrl_val);
@@ -308,7 +409,7 @@ static int zl30793_dpll_nco_modeset(struct spi_device *spi)
 	}
 
 	dev_info(&spi->dev, "pll: ZL30793_PAGE4_REG_DPLL_MODE_REFSEL_0[0x%x] read: 0x%x\n",
-		ZL30793_PAGE4_REG_DPLL_MODE_REFSEL_0, ctrl_val);
+		 ZL30793_PAGE4_REG_DPLL_MODE_REFSEL_0, ctrl_val);
 
 	/* write : ZL30793_PAGE4_REG_DPLL_MODE_REFSEL_0 */
 	ctrl_val = ((ctrl_val & 0xf8) | 0x04);
@@ -361,46 +462,113 @@ zl_ctrl_err:
 	return ret;
 }
 
-int spi_dev_check_zl30793_clock(struct spi_device *spi, 
-		struct intel_freq_control_private *priv)
+static void pll_lock_handler(struct work_struct *work)
 {
-        int ret;
-        u16 *buf;
-        u8 rx_data[2];
-        u16 exp_reply = 0x0ED1; // 0x0ED1: ZL30793
+	struct intel_freq_control_private *priv;
+	struct delayed_work *dwork;
+	u8 pll_status;
+	int i = 0, ret = 0;
+	u16 *buf = NULL;
+	struct spi_device *spi_dev;
+	u8 out_width_1_val[] = {0x00, 0xDE, 0xC7, 0x40};
 
-        if (!spi)
-                return FREQ_CTRL_ERROR_FAIL;
+	dwork = to_delayed_work(work);
+	priv = container_of(dwork, struct intel_freq_control_private, pll_lock_dwork);
+	spi_dev = priv->fc_acc_type.spi_dev;
+	if (!spi_dev)
+		goto reschedule;
 
-        spi->mode = 0;
-        spi->max_speed_hz = 10000000;
-        spi->bits_per_word = 16;
-        ret = spi_setup(spi);
+	buf = kmalloc(PLL_SPI_MAX_FRAME_SIZE, GFP_KERNEL);
+	if (!buf)
+		goto reschedule;
 
-        if (ret) {
-                dev_err(&spi->dev, "spi_setup(%s) failed\n",
-                        dev_name(&spi->dev));
-                
+	memset(buf, 0, PLL_SPI_MAX_FRAME_SIZE);
+	ret = zl30793_spi_read(spi_dev, buf, ZL30793_PAGE2_REG_DPLL_MON_STATUS_0, &pll_status);
+	dev_dbg(&spi_dev->dev, "PLL lock check handler %x\n", pll_status);
+	// when the execution is successful but bit 0 is high implying dpll is locked, time to exit
+	if (!ret && ZL30793_DPLL_IS_LOCKED(pll_status)) {
+		dev_info(&spi_dev->dev, "PLL locked proceeding with duty cycle change\n");
+		for (i = 0; i < sizeof(out_width_1_val); i++) {
+			ret = zl30793_spi_write(spi_dev, buf,
+						ZL30793_PAGE8_REG_GP_OUT_WIDTH_1 + i,
+						&out_width_1_val[i]);
+			if (ret) {
+				dev_err(&spi_dev->dev, "SPI write error %d\n", ret);
+				goto reschedule;
+			}
+		}
+		ret = zl30793_spi_read(spi_dev, buf,
+				       ZL30793_PAGE2_REG_DPLL_MON_STATUS_0, &pll_status);
+		if (!ret && ZL30793_DPLL_IS_LOCKED(pll_status)) {
+			dev_info(&spi_dev->dev, "PLL  duty cycle changed checking lock again\n");
+
+			kfree(buf);
+
+			ret = zl30793_dpll_nco_modeset(spi_dev);
+			if (ret == FREQ_CTRL_ERROR_SUCCESS) {
+				zl30793_dco_centering(spi_dev);
+				dev_info(&spi_dev->dev, "PLL handling completed\n");
+				/*dont schedule after this operation*/
+				return;
+			}
+		}
+	}
+	if (ret)
+		dev_err(&spi_dev->dev, "SPI write error %d\n", ret);
+
+reschedule:
+	kfree(buf);
+	priv->pll_lock_check_ctr++;
+	if (priv->pll_lock_check_ctr < ZL30793_MAX_PLL_LOCK_CHECK_COUNTER) {
+		schedule_delayed_work(&priv->pll_lock_dwork,
+				      msecs_to_jiffies(ZL30793_LOCK_CHECK_INTERVAL_IN_MS));
+	} else {
+		dev_info(&spi_dev->dev, "PLL lock check timed-out, switching to NCO mode\n");
+		ret = zl30793_dpll_nco_modeset(spi_dev);
+		if (ret == FREQ_CTRL_ERROR_SUCCESS)
+			zl30793_dco_centering(spi_dev);
+	}
+}
+
+int spi_dev_check_zl30793_clock(struct intel_freq_control_private *priv)
+{
+	int ret;
+	u16 *buf;
+	u8 rx_data[2];
+	struct spi_device *spi = priv->fc_acc_type.spi_dev;
+	u16 exp_reply = 0x0ED1; // 0x0ED1: ZL30793
+
+	if (!spi)
 		return FREQ_CTRL_ERROR_FAIL;
-        }
 
-        /* Allocate DMA-safe buffer for transfers */
-        buf = kmalloc(PLL_SPI_MAX_FRAME_SIZE, GFP_KERNEL);
-        if (!buf)
-                return FREQ_CTRL_ERROR_FAIL;
+	spi->mode = 0;
+	spi->max_speed_hz = 10000000;
+	spi->bits_per_word = 16;
+	ret = spi_setup(spi);
 
-        memset(buf, 0, PLL_SPI_MAX_FRAME_SIZE);
+	if (ret) {
+		dev_err(&spi->dev, "spi_setup(%s) failed\n",
+			dev_name(&spi->dev));
 
-        /* Device  id*/
-        ret = zl30793_spi_read(spi, buf, ZL30793_PAGE0_REG_GENERAL_ID_0,
-                               &rx_data[0]);
-        if (ret) {
-                
+		return FREQ_CTRL_ERROR_FAIL;
+	}
+
+	/* Allocate DMA-safe buffer for transfers */
+	buf = kmalloc(PLL_SPI_MAX_FRAME_SIZE, GFP_KERNEL);
+	if (!buf)
+		return FREQ_CTRL_ERROR_FAIL;
+
+	memset(buf, 0, PLL_SPI_MAX_FRAME_SIZE);
+
+	/* Device  id*/
+	ret = zl30793_spi_read(spi, buf, ZL30793_PAGE0_REG_GENERAL_ID_0,
+			       &rx_data[0]);
+	if (ret) {
 		dev_err(&spi->dev, "SPI read error %d\n", ret);
-                ret = FREQ_CTRL_ERROR_FAIL;
-                
+		ret = FREQ_CTRL_ERROR_FAIL;
+
 		goto zl_spi_dev_check_err;
-        }
+	}
 
 	ret = zl30793_spi_read(spi, buf, ZL30793_PAGE0_REG_GENERAL_ID_0 + 1,
 			       &rx_data[1]);
@@ -410,34 +578,34 @@ int spi_dev_check_zl30793_clock(struct spi_device *spi,
 		goto zl_spi_dev_check_err;
 	}
 
-        /* expected reply for ZL30793 is 0x0ED1 */
-        if (((rx_data[0] << 8) | rx_data[1]) != exp_reply) {
+	/* expected reply for ZL30793 is 0x0ED1 */
+	if (((rx_data[0] << 8) | rx_data[1]) != exp_reply) {
+		dev_info(&spi->dev,
+			 "0x0ED1 : ZL30793 chip identification number does not match! reply: %04x\n",
+			((rx_data[0] << 8) | rx_data[1]));
 
-                dev_info(&spi->dev,
-			"0x0ED1 : ZL30793 chip identification number does not match! reply: %04x\n",
-                        ((rx_data[0] << 8) | rx_data[1]));
+		ret = FREQ_CTRL_ERROR_FAIL;
 
-                ret = FREQ_CTRL_ERROR_FAIL;
+		goto zl_spi_dev_check_err;
 
-                goto zl_spi_dev_check_err;
-        
 	} else {
-                dev_info(&spi->dev, "0x0ED1 : ZL30793 chip identification number match! reply: %04x\n",
-                         ((rx_data[0] << 8) | rx_data[1]));
-        }
+		dev_info(&spi->dev, "0x0ED1 : ZL30793 chip identification number match! reply: %04x\n",
+			 ((rx_data[0] << 8) | rx_data[1]));
+	}
 
-        zl30793_sysfs_configure(spi);   //append to spi sysfs
+	zl30793_sysfs_configure(spi);   //append to spi sysfs
 
-        ret = zl30793_dpll_nco_modeset(spi);
-        if (ret)
-                goto zl_spi_dev_check_err;
+	priv->fc_acc_type.spi_dev = spi;
+	priv->pll_lock_check_ctr = 0;
+	INIT_DELAYED_WORK(&priv->pll_lock_dwork, pll_lock_handler);
+	schedule_delayed_work(&priv->pll_lock_dwork,
+			      msecs_to_jiffies(ZL30793_LOCK_CHECK_INTERVAL_IN_MS));
 
-        priv->fc_acc_type.spi_dev = spi;
-        
 	ret = FREQ_CTRL_ERROR_SUCCESS;
 
 zl_spi_dev_check_err:
-        kfree(buf);
-        
+	kfree(buf);
+
 	return ret;
 }
+

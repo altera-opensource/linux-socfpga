@@ -39,7 +39,6 @@ struct intel_fpga_tod {
 	u32 drift_adjust;
 	u32 drift_adjust_rate;
 };
-
 #define tod_csroffs(a)	(offsetof(struct intel_fpga_tod, a))
 
 struct intel_fpga_pps {
@@ -52,6 +51,7 @@ struct intel_fpga_pps {
 };
 
 #define pps_csroffs(a)	(offsetof(struct intel_fpga_pps, a))
+
 
 struct intel_fpga_tod_private {
 	struct device *dev;

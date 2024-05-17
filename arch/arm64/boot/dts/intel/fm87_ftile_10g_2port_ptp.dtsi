@@ -133,6 +133,8 @@
                     altr,rx-external-phy-delay-ns = <0x0>;
                     fec-cw-pos-rx = <0x0>;
                     fec-type="no-fec";
+                    monitor_poll_interval = <10>;
+                    ui-adj-interval=<250>;
                     interrupt-parent = <&intc>;
                     interrupt-names = "tx_irq", "rx_irq";
                     interrupts = <0 24 4>, <0 25 4>;
@@ -181,6 +183,8 @@
                     altr,rx-external-phy-delay-ns = <0x0>;
                     fec-cw-pos-rx = <0x0>;
                     fec-type="no-fec";
+                    monitor_poll_interval = <10>;
+                    ui-adj-interval=<250>;
                     interrupt-parent = <&intc>;
                     interrupt-names = "tx_irq", "rx_irq";
                     interrupts = <0 26 4>, <0 27 4>;

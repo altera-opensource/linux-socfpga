@@ -30,6 +30,26 @@
 #define FTILE_25G_RX_TX_MIN_UI		0x9EDC00
 #define FTILE_25G_RX_TX_MAX_UI		0x9EE420
 
+/* write protected read for the ui enable status */
+static inline bool wpr_get_uienable_status(intel_fpga_xtile_eth_private *priv)
+{
+	bool value = false;
+
+	read_lock(&priv->wr_lock);
+	value = priv->ui_enable;
+	read_unlock(&priv->wr_lock);
+
+	return value;
+}
+
+/* read protected write for the ui enable status */
+static inline void rpw_set_uienable_status(bool value,
+					   intel_fpga_xtile_eth_private *priv) {
+	write_lock(&priv->wr_lock);
+	priv->ui_enable = value;
+	write_unlock(&priv->wr_lock);
+}
+
 static void get_min_max_ui(intel_fpga_xtile_eth_private *priv, u64 *min_ui, u64 *max_ui)
 {
 	if (!min_ui || !max_ui) {
@@ -55,40 +75,45 @@ static void get_min_max_ui(intel_fpga_xtile_eth_private *priv, u64 *min_ui, u64 
 	}
 }
 
-void ftile_ui_adjustments_worker_handle(struct timer_list *t)
+void ui_adjustments_worker_handle(struct timer_list *t)
 {
 	intel_fpga_xtile_eth_private *priv = from_timer(priv, t, fec_timer);
 
 	schedule_work(&priv->ui_worker);
 }
 
-void ui_adjustments_cancel_worker(intel_fpga_xtile_eth_private *priv)
+void ftile_ui_adjustments_cancel_worker(intel_fpga_xtile_eth_private *priv)
 {
+	/* if the ui adjustment timer is already cancelled and we request
+	 * cancel again, case should be avoided
+	 */
+	if (!wpr_get_uienable_status(priv))
+		return;
 
-        /* if the ui adjustment timer is already cancelled and we request
-         * cancel again, case should be avoided
-         */
-        if (priv->ui_enable) {
-		/*  we cancel the timer so that it doesn't schedule new
-		 * worker thread execution
-		 */
-		priv->ui_enable = false;
-		del_timer_sync(&priv->fec_timer);
-		cancel_work_sync(&priv->ui_worker);
-	}
+	/* we cancel the timer so that it doesn't schedule new
+	 * worker thread execution
+	 */
+	rpw_set_uienable_status(false, priv);
+	del_timer_sync(&priv->fec_timer);
+	cancel_work_sync(&priv->ui_worker);
 }
 
 void ftile_ui_adjustments_init_worker(intel_fpga_xtile_eth_private *priv)
 {
 	int ret;
 
+	rpw_set_uienable_status(true, priv);
 	INIT_WORK(&priv->ui_worker, ftile_ui_adjustments);
-	timer_setup(&priv->fec_timer, ftile_ui_adjustments_worker_handle, 0);
-	ret = mod_timer(&priv->fec_timer, jiffies + msecs_to_jiffies(250));
+	timer_setup(&priv->fec_timer, ui_adjustments_worker_handle, 0);
+
+	if (priv->ui_adjust_interval == 0)
+		ret = mod_timer(&priv->fec_timer, jiffies + msecs_to_jiffies(250));
+	else
+		ret = mod_timer(&priv->fec_timer,
+				jiffies + msecs_to_jiffies(priv->ui_adjust_interval));
+
 	if (ret)
 		netdev_err(priv->dev, "Timer failed to start UI adjustment\n");
-
-	priv->ui_enable = true;
 }
 
 /* Calculate Unit Interval Adjustments */
@@ -115,12 +140,19 @@ void ftile_ui_adjustments(struct work_struct *work)
 	u16 num_pl = priv->pma_lanes_used;
 	u8 eth_rate = priv->eth_rate;
 
+	if (priv->ui_adjust_interval == 0)
+		goto ui_restart;
+
+	/* to avoid race condition where the timer is deleted and we are scheduled */
+	if (!wpr_get_uienable_status(priv))
+		return;
+
 	start_jiffies = get_jiffies_64();
 	/* Set tam_snapshot to 1 to take the first snapshot of the Time of
 	 * Alignment marker (TAM)
 	 */
-	hssi_set_bit(pdev, HSSI_ETH_RECONFIG, chan,  eth_soft_csroffs(ptp_uim_tam_snapshot),
-		     ETH_TX_TAM_SNAPSHOT | ETH_RX_TAM_SNAPSHOT, true);
+	hssi_set_bit_ba(pdev, HSSI_ETH_RECONFIG, chan,  eth_soft_csroffs(ptp_uim_tam_snapshot),
+			ETH_TX_TAM_SNAPSHOT | ETH_RX_TAM_SNAPSHOT);
 
 	/* Read snapshotted initial TX TAM and counter values */
 	tx_tam_l_initial = hssi_csrrd32_ba(pdev, HSSI_ETH_RECONFIG, chan,
@@ -143,8 +175,9 @@ void ftile_ui_adjustments(struct work_struct *work)
 	rx_tam_valid = (ptp_rx_uim_tam_info1 & ETH_RX_TAM_VALID) ? 1 : 0;
 
 	/* Clear snapshot */
-	hssi_clear_bit(pdev, HSSI_ETH_RECONFIG, chan,  eth_soft_csroffs(ptp_uim_tam_snapshot),
-		       ETH_TX_TAM_SNAPSHOT | ETH_RX_TAM_SNAPSHOT, true);
+	hssi_clear_bit_ba(pdev, HSSI_ETH_RECONFIG, chan,  eth_soft_csroffs(ptp_uim_tam_snapshot),
+			  ETH_TX_TAM_SNAPSHOT | ETH_RX_TAM_SNAPSHOT);
+
 	if (!rx_tam_valid || !tx_tam_valid) {
 		dev_warn(priv->device, "%s: Initial rx_tam_valid=%u tx_tam_valid=%u\n", __func__,
 			 rx_tam_valid, tx_tam_valid);
@@ -154,8 +187,8 @@ void ftile_ui_adjustments(struct work_struct *work)
 	udelay(5300);
 
 	/* Request snapshot of Nth TX TAM and RX TAM */
-	hssi_set_bit(pdev, HSSI_ETH_RECONFIG, chan, eth_soft_csroffs(ptp_uim_tam_snapshot),
-		     ETH_TX_TAM_SNAPSHOT | ETH_RX_TAM_SNAPSHOT, true);
+	hssi_set_bit_ba(pdev, HSSI_ETH_RECONFIG, chan, eth_soft_csroffs(ptp_uim_tam_snapshot),
+			ETH_TX_TAM_SNAPSHOT | ETH_RX_TAM_SNAPSHOT);
 
 	/* Read snapshotted of Nth TX TAM and counter values */
 	tx_tam_l_nth =  hssi_csrrd32_ba(pdev, HSSI_ETH_RECONFIG, chan,
@@ -178,8 +211,8 @@ void ftile_ui_adjustments(struct work_struct *work)
 	rx_tam_valid = (ptp_rx_uim_tam_info1 & ETH_RX_TAM_VALID) ? 1 : 0;
 
 	/* Clear snapshot */
-	hssi_clear_bit(pdev, HSSI_ETH_RECONFIG, chan, eth_soft_csroffs(ptp_uim_tam_snapshot),
-		       ETH_TX_TAM_SNAPSHOT | ETH_RX_TAM_SNAPSHOT, true);
+	hssi_clear_bit_ba(pdev, HSSI_ETH_RECONFIG, chan, eth_soft_csroffs(ptp_uim_tam_snapshot),
+			  ETH_TX_TAM_SNAPSHOT | ETH_RX_TAM_SNAPSHOT);
 	if ((get_jiffies_64() - start_jiffies) > HZ) {
 		dev_warn(priv->device, "%s: 1st to Nth snapshot takes more than 1 second\n",
 			 __func__);
@@ -301,10 +334,13 @@ void ftile_ui_adjustments(struct work_struct *work)
 ui_restart:
 
 	/* to avoid race condition where the timer is deleted and we are scheduled */
-	if (!priv->ui_enable)
+	if (!wpr_get_uienable_status(priv))
 		return;
 
-	mod_timer(&priv->fec_timer, jiffies + msecs_to_jiffies(250));
+	if (priv->ui_adjust_interval == 0)
+		mod_timer(&priv->fec_timer, jiffies + msecs_to_jiffies(250));
+	else
+		mod_timer(&priv->fec_timer, jiffies + msecs_to_jiffies(priv->ui_adjust_interval));
 }
 
 MODULE_LICENSE("GPL");
