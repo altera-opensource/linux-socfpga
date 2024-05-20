@@ -837,7 +837,7 @@ fpga_mgr_register_full(struct device *parent, const struct fpga_manager_info *in
 
 	dev_info(&mgr->dev, "%s registered\n", mgr->name);
 
-	return 0;
+	return mgr;
 
 error_device:
 	ida_free(&fpga_mgr_ida, id);
