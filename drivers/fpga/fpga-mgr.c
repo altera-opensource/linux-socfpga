@@ -844,6 +844,10 @@ __fpga_mgr_register_full(struct device *parent, const struct fpga_manager_info *
 		return ERR_PTR(ret);
 	}
 
+	fpga_mgr_debugfs_add(mgr);
+
+	dev_info(&mgr->dev, "%s registered\n", mgr->name);
+
 	return mgr;
 
 error_device:
