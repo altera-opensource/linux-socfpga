@@ -2115,7 +2115,8 @@ static int stratix10_svc_drv_probe(struct platform_device *pdev)
 	}
 
 	if (of_device_is_compatible(node, "intel,agilex5-svc")) {
-		if (device_iommu_mapped(&pdev->dev)) {
+		if (device_iommu_mapped(&pdev->dev) &&
+			device_property_read_bool(dev, "altr,smmu_enable_quirk")) {
 			controller->is_smmu_enabled = true;
 			controller->sdm_dma_addr_offset = AGILEX5_SDM_DMA_ADDR_OFFSET;
 			pr_debug("Intel Service Layer Driver: IOMMU Present\n");
