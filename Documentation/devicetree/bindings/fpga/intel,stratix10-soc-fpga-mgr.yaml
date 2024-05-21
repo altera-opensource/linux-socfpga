@@ -23,6 +23,11 @@ properties:
     enum:
       - intel,stratix10-soc-fpga-mgr
       - intel,agilex-soc-fpga-mgr
+      - intel,agilex5-soc-fpga-mgr
+
+  altr,smmu_enable_quirk:
+    type: boolean
+    description: set when SMMU is enabled for the platform
 
 required:
   - compatible
