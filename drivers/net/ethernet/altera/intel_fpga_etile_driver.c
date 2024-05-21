@@ -75,7 +75,7 @@ void etile_update_mac_addr(intel_fpga_xtile_eth_private *priv)
 	u32 msb;
 	u32 lsb;
 	u32 chan = priv->tile_chan;
-	u8 *addr = priv->dev->dev_addr;
+	const u8 *addr = priv->dev->dev_addr;
 
 	struct platform_device *pdev = priv->pdev_hssi;
 
@@ -108,7 +108,7 @@ static void etile_enable_mac_flow_ctrl(intel_fpga_xtile_eth_private *priv)
 				   eth_pause_and_priority_csroffs(rx_flow_control_feature_cfg));
 
 		if (netif_msg_ifup(priv))
-			netdev_info(priv->dev, "F-tile rx_flow_ctrl: 0x%08x\n", reg);
+			netdev_info(priv->dev, "E-tile rx_flow_ctrl: 0x%08x\n", reg);
 	}
 
 	/* Tx MAC flow control */
@@ -470,7 +470,7 @@ int etile_start(intel_fpga_xtile_eth_private *priv)
 {
 	int ret;
 
-	/* Enable F-tile MAC datapath */
+	/* Enable E-tile MAC datapath */
 	etile_enable_mac(priv);
 
 	/* Enable flow ctrl */
