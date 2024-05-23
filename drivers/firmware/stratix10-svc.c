@@ -274,6 +274,7 @@ struct stratix10_async_ctrl {
  * @actrl: async control structure
  * @domain: pointer to allocated iommu domain
  * @is_smmu_enabled: flag to indicate whether is smmu_enabled for device
+ * @sdm_dma_addr_offset: dma addr offset to append to the IOVA sent to SDM
  * @carveout: iova_domain used to allocate iova addr that is accessible by SDM
  *
  * This struct is used to create communication channels for service clients, to
@@ -311,6 +312,9 @@ struct stratix10_svc_controller {
  * @svc_fifo_lock: protect access to service message data queue (locking pending fifo)
  * @lock: protect access to the channel
  * @async_chan: reference to asynchronous channel object for this channel
+ * @task: pointer to the thread task which handles SMC or HVC call
+ * @svc_fifo: svc fifo circular buffer
+ * @svc_fifo_lock: svc fifo lock
  *
  * This struct is used by service client to communicate with service layer.
  * Each service client has its own channel created by service controller.
