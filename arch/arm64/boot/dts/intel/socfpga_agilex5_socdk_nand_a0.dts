@@ -11,6 +11,7 @@
 	aliases {
 		serial0 = &uart0;
 		ethernet0 = &gmac0;
+		ethernet2 = &gmac2;
 	};
 
 	chosen {
@@ -37,23 +38,6 @@
 	};
 };
 
-&gmac0 {
-	status = "okay";
-	phy-mode = "rgmii";
-	phy-handle = <&emac0_phy0>;
-	max-frame-size = <9000>;
-
-	mdio0 {
-		#address-cells = <1>;
-		#size-cells = <0>;
-		compatible = "snps,dwmac-mdio";
-
-		emac0_phy0: ethernet-phy@0 {
-			reg = <0>;
-		};
-	};
-};
-
 &gpio0 {
 	status = "okay";
 };
@@ -76,8 +60,7 @@
 
 &nand {
 	status = "okay";
-	reg = <0x10b80000 0x10000>,
-		<0x10840000 0x10000>;
+	disable-ecc;
 
 	nand@0 {
 		#address-cells = <1>;
@@ -96,6 +79,40 @@
 	};
 };
 
+&gmac0 {
+	status = "okay";
+	phy-mode = "rgmii";
+	phy-handle = <&emac0_phy0>;
+
+	max-frame-size = <9000>;
+
+	mdio0 {
+		#address-cells = <1>;
+		#size-cells = <0>;
+		compatible = "snps,dwmac-mdio";
+		emac0_phy0: ethernet-phy@0 {
+			reg = <0>;
+		};
+	};
+};
+
+&gmac2 {
+	status = "disabled";
+	phy-mode = "rgmii";
+	phy-handle = <&emac2_phy0>;
+
+	max-frame-size = <9000>;
+
+	mdio0 {
+		#address-cells = <1>;
+		#size-cells = <0>;
+		compatible = "snps,dwmac-mdio";
+		emac2_phy0: ethernet-phy@0 {
+			reg = <0>;
+		};
+	};
+};
+
 &osc1 {
 	clock-frequency = <25000000>;
 };
@@ -105,6 +122,22 @@
 };
 
 &watchdog0 {
+	status = "okay";
+};
+
+&watchdog1 {
+	status = "okay";
+};
+
+&watchdog2 {
+	status = "okay";
+};
+
+&watchdog3 {
+	status = "okay";
+};
+
+&watchdog4 {
 	status = "okay";
 };
 
