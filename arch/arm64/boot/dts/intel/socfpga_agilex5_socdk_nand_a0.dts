@@ -60,8 +60,7 @@
 
 &nand {
 	status = "okay";
-	reg = <0x10b80000 0x10000>,
-		<0x10840000 0x10000>;
+	disable-ecc;
 
 	nand@0 {
 		#address-cells = <1>;
@@ -123,6 +122,22 @@
 };
 
 &watchdog0 {
+	status = "okay";
+};
+
+&watchdog1 {
+	status = "okay";
+};
+
+&watchdog2 {
+	status = "okay";
+};
+
+&watchdog3 {
+	status = "okay";
+};
+
+&watchdog4 {
 	status = "okay";
 };
 
