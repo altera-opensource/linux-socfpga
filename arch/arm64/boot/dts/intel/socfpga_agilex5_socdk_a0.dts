@@ -11,7 +11,6 @@
 	aliases {
 		serial0 = &uart0;
 		ethernet0 = &gmac0;
-		ethernet1 = &gmac1;
 		ethernet2 = &gmac2;
 	};
 
@@ -20,7 +19,7 @@
 		bootargs = "console=uart8250,mmio32,0x10c02000,115200n8 \
 			root=/dev/ram0 rw initrd=0x10000000 init=/sbin/init \
 			ramdisk_size=10000000 earlycon=uart8250,mmio32,0x10c02000,115200n8 \
-			panic=-1 rootfstype=ext3";
+			panic=-1 nosmp rootfstype=ext3";
 	};
 
 	leds {
@@ -44,22 +43,6 @@
 	status = "okay";
 };
 
-&gmac2 {
-	status = "okay";
-	phy-mode = "rgmii";
-	phy-handle = <&emac2_phy0>;
-	max-frame-size = <9000>;
-
-	mdio0 {
-		#address-cells = <1>;
-		#size-cells = <0>;
-		compatible = "snps,dwmac-mdio";
-		emac2_phy0: ethernet-phy@0 {
-			reg = <0>;
-		};
-	};
-};
-
 &gpio1 {
 	status = "okay";
 };
@@ -81,6 +64,23 @@
 	};
 };
 
+&gmac2 {
+	status = "okay";
+	phy-mode = "rgmii";
+	phy-handle = <&emac2_phy0>;
+
+	max-frame-size = <9000>;
+
+	mdio0 {
+		#address-cells = <1>;
+		#size-cells = <0>;
+		compatible = "snps,dwmac-mdio";
+		emac2_phy0: ethernet-phy@0 {
+			reg = <0>;
+		};
+	};
+};
+
 &i3c0 {
 	status = "okay";
 };
@@ -94,9 +94,10 @@
 	bus-width = <4>;
 	no-1-8-v;
 	cap-sd-highspeed;
-	cap-mmc-highspeed;
 	disable-wp;
 	sd-uhs-sdr50;
+	sdhci-caps = <0x00000000 0x0000c800>;
+	sdhci-caps-mask = <0x00002000 0x0000ff00>;
 	no-sdio;
 	cdns,phy-use-ext-lpbk-dqs = <1>;
 	cdns,phy-use-lpbk-dqs = <1>;
@@ -147,6 +148,8 @@
 		reg = <0>;
 		spi-max-frequency = <100000000>;
 		m25p,fast-read;
+		cdns,page-size = <256>;
+		cdns,block-size = <16>;
 		cdns,read-delay = <2>;
 		cdns,tshsl-ns = <50>;
 		cdns,tsd2d-ns = <50>;
