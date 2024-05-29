@@ -501,6 +501,7 @@ struct cdns_nand_ctrl {
 	unsigned long assigned_cs;
 	struct list_head chips;
 	u8 bch_metadata_size;
+	bool is_ecc;
 };
 
 struct cdns_nand_chip {
@@ -577,7 +578,6 @@ static int cadence_nand_wait_for_value(struct cdns_nand_ctrl *cdns_ctrl,
 	return ret;
 }
 
-/*
 static int cadence_nand_set_ecc_enable(struct cdns_nand_ctrl *cdns_ctrl,
 				       bool enable)
 {
@@ -599,7 +599,6 @@ static int cadence_nand_set_ecc_enable(struct cdns_nand_ctrl *cdns_ctrl,
 
 	return 0;
 }
-*/
 
 static void cadence_nand_set_ecc_strength(struct cdns_nand_ctrl *cdns_ctrl,
 					  u8 corr_str_idx)
@@ -1291,7 +1290,11 @@ cadence_nand_cdma_transfer(struct cdns_nand_ctrl *cdns_ctrl, u8 chip_nr,
 	 * So keeping chip->ecc.engine_type = NAND_ECC_ENGINE_TYPE_ON_HOST to
 	 * use Command DMA mode for page read/write and do not enable ecc here.
 	 */
-	//cadence_nand_set_ecc_enable(cdns_ctrl, with_ecc);
+
+	if(!cdns_ctrl->is_ecc)
+		with_ecc = false;
+
+	cadence_nand_set_ecc_enable(cdns_ctrl, with_ecc);
 
 	dma_buf = dma_map_single(cdns_ctrl->dev, buf, buf_size, dir);
 	if (dma_mapping_error(cdns_ctrl->dev, dma_buf)) {
@@ -3058,6 +3061,11 @@ static int cadence_nand_dt_probe(struct platform_device *ofdev)
 			 val);
 	}
 	cdns_ctrl->board_delay = val;
+
+	if(of_property_read_bool(ofdev->dev.of_node, "disable-ecc"))
+		cdns_ctrl->is_ecc = false;
+	else
+		cdns_ctrl->is_ecc = true;
 
 	ret = cadence_nand_init(cdns_ctrl);
 	if (ret)
