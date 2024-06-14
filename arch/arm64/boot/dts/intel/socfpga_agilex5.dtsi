@@ -778,6 +778,7 @@
 			altr,smtg-hub;
 			snps,clk-csr = <0>;
 			iommus = <&smmu 1>;
+			dma-coherent;
 			status = "disabled";
 
 			stmmac_axi_emac0_setup: stmmac-axi-config {
@@ -930,6 +931,7 @@
 			altr,smtg-hub;
 			snps,clk-csr = <0>;
 			iommus = <&smmu 2>;
+			dma-coherent;
 			status = "disabled";
 
 			stmmac_axi_emac1_setup: stmmac-axi-config {
@@ -1082,6 +1084,7 @@
 			altr,smtg-hub;
 			snps,clk-csr = <0>;
 			iommus = <&smmu 3>;
+			dma-coherent;
 			status = "disabled";
 
 			stmmac_axi_emac2_setup: stmmac-axi-config {
