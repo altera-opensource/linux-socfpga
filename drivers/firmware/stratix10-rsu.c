@@ -1016,8 +1016,11 @@ static int stratix10_rsu_probe(struct platform_device *pdev)
 	}
 
 	if (priv->is_smmu_enabled) {
+		/* TODO: the below fix for DMA_TO_DEVICE is a temporary workaround.
+		 * Need to investigate for correct fix.
+		 */
 		priv->rsu_dma_handle = dma_map_single(dev, priv->get_spt_response_buf,
-			 RSU_GET_SPT_RESP_LEN, DMA_FROM_DEVICE);
+			 RSU_GET_SPT_RESP_LEN, DMA_TO_DEVICE);
 		ret = dma_mapping_error(dev, priv->rsu_dma_handle);
 		if (ret) {
 			dev_err(dev,
