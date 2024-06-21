@@ -312,3 +312,12 @@
 		};
 	};
 };
+
+&temp_volt {
+	status = "disabled";
+};
+&soc {
+	eccmgr {
+		status = "disabled";
+	};
+};
