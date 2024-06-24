@@ -18,7 +18,7 @@
 #include <linux/module.h>
 #include <linux/of.h>
 #include <linux/of_dma.h>
-#include <linux/of_address.h>
+							 
 #include <linux/platform_device.h>
 #include <linux/regmap.h>
 #include <linux/slab.h>
@@ -56,9 +56,9 @@
 #define   AXI_DMAC_DMA_DST_TYPE_GET(x)	FIELD_GET(AXI_DMAC_DMA_DST_TYPE_MSK, x)
 #define   AXI_DMAC_DMA_DST_WIDTH_MSK	GENMASK(3, 0)
 #define   AXI_DMAC_DMA_DST_WIDTH_GET(x)	FIELD_GET(AXI_DMAC_DMA_DST_WIDTH_MSK, x)
-#define AXI_DMAC_REG_COHERENCY_DESC	0x14
-#define   AXI_DMAC_DST_COHERENT_MSK	BIT(0)
-#define   AXI_DMAC_DST_COHERENT_GET(x)	FIELD_GET(AXI_DMAC_DST_COHERENT_MSK, x)
+										
+										  
+																			  
 
 #define AXI_DMAC_REG_IRQ_MASK		0x80
 #define AXI_DMAC_REG_IRQ_PENDING	0x84
@@ -79,6 +79,9 @@
 #define AXI_DMAC_REG_STATUS		0x430
 #define AXI_DMAC_REG_CURRENT_SRC_ADDR	0x434
 #define AXI_DMAC_REG_CURRENT_DEST_ADDR	0x438
+#define AXI_DMAC_REG_DBG0		0x43c
+#define AXI_DMAC_REG_DBG1		0x440
+#define AXI_DMAC_REG_DBG2		0x444
 #define AXI_DMAC_REG_PARTIAL_XFER_LEN	0x44c
 #define AXI_DMAC_REG_PARTIAL_XFER_ID	0x450
 
@@ -149,6 +152,8 @@ struct axi_dmac {
 
 	struct dma_device dma_dev;
 	struct axi_dmac_chan chan;
+
+	struct device_dma_parameters dma_parms;
 };
 
 static struct axi_dmac *chan_to_axi_dmac(struct axi_dmac_chan *chan)
@@ -413,6 +418,8 @@ static irqreturn_t axi_dmac_interrupt_handler(int irq, void *devid)
 	struct axi_dmac *dmac = devid;
 	unsigned int pending;
 	bool start_next = false;
+ 
+											 
 
 	pending = axi_dmac_read(dmac, AXI_DMAC_REG_IRQ_PENDING);
 	if (!pending)
@@ -502,8 +509,13 @@ static struct axi_dmac_sg *axi_dmac_fill_linear_sg(struct axi_dmac_chan *chan,
 	unsigned int segment_size;
 	unsigned int len;
 
-	/* Split into multiple equally sized segments if necessary */
-	num_segments = DIV_ROUND_UP(period_len, chan->max_length);
+	/*
+	 * Split into multiple equally sized segments if necessary.
+	 * chan->max_length can be UINT_MAX, so ensure there are no overflows
+	 * resuting in divide-by-zero errors by casting to u64.
+	 */
+	num_segments = DIV_ROUND_UP_ULL((u64)period_len,
+					(u64)chan->max_length);
 	segment_size = DIV_ROUND_UP(period_len, num_segments);
 	/* Take care of alignment */
 	segment_size = ((segment_size - 1) | chan->length_align_mask) + 1;
@@ -575,6 +587,21 @@ static struct dma_async_tx_descriptor *axi_dmac_prep_slave_sg(
 	desc->cyclic = false;
 
 	return vchan_tx_prep(&chan->vchan, &desc->vdesc, flags);
+}
+
+static int axi_dmac_device_config(struct dma_chan *c,
+			struct dma_slave_config *slave_config)
+{
+	struct axi_dmac_chan *chan = to_axi_dmac_chan(c);
+	struct axi_dmac *dmac = chan_to_axi_dmac(chan);
+
+	/* no configuration required, a sanity check is done instead */
+	if (slave_config->direction != chan->direction) {
+		dev_err(dmac->dma_dev.dev, "Direction not supported by this DMA Channel");
+		return -EINVAL;
+	}
+
+	return 0;
 }
 
 static struct dma_async_tx_descriptor *axi_dmac_prep_dma_cyclic(
@@ -713,6 +740,9 @@ static bool axi_dmac_regmap_rdwr(struct device *dev, unsigned int reg)
 	case AXI_DMAC_REG_STATUS:
 	case AXI_DMAC_REG_CURRENT_SRC_ADDR:
 	case AXI_DMAC_REG_CURRENT_DEST_ADDR:
+	case AXI_DMAC_REG_DBG0:
+	case AXI_DMAC_REG_DBG1:
+	case AXI_DMAC_REG_DBG2:
 	case AXI_DMAC_REG_PARTIAL_XFER_LEN:
 	case AXI_DMAC_REG_PARTIAL_XFER_ID:
 		return true;
@@ -766,6 +796,7 @@ static int axi_dmac_parse_chan_dt(struct device_node *of_chan,
 	ret = of_property_read_u32(of_chan, "adi,source-bus-type", &val);
 	if (ret)
 		return ret;
+									   
 	if (val > AXI_DMAC_BUS_TYPE_FIFO)
 		return -EINVAL;
 	chan->src_type = val;
@@ -773,6 +804,7 @@ static int axi_dmac_parse_chan_dt(struct device_node *of_chan,
 	ret = of_property_read_u32(of_chan, "adi,destination-bus-type", &val);
 	if (ret)
 		return ret;
+									   
 	if (val > AXI_DMAC_BUS_TYPE_FIFO)
 		return -EINVAL;
 	chan->dest_type = val;
@@ -799,6 +831,7 @@ static int axi_dmac_parse_dt(struct device *dev, struct axi_dmac *dmac)
 
 	of_channels = of_get_child_by_name(dev->of_node, "adi,channels");
 	if (of_channels == NULL)
+									
 		return -ENODEV;
 
 	for_each_child_of_node(of_channels, of_chan) {
@@ -806,6 +839,7 @@ static int axi_dmac_parse_dt(struct device *dev, struct axi_dmac *dmac)
 		if (ret) {
 			of_node_put(of_chan);
 			of_node_put(of_channels);
+									  
 			return -EINVAL;
 		}
 	}
@@ -911,19 +945,23 @@ static int axi_dmac_probe(struct platform_device *pdev)
 	struct dma_device *dma_dev;
 	struct axi_dmac *dmac;
 	struct resource *res;
-	struct regmap *regmap;
+					   
 	unsigned int version;
 	int ret;
+
+	printk("axi_dmac: entry\n");
 
 	dmac = devm_kzalloc(&pdev->dev, sizeof(*dmac), GFP_KERNEL);
 	if (!dmac)
 		return -ENOMEM;
+								  
 
 	dmac->irq = platform_get_irq(pdev, 0);
 	if (dmac->irq < 0)
 		return dmac->irq;
 	if (dmac->irq == 0)
 		return -EINVAL;
+								   
 
 	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
 	dmac->base = devm_ioremap_resource(&pdev->dev, res);
@@ -938,18 +976,27 @@ static int axi_dmac_probe(struct platform_device *pdev)
 	if (ret < 0)
 		return ret;
 
-	version = axi_dmac_read(dmac, ADI_AXI_REG_VERSION);
-
-	if (version >= ADI_AXI_PCORE_VER(4, 3, 'a'))
-		ret = axi_dmac_read_chan_config(&pdev->dev, dmac);
-	else
-		ret = axi_dmac_parse_dt(&pdev->dev, dmac);
-
-	if (ret < 0)
-		goto err_clk_disable;
-
 	INIT_LIST_HEAD(&dmac->chan.active_descs);
 
+	version = axi_dmac_read(dmac, ADI_AXI_REG_VERSION);
+											  
+									
+
+	if (version >= ADI_AXI_PCORE_VER(4, 3, 'a'))
+									
+		ret = axi_dmac_read_chan_config(&pdev->dev, dmac);
+	else
+									
+		ret = axi_dmac_parse_dt(&pdev->dev, dmac);
+										
+
+	if (ret < 0)
+		return ret;
+						
+								   
+										  
+
+	pdev->dev.dma_parms = &dmac->dma_parms;
 	dma_set_max_seg_size(&pdev->dev, UINT_MAX);
 
 	dma_dev = &dmac->dma_dev;
@@ -960,6 +1007,7 @@ static int axi_dmac_probe(struct platform_device *pdev)
 	dma_dev->device_tx_status = dma_cookie_status;
 	dma_dev->device_issue_pending = axi_dmac_issue_pending;
 	dma_dev->device_prep_slave_sg = axi_dmac_prep_slave_sg;
+	dma_dev->device_config = axi_dmac_device_config;
 	dma_dev->device_prep_dma_cyclic = axi_dmac_prep_dma_cyclic;
 	dma_dev->device_prep_interleaved_dma = axi_dmac_prep_interleaved;
 	dma_dev->device_terminate_all = axi_dmac_terminate_all;
@@ -983,18 +1031,18 @@ static int axi_dmac_probe(struct platform_device *pdev)
 
 	axi_dmac_write(dmac, AXI_DMAC_REG_IRQ_MASK, 0x00);
 
-	if (of_dma_is_coherent(pdev->dev.of_node)) {
-		ret = axi_dmac_read(dmac, AXI_DMAC_REG_COHERENCY_DESC);
+											 
+														 
 
-		if (version < ADI_AXI_PCORE_VER(4, 4, 'a') ||
-		    !AXI_DMAC_DST_COHERENT_GET(ret)) {
-			dev_err(dmac->dma_dev.dev,
-				"Coherent DMA not supported in hardware");
-			ret = -EINVAL;
-			goto err_clk_disable;
-		}
-	}
-
+											   
+										
+							 
+											  
+				 
+						
+   
+  
+								  
 	ret = dma_async_device_register(dma_dev);
 	if (ret)
 		goto err_clk_disable;
@@ -1011,17 +1059,19 @@ static int axi_dmac_probe(struct platform_device *pdev)
 
 	platform_set_drvdata(pdev, dmac);
 
-	regmap = devm_regmap_init_mmio(&pdev->dev, dmac->base,
-		 &axi_dmac_regmap_config);
-	if (IS_ERR(regmap)) {
-		ret = PTR_ERR(regmap);
-		goto err_free_irq;
-	}
+	devm_regmap_init_mmio(&pdev->dev, dmac->base, &axi_dmac_regmap_config);
 
+													   
+							
+					  
+						
+					
+  
+									
 	return 0;
 
-err_free_irq:
-	free_irq(dmac->irq, dmac);
+			 
+						   
 err_unregister_of:
 	of_dma_controller_free(pdev->dev.of_node);
 err_unregister_device:
