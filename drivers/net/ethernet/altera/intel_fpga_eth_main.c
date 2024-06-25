@@ -1061,7 +1061,6 @@ static int xtile_change_mac(struct net_device *dev, void *inet_ds)
 		return -EADDRNOTAVAIL;
 
 	dev_addr_set(dev, addr->sa_data);
-	//memcpy(dev->dev_addr, addr->sa_data, ETH_ALEN);
 
 	if (priv->spec_ops->tile.update_mac_addr)
 		priv->spec_ops->tile.update_mac_addr(priv);
@@ -1617,30 +1616,7 @@ static int intel_fpga_xtile_probe(struct platform_device *pdev)
 			ret = -ENXIO;
 			goto err_free_netdev;
 		}
-	}	
-#if 0
-	if (priv->ptp_enable) {
-		/* PTP Timestamp Accuracy mode */
-		ret  = of_property_read_string(pdev->dev.of_node, "ptp_accu_mode",
-					       &priv->ptp_accu_mode);
-		if (ret < 0)
-			priv->ptp_accu_mode = "Basic";
-
-		if (strcasecmp(priv->ptp_accu_mode, "Advanced") == 0) {
-			/* Tx Routing adjustment delay */
-			if (of_property_read_u32(np, "ptp_tx_routing_adj",
-						 &priv->ptp_tx_routing_adj)) {
-				priv->ptp_tx_routing_adj = 0;
-			}
-
-			/* Rx Routing adjustment delay */
-			if (of_property_read_u32(np, "ptp_rx_routing_adj",
-						 &priv->ptp_rx_routing_adj)) {
-				priv->ptp_rx_routing_adj = 0;
-			}
-		}
 	}
-#endif
 
 	priv->ptp_clockcleaner_enable = of_property_read_bool(pdev->dev.of_node,
 							      "altr,has-ptp-clockcleaner");
@@ -1795,7 +1771,7 @@ static int intel_fpga_xtile_probe(struct platform_device *pdev)
 		dev_info(&pdev->dev, "cannot obtain MAC address using random HW address\n");
 		eth_hw_addr_random(ndev);
 	} else {
-		ether_addr_copy(ndev->dev_addr, macaddr);
+		dev_addr_set(ndev, macaddr);
 	}
 
 	/* initialize netdev */

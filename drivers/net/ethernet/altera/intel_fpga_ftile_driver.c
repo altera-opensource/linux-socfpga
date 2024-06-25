@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-2.0
 /* Intel FPGA E-tile Ethernet MAC driver
- * Copyright (C) 2022 Intel Corporation. All rights reserved
+ * Copyright (C) 2022, 2024 Intel Corporation. All rights reserved
  *
  * Contributors:
  *   Preetam Narayan
@@ -11,6 +11,7 @@
 #include <linux/phylink.h>
 #include "intel_fpga_eth_ftile.h"
 #include "intel_fpga_eth_hssi_itf.h"
+#include "intel_fpga_hssi_driver.h"
 #include <linux/interrupt.h>
 
 #define FTILE_EHIP_RESET_TO		10000 /* in us */
@@ -145,7 +146,7 @@ void ftile_update_mac_addr(intel_fpga_xtile_eth_private *priv)
 	u32 lsb;
 	u32 chan = priv->tile_chan;
 	struct platform_device *pdev = priv->pdev_hssi;
-	u8 *addr = priv->dev->dev_addr;
+	const u8 *addr = priv->dev->dev_addr;
 
 	lsb = (addr[2] << 24) | (addr[3] << 16) | (addr[4] << 8) | addr[5];
 	msb = ((addr[0] << 8) | addr[1]) & 0xffff;
@@ -1437,16 +1438,9 @@ static bool ftile_check_local_remote_fault_status(intel_fpga_xtile_eth_private *
 						HSSI_ETH_RECONFIG,
 						priv->tile_chan,
 						eth_soft_csroffs(link_fault_status));
-#if 0
-	if ((rx_mac_link_fault & ETH_RX_MAC_REMOTE_FAULT) ||
-	    (rx_mac_link_fault & ETH_RX_MAC_LOCAL_FAULT)) {
-		curr_link_state = false;
-	}
-#endif
 
-	if (rx_mac_link_fault & ETH_RX_MAC_REMOTE_FAULT) {
+	if (rx_mac_link_fault & ETH_RX_MAC_REMOTE_FAULT)
 		curr_link_state = false;
-	}
 
 	return curr_link_state;
 }
@@ -1460,33 +1454,33 @@ bool ftile_check_dts_param(intel_fpga_xtile_eth_private *priv)
 	pdev = to_platform_device(priv->device);
 	np = pdev->dev.of_node;
 
-        if (of_property_read_u16(np, "pma_type",
-                                 &priv->pma_type)) {
-                dev_warn(&pdev->dev, "cannot obtain pma type defaulting to be FGT\n");
-                priv->pma_type = 0;
-        }
+	if (of_property_read_u16(np, "pma_type",
+				 &priv->pma_type)) {
+		dev_warn(&pdev->dev, "cannot obtain pma type defaulting to be FGT\n");
+		priv->pma_type = 0;
+	}
 
-        if (priv->ptp_enable) {
-                /* PTP Timestamp Accuracy mode */
-                ret  = of_property_read_string(pdev->dev.of_node, "ptp_accu_mode",
-                                               &priv->ptp_accu_mode);
-                if (ret < 0)
-                        priv->ptp_accu_mode = "Basic";
+	if (priv->ptp_enable) {
+		/* PTP Timestamp Accuracy mode */
+		ret  = of_property_read_string(pdev->dev.of_node, "ptp_accu_mode",
+					       &priv->ptp_accu_mode);
+		if (ret < 0)
+			priv->ptp_accu_mode = "Basic";
 
-                if (strcasecmp(priv->ptp_accu_mode, "Advanced") == 0) {
-                        /* Tx Routing adjustment delay */
-                        if (of_property_read_u32(np, "ptp_tx_routing_adj",
-                                                 &priv->ptp_tx_routing_adj)) {
-                                priv->ptp_tx_routing_adj = 0;
-                        }
+		if (strcasecmp(priv->ptp_accu_mode, "Advanced") == 0) {
+			/* Tx Routing adjustment delay */
+			if (of_property_read_u32(np, "ptp_tx_routing_adj",
+						 &priv->ptp_tx_routing_adj)) {
+				priv->ptp_tx_routing_adj = 0;
+			}
 
-                        /* Rx Routing adjustment delay */
-                        if (of_property_read_u32(np, "ptp_rx_routing_adj",
-                                                 &priv->ptp_rx_routing_adj)) {
-                                priv->ptp_rx_routing_adj = 0;
-                        }
-                }
-        }
+			/* Rx Routing adjustment delay */
+			if (of_property_read_u32(np, "ptp_rx_routing_adj",
+						 &priv->ptp_rx_routing_adj)) {
+				priv->ptp_rx_routing_adj = 0;
+			}
+		}
+	}
 
 	return true;
 }

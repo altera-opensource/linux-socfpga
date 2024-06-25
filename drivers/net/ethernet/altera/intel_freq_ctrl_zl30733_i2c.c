@@ -183,25 +183,6 @@ void intel_freq_control_zl30733(struct work_struct *work)
 	//(void)i2c_zl30733_write_byte_data(i2c_cli, ZL30733_REG_DPLL_DF_OFFSET_0_0, data, 6);
 }
 
-static void zl30733_check_dpll(struct i2c_client *i2c_cli)
-{
-	u8 i = 1, buf; // DPLL1 is being used
-	int loop;
-	int ret = 0;
-
-	pr_info("%s: Wait for ZL30733 DPLL1 lock...\n", __func__);
-	for (loop = 0; loop < 10000; ++loop) {
-		ret = i2c_zl30733_read_byte_data(i2c_cli, ZL30733_REG_DPLL_MON_STATUS(i), &buf, 1);
-		if (ret == 0 && (buf & 0x1)) {
-			pr_info("ZL30733_REG_DPLL_MON_STATUS(%u): 0x%02x - OK, lock\n", i, buf);
-			return;
-		}
-		mdelay(10);
-	}
-	pr_err("%s: ZL30733_REG_DPLL_MON_STATUS(%u) : 0x%02x - FAIL, timeout waiting for lock\n",
-	       __func__, i, buf);
-}
-
 static int zl30733_dpll_nco_modeset(struct i2c_client *i2c_cli)
 {
 	u8 ctrl_val;
@@ -235,6 +216,41 @@ zl_ctrl_err:
 	return ret;
 }
 
+static void pll_lock_handler(struct work_struct *work)
+{
+	struct i2c_client *i2c_cli = NULL;
+	struct intel_freq_control_private *priv;
+	struct delayed_work *dwork;
+	int ret = FREQ_CTRL_ERROR_SUCCESS;
+	u8 pll_status;
+	u8 i = 1;
+
+	dwork = to_delayed_work(work);
+	priv = container_of(dwork, struct intel_freq_control_private, pll_lock_dwork);
+	i2c_cli = priv->fc_acc_type.i2c_cli;
+
+	ret = i2c_zl30733_read_byte_data(i2c_cli, ZL30733_REG_DPLL_MON_STATUS(i),
+					 &pll_status, sizeof(pll_status));
+	if (!ret && ZL30733_DPLL_IS_LOCKED(pll_status)) {
+		pr_info("ZL30733_REG_DPLL_MON_STATUS(%u): 0x%02x - OK, lock\n", i, pll_status);
+		zl30733_dpll_nco_modeset(i2c_cli);
+
+		return;
+	}
+
+	priv->pll_lock_check_ctr++;
+	if (priv->pll_lock_check_ctr < ZL30733_MAX_PLL_LOCK_CHECK_COUNTER) {
+		schedule_delayed_work(&priv->pll_lock_dwork,
+				      msecs_to_jiffies(ZL30733_LOCK_CHECK_INTERVAL_IN_MS));
+	} else {
+		pr_err("ZL30733_REG_DPLL_MON_STATUS(%u) : 0x%02x - FAIL, timeout waiting for lock\n",
+		       i, pll_status);
+		pr_err("Switching to OCXO clock\n");
+		zl30733_dpll_nco_modeset(i2c_cli);
+	}
+}
+
+
 int i2c_dev_check_zl30733_clock(struct intel_freq_control_private *priv)
 {
 	struct i2c_client *i2c_cli = NULL;
@@ -251,11 +267,14 @@ int i2c_dev_check_zl30733_clock(struct intel_freq_control_private *priv)
 			rdbuf[0], rdbuf[1]);
 
 		if (((rdbuf[0] << 8) | rdbuf[1]) == ZL30733_ID_VALUE) {
-			zl30733_check_dpll(i2c_cli);
-			zl30733_dpll_nco_modeset(i2c_cli);
 #ifdef CONFIG_DEBUG_FS
 			zl30733_dbgfs_init(i2c_cli);
 #endif
+			priv->pll_lock_check_ctr = 0;
+			INIT_DELAYED_WORK(&priv->pll_lock_dwork, pll_lock_handler);
+			schedule_delayed_work(&priv->pll_lock_dwork,
+					      msecs_to_jiffies(1));
+
 		}
 	}
 

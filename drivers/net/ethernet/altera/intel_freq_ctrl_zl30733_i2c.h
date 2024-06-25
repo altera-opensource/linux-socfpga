@@ -63,6 +63,9 @@
 #define ZL30733_DPLL_CHECK_NCO_MODE(x)  (((x) & ZL30733_DPLL_MODE_MASK) == ZL30733_DPLL_NCO_MODE)
 #define ZL30733_DPLL_SET_NCO_MODE(x)      (((x) & 0xf8) | ZL30733_DPLL_NCO_MODE)
 
+#define ZL30733_LOCK_CHECK_INTERVAL_IN_MS (500)
+#define ZL30733_DPLL_IS_LOCKED(data)      ((data) & 0x01)
+#define ZL30733_MAX_PLL_LOCK_CHECK_COUNTER      (200)
 int i2c_dev_check_zl30733_clock(struct intel_freq_control_private *priv);
 
 void intel_freq_control_zl30733(struct work_struct *work);

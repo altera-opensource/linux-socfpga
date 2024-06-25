@@ -40,10 +40,12 @@ ifeq ($(CONFIG_INTEL_FPGA_HSSISS),y)
         obj-$(CONFIG_INTEL_FPGA_HSSISS) += intel_fpga_hssi.o
         ifeq ($(CONFIG_DEBUG_FS),y)
                 intel_fpga_hssi-objs := intel_fpga_hssiss.o \
+					intel_fpga_hssi_driver.o \
 					intel_fpga_hssiss_debug.o \
 					intel_fpga_eth_hssi_itf.o
         else
                 intel_fpga_hssi-objs := intel_fpga_hssiss.o \
+					intel_fpga_hssi_driver.o \
 					intel_fpga_eth_hssi_itf.o
         endif
 endif

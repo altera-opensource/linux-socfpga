@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-2.0
 /* Intel FPGA E-tile Ethernet MAC driver
- * Copyright (C) 2022,2023 Intel Corporation. All rights reserved
+ * Copyright (C) 2022, 2024 Intel Corporation. All rights reserved
  *
  * Contributors:
  *   Preetam Narayan
@@ -10,6 +10,7 @@
 #include <linux/phylink.h>
 #include "intel_fpga_eth_etile.h"
 #include "intel_fpga_eth_hssi_itf.h"
+#include "intel_fpga_hssi_driver.h"
 #include <linux/interrupt.h>
 
 #define ETILE_EHIP_RESET_POLL_INTERVAL  5 /* in us */

@@ -599,7 +599,7 @@ int spi_dev_check_zl30793_clock(struct intel_freq_control_private *priv)
 	priv->pll_lock_check_ctr = 0;
 	INIT_DELAYED_WORK(&priv->pll_lock_dwork, pll_lock_handler);
 	schedule_delayed_work(&priv->pll_lock_dwork,
-			      msecs_to_jiffies(ZL30793_LOCK_CHECK_INTERVAL_IN_MS));
+			      msecs_to_jiffies(1));
 
 	ret = FREQ_CTRL_ERROR_SUCCESS;
 

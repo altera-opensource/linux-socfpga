@@ -1,122 +1,16 @@
-
 /* SPDX-License-Identifier: GPL-2.0 */
-/* Intel FPGA HSSI SS driver
- * Copyright (C) 2022 Intel Corporation. All rights reserved
+/* Intel FPGA HSSI SS interface driver
+ * Copyright (C) 2022, 2024 Intel Corporation. All rights reserved
  *
  * Contributors:
  *   Subhransu S. Prusty
+ *   Preetam Narayan
  */
 
 #ifndef __INTEL_FPGA_HSSISS_H__
 #define __INTEL_FPGA_HSSISS_H__
 
 #include <linux/io.h>
-/* Registers and macros */
-
-/*
- * csr_offset = value@csr_addr_offset + offset
- * for
- *    v0: csr addr offset = 0
- *    v5: read from feature_csr_addr register
- *
- * eth_port_sts = 0x68 + X (0x00 .. 0x0F)*4 + CSR_ADDROFF
- */
-#define HSSISS_CSR_VER				0x8
-#define HSSISS_CSR_COMMON_FEATURE_LIST		0xc
-/*Port attr For E-tile: 0x10 + x * 4 + CSR_ADDROFF */
-#define HSSISS_CSR_INTER_ATTRIB_PORT		0x10
-#define HSSISS_CSR_CMDSTS			0x50
-#define HSSISS_CSR_CTRLADDR			0x54
-#define HSSISS_CSR_RD_DATA			0x58
-#define HSSISS_CSR_WR_DATA			0x5C
-#define HSSISS_CSR_GMII_TX_LATENCY		0x60
-#define HSSISS_CSR_GMII_RX_LATENCY		0x64
-#define HSSISS_CSR_ETH_PORT_STS			0x68
-#define HSSISS_CSR_TSE_CTRL			0xa8
-#define HSSISS_CSR_DBG_CTRL			0xb0
-#define HSSISS_CSR_HOTPLUG_DBG_CTRL		0xb4
-#define HSSISS_CSR_HOTPLUG_DBG_STS		0xb8
-#define HSSISS_CSR_GENERAL_STATUS		0xbc
-
-/*F-tile specific */
-#define HSSISS_CSR_INTER_ATTRIB_PORT_FHT	0x300 /* + x * 4 */
-#define HSSISS_CSR_ETH_PORT_STS_FHT		0x200 /* + x * 4 */
-
-/* Ftile only: PFC offset + x * 4, read returns 0 if port doesn't exit */
-#define HSSISS_CSR_PFC_CTRL			0x400
-#define HSSISS_CSR_PFC_ERR_STS			0x450
-#define HSSISS_CSR_PFC_RX_PARSE_CFG		0x4A0
-
-/* Ftile only: ANLT: ANLTx = ANLT_BASE + x * RANGE */
-#define HSSISS_CSR_ANLT_BASE			0x10000
-#define HSSISS_CSR_ANLT_RANGE			0x400
-
-/* Ftile only: PTP tile adaptor */
-#define HSSISS_CSR_PTP_ASYMMETRY_BASE		0x20000
-#define HSSISS_CSR_PTP_ASYMMETRY_RANGE		0x20000
-#define HSSISS_CSR_PTP_PEER_TO_PEER_MPD		0x40000
-#define HSSISS_CSR_PTP_PEER_TO_PEER_MPD_RANGE	0x20000
-
-/* DFH */
-#define HSSISS_DFHLO_DFHV0_FEA_REV_MASK		GENMASK(15, 12)
-#define HSSISS_DFHLO_DFHV0_FEA_REV_SHIFT	12
-
-/* Command status bits */
-#define HSSI_SAL_CMDSTS_RD		BIT(0)
-#define HSSI_SAL_CMDSTS_WR		BIT(1)
-#define HSSI_SAL_CMDSTS_ACK		BIT(2)
-#define HSSI_SAL_CMDSTS_BUSY		BIT(3)
-#define HSSI_SAL_CMDSTS_ERR		BIT(4)
-#define HSSI_SAL_CMDSTS_REG_OFFS_MASK	GENMASK(6,5)
-#define HSSI_SAL_CMDSTS_REG_OFFS_SHIFT	5
-
-/* Control address bits */
-#define HSSI_SAL_CTRLADDR_SALCMD		0xFF
-#define HSSI_SAL_CTRLADDR_PORT_SHIFT		8
-#define HSSI_SAL_CTRLADDR_COUNTER_SHIFT		16
-#define HSSI_SAL_CTRLADDR_LSB_SHIFT		31
-#define HSSI_SAL_CTRLADDR_ADDRBITS_MASK		0xFFFFF
-#define HSSI_SAL_CTRLADDR_ADDRBITS_SHIFT	8
-#define HSSI_SAL_CTRLADDR_TX			BIT(16)
-#define HSSI_SAL_CTRLADDR_RX			BIT(17)
-
-/* Hotplug dbg ctrl and status */
-#define HSSI_HOTPLUG_DBG_STS_DISABLE_SHIFT	4
-
-/* Feature CSR v5 only */
-#define HSSISS_FEATURE_CSR_ADDR_MASK		GENMASK(31, 1)
-#define HSSISS_FEATURE_CSR_ADDR_SHIFT		1
-
-/* Bit index and mask */
-#define HSSI_SAL_RESET_MAC_STAT_TX	BIT(16)
-#define HSSI_SAL_RESET_MAC_STAT_RX	BIT(17)
-
-#define DR_GRP_INDEX	4
-#define HSSI_DR_GRP_MASK	GENMASK(6, 4)
-#define HSSI_DR_PROFILE_MASK	GENMASK(3, 0)
-
-#define HSSISS_VER_CSR_ADDR_MASK		GENMASK(31, 16)
-#define HSSISS_VER_CSR_ADDR_SHIFT		16
-
-/*
- * Bestcase: 100ns, max: 10ms, driver interval: 10us
- * For DR and enable/disable loopback SAL sequences, the whole operation might
- * take more than 10ms and timeout doesn't apply for these sequences, instead
- * polling method is implemeted where a polling counter is used to poll the DR
- * status and it will exit error when the polling counter expires.
- * <TODO>
- */
-#define FW_ACK_POLL_INTERVAL_US		10
-#define FW_ACK_POLL_TIMEOUT_US		10000
-
-/* CSR read/write macros */
-#define csrrd32_withoffset(base, csroff, offs) csrrd32(base, offs + csroff)
-#define csrwr32_withoffset(val, base, csroff, offs) \
-		csrwr32(val, base, offs + csroff)
-
-#define MASK(idx, nr) (((1 << nr) - 1) << ((idx + 1) - nr))
-#define test_reg_bits(val, idx, numbits) (val & MASK(idx, numbits))
-#define clear_reg_bits(val, idx, numbits) (val & ~(MASK(idx, numbits)))
 
 enum hssiss_salcmd {
 	SAL_NOP,
@@ -268,6 +162,7 @@ typedef union eth_port_attr {
 enum hssiss_hip_type {
 	HSSISS_ETILE = 1,
 	HSSISS_FTILE = 2,
+	HSSISS_TILE_INDEPENDENT = 3,
 };
 
 enum hssi_port_profile {
@@ -296,8 +191,7 @@ enum hssiss_tile_regbank {
 	HSSI_RSVD,
 };
 
-/*
- * data for get/set csr
+/* data for get/set csr
  * @offs: To hold address offset,
  */
 struct get_set_csr_data {
@@ -337,18 +231,17 @@ union hssiss_cmd_sts {
 	u32 full;
 };
 
-/*
- * misc bits in ctrl_addr:
+/* misc bits in ctrl_addr:
  *   for get_csr, set_csr
- *   	address bits[23:8]
+ *	address bits[23:8]
  *   for read_MAC_statistic
- *   	[20:16] - Counters
- *   	[30:21] - Reserved
- *   	[31:31] - LSB
+ *	[20:16] - Counters
+ *	[30:21] - Reserved
+ *	[31:31] - LSB
  *   for reset_MAC_statistic
- *   	[16:16] - TX
- *   	[17:17] - RX
- *   	[31:18] - Reserved
+ *	[16:16] - TX
+ *	[17:17] - RX
+ *	[31:18] - Reserved
  */
 union hssiss_ctrl_addr {
 	struct {
@@ -372,6 +265,7 @@ struct hssiss_csr_v5_only {
 	u32 feature_csr_size_lsb;		//0x20
 	u32 feature_csr_size_msb;		//0x24
 };
+
 #define feature_offs(x) (offsetof(struct hssiss_csr_v5_only, x))
 
 struct cold_reset_register {
@@ -391,6 +285,7 @@ struct hssiss_private {
 	/* HSSI SS CSR address space */
 	void __iomem *sscsr;
 
+	struct hssi_spec_ops *spec_ops;
 	/* private data */
 	unsigned int dfh_feature_rev;
 	unsigned int ver; /* 1: etile, 2: ftile */
@@ -399,8 +294,8 @@ struct hssiss_private {
 
 	struct mutex sal_mutex;
 	struct mutex coldrst_mutex;
-	atomic_t coldrst_inprogress;
-	spinlock_t sal_spinlock;
+	atomic_t coldrst_inprogress; /* checks if the cold reset has been performed */
+	spinlock_t sal_spinlock; /* spinlock used for the sal command access */
 	struct hssiss_sysfs_data sysfs;
 	struct cold_reset_register cold_rst_reg;
 	int hssi_err_wa;
@@ -410,19 +305,22 @@ struct hssiss_private {
 };
 
 int hssiss_execute_sal_cmd(struct platform_device *pdev,
-		enum hssiss_salcmd cmd, void *data);
+			   enum hssiss_salcmd cmd, void *data);
 int hssiss_execute_sal_cmd_atomic(struct platform_device *pdev,
-		enum hssiss_salcmd cmd, void *data);
-int hssiss_set_ethport_status(struct platform_device *pdev, int port, u32 data);
-hssi_eth_port_sts hssiss_get_ethport_status(struct platform_device *pdev, int port);
-hssi_eth_port_attr hssiss_get_ethport_attr(struct platform_device *pdev, int port);
-int hssiss_cold_rst(struct platform_device *pdev);
+				  enum hssiss_salcmd cmd, void *data);
 void hssiss_hotplug_enable(struct platform_device *pdev, bool enable);
+hssi_eth_port_attr hssiss_get_ethport_attr(struct platform_device *pdev, int port);
+hssi_eth_port_sts hssiss_get_ethport_status(struct platform_device *pdev, int port);
+int hssidrv_set_ethport_status(struct platform_device *pdev, int port, u32 data);
 enum hssiss_hip_type hssiss_get_hip_type(struct platform_device *pdev);
+hssi_eth_port_sts get_ethport_status(struct platform_device *pdev, int port);
+int set_ethport_status(struct platform_device *pdev, int port, u32 data);
+int hssiss_cold_rst(struct platform_device *pdev);
 
 #ifdef CONFIG_DEBUG_FS
 struct hssiss_dbg *hssiss_dbgfs_init(struct platform_device *pdev);
 void hssiss_dbgfs_remove(struct hssiss_dbg *d);
 #endif /* CONFIG_DEBUG_FS */
+
 #endif /* __INTEL_FPGA_HSSISS_H__ */
 
