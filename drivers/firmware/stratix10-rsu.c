@@ -41,6 +41,7 @@
 #define RSU_GET_SPT_CMD			0x5A
 #define RSU_GET_DEVICE_INFO_CMD		0x74
 #define RSU_GET_SPT_RESP_LEN		(4 * sizeof(unsigned int))
+#define RSU_GET_SPT_BUFFER_LEN		(round_up(RSU_GET_SPT_RESP_LEN, cache_line_size()))
 
 struct flash_device_info {
 	unsigned int size;
@@ -340,7 +341,7 @@ static void rsu_get_spt_callback(struct stratix10_svc_client *client,
 
 	if (priv->is_smmu_enabled) {
 		dma_unmap_single(client->dev, priv->rsu_dma_handle,
-			 RSU_GET_SPT_RESP_LEN, DMA_FROM_DEVICE);
+			 RSU_GET_SPT_BUFFER_LEN, DMA_FROM_DEVICE);
 			priv->rsu_dma_handle = 0;
 	}
 
@@ -1007,7 +1008,7 @@ static int stratix10_rsu_probe(struct platform_device *pdev)
 	}
 
 	priv->get_spt_response_buf =
-		stratix10_svc_allocate_memory(priv->chan, RSU_GET_SPT_RESP_LEN);
+		stratix10_svc_allocate_memory(priv->chan, RSU_GET_SPT_BUFFER_LEN);
 
 	if (IS_ERR(priv->get_spt_response_buf)) {
 		dev_err(dev, "failed to allocate get spt buffer\n");
@@ -1017,7 +1018,7 @@ static int stratix10_rsu_probe(struct platform_device *pdev)
 
 	if (priv->is_smmu_enabled) {
 		priv->rsu_dma_handle = dma_map_single(dev, priv->get_spt_response_buf,
-			 RSU_GET_SPT_RESP_LEN, DMA_FROM_DEVICE);
+			 RSU_GET_SPT_BUFFER_LEN, DMA_FROM_DEVICE);
 		ret = dma_mapping_error(dev, priv->rsu_dma_handle);
 		if (ret) {
 			dev_err(dev,
@@ -1034,7 +1035,7 @@ static int stratix10_rsu_probe(struct platform_device *pdev)
 		dev_err(dev, "Error, getting SPT table %i\n", ret);
 		if (priv->is_smmu_enabled) {
 			dma_unmap_single(dev, priv->rsu_dma_handle,
-				RSU_GET_SPT_RESP_LEN, DMA_FROM_DEVICE);
+				RSU_GET_SPT_BUFFER_LEN, DMA_FROM_DEVICE);
 			priv->rsu_dma_handle = 0;
 		}
 		stratix10_svc_free_memory(priv->chan, priv->get_spt_response_buf);
