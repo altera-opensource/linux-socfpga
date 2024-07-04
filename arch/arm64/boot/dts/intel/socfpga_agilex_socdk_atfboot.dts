@@ -1,0 +1,25 @@
+// SPDX-License-Identifier:     GPL-2.0
+/*
+ * Copyright (C) 2024, Intel Corporation
+ */
+#include "socfpga_agilex_socdk.dts"
+
+/ {
+	model = "SoCFPGA Agilex SoCDK";
+	compatible = "intel,socfpga-agilex-socdk", "intel,socfpga-agilex";
+
+	chosen {
+		stdout-path = "serial0:115200n8";
+		bootargs = "console=ttys0,115200 root=/dev/ram0 rw \
+		initrd=0x10000000 init=/sbin/init ramdisk_size=10000000 \
+		earlycon panic=-1 rootfstype=ext3";
+	};
+
+	memory {
+		device_type = "memory";
+		/* We expect the bootloader to fill in the reg */
+		reg = <0 0x00000000 0 0x80000000>;
+		#address-cells = <0x2>;
+		#size-cells = <0x2>;
+	};
+};
