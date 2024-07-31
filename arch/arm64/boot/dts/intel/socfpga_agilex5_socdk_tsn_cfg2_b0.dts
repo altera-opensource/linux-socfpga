@@ -1,0 +1,9 @@
+// SPDX-License-Identifier: GPL-2.0
+/*
+ * Copyright (c) 2025, Altera Corporation
+ */
+#include "socfpga_agilex5_socdk_b0.dts"
+
+&gmac1 {
+	status = "okay";
+};
