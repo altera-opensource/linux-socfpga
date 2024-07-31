@@ -665,6 +665,7 @@ static const struct file_operations altr_edac_a10_device_inject_fops __maybe_unu
 	.llseek = generic_file_llseek,
 };
 
+#if IS_ENABLED(CONFIG_EDAC_ALTERA_CRAM_SEU)
 static ssize_t __maybe_unused
 altr_edac_seu_trig(struct file *file, const char __user *user_buf,
 		   size_t count, loff_t *ppos);
@@ -675,6 +676,7 @@ altr_edac_cram_inject_fops __maybe_unused = {
 	.write = altr_edac_seu_trig,
 	.llseek = generic_file_llseek,
 };
+#endif
 
 #if IS_ENABLED(CONFIG_EDAC_ALTERA_SDM_QSPI)
 static ssize_t __maybe_unused
@@ -1488,6 +1490,7 @@ static const struct edac_device_prv_data a10_usbecc_data = {
 
 #endif	/* CONFIG_EDAC_ALTERA_USB */
 
+#if IS_ENABLED(CONFIG_EDAC_ALTERA_CRAM_SEU)
 static irqreturn_t seu_irq_handler(int irq, void *dev_id)
 {
 	struct altr_edac_device_dev *dci = dev_id;
@@ -1522,8 +1525,9 @@ altr_edac_seu_trig(struct file *file, const char __user *user_buf,
 
 	if (trig_type == ALTR_UE_TRIGGER_CHAR)
 		arm_smccc_smc(INTEL_SIP_SMC_SAFE_INJECT_SEU_ERR,
-			      SEU_SAFE_INJECT_DB_UE, 2, 0, 0, 0,
-			      0, 0, &result);
+			      ((uint64_t)SEU_SAFE_INJECT_DB_UE_MSB << 32) |
+			      SEU_SAFE_INJECT_DB_UE_LSB,
+			      2, 0, 0, 0, 0, 0, &result);
 	else
 		arm_smccc_smc(INTEL_SIP_SMC_SAFE_INJECT_SEU_ERR,
 			      SEU_SAFE_INJECT_SB_CE, 2, 0, 0, 0,
@@ -1531,6 +1535,7 @@ altr_edac_seu_trig(struct file *file, const char __user *user_buf,
 
 	return count;
 }
+#endif
 
 /********************** QSPI Device Functions **********************/
 
@@ -2077,6 +2082,7 @@ static int get_s10_sdram_edac_resource(struct device_node *np,
 	return ret;
 }
 
+#if IS_ENABLED(CONFIG_EDAC_ALTERA_CRAM_SEU)
 static int altr_edac_device_add(struct altr_arria10_edac *edac,
 				struct platform_device *pdev, char *ecc_name)
 {
@@ -2153,6 +2159,7 @@ err_release_group:
 
 	return rc;
 }
+#endif
 
 static int altr_edac_a10_device_add(struct altr_arria10_edac *edac,
 				    struct device_node *np)
@@ -2540,8 +2547,10 @@ static int altr_edac_a10_probe(struct platform_device *pdev)
 
 		if (of_match_node(altr_edac_a10_device_of_match, child))
 			altr_edac_a10_device_add(edac, child);
+#if IS_ENABLED(CONFIG_EDAC_ALTERA_CRAM_SEU)
 		else if (of_device_is_compatible(child, "altr,socfpga-cram-seu"))
 			altr_edac_device_add(edac, pdev, (char *)child->name);
+#endif
 
 #ifdef CONFIG_EDAC_ALTERA_SDRAM
 		else if (of_device_is_compatible(child, "altr,sdram-edac-a10"))
