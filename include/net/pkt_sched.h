@@ -244,10 +244,6 @@ struct tc_taprio_qopt_offload {
 	};
 };
 
-struct tc_preempt_qopt_offload {
-	u32 preemptible_queues;
-};
-
 #if IS_ENABLED(CONFIG_NET_SCH_TAPRIO)
 
 /* Reference counting */
