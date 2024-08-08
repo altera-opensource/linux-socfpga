@@ -67,7 +67,7 @@
 
 &gmac1 {
 	status = "disabled";
-	phy-mode = "rgmii";
+	phy-mode = "rgmii-id";
 	mac-mode = "gmii";
 	phy-handle = <&emac1_phy0>;
 
