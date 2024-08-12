@@ -156,38 +156,26 @@ static void etile_disable_mac_flow_ctrl(intel_fpga_xtile_eth_private *priv)
 	}
 }
 
+/* CAUTION: This function would be called in the context of link monitoring thread and
+ * in case of the failure it would be handled by the link monitoring thread by
+ * reiterating over until the condition passes. Avoid using while loop as it might
+ * delay the overall operation performance
+ */
 int etile_check_counter_complete(intel_fpga_xtile_eth_private *priv, u32 regbank,
 				 size_t offs, u8 bit_mask, bool set_bit, int align)
 {
-	int counter;
 	u32 chan = priv->tile_chan;
 	struct platform_device *pdev = priv->pdev_hssi;
 	(void)align;
-	counter = 0;
 
-	while (counter++ < INTEL_FPGA_XTILE_SW_RESET_WATCHDOG_CNTR) {
-		if (set_bit) {
-			if (hssi_bit_is_set(pdev, regbank, chan,
-					    offs, bit_mask))
-				break;
-		} else {
-			if (hssi_bit_is_clear(pdev, regbank, chan,
-					      offs, bit_mask))
-				break;
-		}
-		udelay(1);
-	}
-
-	if (counter >= INTEL_FPGA_XTILE_SW_RESET_WATCHDOG_CNTR) {
-		if (set_bit) {
-			if (hssi_bit_is_clear(pdev, regbank, chan,
-					      offs, bit_mask))
-				return -EINVAL;
-		} else {
-			if (hssi_bit_is_set(pdev, regbank, chan,
-					    offs, bit_mask))
-				return -EINVAL;
-		}
+	if (set_bit) {
+		if (hssi_bit_is_clear(pdev, regbank, chan,
+				      offs, bit_mask))
+			return -EINVAL;
+	} else {
+		if (hssi_bit_is_set(pdev, regbank, chan,
+				    offs, bit_mask))
+			return -EINVAL;
 	}
 
 	return 0;

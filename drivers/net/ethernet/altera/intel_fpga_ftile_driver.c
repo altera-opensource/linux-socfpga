@@ -343,39 +343,27 @@ static u32 get_gb_33_66_occupancy(const u32 speed, const u32 rvld_lsb, const u32
 	return 0;
 }
 
+/* CAUTION: This function would be called in the context of link monitoring thread and 
+ * in case of the failure it would be handled by the link monitoring thread by 
+ * reiterating over until the condition passes. Avoid using while loop as it might 
+ * delay the overall operation performance
+ */
 int ftile_check_counter_complete(intel_fpga_xtile_eth_private *priv, u32 regbank,
 				 size_t offs, u8 bit_mask, bool set_bit,
 				 int align)
 {
-	int counter;
 	u32 chan = priv->tile_chan;
 	struct platform_device *pdev = priv->pdev_hssi;
 	(void)align;
-	counter = 0;
 
-	while (counter++ < INTEL_FPGA_XTILE_SW_RESET_WATCHDOG_CNTR) {
-		if (set_bit) {
-			if (hssi_bit_is_set_ba(pdev, regbank, chan,
-					       offs, bit_mask))
-				break;
-		} else {
-			if (hssi_bit_is_clear_ba(pdev, regbank, chan,
-						 offs, bit_mask))
-				break;
-		}
-		udelay(1);
-	}
-
-	if (counter >= INTEL_FPGA_XTILE_SW_RESET_WATCHDOG_CNTR) {
-		if (set_bit) {
-			if (hssi_bit_is_clear_ba(pdev, regbank, chan,
-						 offs, bit_mask))
-				return -EINVAL;
-		} else {
-			if (hssi_bit_is_set_ba(pdev, regbank, chan,
-					       offs, bit_mask))
-				return -EINVAL;
-		}
+	if (set_bit) {
+		if (hssi_bit_is_clear_ba(pdev, regbank, chan,
+					 offs, bit_mask))
+			return -EINVAL;
+	} else {
+		if (hssi_bit_is_set_ba(pdev, regbank, chan,
+				       offs, bit_mask))
+			return -EINVAL;
 	}
 
 	return 0;
@@ -486,7 +474,7 @@ static int eth_ftile_tx_rx_user_flow(intel_fpga_xtile_eth_private *priv)
 	if (xtile_check_counter_complete(priv, HSSI_ETH_RECONFIG, eth_soft_csroffs(ptp_status),
 					 ETH_TX_PTP_OFFSET_DATA_VALID, true,
 					 INTEL_FPGA_WORD_ALIGN)) {
-		netdev_err(priv->dev, "MAC Tx datapath not ready\n");
+		netdev_err(priv->dev, "PTP Tx calculation data invalid\n");
 		return -EINVAL;
 	}
 
