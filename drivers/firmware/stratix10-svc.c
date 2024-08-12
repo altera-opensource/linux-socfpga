@@ -55,6 +55,8 @@
 #define BYTE_TO_WORD_SIZE				4
 #define IOMMU_LIMIT_ADDR			0x20000000
 #define IOMMU_STARTING_ADDR			0x0
+#define ENABLE_REMAPPER				false
+#define DISABLE_REMAPPER			true
 
 /* stratix10 service layer clients */
 #define STRATIX10_RSU				"stratix10-rsu"
@@ -1885,6 +1887,7 @@ static int stratix10_svc_drv_probe(struct platform_device *pdev)
 	struct stratix10_svc_sh_memory *sh_memory;
 	struct stratix10_svc *svc;
 	struct device_node *node = pdev->dev.of_node;
+	struct arm_smccc_res res;
 
 	svc_invoke_fn *invoke_fn;
 	size_t fifo_size;
@@ -1929,6 +1932,7 @@ static int stratix10_svc_drv_probe(struct platform_device *pdev)
 	controller->chans = chans;
 	controller->genpool = genpool;
 	controller->invoke_fn = invoke_fn;
+	controller->is_smmu_enabled = false;
 	controller->sdm_dma_addr_offset = 0x0;
 	init_completion(&controller->complete_status);
 
@@ -1970,6 +1974,15 @@ static int stratix10_svc_drv_probe(struct platform_device *pdev)
 			controller->carveout.limit = IOMMU_LIMIT_ADDR - PAGE_SIZE;
 		} else {
 			pr_debug("Intel Service Layer Driver: IOMMU Not Present\n");
+			ret = -ENODEV;
+			goto err_destroy_pool;
+		}
+
+		/* when controller->is_smmu_enabled is set to true the SDM remapper will be bypassed*/
+		controller->invoke_fn(INTEL_SIP_SMC_SDM_REMAPPER_CONFIG,
+				controller->is_smmu_enabled? DISABLE_REMAPPER: ENABLE_REMAPPER, 0, 0, 0, 0, 0, 0, &res);
+		if (res.a0 != INTEL_SIP_SMC_STATUS_OK) {
+			pr_info("Failed to configure remapper!\n");
 			ret = -ENODEV;
 			goto err_destroy_pool;
 		}
