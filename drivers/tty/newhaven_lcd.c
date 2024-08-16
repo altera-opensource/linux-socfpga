@@ -292,7 +292,7 @@ static void lcd_backspace(struct lcd *lcd_data)
 }
 
 static int lcd_write(struct tty_struct *tty, const unsigned char *buf,
-		     int count)
+		     unsigned int count)
 {
 	struct lcd *lcd_data = tty->driver_data;
 	int buf_i = 0, left;
@@ -489,8 +489,7 @@ static const struct tty_operations lcd_ops = {
 	.write_room      = lcd_write_room,
 };
 
-static int lcd_probe(struct i2c_client *client,
-			const struct i2c_device_id *i2c_id)
+static int lcd_probe(struct i2c_client *client)
 {
 	struct device_node *np = client->dev.of_node;
 	struct lcd *lcd_data;
