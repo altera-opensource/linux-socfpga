@@ -7,6 +7,8 @@
 
 &qspi {
 	status = "okay";
+	/delete-node/ flash@0;
+
 	flash@0 {
 		#address-cells = <1>;
 		#size-cells = <1>;
