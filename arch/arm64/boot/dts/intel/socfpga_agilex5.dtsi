@@ -363,6 +363,7 @@
 			iommus = <&smmu 8>;
 			snps,dma-40-bit-mask;
 			status = "okay";
+			dma-coherent;
 		};
 
 		dmac1: dma-controller@10dc0000 {
@@ -383,6 +384,7 @@
 			iommus = <&smmu 9>;
 			snps,dma-40-bit-mask;
 			status = "okay";
+			dma-coherent;
 		};
 
 		rst: rstmgr@10d11000 {
