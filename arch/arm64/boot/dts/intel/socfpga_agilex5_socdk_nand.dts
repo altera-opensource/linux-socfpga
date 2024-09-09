@@ -126,6 +126,10 @@
 	status = "okay";
 };
 
+&smmu {
+	status = "okay";
+};
+
 &temp_volt {
 	voltage {
 		#address-cells = <1>;
