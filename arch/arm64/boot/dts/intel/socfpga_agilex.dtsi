@@ -445,7 +445,7 @@
 			reg-io-width = <4>;
 			num-cs = <4>;
 			clocks = <&clkmgr AGILEX_L4_MAIN_CLK>;
-			dmas = <&dmac0 16>, <&dmac0 17>;
+			dmas = <&pdma 16>, <&pdma 17>;
 			dma-names ="tx", "rx";
 			status = "disabled";
 		};
@@ -461,7 +461,7 @@
 			reg-io-width = <4>;
 			num-cs = <4>;
 			clocks = <&clkmgr AGILEX_L4_MAIN_CLK>;
-			dmas = <&dmac0 20>, <&dmac0 21>;
+			dmas = <&pdma 20>, <&pdma 21>;
 			dma-names ="tx", "rx";
 			status = "disabled";
 		};
