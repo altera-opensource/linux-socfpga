@@ -335,6 +335,7 @@
 			cdns,board-delay-ps = <4830>;
 			iommus = <&smmu 4>;
 			status = "disabled";
+			dma-coherent;
 		};
 
 		ocram: sram@0 {
