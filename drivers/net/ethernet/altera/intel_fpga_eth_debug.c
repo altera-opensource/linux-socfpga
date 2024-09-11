@@ -18,6 +18,7 @@
 #include "intel_fpga_eth_tile_ops.h"
 #include "intel_fpga_eth_hssi_itf.h"
 #include "intel_freq_control.h"
+#include <linux/string.h>
 
 static void xtile_prefetcher_reg_dump_tx(struct altera_dma_private *priv)
 {
@@ -203,8 +204,10 @@ static ssize_t msgdma_reg_dump_show(struct device *dev,
 	struct platform_device *pdev = to_platform_device(dev);
 	struct net_device *ndev = platform_get_drvdata(pdev);
 	intel_fpga_xtile_eth_private *priv = netdev_priv(ndev);
+	int queue;
 
-	xtile_dma_regs(&priv->dma_priv);
+	for (queue = 0; queue < priv->num_channels; queue++)
+		xtile_dma_regs(&priv->dma_info[queue].dma_priv);
 
 	return sprintf(buf, "%x", 1);
 }
@@ -214,53 +217,89 @@ static ssize_t msgdma_tx_irq_show(struct device *dev, struct device_attribute *a
 	struct platform_device *pdev = to_platform_device(dev);
 	struct net_device *ndev = platform_get_drvdata(pdev);
 	intel_fpga_xtile_eth_private *priv = netdev_priv(ndev);
-	bool intr_state = priv->spec_ops->dma_ops->is_txirq_set(&priv->dma_priv);
+	bool intr_state;
+	int queue;
 
-	xtile_dispatcher_reg_dump_tx(&priv->dma_priv);
-	xtile_prefetcher_reg_dump_tx(&priv->dma_priv);
+	for (queue = 0; queue < priv->num_channels; queue++) {
+		intr_state = priv->spec_ops->dma_ops->is_txirq_set(&priv->dma_info[queue].dma_priv);
 
-	netdev_info(priv->dev,
-		    "TX Intr state - %x. Rx- %d Tx - %d Napi state: %d Cntr: %lld %lld %lld %lld",
-		    intr_state, priv->rx_irq_enabled, priv->tx_irq_enabled, priv->napi_state,
-		    priv->irq_rx_enable_cntr, priv->irq_tx_enable_cntr,
-		    priv->irq_rx_disable_cntr, priv->irq_tx_disable_cntr);
+		xtile_dispatcher_reg_dump_tx(&priv->dma_info[queue].dma_priv);
+		xtile_prefetcher_reg_dump_tx(&priv->dma_info[queue].dma_priv);
 
-	intr_state = priv->spec_ops->dma_ops->is_rxirq_set(&priv->dma_priv);
-	xtile_dispatcher_reg_dump_rx(&priv->dma_priv);
-	xtile_prefetcher_reg_dump_rx(&priv->dma_priv);
+		netdev_info(priv->dev,
+			    "TX Intr state - %x. Rx- %d Tx - %d Napi state: %d Cntr: %lld %lld %lld %lld",
+			    intr_state, priv->dma_info[queue].rx_irq_enabled,
+				priv->dma_info[queue].tx_irq_enabled,
+				priv->dma_info[queue].napi_state,
+			    priv->dma_info[queue].irq_rx_enable_cntr,
+				priv->dma_info[queue].irq_tx_enable_cntr,
+			    priv->dma_info[queue].irq_rx_disable_cntr,
+				priv->dma_info[queue].irq_tx_disable_cntr);
 
-	return sprintf(buf, "RX Intr state: %x", intr_state);
+		intr_state = priv->spec_ops->dma_ops->is_rxirq_set(&priv->dma_info[queue].dma_priv);
+		xtile_dispatcher_reg_dump_rx(&priv->dma_info[queue].dma_priv);
+		xtile_prefetcher_reg_dump_rx(&priv->dma_info[queue].dma_priv);
+
+		sprintf(buf, "RX Intr state: %x", intr_state);
+		netdev_info(priv->dev, "%s", buf);
+	}
+	return 1;
 }
 
-static ssize_t msgdma_tx_irq_modify(struct device *dev,
-				    struct device_attribute *attr,
-				    const char *buf, size_t len)
+static ssize_t msgdma_tx_irq_store(struct device *dev,
+				   struct device_attribute *attr,
+				   const char *buf, size_t len)
 {
 	struct platform_device *pdev = to_platform_device(dev);
 	struct net_device *ndev = platform_get_drvdata(pdev);
 	intel_fpga_xtile_eth_private *priv = netdev_priv(ndev);
-	int value;
-	int ret;
 	unsigned long flags;
 
-	ret = kstrtouint(buf, 10, &value);
-	if (ret < 0)
-		return ret;
+	int values[2];
+	int i = 0;
+	char *token;
+	char *input_copy;
+	char *delimiter = " ";
+	char *saveptr;
 
-	if (value == 0) {
-		priv->spec_ops->dma_ops->disable_txirq(&priv->dma_priv);
-		priv->spec_ops->dma_ops->clear_txirq(&priv->dma_priv);
-		disable_irq(priv->tx_irq);
-		netdev_info(priv->dev, "IRQ Disabled\n");
-	} else if (value == 1) {
-		enable_irq(priv->tx_irq);
-		spin_lock_irqsave(&priv->rxdma_irq_lock, flags);
-		priv->spec_ops->dma_ops->clear_txirq(&priv->dma_priv);
-		priv->spec_ops->dma_ops->enable_txirq(&priv->dma_priv);
-		spin_unlock_irqrestore(&priv->rxdma_irq_lock, flags);
-		netdev_info(priv->dev, "IRQ Enabled\n");
+	// Make a copy of the input string because strsep modifies the input
+	input_copy = kstrdup(buf, GFP_KERNEL);
+
+	if (!input_copy) {
+		netdev_info(priv->dev, "Failed to allocate memory for input copy\n");
+		return 0;
 	}
 
+	// Initialize saveptr to the copied input string
+	saveptr = input_copy;
+
+	// Tokenize the string using ',' as the delimiter
+	while ((token = strsep(&saveptr, delimiter)) != NULL) {
+		// Process each token as a number (assuming they are numeric strings)
+		if (kstrtoint(token, 10, &values[i]) == 0) {
+			// Successfully converted token to an integer
+		} else {
+			// Failed to convert token to an integer
+			netdev_info(priv->dev, "Invalid number: %s\n", token);
+		}
+		i++;
+	}
+
+	kfree(input_copy);  // Free the allocated memory
+
+	if (values[1] == 0) {
+		priv->spec_ops->dma_ops->disable_txirq(&priv->dma_info[values[0]].dma_priv);
+		priv->spec_ops->dma_ops->clear_txirq(&priv->dma_info[values[0]].dma_priv);
+		disable_irq(priv->dma_info[values[0]].tx_irq);
+		netdev_info(priv->dev, "IRQ Disabled\n");
+	} else if (values[1] == 1) {
+		enable_irq(priv->dma_info[values[0]].tx_irq);
+		spin_lock_irqsave(&priv->dma_info[values[0]].rxdma_irq_lock, flags);
+		priv->spec_ops->dma_ops->clear_txirq(&priv->dma_info[values[0]].dma_priv);
+		priv->spec_ops->dma_ops->enable_txirq(&priv->dma_info[values[0]].dma_priv);
+		spin_unlock_irqrestore(&priv->dma_info[values[0]].rxdma_irq_lock, flags);
+		netdev_info(priv->dev, "IRQ Enabled\n");
+	}
 	return 1;
 }
 
@@ -270,8 +309,10 @@ static ssize_t msgdma_tx_desc_dump_show(struct device *dev,
 	struct platform_device *pdev = to_platform_device(dev);
 	struct net_device *ndev = platform_get_drvdata(pdev);
 	intel_fpga_xtile_eth_private *priv = netdev_priv(ndev);
+	int queue;
 
-	xtile_unprocess_desc_tx(&priv->dma_priv);
+	for (queue = 0; queue < priv->num_channels; queue++)
+		xtile_unprocess_desc_tx(&priv->dma_info[queue].dma_priv);
 
 	return sprintf(buf, "%x", 1);
 }
@@ -376,7 +417,7 @@ static ssize_t eth_poll_monitoring_interval_store(struct device *dev,
 
 static DEVICE_ATTR(msgdma_reg_dump, 0644, msgdma_reg_dump_show, NULL);
 static DEVICE_ATTR(msgdma_tx_desc_dump, 0644, msgdma_tx_desc_dump_show, NULL);
-static DEVICE_ATTR(msgdma_tx_irq, 0644, msgdma_tx_irq_show, msgdma_tx_irq_modify);
+static DEVICE_ATTR(msgdma_tx_irq, 0644, msgdma_tx_irq_show, msgdma_tx_irq_store);
 static DEVICE_ATTR(link_state, 0644, link_state_show, NULL);
 static DEVICE_ATTR_RW(ui_interval);
 static DEVICE_ATTR(en_dis_sec_ip, 0644, NULL, en_dis_sec_ip_store);

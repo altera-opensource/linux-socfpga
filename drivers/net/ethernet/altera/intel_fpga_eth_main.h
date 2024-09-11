@@ -46,16 +46,17 @@
 #define INTEL_FPGA_WORD_ALIGN   32
 
 #define MOD_PARAM_PERM  0644
+#define MAX_DMA_CHANNELS 8
 
 /* Link Stability check */
 #define PRELOAD_LINK_STABILITY_COUNT 10
 
-typedef enum {
+enum {
 	ETH_LINK_STATE_RESET = 0,
 	ETH_LINK_STATE_START,
 	ETH_LINK_STATE_STOP,
 	ETH_LINK_STATE_RUN
-} xtile_eth_link_state;
+};
 
 enum {
 	NAPI_DISABLED,
@@ -63,7 +64,7 @@ enum {
 	NAPI_ENABLED_TXREADY,
 };
 
-typedef struct {
+typedef struct intel_fpga_xtile_eth_private {
 	const char *fec_type;
 	const char *ptp_accu_mode;
 	struct net_device *dev;
@@ -71,8 +72,8 @@ typedef struct {
 	struct phylink    *phylink;
 	struct xtile_spec_ops *spec_ops;
 	struct platform_device *pdev_hssi;
-	struct intel_fpga_rx_fifo __iomem *rx_fifo;
-	struct intel_fpga_rx_fifo __iomem *tx_fifo;
+	u32 num_channels;
+	struct intel_xtile_msgdma_info *dma_info;
 
 	u32 tile_chan;
 	u32 hssi_port;
@@ -108,7 +109,7 @@ typedef struct {
 	u8 qsfp_lane;
 	bool autoneg;
 	bool ptp_enable;
-	xtile_eth_link_state link_state;
+	u32 link_state;
 	bool cable_unplugged;
 	bool ui_enable;
 	bool monitor_thread_enable;

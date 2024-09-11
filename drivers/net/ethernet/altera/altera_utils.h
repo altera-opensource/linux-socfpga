@@ -19,6 +19,8 @@ int tse_bit_is_set(void __iomem *ioaddr, size_t offs, u32 bit_mask);
 int tse_bit_is_clear(void __iomem *ioaddr, size_t offs, u32 bit_mask);
 int request_and_map(struct platform_device *pdev, const char *name,
 		    struct resource **res, void __iomem **ptr);
+int request_and_map_node(struct platform_device *pdev, struct device_node *dmanp,
+			 const char *name, void __iomem **ptr);
 
 static inline
 u32 csrrd32(void __iomem *mac, size_t offs)

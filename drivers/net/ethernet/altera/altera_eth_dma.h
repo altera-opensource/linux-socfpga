@@ -108,6 +108,34 @@ struct altera_dma_resp {
 	u32 external_resp[4];
 };
 
+struct intel_xtile_msgdma_info {
+	void *priv;
+	int queue;
+	struct intel_fpga_rx_fifo __iomem *rx_fifo;
+	struct intel_fpga_rx_fifo __iomem *tx_fifo;
+
+	s32 tx_irq;
+	s32 rx_irq;
+	u32 tx_fifo_depth;
+	u32 rx_fifo_depth;
+	u32 rx_fifo_almost_full;
+	u32 rx_fifo_almost_empty;
+	u8 napi_state;
+	struct napi_struct napi;
+
+	bool tx_irq_enabled;
+	bool rx_irq_enabled;
+	u64 irq_tx_enable_cntr;
+	u64 irq_rx_enable_cntr;
+	u64 irq_tx_disable_cntr;
+	u64 irq_rx_disable_cntr;
+
+	spinlock_t tx_lock; /* tx packet flow synchronization */
+	spinlock_t rxdma_irq_lock; /*rx packet flow synchronization */
+
+	struct altera_dma_private dma_priv;
+};
+
 /* standard DMA interface for SGDMA and MSGDMA */
 struct altera_dmaops {
 	enum altera_dma_type altera_dtype;
@@ -137,5 +165,10 @@ struct altera_dmaops {
 int altera_eth_dma_probe(struct platform_device *pdev,
 			 struct altera_dma_private *priv,
 			 enum altera_dma_type type);
+
+int altera_eth_dma_node_probe(struct platform_device *pdev,
+			      struct device_node *dmanp,
+			      struct intel_xtile_msgdma_info *dmainfo,
+			      enum altera_dma_type type);
 
 #endif /* __ALTERA_ETH_DMA_H__ */
