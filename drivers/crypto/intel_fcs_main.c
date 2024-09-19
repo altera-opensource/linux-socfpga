@@ -95,6 +95,7 @@ struct socfpga_fcs_data {
 	bool have_hwrng;
 };
 
+static const char *platform;
 static char *source_ptr;
 
 typedef void (*fcs_callback)(struct stratix10_svc_client *client,
@@ -3730,6 +3731,9 @@ static int fcs_mmap(struct file *filp, struct vm_area_struct *vma)
 	unsigned long size, off;
 	struct page *page;
 
+	if (strncmp(platform, AGILEX_PLATFORM, AGILEX_PLATFORM_STR_LEN))
+		return -ENOTSUPP;
+
 	if (!source_ptr) {
 		pr_err("vmalloc failed mmap %s", __func__);
 		return -ENOMEM;
@@ -3762,7 +3766,6 @@ static int fcs_driver_probe(struct platform_device *pdev)
 	struct device *dev = &pdev->dev;
 	struct intel_fcs_priv *priv;
 	int ret, i;
-	const char *platform;
 	struct stratix10_svc_client_msg msg;
 	unsigned long off;
 	int l2_idx = SRC_BUFFER_STARTING_L2_IDX;
