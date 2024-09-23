@@ -376,23 +376,23 @@ static int soc64_hwmon_probe(struct platform_device *pdev)
 		return ret;
 	}
 
+	mutex_init(&priv->lock);
+
+	priv->chan = stratix10_svc_request_channel_byname(&priv->client,
+					SVC_CLIENT_HWMON);
+	if (IS_ERR(priv->chan)) {
+		dev_err(dev, "couldn't get service channel %s defering probe...\n",
+			SVC_CLIENT_HWMON);
+		return -EPROBE_DEFER;
+	}
+
 	dev_info(dev, "Initialized %d temperature and %d voltage channels",
 		priv->temperature_channels, priv->voltage_channels);
-
-	mutex_init(&priv->lock);
 
 	hwmon_dev = devm_hwmon_device_register_with_info(dev, "soc64hwmon",
 							 priv,
 							 &soc64_chip_info,
 							 NULL);
-
-	priv->chan = stratix10_svc_request_channel_byname(&priv->client,
-					SVC_CLIENT_HWMON);
-	if (IS_ERR(priv->chan)) {
-		dev_err(dev, "couldn't get service channel %s\n",
-			SVC_CLIENT_RSU);
-	return PTR_ERR(priv->chan);
-	}
 
 	init_completion(&priv->completion);
 	platform_set_drvdata(pdev, priv);
