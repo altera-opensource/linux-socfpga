@@ -1844,33 +1844,33 @@ int stratix10_svc_send(struct stratix10_svc_chan *chan, void *msg)
 		 chan->name, p_msg->payload, p_msg->command,
 		 (unsigned int)p_msg->payload_length);
 
-	if (list_empty(&svc_data_mem)) {
+	if (!list_empty(&svc_data_mem)) {
 		if (p_msg->command == COMMAND_RECONFIG) {
 			struct stratix10_svc_command_config_type *ct =
 				(struct stratix10_svc_command_config_type *)
 				p_msg->payload;
 			p_data->flag = ct->flags;
-		}
-	} else {
-		guard(mutex)(&svc_mem_lock);
-		list_for_each_entry(p_mem, &svc_data_mem, node)
-			if (p_mem->vaddr == p_msg->payload) {
-				p_data->paddr = p_mem->paddr;
-				p_data->size = p_msg->payload_length;
-				if(p_msg->command == COMMAND_RECONFIG_DATA_SUBMIT && chan->ctrl->is_smmu_enabled)
-					p_data->paddr += chan->ctrl->sdm_dma_addr_offset;
-			}
-		if (p_msg->payload_output) {
+		} else {
+			guard(mutex)(&svc_mem_lock);
 			list_for_each_entry(p_mem, &svc_data_mem, node)
-				if (p_mem->vaddr == p_msg->payload_output) {
-					p_data->paddr_output =
-						(p_msg->command == COMMAND_MBOX_SEND_CMD
-						&& chan->ctrl->is_smmu_enabled) ?
-						virt_to_phys(p_mem->vaddr) : p_mem->paddr;
-					p_data->size_output =
-						p_msg->payload_length_output;
-					break;
+				if (p_mem->vaddr == p_msg->payload) {
+					p_data->paddr = p_mem->paddr;
+					p_data->size = p_msg->payload_length;
+					if(p_msg->command == COMMAND_RECONFIG_DATA_SUBMIT && chan->ctrl->is_smmu_enabled)
+						p_data->paddr += chan->ctrl->sdm_dma_addr_offset;
 				}
+			if (p_msg->payload_output) {
+				list_for_each_entry(p_mem, &svc_data_mem, node)
+					if (p_mem->vaddr == p_msg->payload_output) {
+						p_data->paddr_output =
+							(p_msg->command == COMMAND_MBOX_SEND_CMD
+							&& chan->ctrl->is_smmu_enabled) ?
+							virt_to_phys(p_mem->vaddr) : p_mem->paddr;
+						p_data->size_output =
+							p_msg->payload_length_output;
+						break;
+					}
+			}
 		}
 	}
 
