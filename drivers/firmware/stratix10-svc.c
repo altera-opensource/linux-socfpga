@@ -2349,16 +2349,13 @@ int stratix10_svc_send(struct stratix10_svc_chan *chan, void *msg)
 		 chan->name, p_msg->payload, p_msg->command,
 		 (unsigned int)p_msg->payload_length);
 
-	if (list_empty(&svc_data_mem)) {
+	if (!list_empty(&svc_data_mem)) {
 		if (p_msg->command == COMMAND_RECONFIG) {
 			struct stratix10_svc_command_config_type *ct =
 				(struct stratix10_svc_command_config_type *)
 				p_msg->payload;
 			p_data->flag = ct->flags;
-		}
-	} else {
-		guard(mutex)(&svc_mem_lock);
-		if (p_msg->command == COMMAND_FCS_CRYPTO_AES_CRYPT_UPDATE_SMMU ||
+		} else if (p_msg->command == COMMAND_FCS_CRYPTO_AES_CRYPT_UPDATE_SMMU ||
 				p_msg->command == COMMAND_FCS_CRYPTO_AES_CRYPT_FINALIZE_SMMU){
 			src_addr = (phys_addr_t *)p_msg->payload;
 			p_data->paddr = *src_addr;
@@ -2393,6 +2390,7 @@ int stratix10_svc_send(struct stratix10_svc_chan *chan, void *msg)
 					break;
 				}
 		} else {
+			guard(mutex)(&svc_mem_lock);
 			list_for_each_entry(p_mem, &svc_data_mem, node)
 				if (p_mem->vaddr == p_msg->payload) {
 					p_data->paddr = p_mem->paddr;
