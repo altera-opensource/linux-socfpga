@@ -25,6 +25,12 @@
 			alignment = <0x1000>;
 			no-map;
 		};
+                service_reserved1: svcbuffer@1 {
+                        compatible = "shared-dma-pool";
+                        reg = <0x0 0x7F000000 0x0 0x7FFFFFFF>;
+                        alignment = <0x1000>;
+                        no-map;
+                };
 	};
 
 	cpus {

@@ -41,34 +41,6 @@
 		/* We expect the bootloader to fill in the reg */
 		reg = <0 0 0 0>;
 	};
-
-	/*reserved-memory {
-          #address-cells = <1>;
-          #size-cells = <1>;
-          ranges;*/
-          /* global autoconfigured region for contiguous allocations */
-          /*linux,cma {
-              compatible = "shared-dma-pool";
-              reusable;
-              size = <0x200000>;
-              alignment = <0x2000>;
-              linux,cma-default;
-          };*/
-
-	/* current allocation is 2 MB from 0x7F00_0000 to 0x7F1F_FFFF
-	*  these allocaiton will change when we add more TXEs and standardize on 
-	*  the space every TXE needs
-	*/
-         /* display_reserved: framebuffer@7F000000 {
-              reg = <0x7F000000 0x100000>;
-          };
-
-          restricted_dma_reserved: restricted-dma-pool@FF1000000 {
-              compatible = "restricted-dma-pool";
-              reg = <0x7F100000 0x100000>;
-          };
-      };*/
-
 };
 
 &gpio1 {
