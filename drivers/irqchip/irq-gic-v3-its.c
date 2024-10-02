@@ -55,6 +55,7 @@
 #define RD_LOCAL_MEMRESERVE_DONE                BIT(2)
 
 static u32 lpi_id_bits;
+static bool dma_32bit_flag;
 
 /*
  * We allocate memory for PROPBASE to cover 2 ^ lpi_id_bits LPIs to
@@ -2388,6 +2389,7 @@ static int its_setup_baser(struct its_node *its, struct its_baser *baser,
 	u32 alloc_pages, psz;
 	struct page *page;
 	void *base;
+	gfp_t flags = GFP_KERNEL | __GFP_ZERO;
 
 	psz = baser->psz;
 	alloc_pages = (PAGE_ORDER_TO_SIZE(order) / psz);
@@ -2399,7 +2401,10 @@ static int its_setup_baser(struct its_node *its, struct its_baser *baser,
 		order = get_order(GITS_BASER_PAGES_MAX * psz);
 	}
 
-	page = its_alloc_pages_node(its->numa_node, GFP_KERNEL | __GFP_ZERO, order);
+	if (dma_32bit_flag)
+		flags |= GFP_DMA32;
+
+	page = its_alloc_pages_node(its->numa_node, flags, order);
 	if (!page)
 		return -ENOMEM;
 
@@ -3372,6 +3377,7 @@ static bool its_alloc_table_entry(struct its_node *its,
 	struct page *page;
 	u32 esz, idx;
 	__le64 *table;
+	gfp_t flags = GFP_KERNEL | __GFP_ZERO;
 
 	/* Don't allow device id that exceeds single, flat table limit */
 	esz = GITS_BASER_ENTRY_SIZE(baser->val);
@@ -3385,10 +3391,13 @@ static bool its_alloc_table_entry(struct its_node *its,
 
 	table = baser->base;
 
+	if (dma_32bit_flag)
+		flags |= GFP_DMA32;
+
 	/* Allocate memory for 2nd level table */
 	if (!table[idx]) {
-		page = its_alloc_pages_node(its->numa_node, GFP_KERNEL | __GFP_ZERO,
-					    get_order(baser->psz));
+		page = its_alloc_pages_node(its->numa_node, flags,
+					get_order(baser->psz));
 		if (!page)
 			return false;
 
@@ -5232,8 +5241,11 @@ static int __init its_probe_one(struct its_node *its)
 	struct page *page;
 	u32 ctlr;
 	int err;
+	gfp_t flags = GFP_KERNEL | __GFP_ZERO;
 
 	its_enable_quirks(its);
+	if (dma_32bit_flag)
+		flags |= GFP_DMA32;
 
 	if (is_v4(its)) {
 		if (!(its->typer & GITS_TYPER_VMOVP)) {
@@ -5265,9 +5277,8 @@ static int __init its_probe_one(struct its_node *its)
 		}
 	}
 
-	page = its_alloc_pages_node(its->numa_node,
-				    GFP_KERNEL | __GFP_ZERO,
-				    get_order(ITS_CMD_QUEUE_SZ));
+	page = its_alloc_pages_node(its->numa_node, flags,
+				get_order(ITS_CMD_QUEUE_SZ));
 	if (!page) {
 		err = -ENOMEM;
 		goto out_unmap_sgir;
@@ -5582,6 +5593,8 @@ static int __init its_of_probe(struct device_node *node)
 			continue;
 		}
 
+		if (of_property_read_bool(np, "dma-32bit-quirk"))
+			dma_32bit_flag = true;
 
 		its = its_node_init(&res, &np->fwnode, of_node_to_nid(np));
 		if (!its)
@@ -5816,6 +5829,7 @@ int __init its_init(struct fwnode_handle *handle, struct rdists *rdists,
 	bool has_v4 = false;
 	bool has_v4_1 = false;
 	int err;
+	dma_32bit_flag = false;
 
 	itt_pool = gen_pool_create(get_order(ITS_ITT_ALIGN), -1);
 	if (!itt_pool)
