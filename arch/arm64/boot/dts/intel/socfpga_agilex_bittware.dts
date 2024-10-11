@@ -183,6 +183,9 @@
 
 /*&pcie_0_pcie_aglx {
 	status = "okay";
-	compatible = "altr,pcie-root-port-3.0-f-tile";
-};*/
+	compatible = "altr,pcie-root-port-3.0-f-tile";*/
+	/* interrupts = <0 0 0>; */
+/*	interrupts = <32 IRQ_TYPE_LEVEL_HIGH>;
+	interupt_parent = <&intc>; */
+/*};*/
 

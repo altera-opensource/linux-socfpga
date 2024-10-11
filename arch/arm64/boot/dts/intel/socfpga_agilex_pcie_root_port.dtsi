@@ -27,6 +27,7 @@
 			interrupt-controller;
 			#interrupt-cells = <0x1>;
 			device_type = "pci";
+			max-link-speed = <2>; /* MM addded */
 			bus-range = <0x0000000 0x000000ff>;
 			ranges = <0x82000000 0x00000000 0x00100000 0x00000000 0x10000000 0x00000000 0x0ff00000>;
 			msi-parent = <&pcie_0_msi_irq>;
