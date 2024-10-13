@@ -2320,8 +2320,7 @@ int nvme_enable_ctrl(struct nvme_ctrl *ctrl)
 	if (ret)
 		return ret;
 	return nvme_wait_ready(ctrl, NVME_CSTS_RDY, NVME_CSTS_RDY,
-			       (timeout + 1) * 2, "initialisation");
-/*MM : PATCH                          (timeout + 1) / 2, "initialisation"); */
+				(timeout + 1) / 2, "initialisation");
 }
 EXPORT_SYMBOL_GPL(nvme_enable_ctrl);
 
