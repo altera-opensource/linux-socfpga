@@ -138,8 +138,8 @@
 			qsfp-lane = <0x0>;
 			altr,has-ptp;
 			ptp_accu_mode = "Advanced";
-			ptp_tx_routing_adj = <53726>; //0.8198 * 65536
-			ptp_rx_routing_adj = <57697>; //0.8804 * 65536
+			ptp_tx_routing_adj = <52101>; //0.795 * 65536
+			ptp_rx_routing_adj = <51236>; //0.7818 * 65536
 			status = "okay";
 			ui-adj-interval = <250>;
 			num_channels = <3>;
