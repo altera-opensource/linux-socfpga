@@ -1948,8 +1948,10 @@ static int intel_fpga_xtile_probe(struct platform_device *pdev)
 	 * "max-frame-size" parameter is actually max mtu. Definition
 	 * in the ePAPR v1.1 spec and usage differ, so go with usage.
 	 */
-	of_property_read_u32(pdev->dev.of_node, "max-frame-size",
-			     &priv->dev->max_mtu);
+	if (of_property_read_u32(pdev->dev.of_node, "max-frame-size",
+				&priv->dev->max_mtu)) {
+		dev_warn(&pdev->dev, "Not able to get max-frame-size. Defaulting max_mtu to %d\n", priv->dev->max_mtu);
+	}
 
 	/* The DMA buffer size already accounts for an alignment bias
 	 * to avoid unaligned access exceptions for the NIOS processor,

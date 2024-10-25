@@ -69,7 +69,7 @@ int request_and_map_node(struct platform_device *pdev, struct device_node *dmanp
 	int ret = 0;
 	struct resource *region;
 	struct device *device = &pdev->dev;
-	struct resource res;
+	struct resource res={0};
 
 	// Find the property by name
 	int index = of_property_match_string(dmanp, "reg-names", name);
