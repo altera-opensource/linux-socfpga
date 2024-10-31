@@ -1910,6 +1910,44 @@ INTEL_SIP_SMC_FAST_CALL_VAL(INTEL_SIP_SMC_FUNCID_FPGA_CONFIG_COMPLETED_WRITE)
 	INTEL_SIP_SMC_FAST_CALL_VAL(INTEL_SIP_SMC_FUNCID_SDM_REMAPPER_CONFIG)
 
 /**
+ * Request ALTERA_SIP_SMC_ASYNC_HWMON_READTEMP
+ * Async call to request temperature
+ *
+ * Call register usage:
+ * a0 ALTERA_SIP_SMC_ASYNC_FUNCID_HWMON_READTEMP
+ * a1 transaction job id
+ * a2 Temperature Channel
+ * a3-a17 not used
+ *
+ * Return status
+ * a0 INTEL_SIP_SMC_STATUS_OK ,INTEL_SIP_SMC_STATUS_REJECTED
+ * or INTEL_SIP_SMC_STATUS_BUSY
+ * a1-a17 not used
+ */
+#define ALTERA_SIP_SMC_ASYNC_FUNCID_HWMON_READTEMP (0xE8)
+#define ALTERA_SIP_SMC_ASYNC_HWMON_READTEMP \
+	ALTERA_SIP_SMC_ASYNC_VAL(ALTERA_SIP_SMC_ASYNC_FUNCID_HWMON_READTEMP)
+
+/**
+ * Request ALTERA_SIP_SMC_ASYNC_HWMON_READVOLT
+ * Async call to request voltage
+ *
+ * Call register usage:
+ * a0 ALTERA_SIP_SMC_ASYNC_HWMON_READVOLT
+ * a1 transaction job id
+ * a2 Voltage Channel
+ * a3-a17 not used
+ *
+ * Return status
+ * a0 INTEL_SIP_SMC_STATUS_OK ,INTEL_SIP_SMC_STATUS_REJECTED
+ * or INTEL_SIP_SMC_STATUS_BUSY
+ * a1-17 not used
+ */
+#define ALTERA_SIP_SMC_ASYNC_FUNCID_HWMON_READVOLT (0xE9)
+#define ALTERA_SIP_SMC_ASYNC_HWMON_READVOLT \
+	ALTERA_SIP_SMC_ASYNC_VAL(ALTERA_SIP_SMC_ASYNC_FUNCID_HWMON_READVOLT)
+
+/**
  * Request ALTERA_SIP_SMC_ASYNC_POLL
  * Async call used by service driver at EL1 to query QSPI device info from FW
  *
