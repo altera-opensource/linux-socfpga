@@ -37,6 +37,8 @@ Optional properties:
 The svc node has the following optional properties, must be located under
 the firmware node.
 
+- interrupts: specifies the interrupt number for mailbox doorbell interrupt.
+
 - altr,smmu_enable_quirk: set when SMMU is enabled for the platform.
 
 Example:
@@ -60,5 +62,6 @@ Example:
 			compatible = "intel,stratix10-svc";
 			method = "smc";
 			memory-region = <&service_reserved>;
+                        interrupts = <GIC_SPI 0 IRQ_TYPE_LEVEL_HIGH>;
 		};
 	};
