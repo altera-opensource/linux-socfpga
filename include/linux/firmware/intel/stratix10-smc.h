@@ -1,6 +1,6 @@
 /* SPDX-License-Identifier: GPL-2.0 */
 /*
- * Copyright (C) 2017-2018, Intel Corporation
+ * Copyright (C) 2017-2024, Intel Corporation
  */
 
 #ifndef __STRATIX10_SMC_H
@@ -46,6 +46,10 @@
 #define INTEL_SIP_SMC_FAST_CALL_VAL(func_num) \
 	ARM_SMCCC_CALL_VAL(ARM_SMCCC_FAST_CALL, ARM_SMCCC_SMC_64, \
 	ARM_SMCCC_OWNER_SIP, (func_num))
+
+#define ALTERA_SIP_SMC_ASYNC_VAL(func_name)	\
+	ARM_SMCCC_CALL_VAL(ARM_SMCCC_STD_CALL, ARM_SMCCC_SMC_64, \
+	ARM_SMCCC_OWNER_SIP, (func_name))
 
 /**
  * Return values in INTEL_SIP_SMC_* call
@@ -1888,7 +1892,7 @@ INTEL_SIP_SMC_FAST_CALL_VAL(INTEL_SIP_SMC_FUNCID_FPGA_CONFIG_COMPLETED_WRITE)
 
 /**
  * Request INTEL_SIP_SMC_SDM_REMAPPER_CONFIG
- *
+*
  * Sync call to configure SDM remapper
  *
  * Call register usage:
@@ -1905,4 +1909,23 @@ INTEL_SIP_SMC_FAST_CALL_VAL(INTEL_SIP_SMC_FUNCID_FPGA_CONFIG_COMPLETED_WRITE)
 #define INTEL_SIP_SMC_SDM_REMAPPER_CONFIG \
 	INTEL_SIP_SMC_FAST_CALL_VAL(INTEL_SIP_SMC_FUNCID_SDM_REMAPPER_CONFIG)
 
+/**
+ * Request ALTERA_SIP_SMC_ASYNC_POLL
+ * Async call used by service driver at EL1 to query QSPI device info from FW
+ *
+ * Call register usage:
+ * a0 ALTERA_SIP_SMC_ASYNC_POLL
+ * a1 transaction job id
+ * a2-17 will be used to return the response data
+ *
+ * Return status
+ * a0 INTEL_SIP_SMC_STATUS_OK
+ * a1-17 will contain the response values from mailbox for the previous send transaction
+ * Or
+ * a0 INTEL_SIP_SMC_STATUS_NO_RESPONSE
+ * a1-17 not used
+ */
+#define ALTERA_SIP_SMC_ASYNC_FUNC_ID_POLL (0xC8)
+#define ALTERA_SIP_SMC_ASYNC_POLL \
+	ALTERA_SIP_SMC_ASYNC_VAL(ALTERA_SIP_SMC_ASYNC_FUNC_ID_POLL)
 #endif
