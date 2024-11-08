@@ -1928,4 +1928,25 @@ INTEL_SIP_SMC_FAST_CALL_VAL(INTEL_SIP_SMC_FUNCID_FPGA_CONFIG_COMPLETED_WRITE)
 #define ALTERA_SIP_SMC_ASYNC_FUNC_ID_POLL (0xC8)
 #define ALTERA_SIP_SMC_ASYNC_POLL \
 	ALTERA_SIP_SMC_ASYNC_VAL(ALTERA_SIP_SMC_ASYNC_FUNC_ID_POLL)
+
+/**
+ * Request ALTERA_SIP_SMC_ASYNC_POLL_ON_IRQ
+ * Async call used by service driver at EL1 to query QSPI device info from FW
+ *
+ * Call register usage:
+ * a0 ALTERA_SIP_SMC_ASYNC_POLL_ON_IRQ
+ * a1 transaction job id
+ * a2-7 will be used to return the response data
+ *
+ * Return status
+ * a0 INTEL_SIP_SMC_STATUS_OK
+ * a1-a4 will contain bitmap of available responses's transaction id as set bit position.
+ * a5-17 not used
+ * Or
+ * a0 INTEL_SIP_SMC_STATUS_NO_RESPONSE
+ * a1-17 not used
+ */
+#define ALTERA_SIP_SMC_ASYNC_FUNC_ID_IRQ_POLL (0xC9)
+#define ALTERA_SIP_SMC_ASYNC_POLL_ON_IRQ \
+	ALTERA_SIP_SMC_ASYNC_VAL(ALTERA_SIP_SMC_ASYNC_FUNC_ID_IRQ_POLL)
 #endif
