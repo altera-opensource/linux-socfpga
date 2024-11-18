@@ -2337,8 +2337,7 @@ static inline void stratix10_smc_1_2(struct stratix10_async_ctrl *actrl,
 	t0 = ktime_get();
 	arm_smccc_1_2_smc(args, res);
 	t1 = ktime_get();
-	dev_err(ctrl->dev, "Duration is %lld ns res->a0=0x%016lx\n",
-		ktime_to_ns(ktime_sub(t1, t0)), res->a0);
+	dev_dbg(ctrl->dev, "Duration is %lld ns", ktime_to_ns(ktime_sub(t1, t0)));
 	dev_dbg(ctrl->dev, "res->a0=0x%016lx", res->a0);
 	dev_dbg(ctrl->dev, "res->a1=0x%016lx, res->a2=0x%016lx,", res->a1, res->a2);
 	dev_dbg(ctrl->dev, "res->a3=0x%016lx, res->a4=0x%016lx,", res->a3, res->a4);
