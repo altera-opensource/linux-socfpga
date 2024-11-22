@@ -163,9 +163,80 @@ struct stratix10_svc_chan;
  * @COMMAND_HWMON_READVOLT: query the voltage from the hardware monitor,
  * return status is SVC_STATUS_OK or SVC_STATUS_ERROR
  *
+ * @COMMAND_FCS_CRYPTO_CREATE_KEY: create the crypto service key object,
+ * return status is SVC_STATUS_OK or SVC_STATUS_ERROR
+ *
+ * @COMMAND_FCS_CRYPTO_GET_DIGEST (INIT and FINALIZE): request the SHA-2
+ * hash digest on a data block, return status is SVC_STATUS_OK or
+ * SVC_STATUS_ERROR
+ *
+ * @COMMAND_FCS_CRYPTO_MAC_VERIFY (INIT and FINALIZE): check the integrity
+ * and authenticity of a blob, return status is SVC_STATUS_OK or
+ * SVC_STATUS_ERROR
+ *
+ * @COMMAND_FCS_CRYPTO_ECDSA_HASH_SIGNING (INIT and FINALIZE): send
+ * digital signature signing request on a data blob, return status is
+ * SVC_STATUS_OK or SVC_STATUS_ERROR
+ *
+ * @COMMAND_FCS_CRYPTO_ECDSA_SHA2_DATA_SIGNING (INIT and FINALIZE): send
+ * SHA2 digital signature signing request on a data blob, return status is
+ * SVC_STATUS_OK or SVC_STATUS_ERROR
+ *
+ * @COMMAND_FCS_CRYPTO_ECDSA_HASH_VERIFY (INIT and FINALIZE): send
+ * digital signature verify request with precalculated hash, return status is
+ * SVC_STATUS_OK or SVC_STATUS_ERROR
+ *
+ * @COMMAND_FCS_CRYPTO_ECDSA_SHA2_VERIFY (INIT and FINALIZE): send digital
+ * signature verify request, return status is SVC_STATUS_OK or
+ * SVC_STATUS_ERROR
+ *
+ * @COMMAND_FCS_CRYPTO_ECDSA_GET_PUBLIC_KEY (INIT and FINALIZE): send the
+ * request to get the public key, return status is SVC_STATUS_OK or
+ * SVC_STATUS_ERROR
+ *
  * @COMMAND_FCS_CRYPTO_ECDH_REQUEST (INIT and FINALIZE): send the request
  * on generating a share secret on Diffie-Hellman key exchange, return
  * status is SVC_STATUS_OK or SVC_STATUS_ERROR
+ *
+ * @COMMAND_POLL_SERVICE_STATUS_ASYNC: poll if the async service request is
+ * complete, return status is SVC_STATUS_OK, SVC_STATUS_ERROR or SVC_STATUS_BUSY
+ *
+ * @COMMAND_FCS_CRYPTO_HKDF_REQUEST: performs HKDF extract or expand with
+ * input key and data, the output key will be placed in key vault, return
+ * status is SVC_STATUS_OK or SVC_STATUS_ERROR
+ *
+ * @COMMAND_FCS_RANDOM_NUMBER_GEN_EXT: extend random number generation,
+ * return status is SVC_STATUS_OK or SVC_STATUS_ERROR
+ *
+ * @COMMAND_FCS_CRYPTO_GET_DEVICE_IDENTITY: send the request to get the
+ * device identity, return status is SVC_STATUS_OK or SVC_STATUS_ERROR
+ *
+ * @COMMAND_FCS_MCTP_SEND: send the MCTP message, return status is
+ * SVC_STATUS_OK or SVC_STATUS_ERROR
+ *
+ * @COMMAND_GET_IDCODE: get the device's IDCODE, return status is
+ * SVC_STATUS_OK or SVC_STATUS_ERROR
+ *
+ * @COMMAND_QSPI_OPEN: open the QSPI proxy, return status is
+ * SVC_STATUS_OK or SVC_STATUS_ERROR
+ *
+ * @COMMAND_QSPI_CLOSE: close the QSPI proxy, return status is
+ * SVC_STATUS_OK or SVC_STATUS_ERROR
+ *
+ * @COMMAND_QSPI_SET_CS: set the QSPI proxy chip select, return status is
+ * SVC_STATUS_OK or SVC_STATUS_ERROR
+ *
+ * @COMMAND_QSPI_READ: read from the QSPI proxy, return status is
+ * SVC_STATUS_OK or SVC_STATUS_ERROR
+ *
+ * @COMMAND_QSPI_WRITE: write to the QSPI proxy, return status is
+ * SVC_STATUS_OK or SVC_STATUS_ERROR
+ *
+ * @COMMAND_QSPI_ERASE: erase the QSPI proxy, return status is
+ * SVC_STATUS_OK or SVC_STATUS_ERROR
+ *
+ * @
+ *
  */
 enum stratix10_svc_command_code {
 	/* for FPGA */
@@ -194,16 +265,50 @@ enum stratix10_svc_command_code {
 	COMMAND_FCS_RANDOM_NUMBER_GEN,
 	/* for general status poll */
 	COMMAND_POLL_SERVICE_STATUS = 40,
+	COMMAND_POLL_SERVICE_STATUS_ASYNC,
 	COMMAND_FCS_CRYPTO_ECDH_REQUEST_INIT = 50,
 	COMMAND_FCS_CRYPTO_ECDH_REQUEST_FINALIZE,
+	COMMAND_FCS_CRYPTO_HKDF_REQUEST,
+	COMMAND_FCS_RANDOM_NUMBER_GEN_EXT,
+	COMMAND_FCS_CRYPTO_CREATE_KEY,
+	COMMAND_FCS_CRYPTO_AES_CRYPT_UPDATE,
+	COMMAND_FCS_CRYPTO_GET_DIGEST_INIT,
+	COMMAND_FCS_CRYPTO_GET_DIGEST_UPDATE,
+	COMMAND_FCS_CRYPTO_GET_DIGEST_FINALIZE,
+	COMMAND_FCS_CRYPTO_MAC_VERIFY_INIT,
+	COMMAND_FCS_CRYPTO_MAC_VERIFY_UPDATE,
+	COMMAND_FCS_CRYPTO_MAC_VERIFY_FINALIZE,
+	COMMAND_FCS_CRYPTO_ECDSA_HASH_SIGNING_INIT,
+	COMMAND_FCS_CRYPTO_ECDSA_HASH_SIGNING_FINALIZE,
+	COMMAND_FCS_CRYPTO_ECDSA_SHA2_DATA_SIGNING_INIT,
+	COMMAND_FCS_CRYPTO_ECDSA_SHA2_DATA_SIGNING_UPDATE,
+	COMMAND_FCS_CRYPTO_ECDSA_SHA2_DATA_SIGNING_FINALIZE,
+	COMMAND_FCS_CRYPTO_ECDSA_HASH_VERIFY_INIT,
+	COMMAND_FCS_CRYPTO_ECDSA_HASH_VERIFY_FINALIZE,
+	COMMAND_FCS_CRYPTO_ECDSA_SHA2_VERIFY_INIT,
+	COMMAND_FCS_CRYPTO_ECDSA_SHA2_VERIFY_UPDATE,
+	COMMAND_FCS_CRYPTO_ECDSA_SHA2_VERIFY_FINALIZE,
+	COMMAND_FCS_CRYPTO_ECDSA_GET_PUBLIC_KEY_INIT,
+	COMMAND_FCS_CRYPTO_ECDSA_GET_PUBLIC_KEY_FINALIZE,
 	COMMAND_FCS_SDOS_DATA_EXT,
+	COMMAND_FCS_CRYPTO_GET_DEVICE_IDENTITY,
+	COMMAND_FCS_MCTP_SEND,
 	/* for generic mailbox send command */
 	COMMAND_MBOX_SEND_CMD = 100,
 	/* Non-mailbox SMC Call */
 	COMMAND_SMC_SVC_VERSION = 200,
 	/* for HWMON */
 	COMMAND_HWMON_READTEMP,
-	COMMAND_HWMON_READVOLT
+	COMMAND_HWMON_READVOLT,
+	/*for Device identity*/
+	COMMAND_GET_IDCODE,
+	/*for QSPI proxy commands via SDM*/
+	COMMAND_QSPI_OPEN,
+	COMMAND_QSPI_CLOSE,
+	COMMAND_QSPI_SET_CS,
+	COMMAND_QSPI_READ,
+	COMMAND_QSPI_WRITE,
+	COMMAND_QSPI_ERASE
 };
 
 /**
