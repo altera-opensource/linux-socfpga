@@ -1946,6 +1946,7 @@ int stratix10_svc_async_send(struct stratix10_svc_chan *chan, void *msg,
 	struct stratix10_async_ctrl *actrl;
 	struct stratix10_async_chan *achan;
 	int ret = 0;
+	struct stratix10_svc_data_mem *pmem = NULL;
 
 	if (!chan || !msg || !handler)
 		return -EINVAL;
@@ -2006,6 +2007,378 @@ int stratix10_svc_async_send(struct stratix10_svc_chan *chan, void *msg,
 		args.a0 = INTEL_SIP_SMC_ASYNC_HWMON_READVOLT;
 		args.a2 = p_msg->arg[0];
 		break;
+	case COMMAND_FCS_CRYPTO_OPEN_SESSION:
+		args.a0 = INTEL_SIP_SMC_ASYNC_FCS_OPEN_CS_SESSION;
+		break;
+	case COMMAND_FCS_CRYPTO_CLOSE_SESSION:
+		args.a0 = INTEL_SIP_SMC_ASYNC_FCS_CLOSE_CS_SESSION;
+		args.a2 = p_msg->arg[0];
+		break;
+	case COMMAND_FCS_CRYPTO_IMPORT_KEY:
+		args.a0 = INTEL_SIP_SMC_ASYNC_FCS_IMPORT_CS_KEY;
+		args.a2 = (unsigned long)virt_to_phys(p_msg->payload);
+		args.a3 = (unsigned long)p_msg->payload_length;
+		break;
+	case COMMAND_FCS_CRYPTO_EXPORT_KEY:
+		args.a0 = INTEL_SIP_SMC_ASYNC_FCS_EXPORT_CS_KEY;
+		args.a2 = p_msg->arg[0];
+		args.a3 = p_msg->arg[1];
+		args.a4 = (unsigned long)virt_to_phys(p_msg->payload_output);
+		args.a5 = (unsigned long)p_msg->payload_length_output;
+		break;
+	case COMMAND_FCS_CRYPTO_REMOVE_KEY:
+		args.a0 = INTEL_SIP_SMC_ASYNC_FCS_REMOVE_CS_KEY;
+		args.a2 = p_msg->arg[0];
+		args.a3 = p_msg->arg[1];
+		break;
+	case COMMAND_FCS_CRYPTO_GET_KEY_INFO:
+		args.a0 = INTEL_SIP_SMC_ASYNC_FCS_GET_CS_KEY_INFO;
+		args.a2 = p_msg->arg[0];
+		args.a3 = p_msg->arg[1];
+		args.a4 = (unsigned long)virt_to_phys(p_msg->payload_output);
+		args.a5 = (unsigned long)p_msg->payload_length_output;
+		break;
+	case COMMAND_FCS_RANDOM_NUMBER_GEN_EXT:
+		args.a0 = INTEL_SIP_SMC_ASYNC_FCS_RANDOM_NUMBER_EXT;
+		args.a2 = p_msg->arg[0];
+		args.a3 = p_msg->arg[1];
+		args.a4 = (unsigned long)virt_to_phys(p_msg->payload_output);
+		args.a5 = (unsigned long)p_msg->payload_length_output;
+		break;
+	case COMMAND_FCS_GET_PROVISION_DATA:
+		args.a0 = INTEL_SIP_SMC_ASYNC_FCS_GET_PROVISION_DATA;
+		args.a2 = (unsigned long)virt_to_phys(p_msg->payload_output);
+		args.a3 = (unsigned long)p_msg->payload_length_output;
+		break;
+	case COMMAND_FCS_SEND_CERTIFICATE:
+		args.a0 = INTEL_SIP_SMC_ASYNC_FCS_SEND_CERTIFICATE;
+		args.a2 = (unsigned long)virt_to_phys(p_msg->payload);
+		args.a3 = (unsigned long)p_msg->payload_length;
+		break;
+	case COMMAND_FCS_COUNTER_SET_PREAUTHORIZED:
+		args.a0 = INTEL_SIP_SMC_ASYNC_FCS_CNTR_SET_PREAUTH;
+		args.a2 = p_msg->arg[0];
+		args.a3 = p_msg->arg[1];
+		args.a4 = p_msg->arg[2];
+		break;
+	case COMMAND_FCS_CRYPTO_HKDF_REQUEST:
+		args.a0 = INTEL_SIP_SMC_ASYNC_FCS_HKDF_REQUEST;
+		args.a2 = p_msg->arg[0];
+		args.a3 = p_msg->arg[1];
+		args.a4 = p_msg->arg[2];
+		args.a5 = (unsigned long)virt_to_phys(p_msg->payload);
+		args.a6 = p_msg->arg[3];
+		args.a7 = (unsigned long)virt_to_phys(p_msg->payload_output);
+		args.a8 = (unsigned long)p_msg->payload_length_output;
+		break;
+	case COMMAND_FCS_CRYPTO_CREATE_KEY:
+		args.a0 = INTEL_SIP_SMC_ASYNC_FCS_CREATE_CRYPTO_SERVICE_KEY;
+		args.a2 = (unsigned long)virt_to_phys(p_msg->payload);
+		args.a3 = (unsigned long)p_msg->payload_length;
+		break;
+	case COMMAND_GET_IDCODE:
+		args.a0 = INTEL_SIP_SMC_ASYNC_GET_IDCODE;
+		break;
+	case COMMAND_FCS_CRYPTO_GET_DEVICE_IDENTITY:
+		args.a0 = INTEL_SIP_SMC_ASYNC_GET_DEVICE_IDENTITY;
+		args.a2 = (unsigned long)virt_to_phys(p_msg->payload_output);
+		args.a3 = (unsigned long)p_msg->payload_length_output;
+		break;
+	case COMMAND_QSPI_OPEN:
+		args.a0 = INTEL_SIP_SMC_ASYNC_QSPI_OPEN;
+		break;
+	case COMMAND_QSPI_CLOSE:
+		args.a0 = INTEL_SIP_SMC_ASYNC_QSPI_CLOSE;
+		break;
+	case COMMAND_QSPI_SET_CS:
+		args.a0 = INTEL_SIP_SMC_ASYNC_QSPI_SET_CS;
+		args.a2 = p_msg->arg[0];
+		args.a3 = p_msg->arg[1];
+		args.a4 = p_msg->arg[2];
+		break;
+	case COMMAND_QSPI_READ:
+		args.a0 = INTEL_SIP_SMC_ASYNC_QSPI_READ;
+		args.a2 = p_msg->arg[0];
+		args.a3 = (unsigned long)virt_to_phys(p_msg->payload_output);
+		args.a4 = (unsigned long)p_msg->payload_length_output;
+		break;
+	case COMMAND_QSPI_WRITE:
+		args.a0 = INTEL_SIP_SMC_ASYNC_QSPI_WRITE;
+		args.a2 = (unsigned long)virt_to_phys(p_msg->payload);
+		args.a3 = (unsigned long)p_msg->payload_length;
+		break;
+	case COMMAND_QSPI_ERASE:
+		args.a0 = INTEL_SIP_SMC_ASYNC_QSPI_ERASE;
+		args.a2 = p_msg->arg[0];
+		args.a3 = p_msg->arg[1];
+		break;
+	case COMMAND_FCS_MCTP_SEND:
+		args.a0 = INTEL_SIP_SMC_ASYNC_FCS_MCTP;
+		args.a2 = (unsigned long)virt_to_phys(p_msg->payload);
+		args.a3 = (unsigned long)p_msg->payload_length;
+		args.a4 = (unsigned long)virt_to_phys(p_msg->payload_output);
+		args.a5 = (unsigned long)p_msg->payload_length_output;
+		break;
+	case COMMAND_FCS_CRYPTO_GET_DIGEST_INIT:
+		args.a0 = INTEL_SIP_SMC_ASYNC_FCS_GET_DIGEST_INIT;
+		args.a2 = p_msg->arg[0];
+		args.a3 = p_msg->arg[1];
+		args.a4 = p_msg->arg[2];
+		args.a5 = p_msg->arg[3];
+		args.a6 = p_msg->arg[4];
+		break;
+	case COMMAND_FCS_CRYPTO_GET_DIGEST_UPDATE:
+		args.a0 = INTEL_SIP_SMC_ASYNC_FCS_GET_DIGEST_UPDATE;
+		args.a2 = p_msg->arg[0];
+		args.a3 = p_msg->arg[1];
+		args.a4 = (unsigned long)virt_to_phys(p_msg->payload);
+		args.a5 = p_msg->payload_length;
+		args.a6 = (unsigned long)virt_to_phys(p_msg->payload_output);
+		args.a7 = p_msg->payload_length_output;
+		pmem = stratix10_get_memobj(p_msg->payload);
+		args.a8 = (pmem && ctrl->is_smmu_enabled) ? pmem->paddr : 0;
+		break;
+	case COMMAND_FCS_CRYPTO_GET_DIGEST_FINALIZE:
+		args.a0 = INTEL_SIP_SMC_ASYNC_FCS_GET_DIGEST_FINALIZE;
+		args.a2 = p_msg->arg[0];
+		args.a3 = p_msg->arg[1];
+		args.a4 = (unsigned long)virt_to_phys(p_msg->payload);
+		args.a5 = p_msg->payload_length;
+		args.a6 = (unsigned long)virt_to_phys(p_msg->payload_output);
+		args.a7 = p_msg->payload_length_output;
+		pmem = stratix10_get_memobj(p_msg->payload);
+		args.a8 = (pmem && ctrl->is_smmu_enabled) ? pmem->paddr : 0;
+		break;
+	case COMMAND_FCS_CRYPTO_MAC_VERIFY_INIT:
+		args.a0 = INTEL_SIP_SMC_ASYNC_FCS_MAC_VERIFY_INIT;
+		args.a2 = p_msg->arg[0];
+		args.a3 = p_msg->arg[1];
+		args.a4 = p_msg->arg[2];
+		args.a5 = p_msg->arg[3];
+		args.a6 = p_msg->arg[4];
+		break;
+	case COMMAND_FCS_CRYPTO_MAC_VERIFY_UPDATE:
+		args.a0 = INTEL_SIP_SMC_ASYNC_FCS_MAC_VERIFY_UPDATE;
+		args.a2 = p_msg->arg[0];
+		args.a3 = p_msg->arg[1];
+		args.a4 = (unsigned long)virt_to_phys(p_msg->payload);
+		args.a5 = p_msg->payload_length;
+		args.a6 = (unsigned long)virt_to_phys(p_msg->payload_output);
+		args.a7 = p_msg->payload_length_output;
+		args.a8 = p_msg->arg[2];
+		pmem = stratix10_get_memobj(p_msg->payload);
+		args.a9 = (pmem && ctrl->is_smmu_enabled) ? pmem->paddr : 0;
+		break;
+	case COMMAND_FCS_CRYPTO_MAC_VERIFY_FINALIZE:
+		args.a0 = INTEL_SIP_SMC_ASYNC_FCS_MAC_VERIFY_FINALIZE;
+		args.a2 = p_msg->arg[0];
+		args.a3 = p_msg->arg[1];
+		args.a4 = (unsigned long)virt_to_phys(p_msg->payload);
+		args.a5 = p_msg->payload_length;
+		args.a6 = (unsigned long)virt_to_phys(p_msg->payload_output);
+		args.a7 = p_msg->payload_length_output;
+		args.a8 = p_msg->arg[2];
+		pmem = stratix10_get_memobj(p_msg->payload);
+		args.a9 = (pmem && ctrl->is_smmu_enabled) ? pmem->paddr : 0;
+		break;
+	case COMMAND_FCS_CRYPTO_AES_CRYPT_INIT:
+		args.a0 = INTEL_SIP_SMC_ASYNC_FCS_AES_CRYPT_INIT;
+		args.a2 = p_msg->arg[0];
+		args.a3 = p_msg->arg[1];
+		args.a4 = p_msg->arg[2];
+		args.a5 = (unsigned long)virt_to_phys(p_msg->payload);
+		args.a6 = p_msg->payload_length;
+		break;
+	case COMMAND_FCS_CRYPTO_AES_CRYPT_UPDATE:
+		args.a0 = INTEL_SIP_SMC_ASYNC_FCS_AES_CRYPT_UPDATE;
+		args.a2 = p_msg->arg[0];
+		args.a3 = p_msg->arg[1];
+		args.a4 = (unsigned long)virt_to_phys(p_msg->payload);
+		args.a5 = p_msg->payload_length;
+		args.a6 = (unsigned long)virt_to_phys(p_msg->payload_output);
+		args.a7 = p_msg->payload_length_output;
+		args.a8 = p_msg->arg[2];
+		pmem = stratix10_get_memobj(p_msg->payload);
+		args.a9 = (pmem && ctrl->is_smmu_enabled) ? pmem->paddr : 0;
+		pmem = stratix10_get_memobj(p_msg->payload_output);
+		args.a10 = (pmem && ctrl->is_smmu_enabled) ? pmem->paddr : 0;
+		break;
+	case COMMAND_FCS_CRYPTO_AES_CRYPT_FINALIZE:
+		args.a0 = INTEL_SIP_SMC_ASYNC_FCS_AES_CRYPT_FINALIZE;
+		args.a2 = p_msg->arg[0];
+		args.a3 = p_msg->arg[1];
+		args.a4 = (unsigned long)virt_to_phys(p_msg->payload);
+		args.a5 = p_msg->payload_length;
+		args.a6 = (unsigned long)virt_to_phys(p_msg->payload_output);
+		args.a7 = p_msg->payload_length_output;
+		args.a8 = p_msg->arg[2];
+		pmem = stratix10_get_memobj(p_msg->payload);
+		args.a9 = (pmem && ctrl->is_smmu_enabled) ? pmem->paddr : 0;
+		pmem = stratix10_get_memobj(p_msg->payload_output);
+		args.a10 = (pmem && ctrl->is_smmu_enabled) ? pmem->paddr : 0;
+		break;
+	case COMMAND_FCS_GET_CHIP_ID:
+		args.a0 = INTEL_SIP_SMC_ASYNC_FCS_CHIP_ID;
+		break;
+	case COMMAND_FCS_ATTESTATION_CERTIFICATE:
+		args.a0 = INTEL_SIP_SMC_ASYNC_FCS_GET_ATTESTATION_CERT;
+		args.a2 = p_msg->arg[0];
+		args.a3 = (unsigned long)virt_to_phys(p_msg->payload_output);
+		args.a4 = (unsigned long)p_msg->payload_length_output;
+		break;
+	case COMMAND_FCS_ATTESTATION_CERTIFICATE_RELOAD:
+		args.a0 = INTEL_SIP_SMC_ASYNC_FCS_CREATE_CERT_ON_RELOAD;
+		args.a2 = p_msg->arg[0];
+		break;
+	case COMMAND_FCS_SDOS_DATA_EXT:
+		args.a0 = INTEL_SIP_SMC_ASYNC_FCS_CRYPTION_EXT;
+		args.a2 = p_msg->arg[0];
+		args.a3 = p_msg->arg[1];
+		args.a4 = p_msg->arg[2];
+		args.a5 = (unsigned long)virt_to_phys(p_msg->payload);
+		args.a6 = p_msg->payload_length;
+		args.a7 = (unsigned long)virt_to_phys(p_msg->payload_output);
+		args.a8 = p_msg->payload_length_output;
+		args.a9 = p_msg->arg[3];
+		pmem = stratix10_get_memobj(p_msg->payload);
+		args.a10 = (pmem && ctrl->is_smmu_enabled) ? pmem->paddr : 0;
+		pmem = stratix10_get_memobj(p_msg->payload_output);
+		args.a11 = (pmem && ctrl->is_smmu_enabled) ? pmem->paddr : 0;
+		break;
+	case COMMAND_FCS_CRYPTO_ECDSA_GET_PUBLIC_KEY_INIT:
+		args.a0 = INTEL_SIP_SMC_ASYNC_FCS_ECDSA_GET_PUBKEY_INIT;
+		args.a2 = p_msg->arg[0];
+		args.a3 = p_msg->arg[1];
+		args.a4 = p_msg->arg[2];
+		args.a5 = p_msg->arg[3];
+		args.a6 = p_msg->arg[4];
+		break;
+	case COMMAND_FCS_CRYPTO_ECDSA_GET_PUBLIC_KEY_FINALIZE:
+		args.a0 = INTEL_SIP_SMC_ASYNC_FCS_ECDSA_GET_PUBKEY_FINALIZE;
+		args.a2 = p_msg->arg[0];
+		args.a3 = p_msg->arg[1];
+		args.a4 = (unsigned long)virt_to_phys(p_msg->payload_output);
+		args.a5 = p_msg->payload_length_output;
+		break;
+	case COMMAND_FCS_CRYPTO_ECDH_REQUEST_INIT:
+		args.a0 = INTEL_SIP_SMC_ASYNC_FCS_ECDH_REQUEST_INIT;
+		args.a2 = p_msg->arg[0];
+		args.a3 = p_msg->arg[1];
+		args.a4 = p_msg->arg[2];
+		args.a5 = p_msg->arg[3];
+		args.a6 = p_msg->arg[4];
+		break;
+	case COMMAND_FCS_CRYPTO_ECDH_REQUEST_FINALIZE:
+		args.a0 = INTEL_SIP_SMC_ASYNC_FCS_ECDH_REQUEST_FINALIZE;
+		args.a2 = p_msg->arg[0];
+		args.a3 = p_msg->arg[1];
+		args.a4 = (unsigned long)virt_to_phys(p_msg->payload);
+		args.a5 = p_msg->payload_length;
+		args.a6 = (unsigned long)virt_to_phys(p_msg->payload_output);
+		args.a7 = p_msg->payload_length_output;
+		break;
+	case COMMAND_FCS_CRYPTO_ECDSA_HASH_VERIFY_INIT:
+		args.a0 = INTEL_SIP_SMC_ASYNC_FCS_ECDSA_HASH_SIG_VERIFY_INIT;
+		args.a2 = p_msg->arg[0];
+		args.a3 = p_msg->arg[1];
+		args.a4 = p_msg->arg[2];
+		args.a5 = p_msg->arg[3];
+		args.a6 = p_msg->arg[4];
+		break;
+	case COMMAND_FCS_CRYPTO_ECDSA_HASH_VERIFY_FINALIZE:
+		args.a0 = INTEL_SIP_SMC_ASYNC_FCS_ECDSA_HASH_SIG_VERIFY_FINALIZE;
+		args.a2 = p_msg->arg[0];
+		args.a3 = p_msg->arg[1];
+		args.a4 = (unsigned long)virt_to_phys(p_msg->payload);
+		args.a5 = p_msg->payload_length;
+		args.a6 = (unsigned long)virt_to_phys(p_msg->payload_output);
+		args.a7 = p_msg->payload_length_output;
+		break;
+	case COMMAND_FCS_CRYPTO_ECDSA_SHA2_VERIFY_INIT:
+		args.a0 = INTEL_SIP_SMC_ASYNC_FCS_ECDSA_SHA2_DATA_SIG_VERIFY_INIT;
+		args.a2 = p_msg->arg[0];
+		args.a3 = p_msg->arg[1];
+		args.a4 = p_msg->arg[2];
+		args.a5 = p_msg->arg[3];
+		args.a6 = p_msg->arg[4];
+		break;
+	case COMMAND_FCS_CRYPTO_ECDSA_SHA2_VERIFY_UPDATE:
+		args.a0 = INTEL_SIP_SMC_ASYNC_FCS_ECDSA_SHA2_DATA_SIG_VERIFY_UPDATE;
+		args.a2 = p_msg->arg[0];
+		args.a3 = p_msg->arg[1];
+		args.a4 = (unsigned long)virt_to_phys(p_msg->payload);
+		args.a5 = p_msg->payload_length;
+		args.a6 = (unsigned long)virt_to_phys(p_msg->payload_output);
+		args.a7 = p_msg->payload_length_output;
+		args.a8 = p_msg->arg[2];
+		pmem = stratix10_get_memobj(p_msg->payload);
+		args.a9 = (pmem && ctrl->is_smmu_enabled) ? pmem->paddr : 0;
+		break;
+	case COMMAND_FCS_CRYPTO_ECDSA_SHA2_VERIFY_FINALIZE:
+		args.a0 = INTEL_SIP_SMC_ASYNC_FCS_ECDSA_SHA2_DATA_SIG_VERIFY_FINALIZE;
+		args.a2 = p_msg->arg[0];
+		args.a3 = p_msg->arg[1];
+		args.a4 = (unsigned long)virt_to_phys(p_msg->payload);
+		args.a5 = p_msg->payload_length;
+		args.a6 = (unsigned long)virt_to_phys(p_msg->payload_output);
+		args.a7 = p_msg->payload_length_output;
+		args.a8 = p_msg->arg[2];
+		pmem = stratix10_get_memobj(p_msg->payload);
+		args.a9 = (pmem && ctrl->is_smmu_enabled) ? pmem->paddr : 0;
+		break;
+	case COMMAND_FCS_CRYPTO_ECDSA_HASH_SIGNING_INIT:
+		args.a0 = INTEL_SIP_SMC_ASYNC_FCS_ECDSA_HASH_SIGN_INIT;
+		args.a2 = p_msg->arg[0];
+		args.a3 = p_msg->arg[1];
+		args.a4 = p_msg->arg[2];
+		args.a5 = p_msg->arg[3];
+		args.a6 = p_msg->arg[4];
+		break;
+	case COMMAND_FCS_CRYPTO_ECDSA_HASH_SIGNING_FINALIZE:
+		args.a0 = INTEL_SIP_SMC_ASYNC_FCS_ECDSA_HASH_SIGN_FINALIZE;
+		args.a2 = p_msg->arg[0];
+		args.a3 = p_msg->arg[1];
+		args.a4 = (unsigned long)virt_to_phys(p_msg->payload);
+		args.a5 = p_msg->payload_length;
+		args.a6 = (unsigned long)virt_to_phys(p_msg->payload_output);
+		args.a7 = p_msg->payload_length_output;
+		break;
+	case COMMAND_FCS_CRYPTO_ECDSA_SHA2_DATA_SIGNING_INIT:
+		args.a0 = INTEL_SIP_SMC_ASYNC_FCS_ECDSA_SHA2_DATA_SIGN_INIT;
+		args.a2 = p_msg->arg[0];
+		args.a3 = p_msg->arg[1];
+		args.a4 = p_msg->arg[2];
+		args.a5 = p_msg->arg[3];
+		args.a6 = p_msg->arg[4];
+		break;
+	case COMMAND_FCS_CRYPTO_ECDSA_SHA2_DATA_SIGNING_UPDATE:
+		args.a0 = INTEL_SIP_SMC_ASYNC_FCS_ECDSA_SHA2_DATA_SIGN_UPDATE;
+		args.a2 = p_msg->arg[0];
+		args.a3 = p_msg->arg[1];
+		args.a4 = (unsigned long)virt_to_phys(p_msg->payload);
+		args.a5 = p_msg->payload_length;
+		args.a6 = (unsigned long)virt_to_phys(p_msg->payload_output);
+		args.a7 = p_msg->payload_length_output;
+		pmem = stratix10_get_memobj(p_msg->payload);
+		args.a8 = (pmem && ctrl->is_smmu_enabled) ? pmem->paddr : 0;
+		break;
+	case COMMAND_FCS_CRYPTO_ECDSA_SHA2_DATA_SIGNING_FINALIZE:
+		args.a0 = INTEL_SIP_SMC_ASYNC_FCS_ECDSA_SHA2_DATA_SIGN_FINALIZE;
+		args.a2 = p_msg->arg[0];
+		args.a3 = p_msg->arg[1];
+		args.a4 = (unsigned long)virt_to_phys(p_msg->payload);
+		args.a5 = p_msg->payload_length;
+		args.a6 = (unsigned long)virt_to_phys(p_msg->payload_output);
+		args.a7 = p_msg->payload_length_output;
+		pmem = stratix10_get_memobj(p_msg->payload);
+		args.a8 = (pmem && ctrl->is_smmu_enabled) ? pmem->paddr : 0;
+		break;
+	case COMMAND_RSU_GET_DEVICE_INFO:
+		args.a0 = INTEL_SIP_SMC_ASYNC_QSPI_GET_DEV_INFO;
+		args.a2 = (unsigned long)virt_to_phys(p_msg->payload_output);
+		args.a3 = (unsigned long)p_msg->payload_length_output;
+		break;
+
 	default:
 		dev_err(ctrl->dev, "Invalid command ,%d\n", p_msg->command);
 		ret = -EINVAL;
@@ -2113,6 +2486,8 @@ static int stratix10_svc_async_prepare_response(struct stratix10_svc_chan *chan,
 	switch (p_msg->command) {
 	case COMMAND_RSU_NOTIFY:
 		break;
+	case COMMAND_GET_IDCODE:
+	case COMMAND_FCS_GET_CHIP_ID:
 	case COMMAND_RSU_GET_SPT_TABLE:
 		data->kaddr1 = (void *)&handle->res.a2;
 		data->kaddr2 = (void *)&handle->res.a3;
@@ -2125,8 +2500,47 @@ static int stratix10_svc_async_prepare_response(struct stratix10_svc_chan *chan,
 		 */
 		data->kaddr1 = (void *)&handle->res;
 		break;
+	case COMMAND_FCS_CRYPTO_CLOSE_SESSION:
+	case COMMAND_FCS_COUNTER_SET_PREAUTHORIZED:
+	case COMMAND_QSPI_OPEN:
+	case COMMAND_QSPI_CLOSE:
+	case COMMAND_QSPI_SET_CS:
+	case COMMAND_QSPI_WRITE:
+	case COMMAND_QSPI_ERASE:
+	case COMMAND_FCS_ATTESTATION_CERTIFICATE_RELOAD:
+		break;
 	case COMMAND_HWMON_READTEMP:
 	case COMMAND_HWMON_READVOLT:
+	case COMMAND_FCS_CRYPTO_OPEN_SESSION:
+	case COMMAND_FCS_CRYPTO_IMPORT_KEY:
+	case COMMAND_FCS_CRYPTO_REMOVE_KEY:
+	case COMMAND_FCS_CRYPTO_GET_KEY_INFO:
+	case COMMAND_FCS_SEND_CERTIFICATE:
+	case COMMAND_FCS_GET_PROVISION_DATA:
+	case COMMAND_FCS_CRYPTO_HKDF_REQUEST:
+	case COMMAND_FCS_CRYPTO_CREATE_KEY:
+	case COMMAND_FCS_MCTP_SEND:
+	case COMMAND_FCS_CRYPTO_GET_DIGEST_UPDATE:
+	case COMMAND_FCS_CRYPTO_MAC_VERIFY_UPDATE:
+	case COMMAND_FCS_CRYPTO_AES_CRYPT_UPDATE:
+	case COMMAND_FCS_CRYPTO_GET_DIGEST_FINALIZE:
+	case COMMAND_FCS_CRYPTO_MAC_VERIFY_FINALIZE:
+	case COMMAND_FCS_CRYPTO_AES_CRYPT_FINALIZE:
+	case COMMAND_FCS_ATTESTATION_CERTIFICATE:
+	case COMMAND_FCS_RANDOM_NUMBER_GEN_EXT:
+	case COMMAND_FCS_CRYPTO_EXPORT_KEY:
+	case COMMAND_FCS_CRYPTO_ECDSA_GET_PUBLIC_KEY_FINALIZE:
+	case COMMAND_FCS_CRYPTO_ECDH_REQUEST_FINALIZE:
+	case COMMAND_FCS_CRYPTO_ECDSA_HASH_VERIFY_FINALIZE:
+	case COMMAND_FCS_CRYPTO_ECDSA_SHA2_VERIFY_UPDATE:
+	case COMMAND_FCS_CRYPTO_ECDSA_SHA2_VERIFY_FINALIZE:
+	case COMMAND_FCS_CRYPTO_ECDSA_HASH_SIGNING_FINALIZE:
+	case COMMAND_FCS_CRYPTO_ECDSA_SHA2_DATA_SIGNING_UPDATE:
+	case COMMAND_FCS_CRYPTO_ECDSA_SHA2_DATA_SIGNING_FINALIZE:
+	case COMMAND_FCS_CRYPTO_GET_DEVICE_IDENTITY:
+	case COMMAND_FCS_SDOS_DATA_EXT:
+	case COMMAND_RSU_GET_DEVICE_INFO:
+	case COMMAND_QSPI_READ:
 		data->kaddr1 = (void *)&handle->res.a2;
 		break;
 
@@ -2189,6 +2603,28 @@ int stratix10_svc_async_poll(struct stratix10_svc_chan *chan,
 			return -EINVAL;
 		}
 	}
+
+	/**
+	 * For certain operations like AES there are 2/3 stages of function
+	 * called init, setup and finalize. But the init stage could be combined
+	 * with setup or final stage. So for init we will do a non mailbox
+	 * command instructing the ATF to store the context for the next two
+	 * stages. And for these init stages poll command won't be supported.
+	 */
+	switch (handle->msg->command) {
+	case COMMAND_FCS_CRYPTO_MAC_VERIFY_INIT:
+	case COMMAND_FCS_CRYPTO_GET_DIGEST_INIT:
+	case COMMAND_FCS_CRYPTO_AES_CRYPT_INIT:
+	case COMMAND_FCS_CRYPTO_ECDSA_GET_PUBLIC_KEY_INIT:
+	case COMMAND_FCS_CRYPTO_ECDH_REQUEST_INIT:
+	case COMMAND_FCS_CRYPTO_ECDSA_HASH_VERIFY_INIT:
+	case COMMAND_FCS_CRYPTO_ECDSA_SHA2_VERIFY_INIT:
+	case COMMAND_FCS_CRYPTO_ECDSA_HASH_SIGNING_INIT:
+	case COMMAND_FCS_CRYPTO_ECDSA_SHA2_DATA_SIGNING_INIT:
+		return -EPERM;
+	default:
+		break;
+	};
 
 	args.a0 = INTEL_SIP_SMC_ASYNC_POLL;
 	args.a1 =
@@ -2290,7 +2726,7 @@ static irqreturn_t stratix10_svc_async_irq_handler(int irq, void *dev_id)
 }
 
 /**
- * startix10_async_workqueue_handler - Handles asynchronous workqueue tasks
+ * stratix10_async_workqueue_handler - Handles asynchronous workqueue tasks
  * @work: Pointer to the work_struct representing the work to be handled
  *
  * This function is the handler for the asynchronous workqueue. It performs
@@ -2306,7 +2742,7 @@ static irqreturn_t stratix10_svc_async_irq_handler(int irq, void *dev_id)
  * and logs the total time taken to handle the transactions along with the number
  * of transactions handled and the CPU on which the handler ran.
  */
-static void startix10_async_workqueue_handler(struct work_struct *work)
+static void stratix10_async_workqueue_handler(struct work_struct *work)
 {
 	unsigned long tid = 0, transaction_id = 0;
 	ktime_t t0, t1;
@@ -2435,7 +2871,7 @@ static int stratix10_svc_async_init(struct stratix10_svc_controller *controller)
 				  "Registered IRQ %d for sip async operations\n",
 				irq);
 			actrl->irq = irq;
-			INIT_WORK(&actrl->async_work, startix10_async_workqueue_handler);
+			INIT_WORK(&actrl->async_work, stratix10_async_workqueue_handler);
 			enable_irq(actrl->irq);
 		}
 	}
