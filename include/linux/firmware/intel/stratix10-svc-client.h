@@ -135,6 +135,9 @@ struct stratix10_svc_chan;
  * @COMMAND_RSU_GET_DEVICE_INFO: query firmware for QSPI device info
  * return status is SVC_STATUS_OK or SVC_STATUS_ERROR
  *
+ * @COMMAND_RSU_GET_SPT_TABLE: query firmware for SPT table
+ * return status is SVC_STATUS_OK or SVC_STATUS_ERROR
+ *
  * @COMMAND_FCS_REQUEST_SERVICE: request validation of image from firmware,
  * return status is SVC_STATUS_OK, SVC_STATUS_INVALID_PARAM
  *
@@ -200,6 +203,9 @@ struct stratix10_svc_chan;
  * @COMMAND_FCS_CRYPTO_GET_KEY_INFO: get the crypto service key object
  * info, return status is SVC_STATUS_OK or SVC_STATUS_ERROR
  *
+ * @COMMAND_FCS_CRYPTO_CREATE_KEY: create the crypto service key object,
+ * return status is SVC_STATUS_OK or SVC_STATUS_ERROR
+ *
  * @COMMAND_FCS_CRYPTO_AES_CRYPT: sends request to encrypt or decrypt a
  * data block, return status is SVC_STATUS_OK or SVC_STATUS_ERROR
  *
@@ -235,6 +241,10 @@ struct stratix10_svc_chan;
  * on generating a share secret on Diffie-Hellman key exchange, return
  * status is SVC_STATUS_OK or SVC_STATUS_ERROR
  *
+ * @COMMAND_FCS_CRYPTO_HKDF_REQUEST: performs HKDF extract or expand with
+ * input key and data, the output key will be placed in key vault, return
+ * status is SVC_STATUS_OK or SVC_STATUS_ERROR
+ *
  * @COMMAND_FCS_RANDOM_NUMBER_GEN_EXT: extend random number generation,
  * return status is SVC_STATUS_OK or SVC_STATUS_ERROR
  *
@@ -243,6 +253,39 @@ struct stratix10_svc_chan;
  *
  * @COMMAND_SMC_SVC_VERSION: Non-mailbox SMC SVC API Version,
  * return status is SVC_STATUS_OK
+ *
+ * @COMMAND_FCS_CRYPTO_GET_DEVICE_IDENTITY: send the request to get the
+ * device identity, return status is SVC_STATUS_OK or SVC_STATUS_ERROR
+ *
+ * @COMMAND_FCS_MCTP_SEND: send the MCTP message, return status is
+ * SVC_STATUS_OK or SVC_STATUS_ERROR
+ *
+ * @COMMAND_MBOX_SEND_CMD: send generic mailbox command, return status is
+ * SVC_STATUS_OK or SVC_STATUS_ERROR
+ *
+ * @COMMAND_GET_IDCODE: get the device's IDCODE, return status is
+ * SVC_STATUS_OK or SVC_STATUS_ERROR
+ *
+ * @COMMAND_QSPI_OPEN: open the QSPI proxy, return status is
+ * SVC_STATUS_OK or SVC_STATUS_ERROR
+ *
+ * @COMMAND_QSPI_CLOSE: close the QSPI proxy, return status is
+ * SVC_STATUS_OK or SVC_STATUS_ERROR
+ *
+ * @COMMAND_QSPI_SET_CS: set the QSPI proxy chip select, return status is
+ * SVC_STATUS_OK or SVC_STATUS_ERROR
+ *
+ * @COMMAND_QSPI_READ: read from the QSPI proxy, return status is
+ * SVC_STATUS_OK or SVC_STATUS_ERROR
+ *
+ * @COMMAND_QSPI_WRITE: write to the QSPI proxy, return status is
+ * SVC_STATUS_OK or SVC_STATUS_ERROR
+ *
+ * @COMMAND_QSPI_ERASE: erase the QSPI proxy, return status is
+ * SVC_STATUS_OK or SVC_STATUS_ERROR
+ *
+ * @
+ *
  */
 enum stratix10_svc_command_code {
 	/* for FPGA */
@@ -260,6 +303,7 @@ enum stratix10_svc_command_code {
 	COMMAND_RSU_DCMF_VERSION,
 	COMMAND_RSU_DCMF_STATUS,
 	COMMAND_RSU_GET_DEVICE_INFO,
+	COMMAND_RSU_GET_SPT_TABLE,
 	/* for FCS */
 	COMMAND_FCS_REQUEST_SERVICE = 20,
 	COMMAND_FCS_SEND_CERTIFICATE,
@@ -287,6 +331,7 @@ enum stratix10_svc_command_code {
 	COMMAND_FCS_CRYPTO_EXPORT_KEY,
 	COMMAND_FCS_CRYPTO_REMOVE_KEY,
 	COMMAND_FCS_CRYPTO_GET_KEY_INFO,
+	COMMAND_FCS_CRYPTO_CREATE_KEY,
 	COMMAND_FCS_CRYPTO_AES_CRYPT_INIT,
 	COMMAND_FCS_CRYPTO_AES_CRYPT_UPDATE,
 	COMMAND_FCS_CRYPTO_AES_CRYPT_FINALIZE,
@@ -310,6 +355,7 @@ enum stratix10_svc_command_code {
 	COMMAND_FCS_CRYPTO_ECDSA_GET_PUBLIC_KEY_FINALIZE,
 	COMMAND_FCS_CRYPTO_ECDH_REQUEST_INIT,
 	COMMAND_FCS_CRYPTO_ECDH_REQUEST_FINALIZE,
+	COMMAND_FCS_CRYPTO_HKDF_REQUEST,
 	COMMAND_FCS_RANDOM_NUMBER_GEN_EXT,
 	COMMAND_FCS_SDOS_DATA_EXT,
 	COMMAND_WRITE_TO_SECURE_REG,
@@ -324,13 +370,24 @@ enum stratix10_svc_command_code {
 	COMMAND_FCS_CRYPTO_ECDSA_SHA2_DATA_SIGNING_FINALIZE_SMMU,
 	COMMAND_FCS_CRYPTO_ECDSA_SHA2_VERIFY_UPDATE_SMMU,
 	COMMAND_FCS_CRYPTO_ECDSA_SHA2_VERIFY_FINALIZE_SMMU,
+	COMMAND_FCS_CRYPTO_GET_DEVICE_IDENTITY,
+	COMMAND_FCS_MCTP_SEND,
 	/* for generic mailbox send command */
 	COMMAND_MBOX_SEND_CMD = 100,
 	/* Non-mailbox SMC Call */
 	COMMAND_SMC_SVC_VERSION = 200,
 	/* for HWMON */
 	COMMAND_HWMON_READTEMP,
-	COMMAND_HWMON_READVOLT
+	COMMAND_HWMON_READVOLT,
+	/*for Device identity*/
+	COMMAND_GET_IDCODE,
+	/*for QSPI proxy commands via SDM*/
+	COMMAND_QSPI_OPEN,
+	COMMAND_QSPI_CLOSE,
+	COMMAND_QSPI_SET_CS,
+	COMMAND_QSPI_READ,
+	COMMAND_QSPI_WRITE,
+	COMMAND_QSPI_ERASE
 };
 
 /**
