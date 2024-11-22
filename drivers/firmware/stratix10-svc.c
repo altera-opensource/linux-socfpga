@@ -199,6 +199,8 @@ struct stratix10_svc_data {
  * @cb_arg: Argument to be passed to the callback function
  * @cb: Callback function to be called upon completion
  * @msg: Pointer to the client message structure
+ * @input_handle: DMA handle for the input buffer
+ * @output_handle: DMA handle for the output buffer
  * @next: Node in the hash list
  * @res: Response structure to store result from the secure firmware
  *
@@ -213,6 +215,7 @@ struct stratix10_svc_async_handler {
 	void *cb_arg;
 	async_callback_t cb;
 	struct stratix10_svc_client_msg *msg;
+	dma_addr_t input_handle, output_handle;
 	struct hlist_node next;
 	struct arm_smccc_1_2_regs res;
 };
@@ -1323,6 +1326,67 @@ int stratix10_svc_remove_async_client(struct stratix10_svc_chan *chan)
 }
 EXPORT_SYMBOL_GPL(stratix10_svc_remove_async_client);
 
+static struct stratix10_svc_data_mem *stratix10_get_memobj(void *vaddr)
+{
+	struct stratix10_svc_data_mem *pmem = NULL;
+
+	if (!vaddr)
+		return NULL;
+
+	mutex_lock(&svc_mem_lock);
+	list_for_each_entry(pmem, &svc_data_mem, node)
+		if (pmem->vaddr == vaddr) {
+			mutex_unlock(&svc_mem_lock);
+			return pmem;
+		}
+	mutex_unlock(&svc_mem_lock);
+	return NULL;
+}
+
+static inline int stratix10_dma_map_buffer(struct stratix10_svc_controller *ctrl,
+					   dma_addr_t *handle, void *buffer,
+					   enum dma_data_direction dir)
+{
+	int ret = 0;
+	struct stratix10_svc_data_mem *pmem;
+
+	if (!buffer)
+		return -EINVAL;
+
+	pmem = stratix10_get_memobj(buffer);
+	if (!pmem) {
+		dev_err(ctrl->dev, "Invalid payload memory\n");
+		return -ENOENT;
+	}
+
+	*handle = dma_map_single(ctrl->dev, pmem->vaddr, pmem->size, dir);
+	ret = dma_mapping_error(ctrl->dev, *handle);
+	if (ret) {
+		dev_err(ctrl->dev, "Failed to map payload memory\n");
+		return ret;
+	}
+
+	return 0;
+}
+
+static inline void stratix10_dma_unmap_buffer(struct stratix10_svc_controller *ctrl,
+					      dma_addr_t *handle, void *buffer,
+					      enum dma_data_direction dir)
+{
+	struct stratix10_svc_data_mem *pmem;
+
+	if (!*handle || !buffer)
+		return;
+
+	pmem = stratix10_get_memobj(buffer);
+	if (!pmem) {
+		dev_err(ctrl->dev, "Invalid payload memory\n");
+		return;
+	}
+
+	dma_unmap_single(ctrl->dev, *handle, pmem->size, dir);
+}
+
 /**
  * stratix10_svc_async_send - Send an asynchronous message to the
  *                            Stratix10 service
@@ -1416,6 +1480,22 @@ int stratix10_svc_async_send(struct stratix10_svc_chan *chan, void *msg,
 		goto deallocate_id;
 	}
 
+	if (p_msg->payload && p_msg->payload_length > 0 &&
+	    ctrl->is_smmu_enabled && !is_vmalloc_addr(p_msg->payload)) {
+		ret = stratix10_dma_map_buffer(ctrl, &handle->input_handle,
+					       p_msg->payload, DMA_TO_DEVICE);
+		if (ret)
+			goto dma_unmap_buffer;
+	}
+
+	if (p_msg->payload_output && p_msg->payload_length_output > 0 &&
+	    ctrl->is_smmu_enabled && !is_vmalloc_addr(p_msg->payload_output)) {
+		ret = stratix10_dma_map_buffer(ctrl, &handle->output_handle,
+					       p_msg->payload_output, DMA_FROM_DEVICE);
+		if (ret)
+			goto dma_unmap_buffer;
+	}
+
 	/**
 	 * There is a chance that during the execution of async_send()
 	 * in one core, an interrupt might be received in another core;
@@ -1456,6 +1536,11 @@ int stratix10_svc_async_send(struct stratix10_svc_chan *chan, void *msg,
 		hash_del(&handle->next);
 	}
 
+dma_unmap_buffer:
+	stratix10_dma_unmap_buffer(ctrl, &handle->input_handle, p_msg->payload,
+				   DMA_TO_DEVICE);
+	stratix10_dma_unmap_buffer(ctrl, &handle->output_handle, p_msg->payload_output,
+				   DMA_FROM_DEVICE);
 deallocate_id:
 	ida_free(&achan->job_id_pool,
 		 STRATIX10_GET_JOBID(handle->transaction_id));
@@ -1485,6 +1570,11 @@ static int stratix10_svc_async_prepare_response(struct stratix10_svc_chan *chan,
 	struct stratix10_svc_client_msg *p_msg =
 		(struct stratix10_svc_client_msg *)handle->msg;
 	struct stratix10_svc_controller *ctrl = chan->ctrl;
+
+	stratix10_dma_unmap_buffer(ctrl, &handle->input_handle, p_msg->payload,
+				   DMA_TO_DEVICE);
+	stratix10_dma_unmap_buffer(ctrl, &handle->output_handle, p_msg->payload_output,
+				   DMA_FROM_DEVICE);
 
 	data->status = STRATIX10_GET_SDM_STATUS_CODE(handle->res.a1);
 
@@ -1636,6 +1726,11 @@ int stratix10_svc_async_done(struct stratix10_svc_chan *chan, void *tx_handle)
 	}
 	ida_free(&achan->job_id_pool,
 		 STRATIX10_GET_JOBID(handle->transaction_id));
+
+	stratix10_dma_unmap_buffer(ctrl, &handle->input_handle, handle->msg->payload,
+				   DMA_TO_DEVICE);
+	stratix10_dma_unmap_buffer(ctrl, &handle->output_handle, handle->msg->payload_output,
+				   DMA_FROM_DEVICE);
 	kfree(handle);
 	return 0;
 }
