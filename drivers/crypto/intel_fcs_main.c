@@ -223,7 +223,8 @@ static void fcs_attestation_callback(struct stratix10_svc_client *client,
 	if (data->status == BIT(SVC_STATUS_OK)) {
 		priv->status = 0;
 		priv->kbuf = data->kaddr2;
-		priv->size = *((unsigned int *)data->kaddr3);
+		priv->size = (data->kaddr3 != NULL) ?
+			*((unsigned int *)data->kaddr3) : 0;
 	} else if (data->status == BIT(SVC_STATUS_ERROR)) {
 		priv->status = *((unsigned int *)data->kaddr1);
 		dev_err(client->dev, "mbox_error=0x%x\n", priv->status);
