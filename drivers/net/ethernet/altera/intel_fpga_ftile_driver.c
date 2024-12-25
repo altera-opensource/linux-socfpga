@@ -722,9 +722,54 @@ static int eth_ftile_tx_rx_user_flow(intel_fpga_xtile_eth_private *priv)
 	/* Step 2 [FEC variant only] */
 	if (strcasecmp(priv->fec_type, "no-fec") != 0) {
 		// Configure RX FEC codeword position into transceiver
-		// Step 2a Read RX FEC codeword position and FEC lane mapping for each PMA lane
+		// Step 2a 
+		// Reset value of lat bit before updating the same with FEC CW position
+		// Read RX FEC codeword position and FEC lane mapping for each PMA lane
 		// Determine mapping from PMA lane to FEC lane:
+		xcvr_sel = 0;
 		pl_fl_map = num_fl / num_pl;
+		// Reset value of lat bit before updating the same with FEC CW position
+		if ((pma_type) == XCVR_PMA_TYPE_FGT) {
+			/* FGT transceiver:
+			 *  Note: There are 4 FGT quads with 4 apl lanes each.
+			 * User must ensure register of all active quad lanes are programmed.
+			 * Please refer to AVMM2 or global AVMM User Guide on
+			 * how to access different FGT quad.
+			 */
+			n = eth_pma_avmm_csroffs(fgt_q_dl_ctrl_a_l1, 0) -
+				eth_pma_avmm_csroffs(fgt_q_dl_ctrl_a_l0, 0);
+			for (pl = 0; pl < num_pl; pl++) {
+				apl = (3 - ((pl + init_pl) % 4));
+				regval = hssi_csrrd32_ba(pdev, HSSI_PHY_XCVR_PMACAP, chan,
+						eth_pma_avmm_csroffs(fgt_q_dl_ctrl_a_l0,
+							xcvr_sel)
+						+ apl * n);
+				regval &= ~XCVR_FGT_Q_DL_CTRL_RX_LAT_CNTRVAL_ASYNC; //RESET LAT bits to 0
+				hssi_csrwr32_ba(pdev, HSSI_PHY_XCVR_PMACAP, chan,
+						eth_pma_avmm_csroffs(fgt_q_dl_ctrl_a_l0,
+							xcvr_sel) +
+						apl * n, regval);
+				/* tcl script has this xcvr_sel 8,9,A,B ==> quad3,
+				 * xcvr_sel C,D,E,F ==> quad2, etc
+				 */
+				xcvr_sel++;
+			}
+		} else {
+			// FHT transceiver:
+			n = 4;
+			for (pl = 0; pl < num_pl; pl++) {
+				apl = (3 - ((pl + init_pl) % 4));
+				regval = hssi_csrrd32_ba(pdev, HSSI_PHY_XCVR_PMACAP, chan,
+						eth_pma_avmm_csroffs(fgt_q_dl_ctrl_a_l2,
+							xcvr_sel) +
+						apl * n);
+				regval &= ~XCVR_FHT_Q_DL_CTRL_RX_LAT_CNTRVAL_ASYNC; //RESET LAT bits to 0
+				hssi_csrwr32_ba(pdev, HSSI_PHY_XCVR_PMACAP, chan,
+						eth_pma_avmm_csroffs(fgt_q_dl_ctrl_a_l2,
+							xcvr_sel) +
+						apl * n, regval);
+			}
+		}
 
 		for (fl = 0; fl < num_fl; fl++)
 			rx_fec_cw_pos[fl] = hssi_csrrd32_ba(pdev, HSSI_ETH_RECONFIG, chan,
@@ -746,6 +791,7 @@ static int eth_ftile_tx_rx_user_flow(intel_fpga_xtile_eth_private *priv)
 			 * Please refer to AVMM2 or global AVMM User Guide on
 			 * how to access different FGT quad.
 			 */
+			xcvr_sel = 0;
 			n = eth_pma_avmm_csroffs(fgt_q_dl_ctrl_a_l1, 0) -
 			    eth_pma_avmm_csroffs(fgt_q_dl_ctrl_a_l0, 0);
 			for (pl = 0; pl < num_pl; pl++) {
