@@ -2085,11 +2085,11 @@ int stratix10_svc_async_send(struct stratix10_svc_chan *chan, void *msg, void **
 
 	switch (p_msg->command) {
 	case COMMAND_HWMON_READTEMP:
-		args.a0 = ALTERA_SIP_SMC_ASYNC_HWMON_READTEMP;
+		args.a0 = INTEL_SIP_SMC_ASYNC_HWMON_READTEMP;
 		args.a2 = p_msg->arg[0];
 		break;
 	case COMMAND_HWMON_READVOLT:
-		args.a0 = ALTERA_SIP_SMC_ASYNC_HWMON_READVOLT;
+		args.a0 = INTEL_SIP_SMC_ASYNC_HWMON_READVOLT;
 		args.a2 = p_msg->arg[0];
 		break;
 	default:
@@ -2227,7 +2227,7 @@ int stratix10_svc_async_poll(struct stratix10_svc_chan *chan, void *tx_handle,
 		return -EINVAL;
 	}
 
-	args.a0 = ALTERA_SIP_SMC_ASYNC_POLL;
+	args.a0 = INTEL_SIP_SMC_ASYNC_POLL;
 	args.a1 =
 		STRATIX10_SIP_SMC_SET_TRANSACTIONID_X1(handle->transaction_id);
 
@@ -2366,7 +2366,7 @@ static void startix10_async_workqueue_handler(struct work_struct *work)
 	DECLARE_BITMAP(pend_on_irq, TOTAL_TRANSACTION_IDS);
 	u64 bitmap_array[4];
 	struct arm_smccc_1_2_regs
-		args = { .a0 = ALTERA_SIP_SMC_ASYNC_POLL_ON_IRQ },
+		args = { .a0 = INTEL_SIP_SMC_ASYNC_POLL_ON_IRQ },
 		res;
 	t0 = ktime_get();
 
