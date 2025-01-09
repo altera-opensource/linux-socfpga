@@ -3628,6 +3628,10 @@ static int stratix10_svc_drv_probe(struct platform_device *pdev)
 	if (ret)
 		goto err_put_device;
 
+	ret = of_platform_default_populate(dev_of_node(dev), NULL, dev);
+	if (ret)
+		goto err_put_device;
+
 	pr_info("Intel Service Layer Driver Initialized\n");
 
 	return 0;
@@ -3645,6 +3649,8 @@ static void stratix10_svc_drv_remove(struct platform_device *pdev)
 	int i;
 	struct stratix10_svc_controller *ctrl = platform_get_drvdata(pdev);
 	struct stratix10_svc *svc = ctrl->svc;
+
+	of_platform_depopulate(ctrl->dev);
 
 	if (ctrl->domain) {
 		put_iova_domain(&ctrl->carveout.domain);
