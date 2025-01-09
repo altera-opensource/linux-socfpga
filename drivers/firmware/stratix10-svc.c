@@ -1496,11 +1496,11 @@ int stratix10_svc_async_send(struct stratix10_svc_chan *chan, void *msg,
 		args.a2 = p_msg->arg[0];
 		break;
 	case COMMAND_HWMON_READTEMP:
-		args.a0 = ALTERA_SIP_SMC_ASYNC_HWMON_READTEMP;
+		args.a0 = INTEL_SIP_SMC_ASYNC_HWMON_READTEMP;
 		args.a2 = p_msg->arg[0];
 		break;
 	case COMMAND_HWMON_READVOLT:
-		args.a0 = ALTERA_SIP_SMC_ASYNC_HWMON_READVOLT;
+		args.a0 = INTEL_SIP_SMC_ASYNC_HWMON_READVOLT;
 		args.a2 = p_msg->arg[0];
 		break;
 	default:
