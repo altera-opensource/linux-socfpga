@@ -107,8 +107,9 @@ static void fcs_atf_version_smmu_check_callback(struct stratix10_svc_client *cli
 
 	priv->status = data->status;
 	if (data->status == BIT(SVC_STATUS_OK)) {
-		if ((*((unsigned int *)data->kaddr1) >= ATF_SMMU_FW_MAJOR_VER) &&
-			(*((unsigned int *)data->kaddr2) >= ATF_SMMU_FW_MIN_VER))
+		if ((*((unsigned int *)data->kaddr1) > ATF_SMMU_FW_MAJOR_VER) ||
+		    ((*((unsigned int *)data->kaddr1) == ATF_SMMU_FW_MAJOR_VER) &&
+		     (*((unsigned int *)data->kaddr2) >= ATF_SMMU_FW_MIN_VER)))
 			priv->status = 0;
 		else
 			priv->status = -1;
