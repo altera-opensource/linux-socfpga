@@ -343,10 +343,11 @@ static u32 get_gb_33_66_occupancy(const u32 speed, const u32 rvld_lsb, const u32
 	return 0;
 }
 
-/* CAUTION: This function would be called in the context of link monitoring thread and 
- * in case of the failure it would be handled by the link monitoring thread by 
- * reiterating over until the condition passes. Avoid using while loop as it might 
- * delay the overall operation performance
+/* CAUTION: This function would be called in the context of link monitoring thread and
+ * in case of the failure it would be handled by the link monitoring thread by
+ * reiterating over until the condition passes. A while loop with a long operation
+ * or delay should be avoided as it  might delay the overall operation performance 
+ * but a short loop with minimal delay should not cause any issue.
  */
 int ftile_check_counter_complete(intel_fpga_xtile_eth_private *priv, u32 regbank,
 				 size_t offs, u8 bit_mask, bool set_bit,
@@ -357,12 +358,12 @@ int ftile_check_counter_complete(intel_fpga_xtile_eth_private *priv, u32 regbank
 	(void)align;
 
 	if (set_bit) {
-		if (hssi_bit_is_clear_ba(pdev, regbank, chan,
-					 offs, bit_mask))
+		if (!hssi_bit_is_set_ba(pdev, regbank, chan,
+				       offs, bit_mask))
 			return -EINVAL;
 	} else {
-		if (hssi_bit_is_set_ba(pdev, regbank, chan,
-				       offs, bit_mask))
+		if (!hssi_bit_is_clear_ba(pdev, regbank, chan,
+					 offs, bit_mask))
 			return -EINVAL;
 	}
 
@@ -722,7 +723,7 @@ static int eth_ftile_tx_rx_user_flow(intel_fpga_xtile_eth_private *priv)
 	/* Step 2 [FEC variant only] */
 	if (strcasecmp(priv->fec_type, "no-fec") != 0) {
 		// Configure RX FEC codeword position into transceiver
-		// Step 2a 
+		// Step 2a
 		// Reset value of lat bit before updating the same with FEC CW position
 		// Read RX FEC codeword position and FEC lane mapping for each PMA lane
 		// Determine mapping from PMA lane to FEC lane:
@@ -741,13 +742,14 @@ static int eth_ftile_tx_rx_user_flow(intel_fpga_xtile_eth_private *priv)
 			for (pl = 0; pl < num_pl; pl++) {
 				apl = (3 - ((pl + init_pl) % 4));
 				regval = hssi_csrrd32_ba(pdev, HSSI_PHY_XCVR_PMACAP, chan,
-						eth_pma_avmm_csroffs(fgt_q_dl_ctrl_a_l0,
-							xcvr_sel)
-						+ apl * n);
-				regval &= ~XCVR_FGT_Q_DL_CTRL_RX_LAT_CNTRVAL_ASYNC; //RESET LAT bits to 0
+							 eth_pma_avmm_csroffs(fgt_q_dl_ctrl_a_l0,
+									      xcvr_sel) +
+							 apl * n);
+				//RESET LAT bits to 0
+				regval &= ~XCVR_FGT_Q_DL_CTRL_RX_LAT_CNTRVAL_ASYNC;
 				hssi_csrwr32_ba(pdev, HSSI_PHY_XCVR_PMACAP, chan,
 						eth_pma_avmm_csroffs(fgt_q_dl_ctrl_a_l0,
-							xcvr_sel) +
+								     xcvr_sel) +
 						apl * n, regval);
 				/* tcl script has this xcvr_sel 8,9,A,B ==> quad3,
 				 * xcvr_sel C,D,E,F ==> quad2, etc
@@ -760,13 +762,14 @@ static int eth_ftile_tx_rx_user_flow(intel_fpga_xtile_eth_private *priv)
 			for (pl = 0; pl < num_pl; pl++) {
 				apl = (3 - ((pl + init_pl) % 4));
 				regval = hssi_csrrd32_ba(pdev, HSSI_PHY_XCVR_PMACAP, chan,
-						eth_pma_avmm_csroffs(fgt_q_dl_ctrl_a_l2,
-							xcvr_sel) +
-						apl * n);
-				regval &= ~XCVR_FHT_Q_DL_CTRL_RX_LAT_CNTRVAL_ASYNC; //RESET LAT bits to 0
+							 eth_pma_avmm_csroffs(fgt_q_dl_ctrl_a_l2,
+									      xcvr_sel) +
+							 apl * n);
+				//RESET LAT bits to 0
+				regval &= ~XCVR_FHT_Q_DL_CTRL_RX_LAT_CNTRVAL_ASYNC;
 				hssi_csrwr32_ba(pdev, HSSI_PHY_XCVR_PMACAP, chan,
 						eth_pma_avmm_csroffs(fgt_q_dl_ctrl_a_l2,
-							xcvr_sel) +
+								     xcvr_sel) +
 						apl * n, regval);
 			}
 		}

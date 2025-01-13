@@ -787,7 +787,7 @@ int xtile_check_counter_complete(struct intel_fpga_xtile_eth_private *priv, u32 
 	counter = 0;
 	switch (align) {
 	case 8: /* byte aligned */
-		while (counter++ < INTEL_FPGA_XTILE_SW_RESET_WATCHDOG_CNTR) {
+		while (counter++ < INTEL_FPGA_XTILE_CNTR_CHECK) {
 			if (set_bit) {
 				if (hssi_csrrd8(pdev, regbank, chan, offs) & bit_mask)
 					break;
@@ -796,7 +796,7 @@ int xtile_check_counter_complete(struct intel_fpga_xtile_eth_private *priv, u32 
 					break;
 			}
 		}
-		if (counter >= INTEL_FPGA_XTILE_SW_RESET_WATCHDOG_CNTR) {
+		if (counter >= INTEL_FPGA_XTILE_CNTR_CHECK) {
 			if (set_bit) {
 				if ((hssi_csrrd8(pdev, regbank, chan, offs) & bit_mask) == 0)
 					return -EINVAL;
@@ -808,8 +808,15 @@ int xtile_check_counter_complete(struct intel_fpga_xtile_eth_private *priv, u32 
 		break;
 	default:
 	/* default is word aligned */
-		priv->spec_ops->tile.check_counter_complete(priv, regbank, offs,
-							    bit_mask, set_bit, align);
+		while (counter++ < INTEL_FPGA_XTILE_CNTR_CHECK) {
+			if (priv->spec_ops->tile.check_counter_complete(priv, regbank, offs,
+									bit_mask, set_bit,
+									align) == 0)
+				break;
+			usleep_range(100, 200);
+		}
+		if (counter >= INTEL_FPGA_XTILE_CNTR_CHECK)
+			return -EINVAL;
 		break;
 	}
 	return 0;
@@ -1900,13 +1907,13 @@ static int intel_fpga_xtile_probe(struct platform_device *pdev)
 
 			/* Rx Fifo */
 			ret = request_and_map_node(pdev, dmanp, "rx_fifo",
-						(void __iomem **)(&priv->dma_info[queue].rx_fifo));
+						   (void __iomem **)(&priv->dma_info[queue].rx_fifo));
 			if (ret)
 				goto err_free_netdev;
 
 			/* Tx Fifo */
 			ret = request_and_map_node(pdev, dmanp, "tx_fifo",
-						(void __iomem **)(&priv->dma_info[queue].tx_fifo));
+						   (void __iomem **)(&priv->dma_info[queue].tx_fifo));
 			if (ret)
 				goto err_free_netdev;
 
@@ -1949,8 +1956,9 @@ static int intel_fpga_xtile_probe(struct platform_device *pdev)
 	 * in the ePAPR v1.1 spec and usage differ, so go with usage.
 	 */
 	if (of_property_read_u32(pdev->dev.of_node, "max-frame-size",
-				&priv->dev->max_mtu)) {
-		dev_warn(&pdev->dev, "Not able to get max-frame-size. Defaulting max_mtu to %d\n", priv->dev->max_mtu);
+				 &priv->dev->max_mtu)) {
+		dev_warn(&pdev->dev, "Not able to get max-frame-size. Defaulting max_mtu to %d\n",
+			 priv->dev->max_mtu);
 	}
 
 	/* The DMA buffer size already accounts for an alignment bias
