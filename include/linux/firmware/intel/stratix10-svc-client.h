@@ -284,6 +284,9 @@ struct stratix10_svc_chan;
  * @COMMAND_QSPI_ERASE: erase the QSPI proxy, return status is
  * SVC_STATUS_OK or SVC_STATUS_ERROR
  *
+ * @COMMAND_SMC_ATF_BUILD_VER: Non-mailbox SMC ATF Build Version,
+ * return status is SVC_STATUS_OK
+ *
  * @
  *
  */
@@ -387,7 +390,8 @@ enum stratix10_svc_command_code {
 	COMMAND_QSPI_SET_CS,
 	COMMAND_QSPI_READ,
 	COMMAND_QSPI_WRITE,
-	COMMAND_QSPI_ERASE
+	COMMAND_QSPI_ERASE,
+	COMMAND_SMC_ATF_BUILD_VER
 };
 
 /**

@@ -547,6 +547,25 @@ INTEL_SIP_SMC_FAST_CALL_VAL(INTEL_SIP_SMC_FUNCID_FPGA_CONFIG_COMPLETED_WRITE)
 	INTEL_SIP_SMC_FAST_CALL_VAL(INTEL_SIP_SMC_SVC_FUNCID_VERSION)
 
 /**
+ * Request INTEL_SIP_SMC_ATF_BUILD_VER
+ *
+ * Sync call used to query the ATF Build Version
+ *
+ * Call register usage:
+ * a0 INTEL_SIP_SMC_ATF_BUILD_VER
+ * a1-a7 not used
+ *
+ * Return status:
+ * a0 INTEL_SIP_SMC_STATUS_OK
+ * a1 Major
+ * a2 Minor
+ * a3 Patch
+ */
+#define INTEL_SIP_SMC_ATF_BUILD_VERSION 155
+#define INTEL_SIP_SMC_ATF_BUILD_VER \
+		INTEL_SIP_SMC_FAST_CALL_VAL(INTEL_SIP_SMC_ATF_BUILD_VERSION)
+
+/**
  * SMC call protocol for FPGA Crypto Service (FCS)
  * FUNCID starts from 90
  */
