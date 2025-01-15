@@ -1384,7 +1384,10 @@ static inline void stratix10_dma_unmap_buffer(struct stratix10_svc_controller *c
 		return;
 	}
 
-	dma_unmap_single(ctrl->dev, *handle, pmem->size, dir);
+	if (*handle != 0) {
+		dma_unmap_single(ctrl->dev, *handle, pmem->size, dir);
+		*handle = 0;
+	}
 }
 
 /**
