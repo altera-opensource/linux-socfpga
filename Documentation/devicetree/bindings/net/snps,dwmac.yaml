@@ -134,7 +134,7 @@ properties:
     items:
       oneOf:
         - description: Combined signal for various interrupt events
-          pattern: '^macirq$|^macirq_tx[0-7]$|^macirq_rx[0-7]$'
+          pattern: '^macirq$|^macirq_[tr]x[0-7]$'
         - description: The interrupt to manage the remote wake-up packet detection
           const: eth_wake_irq
         - description: The interrupt that occurs when Rx exits the LPI state
