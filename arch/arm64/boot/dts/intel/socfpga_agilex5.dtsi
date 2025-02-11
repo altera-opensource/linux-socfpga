@@ -85,6 +85,18 @@
 			method = "smc";
 			memory-region = <&service_reserved>;
 			iommus = <&smmu 10>;
+			interrupts = <GIC_SPI 0 IRQ_TYPE_LEVEL_HIGH>;
+			interrupt-parent = <&intc>;
+			altr,smmu_enable_quirk;
+
+			fpga_mgr: fpga-mgr {
+				compatible = "intel,agilex5-soc-fpga-mgr";
+				altr,smmu_enable_quirk;
+			};
+
+			temp_volt: hwmon {
+				compatible = "intel,soc64-hwmon";
+			};
 		};
 	};
 
@@ -1226,31 +1238,6 @@
 				<0x160F2000 0x1000>;
 			interrupt-parent = <&intc>;
 			interrupts = <GIC_SPI 150 IRQ_TYPE_EDGE_RISING>;
-		};
-
-		firmware {
-			svc {
-				compatible = "intel,agilex5-svc";
-				method = "smc";
-				memory-region = <&service_reserved>;
-				iommus = <&smmu 10>;
-				interrupts = <GIC_SPI 0 IRQ_TYPE_LEVEL_HIGH>;
-				altr,smmu_enable_quirk;
-
-				fpga_mgr: fpga-mgr {
-					compatible = "intel,agilex5-soc-fpga-mgr";
-					altr,smmu_enable_quirk;
-				};
-
-				fcs: fcs {
-					compatible = "intel,agilex-soc-fcs";
-					platform = "agilex";
-				};
-
-				temp_volt: hwmon {
-					compatible = "intel,soc64-hwmon";
-				};
-			};
 		};
 	};
 };
