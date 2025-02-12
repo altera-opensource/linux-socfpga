@@ -1,0 +1,23 @@
+# YAML binding for fcs_security device node
+
+compatible: "intel,agilex5-soc-fcs-config"
+
+title: Altera SoC FPGA Security features
+
+maintainers:
+  - Balsundar Ponnusamy <balsundar.ponnusamy@altera.com>
+  - Sagar Khadgi <sagar.khadgi@altera.com>
+  - Santosh Male <santosh.male@altera.com>
+
+properties:
+  dependent-on:
+      description: "Reference to fcs-hal device that must be
+        initialized first"
+      type: phandle
+      required: false
+      items:
+        - description: "Phandle to deviceA"
+          type: phandle
+
+required:
+  - compatible
