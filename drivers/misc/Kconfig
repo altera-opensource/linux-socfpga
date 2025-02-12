@@ -629,6 +629,12 @@ config MCHP_LAN966X_PCI
 	    - lan966x-miim (MDIO_MSCC_MIIM)
 	    - lan966x-switch (LAN966X_SWITCH)
 
+config ALTERA_SOCFPGA_CONFIG
+	tristate "Altera FPGA FCS configuration support"
+	depends on ALTERA_SOCFPGA_FCS_HAL
+	help
+	  Altera socfpga FCS security features driver.
+
 config ALTERA_SOCFPGA_FCS_HAL
 	tristate "Altera FPGA FCS hal driver support"
 	depends on INTEL_STRATIX10_SERVICE
