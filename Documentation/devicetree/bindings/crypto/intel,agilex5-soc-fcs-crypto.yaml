@@ -1,0 +1,20 @@
+# YAML binding for fcs_crypto device node
+
+title: Altera SoCFPGA Crypto module
+
+maintainers:
+  - Balsundar Ponnusamy <balsundar.ponnusamy@altera.com>
+  - Sagar Khadgi <sagar.khadgi@altera.com>
+  - Santosh Male <santosh.male@altera.com>
+
+compatible: "intel,agilex5-soc-fcs-crypto"
+
+properties:
+  dependent-on:
+      description: "Reference to fcs-hal device that must be
+        initialized first"
+      type: phandle
+      required: false
+      items:
+        - description: "Phandle to deviceA"
+          type: phandle
