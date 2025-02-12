@@ -287,6 +287,16 @@ config CRYPTO_DEV_INTEL_FCS
 
 	 Say Y here if you want Intel FCS support
 
+config CRYPTO_DEV_ALTERA_FCS
+	tristate "Altera FPGA Crypto Service support"
+	depends on INTEL_STRATIX10_SERVICE
+	help
+	 Support crypto services on Altera SoCFPGA platforms. The crypto
+	 services include random number generation, SDOS, AES and
+	 message digest.
+
+	 Say Y here if you want Altera FCS support
+
 config CRYPTO_DEV_PPC4XX
 	tristate "Driver AMCC PPC4xx crypto accelerator"
 	depends on PPC && 4xx
