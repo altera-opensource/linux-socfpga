@@ -607,6 +607,12 @@ config ALTERA_ILC
 	  This enables the Interrupt Latency Counter driver for the Altera
 	  SOCFPGA platform.
 
+config ALTERA_SOCFPGA_CONFIG
+	tristate "Altera FPGA FCS configuration support"
+	depends on ALTERA_SOCFPGA_FCS_HAL
+	help
+	  Altera socfpga FCS security features driver.
+
 config ALTERA_SOCFPGA_FCS_HAL
 	tristate "Altera FPGA FCS hal driver support"
 	depends on INTEL_STRATIX10_SERVICE
