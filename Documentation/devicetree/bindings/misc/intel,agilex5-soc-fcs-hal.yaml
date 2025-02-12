@@ -1,0 +1,10 @@
+# YAML binding for fcs HAL device node
+
+compatible: "intel,agilex5-soc-fcs-hal"
+
+title: Altera SoC FPGA HAL
+
+maintainers:
+  - Balsundar Ponnusamy <balsundar.ponnusamy@altera.com>
+  - Sagar Khadgi <sagar.khadgi@altera.com>
+  - Santosh Male <santosh.male@altera.com>
