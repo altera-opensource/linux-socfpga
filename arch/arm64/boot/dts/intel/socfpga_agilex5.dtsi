@@ -233,7 +233,21 @@
 			temp_volt: hwmon {
 				compatible = "intel,soc64-hwmon";
 			};
+
+			fcs_hal: fcs-hal {
+				compatible = "intel,agilex5-soc-fcs-hal";
+			};
 		};
+	};
+
+	fcs_crypto: fcs-crypto {
+		compatible = "intel,agilex5-soc-fcs-crypto";
+		dependent-on = <&fcs_hal>;
+	};
+
+	fcs_config: fcs-config {
+		compatible = "intel,agilex5-soc-fcs-config";
+		dependent-on = <&fcs_hal>;
 	};
 
 	soc: soc@0 {
@@ -1237,6 +1251,5 @@
 			clocks = <&qspi_clk>;
 			status = "disabled";
 		};
-
 	};
 };
