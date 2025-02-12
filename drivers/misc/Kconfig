@@ -629,6 +629,13 @@ config MCHP_LAN966X_PCI
 	    - lan966x-miim (MDIO_MSCC_MIIM)
 	    - lan966x-switch (LAN966X_SWITCH)
 
+config ALTERA_SOCFPGA_FCS_HAL
+	tristate "Altera FPGA FCS hal driver support"
+	depends on INTEL_STRATIX10_SERVICE
+	help
+	  Altera socfpga FCS HAL driver.
+	  This is a subdriver of the Altera SOCFPGA FCS features.
+
 source "drivers/misc/c2port/Kconfig"
 source "drivers/misc/eeprom/Kconfig"
 source "drivers/misc/cb710/Kconfig"
