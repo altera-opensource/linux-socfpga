@@ -607,6 +607,13 @@ config ALTERA_ILC
 	  This enables the Interrupt Latency Counter driver for the Altera
 	  SOCFPGA platform.
 
+config ALTERA_SOCFPGA_FCS_HAL
+	tristate "Altera FPGA FCS hal driver support"
+	depends on INTEL_STRATIX10_SERVICE
+	help
+	  Altera socfpga FCS HAL driver.
+	  This is a subdriver of the Altera SOCFPGA FCS features.
+
 source "drivers/misc/c2port/Kconfig"
 source "drivers/misc/eeprom/Kconfig"
 source "drivers/misc/cb710/Kconfig"

@@ -75,3 +75,5 @@ obj-$(CONFIG_TPS6594_PFSM)	+= tps6594-pfsm.o
 obj-$(CONFIG_NSM)		+= nsm.o
 obj-$(CONFIG_MARVELL_CN10K_DPI)	+= mrvl_cn10k_dpi.o
 obj-y				+= keba/
+obj-$(CONFIG_ALTERA_SOCFPGA_FCS_HAL) += altera-fcs-hal.o
+altera-fcs-hal-y := fcs_hal_mod.o socfpga_fcs_plat.o socfpga_fcs_hal.o
