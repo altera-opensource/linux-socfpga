@@ -1526,7 +1526,10 @@ static void stmmac_free_tx_buffer(struct stmmac_priv *priv,
 
 	if (tx_q->tx_skbuff_dma[i].buf &&
 	    tx_q->tx_skbuff_dma[i].buf_type != STMMAC_TXBUF_T_XDP_TX) {
-		if (tx_q->tx_skbuff_dma[i].map_as_page)
+		if (tx_q->tx_skbuff_dma[i].buf_type == STMMAC_TXBUF_T_DMA)
+			page_pool_recycle_direct(tx_q->page_pool,
+						 tx_q->tx_skbuff_dma[i].page);
+		else if (tx_q->tx_skbuff_dma[i].map_as_page)
 			dma_unmap_page(priv->device,
 				       tx_q->tx_skbuff_dma[i].buf,
 				       tx_q->tx_skbuff_dma[i].len,
@@ -1549,7 +1552,8 @@ static void stmmac_free_tx_buffer(struct stmmac_priv *priv,
 		tx_q->xsk_frames_done++;
 
 	if (tx_q->tx_skbuff[i] &&
-	    tx_q->tx_skbuff_dma[i].buf_type == STMMAC_TXBUF_T_SKB) {
+	    (tx_q->tx_skbuff_dma[i].buf_type == STMMAC_TXBUF_T_SKB ||
+	     tx_q->tx_skbuff_dma[i].buf_type == STMMAC_TXBUF_T_DMA)) {
 		dev_kfree_skb_any(tx_q->tx_skbuff[i]);
 		tx_q->tx_skbuff[i] = NULL;
 	}
@@ -2003,6 +2007,8 @@ static void __free_dma_tx_desc_resources(struct stmmac_priv *priv,
 
 	kfree(tx_q->tx_skbuff_dma);
 	kfree(tx_q->tx_skbuff);
+	if (tx_q->page_pool)
+		page_pool_destroy(tx_q->page_pool);
 }
 
 static void free_dma_tx_desc_resources(struct stmmac_priv *priv,
@@ -2146,11 +2152,31 @@ static int __alloc_dma_tx_desc_resources(struct stmmac_priv *priv,
 					 u32 queue)
 {
 	struct stmmac_tx_queue *tx_q = &dma_conf->tx_queue[queue];
+	struct page_pool_params pp_params = { 0 };
+	unsigned int num_pages;
 	size_t size;
 	void *addr;
+	int ret;
 
 	tx_q->queue_index = queue;
 	tx_q->priv_data = priv;
+
+	pp_params.flags = PP_FLAG_DMA_MAP | PP_FLAG_DMA_SYNC_DEV;
+	pp_params.pool_size = dma_conf->dma_tx_size;
+	num_pages = DIV_ROUND_UP(dma_conf->dma_buf_sz, PAGE_SIZE);
+	pp_params.order = ilog2(num_pages);
+	pp_params.nid = dev_to_node(priv->device);
+	pp_params.dev = priv->device;
+	pp_params.dma_dir = DMA_BIDIRECTIONAL;
+	pp_params.offset = 0;
+	pp_params.max_len = num_pages * PAGE_SIZE;
+
+	tx_q->page_pool = page_pool_create(&pp_params);
+	if (IS_ERR(tx_q->page_pool)) {
+		ret = PTR_ERR(tx_q->page_pool);
+		tx_q->page_pool = NULL;
+		return ret;
+	}
 
 	tx_q->tx_skbuff_dma = kcalloc(dma_conf->dma_tx_size,
 				      sizeof(*tx_q->tx_skbuff_dma),
@@ -2673,7 +2699,8 @@ static int stmmac_tx_clean(struct stmmac_priv *priv, int budget, u32 queue,
 		    tx_q->tx_skbuff_dma[entry].buf_type == STMMAC_TXBUF_T_XDP_NDO) {
 			xdpf = tx_q->xdpf[entry];
 			skb = NULL;
-		} else if (tx_q->tx_skbuff_dma[entry].buf_type == STMMAC_TXBUF_T_SKB) {
+		} else if (tx_q->tx_skbuff_dma[entry].buf_type == STMMAC_TXBUF_T_SKB ||
+			   tx_q->tx_skbuff_dma[entry].buf_type == STMMAC_TXBUF_T_DMA) {
 			xdpf = NULL;
 			skb = tx_q->tx_skbuff[entry];
 		} else {
@@ -2727,7 +2754,10 @@ static int stmmac_tx_clean(struct stmmac_priv *priv, int budget, u32 queue,
 
 		if (likely(tx_q->tx_skbuff_dma[entry].buf &&
 			   tx_q->tx_skbuff_dma[entry].buf_type != STMMAC_TXBUF_T_XDP_TX)) {
-			if (tx_q->tx_skbuff_dma[entry].map_as_page)
+			if (tx_q->tx_skbuff_dma[entry].buf_type == STMMAC_TXBUF_T_DMA)
+				page_pool_recycle_direct(tx_q->page_pool,
+							 tx_q->tx_skbuff_dma[entry].page);
+			else if (tx_q->tx_skbuff_dma[entry].map_as_page)
 				dma_unmap_page(priv->device,
 					       tx_q->tx_skbuff_dma[entry].buf,
 					       tx_q->tx_skbuff_dma[entry].len,
@@ -2762,7 +2792,8 @@ static int stmmac_tx_clean(struct stmmac_priv *priv, int budget, u32 queue,
 		if (tx_q->tx_skbuff_dma[entry].buf_type == STMMAC_TXBUF_T_XSK_TX)
 			tx_q->xsk_frames_done++;
 
-		if (tx_q->tx_skbuff_dma[entry].buf_type == STMMAC_TXBUF_T_SKB) {
+		if (tx_q->tx_skbuff_dma[entry].buf_type == STMMAC_TXBUF_T_SKB ||
+		    tx_q->tx_skbuff_dma[entry].buf_type == STMMAC_TXBUF_T_DMA) {
 			if (likely(skb)) {
 				pkts_compl++;
 				bytes_compl += skb->len;
@@ -4501,6 +4532,7 @@ static netdev_tx_t stmmac_xmit(struct sk_buff *skb, struct net_device *dev)
 	struct stmmac_priv *priv = netdev_priv(dev);
 	unsigned int nopaged_len = skb_headlen(skb);
 	int i, csum_insertion = 0, is_jumbo = 0;
+	gfp_t gfp = (GFP_ATOMIC | __GFP_NOWARN);
 	u32 queue = skb_get_queue_mapping(skb);
 	int nfrags = skb_shinfo(skb)->nr_frags;
 	int gso = skb_shinfo(skb)->gso_type;
@@ -4508,6 +4540,7 @@ static netdev_tx_t stmmac_xmit(struct sk_buff *skb, struct net_device *dev)
 	struct dma_edesc *tbs_desc = NULL;
 	struct dma_desc *desc, *first;
 	struct stmmac_tx_queue *tx_q;
+	struct page *tx_buf_page;
 	bool has_vlan, set_ic;
 	int entry, first_tx;
 	dma_addr_t des;
@@ -4709,14 +4742,30 @@ static netdev_tx_t stmmac_xmit(struct sk_buff *skb, struct net_device *dev)
 	if (likely(!is_jumbo)) {
 		bool last_segment = (nfrags == 0);
 
-		des = dma_map_single(priv->device, skb->data,
-				     nopaged_len, DMA_TO_DEVICE);
-		if (dma_mapping_error(priv->device, des))
-			goto dma_map_err;
-
-		tx_q->tx_skbuff_dma[first_entry].buf = des;
-		tx_q->tx_skbuff_dma[first_entry].buf_type = STMMAC_TXBUF_T_SKB;
-		tx_q->tx_skbuff_dma[first_entry].map_as_page = false;
+		if (!(last_segment && priv->plat->tx_buf_quirk)) {
+			des = dma_map_single(priv->device, skb->data,
+					     nopaged_len, DMA_TO_DEVICE);
+			if (dma_mapping_error(priv->device, des))
+				goto dma_map_err;
+			tx_q->tx_skbuff_dma[first_entry].buf = des;
+			tx_q->tx_skbuff_dma[first_entry].buf_type = STMMAC_TXBUF_T_SKB;
+			tx_q->tx_skbuff_dma[first_entry].map_as_page = false;
+		} else {
+			tx_q->tx_skbuff_dma[first_entry].buf_type = STMMAC_TXBUF_T_DMA;
+			tx_q->tx_skbuff_dma[first_entry].map_as_page = false;
+			tx_q->tx_skbuff_dma[first_entry].skb = skb;
+			tx_q->tx_skbuff_dma[first_entry].page =
+				page_pool_alloc_pages(tx_q->page_pool, gfp);
+			tx_buf_page = tx_q->tx_skbuff_dma[first_entry].page;
+			des = page_pool_get_dma_addr(tx_buf_page);
+			tx_q->tx_skbuff_dma[first_entry].buf = des;
+			dma_sync_single_for_cpu(priv->device, des,
+						nopaged_len, DMA_BIDIRECTIONAL);
+			skb_copy_from_linear_data(skb, page_address(tx_buf_page),
+						  nopaged_len);
+			dma_sync_single_for_device(priv->device, des, nopaged_len,
+						   DMA_BIDIRECTIONAL);
+		}
 
 		stmmac_set_desc_addr(priv, first, des);
 

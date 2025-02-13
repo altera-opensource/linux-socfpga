@@ -620,6 +620,8 @@ stmmac_probe_config_dt(struct platform_device *pdev, u8 *mac)
 
 	of_property_read_u32(np, "snps,ps-speed", &plat->mac_port_sel_speed);
 
+	plat->tx_buf_quirk = of_property_read_bool(np, "snps,pagepool-tx-buf-quirk");
+
 	plat->axi = stmmac_axi_setup(pdev);
 
 	rc = stmmac_mtl_setup(pdev, plat);
