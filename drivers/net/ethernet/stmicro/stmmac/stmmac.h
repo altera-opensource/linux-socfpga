@@ -40,6 +40,7 @@ struct stmmac_resources {
 
 enum stmmac_txbuf_type {
 	STMMAC_TXBUF_T_SKB,
+	STMMAC_TXBUF_T_DMA,
 	STMMAC_TXBUF_T_XDP_TX,
 	STMMAC_TXBUF_T_XDP_NDO,
 	STMMAC_TXBUF_T_XSK_TX,
@@ -47,6 +48,8 @@ enum stmmac_txbuf_type {
 
 struct stmmac_tx_info {
 	dma_addr_t buf;
+	struct page *page;
+	struct sk_buff *skb;
 	bool map_as_page;
 	unsigned len;
 	bool last_segment;
@@ -64,6 +67,7 @@ struct stmmac_tx_queue {
 	int tbs;
 	struct hrtimer txtimer;
 	u32 queue_index;
+	struct page_pool *page_pool;
 	struct stmmac_priv *priv_data;
 	struct dma_extended_desc *dma_etx ____cacheline_aligned_in_smp;
 	struct dma_edesc *dma_entx;
