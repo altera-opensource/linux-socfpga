@@ -152,7 +152,7 @@ enum stmmac_mpacket_type {
 	MPACKET_RESPONSE = 1,
 };
 
-#define STMMAC_FPE_MM_MAX_VERIFY_RETRIES	3
+#define STMMAC_FPE_MM_MAX_VERIFY_RETRIES	20
 #define STMMAC_FPE_MM_MAX_VERIFY_TIME_MS	128
 
 struct stmmac_fpe_cfg {

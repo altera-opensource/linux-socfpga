@@ -975,13 +975,7 @@ static void stmmac_fpe_link_state_handle(struct stmmac_priv *priv, bool is_up)
 
 	spin_lock_irqsave(&fpe_cfg->lock, flags);
 
-	if (is_up && fpe_cfg->pmac_enabled) {
-		/* VERIFY process requires pmac enabled when NIC comes up */
-		stmmac_fpe_configure(priv, priv->ioaddr, fpe_cfg,
-				     priv->plat->tx_queues_to_use,
-				     priv->plat->rx_queues_to_use,
-				     false, true);
-
+	if (is_up && fpe_cfg->tx_enabled) {
 		/* New link => maybe new partner => new verification process */
 		stmmac_fpe_apply(priv);
 	} else {
@@ -990,6 +984,8 @@ static void stmmac_fpe_link_state_handle(struct stmmac_priv *priv, bool is_up)
 				     priv->plat->tx_queues_to_use,
 				     priv->plat->rx_queues_to_use,
 				     false, false);
+		if (fpe_cfg->status != ETHTOOL_MM_VERIFY_STATUS_DISABLED)
+			fpe_cfg->status = ETHTOOL_MM_VERIFY_STATUS_INITIAL;
 	}
 
 	spin_unlock_irqrestore(&fpe_cfg->lock, flags);
@@ -6010,7 +6006,7 @@ static void stmmac_fpe_event_status(struct stmmac_priv *priv, int status)
 	/* This is interrupt context, just spin_lock() */
 	spin_lock(&fpe_cfg->lock);
 
-	if (!fpe_cfg->pmac_enabled || status == FPE_EVENT_UNKNOWN)
+	if (status == FPE_EVENT_UNKNOWN)
 		goto unlock_out;
 
 	/* LP has sent verify mPacket */
