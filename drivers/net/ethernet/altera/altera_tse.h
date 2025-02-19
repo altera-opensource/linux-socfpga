@@ -416,6 +416,9 @@ struct altera_tse_private {
 	int hwts_rx_en;
 	u32 ptp_enable;
 
+	/* SGMII PCS address space */
+	void __iomem *pcs_base;
+
 	/* mSGDMA Rx Dispatcher address space */
 	void __iomem *rx_dma_csr;
 	void __iomem *rx_dma_desc;
