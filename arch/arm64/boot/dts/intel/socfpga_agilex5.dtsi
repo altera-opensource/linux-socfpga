@@ -240,6 +240,13 @@
 		};
 	};
 
+	fpga-region {
+		compatible = "fpga-region";
+		#address-cells = <0x2>;
+		#size-cells = <0x2>;
+		fpga-mgr = <&fpga_mgr>;
+	};
+
 	fcs_crypto: fcs-crypto {
 		compatible = "intel,agilex5-soc-fcs-crypto";
 		dependent-on = <&fcs_hal>;
@@ -257,13 +264,6 @@
 		#size-cells = <1>;
 		device_type = "soc";
 		interrupt-parent = <&intc>;
-
-		base_fpga_region {
-			#address-cells = <0x2>;
-			#size-cells = <0x2>;
-			compatible = "fpga-region";
-			fpga-mgr = <&fpga_mgr>;
-		};
 
 		clkmgr: clock-controller@10d10000 {
 			compatible = "intel,agilex5-clkmgr";
