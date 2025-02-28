@@ -1571,8 +1571,7 @@ int stratix10_svc_async_send(struct stratix10_svc_chan *chan, void *msg,
 		args.a4 = p_msg->arg[2];
 		args.a5 = stratix10_get_physical_address(ctrl, p_msg->payload);
 		args.a6 = p_msg->arg[3];
-		args.a7 = stratix10_get_physical_address(ctrl, p_msg->payload_output);
-		args.a8 = (unsigned long)p_msg->payload_length_output;
+		args.a7 = p_msg->arg[4];
 		break;
 	case COMMAND_GET_IDCODE:
 		args.a0 = INTEL_SIP_SMC_ASYNC_GET_IDCODE;

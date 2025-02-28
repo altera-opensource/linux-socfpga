@@ -986,14 +986,19 @@ INTEL_SIP_SMC_FAST_CALL_VAL(INTEL_SIP_SMC_FUNCID_FPGA_CONFIG_COMPLETED_WRITE)
 
 /**
  * Request INTEL_SIP_SMC_ASYNC_FCS_HKDF_REQUEST
- *
- * Async call to perform HKDF extract or expand with input key and data.
+ * Sync call to send the request on performing HKDF extract or expand with
+ * input key and data.
  *
  * Call register usage:
  * a0 INTEL_SIP_SMC_ASYNC_FCS_HKDF_REQUEST
- * a1 transaction job id
- * a2-a8 parameters
- * a9-a17 not used
+ * a1 transaction job id in lower half,smmu addr offset in upper half
+ * a2 session ID
+ * a3 step type
+ * a4 MAC mode
+ * a5 physical address of source
+ * a6 key_id
+ * a7 output key object length
+ * a8-a17 not used
  *
  * Return status:
  * a0 INTEL_SIP_SMC_STATUS_OK, INTEL_SIP_SMC_STATUS_REJECTED
