@@ -2203,9 +2203,8 @@ INTEL_SIP_SMC_FAST_CALL_VAL(INTEL_SIP_SMC_FUNCID_FPGA_CONFIG_COMPLETED_WRITE)
  * a4 MAC mode
  * a5 physical address of source
  * a6 key_id
- * a7 physical address of destation
- * a8 size of destination
- * a9-a17 not used
+ * a7 output key object length
+ * a8-a17 not used
  *
  * Return status:
  * a0 INTEL_SIP_SMC_STATUS_OK ,INTEL_SIP_SMC_STATUS_REJECTED
