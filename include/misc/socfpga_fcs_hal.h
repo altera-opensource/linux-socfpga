@@ -109,8 +109,7 @@ struct fcs_cmd_context {
 			FCS_HAL_U32 info_len;
 			FCS_HAL_CHAR *output_key_obj;
 			FCS_HAL_U32 output_key_obj_len;
-			FCS_HAL_CHAR *hkdf_resp;
-			FCS_HAL_U32 *hkdf_resp_len;
+			FCS_HAL_U32 *hkdf_resp;
 		} hkdf_req;
 
 		struct {

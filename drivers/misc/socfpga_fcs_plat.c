@@ -300,9 +300,8 @@ static FCS_HAL_INT plat_sip_svc_send_request(struct socfpga_fcs_priv *priv,
 		msg->arg[1] = k_ctx->hkdf_req.step_type;
 		msg->arg[2] = k_ctx->hkdf_req.mac_mode;
 		msg->arg[3] = k_ctx->hkdf_req.key_id;
+		msg->arg[4] = k_ctx->hkdf_req.output_key_obj_len;
 		msg->payload = k_ctx->hkdf_req.ikm;
-		msg->payload_output = k_ctx->hkdf_req.hkdf_resp;
-		msg->payload_length_output = *k_ctx->hkdf_req.hkdf_resp_len;
 		msg->command = COMMAND_FCS_CRYPTO_HKDF_REQUEST;
 		break;
 
