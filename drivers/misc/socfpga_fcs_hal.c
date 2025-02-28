@@ -47,6 +47,9 @@
 #define FCS_STATUS_LEN			4
 #define FCS_ECDSA_CRYPTO_BLOCK_SZ	FCS_CRYPTO_BLOCK_SZ
 
+/* HKDF input payload size with 1st and 2nd input */
+#define HKDF_INPUT_DATA_SIZE		80
+
 FCS_HAL_INT hal_session_close(struct fcs_cmd_context *const k_ctx)
 {
 	FCS_HAL_INT ret = 0;
@@ -821,9 +824,8 @@ EXPORT_SYMBOL(hal_random_number);
 FCS_HAL_INT hal_hkdf_request(struct fcs_cmd_context *const k_ctx)
 {
 	FCS_HAL_INT ret = 0;
-	FCS_HAL_U32 resp_len = FCS_KDK_MAX_SZ;
-	FCS_HAL_VOID *s_buf = NULL, *d_buf = NULL, *src_ptr = NULL;
-	FCS_HAL_DMA_ADDR fcs_dma_handle_src, fcs_dma_handle_dst;
+	FCS_HAL_VOID *s_buf = NULL, *src_ptr = NULL;
+	FCS_HAL_DMA_ADDR fcs_dma_handle_src;
 	struct fcs_cmd_context ctx;
 
 	fcs_plat_memcpy(&ctx, k_ctx, sizeof(struct fcs_cmd_context));
@@ -860,16 +862,14 @@ FCS_HAL_INT hal_hkdf_request(struct fcs_cmd_context *const k_ctx)
 	}
 	src_ptr += sizeof(ctx.hkdf_req.ikm_len);
 
-	if (ctx.hkdf_req.ikm_len) {
-		ret = fcs_plat_copy_from_user(src_ptr, &ctx.hkdf_req.ikm,
-					      ctx.hkdf_req.info_len);
-		if (ret) {
-			LOG_ERR("Failed to copy HKDF info from user to kernel buffer ret: %d\n",
-				ret);
-			goto free_mem;
-		}
+	ret = fcs_plat_copy_from_user(src_ptr, ctx.hkdf_req.ikm,
+				      ctx.hkdf_req.ikm_len);
+	if (ret) {
+		LOG_ERR("Failed to copy HKDF info from user to kernel buffer ret: %d\n",
+			ret);
+		goto free_mem;
 	}
-	src_ptr += 80;
+	src_ptr += HKDF_INPUT_DATA_SIZE;
 
 	ret = fcs_plat_copy_from_user(src_ptr, &ctx.hkdf_req.info_len,
 				      sizeof(ctx.hkdf_req.info_len));
@@ -880,36 +880,22 @@ FCS_HAL_INT hal_hkdf_request(struct fcs_cmd_context *const k_ctx)
 	}
 	src_ptr += sizeof(ctx.hkdf_req.info_len);
 
-	if (ctx.hkdf_req.info_len) {
-		ret = fcs_plat_copy_from_user(src_ptr, ctx.hkdf_req.info,
-					      ctx.hkdf_req.info_len);
-		if (ret) {
-			LOG_ERR("Failed to copy HKDF salt from user to kernel buffer ret: %d\n",
-				ret);
-			goto free_mem;
-		}
-	}
-	src_ptr += 80;
-
-	ret = fcs_plat_copy_from_user(src_ptr, &ctx.hkdf_req.output_key_obj_len,
-				      sizeof(ctx.hkdf_req.output_key_obj_len));
+	ret = fcs_plat_copy_from_user(src_ptr, ctx.hkdf_req.info,
+					ctx.hkdf_req.info_len);
 	if (ret) {
-		LOG_ERR("Failed to copy HKDF output key object length from user to kernel buffer ret: %d\n",
+		LOG_ERR("Failed to copy HKDF salt from user to kernel buffer ret: %d\n",
 			ret);
 		goto free_mem;
 	}
+	src_ptr += HKDF_INPUT_DATA_SIZE;
 
-	src_ptr += sizeof(ctx.hkdf_req.output_key_obj_len);
-
-	if (ctx.hkdf_req.output_key_obj_len) {
-		ret = fcs_plat_copy_from_user(src_ptr,
-					      ctx.hkdf_req.output_key_obj,
-					      ctx.hkdf_req.output_key_obj_len);
-		if (ret) {
-			LOG_ERR("Failed to copy HKDF output key object from user to kernel buffer ret: %d\n",
-				ret);
-			goto free_mem;
-		}
+	ret = fcs_plat_copy_from_user(src_ptr,
+				      ctx.hkdf_req.output_key_obj,
+				      ctx.hkdf_req.output_key_obj_len);
+	if (ret) {
+		LOG_ERR("Failed to copy HKDF output key obj from user ret: %d\n",
+			ret);
+		goto free_mem;
 	}
 
 	/* Map buffer for DMA */
@@ -921,32 +907,11 @@ FCS_HAL_INT hal_hkdf_request(struct fcs_cmd_context *const k_ctx)
 		goto free_mem;
 	}
 
-	/* Allocate memory for the Key derivation key kernel buffer */
-	d_buf = priv->plat_data->svc_alloc_memory(priv, FCS_KDK_MAX_SZ);
-	if (IS_ERR(d_buf)) {
-		ret = -ENOMEM;
-		LOG_ERR("Failed to allocate memory for HKDF destination buffer ret: %d\n",
-			ret);
-		goto unmap;
-	}
-
-	/* Map the Key derivation key kernel buffer for DMA */
-	ret = fcs_plat_dma_addr_map(priv, &fcs_dma_handle_dst, d_buf,
-				    FCS_KDK_MAX_SZ, FCS_DMA_FROM_DEVICE);
-	if (ret) {
-		LOG_ERR("Failed to map dma address for HKDF destination buffer ret: %d\n",
-			ret);
-		goto unmap;
-	}
-
 	k_ctx->hkdf_req.ikm = s_buf;
-	k_ctx->hkdf_req.hkdf_resp = d_buf;
-	k_ctx->hkdf_req.hkdf_resp_len = &resp_len;
 
-	ret = priv->plat_data->svc_send_request(
-		priv, FCS_DEV_CRYPTO_HKDF_REQUEST, FCS_REQUEST_TIMEOUT);
-	fcs_plat_dma_addr_unmap(priv, &fcs_dma_handle_dst, FCS_KDK_MAX_SZ,
-				FCS_DMA_FROM_DEVICE);
+	ret = priv->plat_data->svc_send_request(priv,
+						FCS_DEV_CRYPTO_HKDF_REQUEST,
+						FCS_REQUEST_TIMEOUT);
 	if (ret) {
 		LOG_ERR("Failed to send the cmd=%d,ret=%d\n",
 			FCS_DEV_CRYPTO_HKDF_REQUEST, ret);
@@ -956,29 +921,20 @@ FCS_HAL_INT hal_hkdf_request(struct fcs_cmd_context *const k_ctx)
 	if (priv->status) {
 		ret = -EIO;
 		LOG_ERR("Mailbox error, Failed to perform HKDF ret: %d\n", ret);
-		goto copy_mbox_status;
 	}
 
-	ret = fcs_plat_copy_to_user(ctx.hkdf_req.hkdf_resp, d_buf, priv->resp);
-	if (ret) {
-		LOG_ERR("Failed to copy HKDF status to user ret: %d\n", ret);
-		goto copy_mbox_status;
-	}
-
-	ret = fcs_plat_copy_to_user(ctx.hkdf_req.hkdf_resp_len, &priv->resp,
-				    sizeof(priv->resp));
-	if (ret) {
-		LOG_ERR("Failed to copy HKDF status length to user ret: %d\n",
-			ret);
-	}
-
-copy_mbox_status:
 	ret = fcs_plat_copy_to_user(ctx.error_code_addr, &priv->status,
 				    sizeof(priv->status));
 	if (ret) {
 		LOG_ERR("Failed to copy mailbox status code to user ret: %d\n",
 			ret);
 	}
+
+	ret = fcs_plat_copy_to_user(ctx.hkdf_req.hkdf_resp, &priv->resp,
+				    sizeof(priv->resp));
+	if (ret)
+		LOG_ERR("Failed to copy HKDF status to user ret: %d\n", ret);
+
 	priv->plat_data->svc_task_done(priv);
 unmap:
 	fcs_plat_dma_addr_unmap(priv, &fcs_dma_handle_src, FCS_KDK_MAX_SZ,
