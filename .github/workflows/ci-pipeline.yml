@@ -41,6 +41,87 @@ jobs:
           git checkout master
           bash workflow_Checkpatch.sh ${{ github.workspace }} ${{ github.event.repository.name }} ${{ secrets.GITHUB_TOKEN }} ${{ github.event.pull_request.number }} ${{ github.head_ref }} ${{ github.base_ref }}
 
+  ci-coverity:
+    runs-on: [self-hosted,build_server,pswe-ci-runner1.sj.altera.com]
+    container:
+        image: amr-registry-pre.caas.intel.com/pse-pswe-software-ba/embedded_coverity:ubuntu20.04.0_6
+    env:
+      # Disable the warnings of Security violation. We need to check why this is trigger later, plaintext password.
+      EC_DISABLE_VAL: project,system
+
+    steps:
+      - uses: actions/checkout@v4
+      - name : Download coverity script
+        run: |
+          git config --global credential.helper store
+          git clone https://${{ secrets.GIT_USER }}:${{ secrets.GIT_TOKEN }}@github.com/intel-sandbox/application.devops.github.pr.workflow
+          cd application.devops.github.pr.workflow
+          git checkout master
+
+      - name : Setup Coverity
+        uses: intel-innersource/frameworks.actions.setup-coverity@v1
+        env:
+          https_proxy: proxy-dmz.intel.com:912 # If the self-hosted runner has issues with the proxy
+        with:
+          version: '2022.3.1'
+
+      - name: Run Coverity Build
+        run: |
+          cd application.devops.github.pr.workflow
+          bash workflow_Coverity.sh ${{ github.workspace }} ${{ github.event.repository.name }} linux-socfpga-github-workflow ${{ github.head_ref }} ${{ github.base_ref }}
+
+      - name: linux-coverity-report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: linux-coverity-report
+          path: |
+            linux_output_defect.json
+          retention-days: 1
+
+  ci-coverity-parse-result:
+    needs: ci-coverity
+    runs-on: [self-hosted,build_server,pswe-ci-runner1.sj.altera.com]
+    container:
+        image: amr-registry-pre.caas.intel.com/pse-pswe-software-ba/embedded_coverity:ubuntu20.04.0_6
+
+    steps:
+      - name: Download coverity result
+        uses: actions/download-artifact@v4
+        with:
+          name: linux-coverity-report
+      - run: |
+          ls
+          pwd
+          rm -rf /tmp/coverity-result-json
+          mkdir /tmp/coverity-result-json
+          cp linux_output_defect.json /tmp/coverity-result-json/
+          ls /tmp/coverity-result-json/*
+
+      - uses: actions/checkout@v4
+      - name : Download coverity parser script
+        run: |
+          git config --global credential.helper store
+          git clone https://${{ secrets.GIT_USER }}:${{ secrets.GIT_TOKEN }}@github.com/intel-sandbox/application.devops.github.pr.workflow
+          cd application.devops.github.pr.workflow
+          git checkout master
+
+      - name : Run Coverity Parser
+        run: |
+          cd application.devops.github.pr.workflow
+          mv /tmp/coverity-result-json/* .
+          rm -rf /tmp/coverity-result-json
+          bash workflow_Coverity_Parser.sh ${{ github.workspace }} ${{ github.event.repository.name }}
+
+      - name: linux-coverity-report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: linux-coverity-report
+          path: |
+            linux_output_defect.csv
+          retention-days: 1
+
 #This action performs a build test using an ubuntu container.
   ci-build:
     # The type of runner that the job will run on
@@ -115,7 +196,7 @@ jobs:
 #This is the commit gate that ensures all required checks are passing before the PR is allowed to be merged.
   ci-check-pr-status:
     runs-on: [self-hosted,pswe-ci-runner1.sj.altera.com]
-    needs: [ci-checkpatch, ci-build, ci-verification, ci-check-reviews]
+    needs: [ci-coverity-parse-result, ci-verification, ci-checkpatch, ci-check-reviews]
     steps:
      - name: Check for unaddressed change requests
        env:
@@ -132,7 +213,7 @@ jobs:
           rm -rf $tmp_dir
 
      - name: On failure
-       if: ${{ needs.ci-checkpatch.result != 'success' || needs.ci-build.result != 'success' || needs.ci-verification.result != 'success' || needs.ci-check-reviews.result != 'success' }}
+       if: ${{ needs.ci-coverity-parse-result.result != 'success' || needs.ci-verification.result != 'success' || needs.ci-checkpatch.result != 'success' || needs.ci-check-reviews.result != 'success' }}
        run: |
           echo "Status check has failed."
           exit 1
