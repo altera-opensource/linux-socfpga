@@ -309,7 +309,7 @@ struct dw_i2c_dev {
 #define MODEL_AMD_NAVI_GPU			BIT(10)
 #define MODEL_WANGXUN_SP			BIT(11)
 #define MODEL_SOCFPGA				BIT(12)
-#define MODEL_MASK				GENMASK(11, 8)
+#define MODEL_MASK				GENMASK(12, 8)
 
 /*
  * Enable UCSI interrupt by writing 0xd at register
