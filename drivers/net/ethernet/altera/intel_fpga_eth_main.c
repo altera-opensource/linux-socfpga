@@ -2051,6 +2051,19 @@ static int intel_fpga_xtile_probe(struct platform_device *pdev)
 		goto err_free_netdev;
 	}
 
+	if (priv->ptp_enable) {
+		dev_tod  = of_parse_phandle(pdev->dev.of_node, "tod", 0);
+		pdev_tod = of_find_device_by_node(dev_tod);
+		if (pdev_tod)
+			priv->ptp_priv = dev_get_drvdata(&pdev_tod->dev);
+		if (!pdev_tod || !priv->ptp_priv) {
+			dev_err(&pdev->dev, "PTP clock not available, retry!\n");
+			ret = -EPROBE_DEFER;
+			goto err_free_netdev;
+		}
+		dev_info(&pdev->dev, "\tPTP Clock: %s\n", priv->ptp_priv->ptp_clock_ops.name);
+	}
+
 	/* create phylink */
 	priv->phylink = phylink_create(&priv->phylink_config, pdev->dev.fwnode,
 				       priv->phy_iface, &intel_fpga_xtile_phylink_ops);
@@ -2074,19 +2087,6 @@ static int intel_fpga_xtile_probe(struct platform_device *pdev)
 	} else {
 		dev_err(&pdev->dev, "fixed link property undefined\n");
 		goto err_free_netdev;
-	}
-
-	if (priv->ptp_enable) {
-		dev_tod  = of_parse_phandle(pdev->dev.of_node, "tod", 0);
-		pdev_tod = of_find_device_by_node(dev_tod);
-		if (pdev_tod)
-			priv->ptp_priv = dev_get_drvdata(&pdev_tod->dev);
-		if (!pdev_tod || !priv->ptp_priv) {
-			dev_err(&pdev->dev, "PTP clock not available, retry!\n");
-			ret = -EPROBE_DEFER;
-			goto err_free_netdev;
-		}
-		dev_info(&pdev->dev, "\tPTP Clock: %s\n", priv->ptp_priv->ptp_clock_ops.name);
 	}
 
 	ret = register_netdev(ndev);
