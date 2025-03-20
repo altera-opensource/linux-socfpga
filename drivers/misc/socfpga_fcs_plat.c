@@ -437,17 +437,18 @@ static FCS_HAL_INT plat_sip_svc_send_request(struct socfpga_fcs_priv *priv,
 		break;
 
 	case FCS_DEV_CRYPTO_AES_CRYPT_UPDATE:
-		pr_debug("src = %p, dst = %p, size = %d cmd = %d\n",
-			 k_ctx->aes.input, k_ctx->aes.output, k_ctx->aes.ip_len,
-			 COMMAND_FCS_CRYPTO_AES_CRYPT_FINALIZE);
+		pr_debug("Sending command: COMMAND_FCS_CRYPTO_AES_CRYPT_UPDATE with session_id:0x%x, cid: 0x%x, kid: 0x%x src = %p, dst = %p, src_size = %d dst_size= %d\n",
+			 priv->session_id, k_ctx->aes.cid, k_ctx->aes.kid, k_ctx->aes.input,
+			 k_ctx->aes.output, k_ctx->aes.ip_len, *k_ctx->aes.op_len);
 		msg->arg[0] = priv->session_id;
 		msg->arg[1] = k_ctx->aes.cid;
+
 		if (k_ctx->aes.mode == FCS_AES_BLOCK_MODE_GCM ||
-		    k_ctx->aes.mode == FCS_AES_BLOCK_MODE_GHASH) {
-			msg->arg[2] = k_ctx->aes.aad_len;
-		} else {
+		    k_ctx->aes.mode == FCS_AES_BLOCK_MODE_GHASH)
+			msg->arg[2] = k_ctx->aes.input_pad;
+		else
 			msg->arg[2] = 0;
-		}
+
 		msg->payload = k_ctx->aes.input;
 		msg->payload_length = k_ctx->aes.ip_len;
 		msg->payload_output = k_ctx->aes.output;
@@ -456,17 +457,18 @@ static FCS_HAL_INT plat_sip_svc_send_request(struct socfpga_fcs_priv *priv,
 		break;
 
 	case FCS_DEV_CRYPTO_AES_CRYPT_FINAL:
-		pr_debug("src = %p, dst = %p, size = %d cmd = %d\n",
-			 k_ctx->aes.input, k_ctx->aes.output, k_ctx->aes.ip_len,
-			 COMMAND_FCS_CRYPTO_AES_CRYPT_FINALIZE);
+		pr_debug("Sending command: COMMAND_FCS_CRYPTO_AES_CRYPT_FINALIZE with session_id: 0x%x, cid: 0x%x, kid: 0x%x src = %p, dst = %p, src_size = %d dst_size= %d\n",
+			 priv->session_id, k_ctx->aes.cid, k_ctx->aes.kid, k_ctx->aes.input,
+			 k_ctx->aes.output, k_ctx->aes.ip_len, *k_ctx->aes.op_len);
 		msg->arg[0] = priv->session_id;
 		msg->arg[1] = k_ctx->aes.cid;
+
 		if (k_ctx->aes.mode == FCS_AES_BLOCK_MODE_GCM ||
-		    k_ctx->aes.mode == FCS_AES_BLOCK_MODE_GHASH) {
-			msg->arg[2] = k_ctx->aes.aad_len;
-		} else {
+		    k_ctx->aes.mode == FCS_AES_BLOCK_MODE_GHASH)
+			msg->arg[2] = k_ctx->aes.input_pad;
+		else
 			msg->arg[2] = 0;
-		}
+
 		msg->payload = k_ctx->aes.input;
 		msg->payload_length = k_ctx->aes.ip_len;
 		msg->payload_output = k_ctx->aes.output;
@@ -760,9 +762,9 @@ static FCS_HAL_INT plat_sip_svc_send_request(struct socfpga_fcs_priv *priv,
 
 	case FCS_DEV_CRYPTO_ECDSA_SHA2_DATA_VERIFY_FINALIZE:
 		pr_debug("Sending command: COMMAND_FCS_CRYPTO_ECDSA_SHA2_VERIFY_FINALIZE with session_id: 0x%x, context_id: 0x%x, user_data_sz: 0x%x\n",
-			 priv->session_id,
-			 k_ctx->ecdsa_sha2_data_verify.context_id,
-			 k_ctx->ecdsa_sha2_data_verify.user_data_sz);
+			priv->session_id,
+			k_ctx->ecdsa_sha2_data_verify.context_id,
+			k_ctx->ecdsa_sha2_data_verify.user_data_sz);
 		msg->arg[0] = priv->session_id;
 		msg->arg[1] = k_ctx->ecdsa_sha2_data_verify.context_id;
 		msg->arg[2] = k_ctx->ecdsa_sha2_data_verify.user_data_sz;
@@ -776,9 +778,9 @@ static FCS_HAL_INT plat_sip_svc_send_request(struct socfpga_fcs_priv *priv,
 
 	case FCS_DEV_CRYPTO_ECDSA_SHA2_DATA_VERIFY_UPDATE:
 		pr_debug("Sending command: COMMAND_FCS_CRYPTO_ECDSA_SHA2_VERIFY_UPDATE with session_id: 0x%x, context_id: 0x%x, user_data_sz: 0x%x\n",
-			 priv->session_id,
-			 k_ctx->ecdsa_sha2_data_verify.context_id,
-			 k_ctx->ecdsa_sha2_data_verify.user_data_sz);
+			priv->session_id,
+			k_ctx->ecdsa_sha2_data_verify.context_id,
+			k_ctx->ecdsa_sha2_data_verify.user_data_sz);
 		msg->arg[0] = priv->session_id;
 		msg->arg[1] = k_ctx->ecdsa_sha2_data_verify.context_id;
 		msg->arg[2] = k_ctx->ecdsa_sha2_data_verify.user_data_sz;
@@ -792,7 +794,7 @@ static FCS_HAL_INT plat_sip_svc_send_request(struct socfpga_fcs_priv *priv,
 
 	case FCS_DEV_HPS_IMG_VALIDATE_REQUEST:
 		pr_debug("Sending command: COMMAND_FCS_SEND_CERTIFICATE with vab_cert_len: 0x%x\n",
-			 k_ctx->hps_img_validate.vab_cert_len);
+			k_ctx->hps_img_validate.vab_cert_len);
 		msg->payload = k_ctx->hps_img_validate.vab_cert;
 		msg->payload_length = k_ctx->hps_img_validate.vab_cert_len;
 		msg->command = COMMAND_FCS_SEND_CERTIFICATE;
