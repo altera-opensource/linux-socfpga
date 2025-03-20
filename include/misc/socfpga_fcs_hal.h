@@ -180,12 +180,13 @@ struct fcs_cmd_context {
 			FCS_HAL_U16 tag_len; /* Tag length */
 			FCS_HAL_U8 iv_source; /* IV source External/Internal */
 			FCS_HAL_CHAR *iv; /* IV */
-			FCS_HAL_CHAR *aad; /* IV */
-			FCS_HAL_CHAR *Tag; /* Tag */
+			FCS_HAL_CHAR *aad; /* AAD */
+			FCS_HAL_CHAR *tag; /* Tag */
 			FCS_HAL_CHAR *input; /* Input data */
 			FCS_HAL_UINT ip_len; /* Input Length */
 			FCS_HAL_CHAR *output; /* Output data */
 			FCS_HAL_UINT *op_len; /* Output Length */
+			FCS_HAL_UINT input_pad; /* Source data padding (only GCM mode) */
 		} aes;
 
 		struct {
