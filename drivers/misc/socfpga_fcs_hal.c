@@ -41,9 +41,18 @@
 #define DIGEST_SERVICE_MIN_DATA_SIZE	8
 #define FCS_AES_IV_SZ			16
 #define FCS_POLL_STATUS_LEN		4
-#define FCS_CRYPTO_BLOCK_SZ		0x400000
+#define FCS_AES_REQUEST_TIMEOUT		(10 * FCS_REQUEST_TIMEOUT)
+#define FCS_CRYPTO_BLOCK_SZ		(4 * 1024 * 1024)
 #define FCS_AES_CRYPT_BLOCK_SZ		FCS_CRYPTO_BLOCK_SZ
+#define AES_PARAMS_CRYPT_OFFSET		1
+#define AES_PARAMS_TAG_LEN_OFFSET	2
+#define AES_PARAMS_IV_TYPE_OFFSET	4
+#define AES_PARAMS_AAD_LEN_OFFSET	8
 #define FCS_AES_PARAMS_ECB_SZ		12
+#define GCM_TAG_LEN			16
+#define GCM_AAD_ALIGN			16
+#define GCM_DATA_ALIGN			16
+#define NON_GCM_DATA_ALIGN		32
 #define FCS_STATUS_LEN			4
 #define FCS_ECDSA_CRYPTO_BLOCK_SZ	FCS_CRYPTO_BLOCK_SZ
 
@@ -1436,10 +1445,14 @@ static FCS_HAL_INT hal_aes_crypt_init(struct fcs_cmd_context *const k_ctx)
 
 	fcs_plat_memset(aes_parms, 0, aes_parms_len);
 	fcs_plat_memcpy(aes_parms, &k_ctx->aes.mode, 1);
-	fcs_plat_memcpy(aes_parms + 1, &k_ctx->aes.crypt, 1);
-	fcs_plat_memcpy(aes_parms + 2, &k_ctx->aes.tag_len, 2);
-	fcs_plat_memcpy(aes_parms + 4, &k_ctx->aes.iv_source, 1);
-	fcs_plat_memcpy(aes_parms + 8, &k_ctx->aes.aad_len, 4);
+	fcs_plat_memcpy(aes_parms + AES_PARAMS_CRYPT_OFFSET, &k_ctx->aes.crypt, 1);
+	fcs_plat_memcpy(aes_parms + AES_PARAMS_TAG_LEN_OFFSET, &k_ctx->aes.tag_len, 2);
+	fcs_plat_memcpy(aes_parms + AES_PARAMS_IV_TYPE_OFFSET, &k_ctx->aes.iv_source, 1);
+	fcs_plat_memcpy(aes_parms + AES_PARAMS_AAD_LEN_OFFSET, &k_ctx->aes.aad_len, 4);
+
+	LOG_DBG("AES init: mode: %d, ENC/DEC: %d, tag_len: %d iv_src: %d aad_len: %d\n",
+		k_ctx->aes.mode, k_ctx->aes.crypt, k_ctx->aes.tag_len,
+		k_ctx->aes.iv_source, k_ctx->aes.aad_len);
 
 	k_ctx->aes.ip_len = FCS_AES_PARAMS_ECB_SZ;
 	if (k_ctx->aes.mode != FCS_AES_BLOCK_MODE_ECB) {
@@ -1480,25 +1493,125 @@ free_mem:
 	return ret;
 }
 
-static FCS_HAL_INT
-hal_aes_crypt_update(FCS_HAL_CHAR *ip_ptr, FCS_HAL_UINT src_len,
-		     FCS_HAL_CHAR *s_buf, FCS_HAL_UINT dst_len,
-		     FCS_HAL_CHAR *d_buf, FCS_HAL_CHAR *op_ptr,
-		     struct fcs_cmd_context *const k_ctx, FCS_HAL_INT command)
+static FCS_HAL_INT hal_aes_crypt_update_final(FCS_HAL_CHAR *ip_ptr, FCS_HAL_UINT src_len,
+					      FCS_HAL_CHAR *aad, FCS_HAL_UINT aad_size,
+					      FCS_HAL_CHAR *tag, FCS_HAL_UINT src_tag_len,
+					      FCS_HAL_UINT dst_tag_len, FCS_HAL_CHAR *op_ptr,
+					      FCS_HAL_UINT mode,
+					      struct fcs_cmd_context *const k_ctx,
+					      FCS_HAL_INT command)
 {
-	FCS_HAL_INT ret = 0;
+	FCS_HAL_INT ret = 0, pad1 = 0, pad2 = 0, s_buf_size = 0, d_buf_size = 0;
+	FCS_HAL_CHAR *s_buf = NULL, *s_buf_wr_ptr = NULL, *d_buf = NULL;
 	FCS_HAL_DMA_ADDR fcs_dma_handle_src, fcs_dma_handle_dst;
-	FCS_HAL_UINT data_len = 0, pad1;
 
-	pad1 = (k_ctx->aes.aad_len % 8) ? 8 - (k_ctx->aes.aad_len % 8) : 0;
-	data_len = src_len - (k_ctx->aes.aad_len + pad1);
-	/* Copy the user space source data to the kernel source buffer */
-	ret = fcs_plat_copy_from_user(s_buf + k_ctx->aes.aad_len + pad1, ip_ptr,
-				      data_len);
-	if (ret) {
-		LOG_ERR("Failed to copy AES data from user to kernel buffer ret: %d\n",
-			ret);
+	if (mode == FCS_AES_BLOCK_MODE_GCM ||
+	    mode == FCS_AES_BLOCK_MODE_GHASH) {
+		pad1 = (aad_size % GCM_AAD_ALIGN) ?
+			(GCM_AAD_ALIGN - (aad_size % GCM_AAD_ALIGN)) : 0;
+		pad2 = (src_len % GCM_DATA_ALIGN) ?
+			(GCM_DATA_ALIGN - (src_len % GCM_DATA_ALIGN)) : 0;
+
+		s_buf_size = aad_size + pad1 + src_len + pad2 + src_tag_len;
+		d_buf_size = src_len + pad2 + dst_tag_len;
+
+		if (s_buf_size > FCS_AES_CRYPT_BLOCK_SZ ||
+		    d_buf_size > FCS_AES_CRYPT_BLOCK_SZ) {
+			LOG_ERR("Invalid size request. Maximum buffer size supported is %d bytes\n",
+				FCS_AES_CRYPT_BLOCK_SZ);
+			return -EINVAL;
+		}
+
+		LOG_DBG("AES GCM: aadlen:%d, pad1:%d, srcln:%d, pad2:%d, srctag:%d, dsttag:%d\n",
+			aad_size, pad1, src_len, pad2, src_tag_len,
+			dst_tag_len);
+	} else {
+		pad2 = (src_len % NON_GCM_DATA_ALIGN) ?
+			       (NON_GCM_DATA_ALIGN - (aad_size % NON_GCM_DATA_ALIGN)) :
+			       0;
+		s_buf_size = src_len + pad2;
+		d_buf_size = src_len + pad2;
+
+		if (s_buf_size > FCS_AES_CRYPT_BLOCK_SZ) {
+			LOG_ERR("Invalid size request. Maximum buffer size supported is %d bytes\n",
+				FCS_AES_CRYPT_BLOCK_SZ);
+			return -EINVAL;
+		}
+		aad_size = 0;
+		src_tag_len = 0;
+		dst_tag_len = 0;
+	}
+
+	s_buf = priv->plat_data->svc_alloc_memory(priv, FCS_AES_CRYPT_BLOCK_SZ);
+	if (IS_ERR(s_buf)) {
+		ret = -ENOMEM;
+		LOG_ERR("Failed to allocate memory for AES source buffer ret: %d\n", ret);
 		return ret;
+	}
+	s_buf_wr_ptr = s_buf;
+
+	LOG_DBG("AES Update/final s_buf = %p, s_buf_size = %d\n", s_buf, s_buf_size);
+
+	if (aad_size) {
+		if (aad) {
+			LOG_ERR("AES Update/final copy AAD at %p aad_size = %d\n",
+				s_buf, aad_size);
+
+			ret = fcs_plat_copy_from_user(s_buf, aad, aad_size);
+			if (ret) {
+				LOG_ERR("Failed to copy AAD data to svc buffer ret: %d\n",
+					ret);
+				goto free_src;
+			}
+
+			fcs_plat_memset(s_buf + aad_size, 0, pad1);
+		} else {
+			LOG_ERR("Invalid AAD data buffer address %d\n", ret);
+			ret = -EINVAL;
+			goto free_src;
+		}
+
+		aad_size += pad1;
+		s_buf_wr_ptr = s_buf_wr_ptr + aad_size;
+	}
+
+	LOG_DBG("AES Update/final copy Data at %p  data_size = %d\n",
+		s_buf_wr_ptr, src_len);
+
+	ret = fcs_plat_copy_from_user(s_buf_wr_ptr, ip_ptr, src_len);
+	if (ret) {
+		LOG_ERR("Failed to copy AES data to svc buffer ret: %d\n", ret);
+		goto free_src;
+	}
+
+	s_buf_wr_ptr = s_buf_wr_ptr + src_len;
+	fcs_plat_memset(s_buf_wr_ptr, 0, pad2);
+	s_buf_wr_ptr = s_buf_wr_ptr + pad2;
+
+	if (src_tag_len) {
+		if (tag) {
+			LOG_DBG("AES Update/final Tag value at %p  tag_size = %d\n",
+				s_buf_wr_ptr, src_tag_len);
+			ret = fcs_plat_copy_from_user(s_buf_wr_ptr, tag,
+						      src_tag_len);
+			if (ret) {
+				LOG_ERR("Failed to copy Tag data to svc buffer ret: %d\n",
+					ret);
+				goto free_src;
+			}
+		} else {
+			LOG_ERR("Invalid TAG data buffer address %d\n", ret);
+			ret = -EINVAL;
+			goto free_src;
+		}
+	}
+
+	d_buf = priv->plat_data->svc_alloc_memory(priv, FCS_AES_CRYPT_BLOCK_SZ);
+	if (IS_ERR(d_buf)) {
+		ret = -ENOMEM;
+		LOG_ERR("Failed to allocate memory for AES destination buffer ret: %d\n",
+			ret);
+		goto free_src;
 	}
 
 	/* Map the source buffer for DMA */
@@ -1507,7 +1620,7 @@ hal_aes_crypt_update(FCS_HAL_CHAR *ip_ptr, FCS_HAL_UINT src_len,
 	if (ret) {
 		LOG_ERR("Failed perform dma address map for the AES source buffer ret: %d\n",
 			ret);
-		return ret;
+		goto free_dst;
 	}
 
 	/* Map the destination buffer for DMA */
@@ -1517,25 +1630,27 @@ hal_aes_crypt_update(FCS_HAL_CHAR *ip_ptr, FCS_HAL_UINT src_len,
 	if (ret) {
 		LOG_ERR("Failed perform dma address map for the AES destination buffer ret: %d\n",
 			ret);
-		goto unmap_src;
+		fcs_plat_dma_addr_unmap(priv, &fcs_dma_handle_src,
+					FCS_AES_CRYPT_BLOCK_SZ, FCS_DMA_TO_DEVICE);
+		goto free_dst;
 	}
 
-	if (k_ctx->aes.mode == FCS_AES_BLOCK_MODE_GHASH) {
-		dst_len = 0;
-		d_buf = NULL;
-	}
-
-	k_ctx->aes.ip_len = src_len;
-	*k_ctx->aes.op_len = dst_len;
+	k_ctx->aes.ip_len = s_buf_size;
+	*k_ctx->aes.op_len = d_buf_size;
 	k_ctx->aes.input = s_buf;
 	k_ctx->aes.output = d_buf;
+	k_ctx->aes.input_pad = pad2;
 
 	/* Send the AES crypt request */
 	ret = priv->plat_data->svc_send_request(priv, command,
-						10 * FCS_REQUEST_TIMEOUT);
+				FCS_AES_REQUEST_TIMEOUT);
 	if (ret) {
 		LOG_ERR("Failed to send the cmd=%d,ret=%d\n", command, ret);
-		goto unmap;
+		fcs_plat_dma_addr_unmap(priv, &fcs_dma_handle_dst,
+					FCS_AES_CRYPT_BLOCK_SZ, FCS_DMA_FROM_DEVICE);
+		fcs_plat_dma_addr_unmap(priv, &fcs_dma_handle_src,
+					FCS_AES_CRYPT_BLOCK_SZ, FCS_DMA_TO_DEVICE);
+		goto free_dst;
 	}
 
 	/* Copy the mailbox status code to the user */
@@ -1544,14 +1659,23 @@ hal_aes_crypt_update(FCS_HAL_CHAR *ip_ptr, FCS_HAL_UINT src_len,
 	if (ret) {
 		LOG_ERR("Failed to copy mailbox status code to user ret: %d\n",
 			ret);
-		goto take_done;
+		fcs_plat_dma_addr_unmap(priv, &fcs_dma_handle_dst,
+					FCS_AES_CRYPT_BLOCK_SZ, FCS_DMA_FROM_DEVICE);
+		fcs_plat_dma_addr_unmap(priv, &fcs_dma_handle_src,
+					FCS_AES_CRYPT_BLOCK_SZ, FCS_DMA_TO_DEVICE);
+		goto task_done;
 	}
 
 	if (priv->status) {
 		ret = -EIO;
 		LOG_ERR("Mailbox error, Failed to perform AES crypt Mbox status: 0x%x\n",
 			priv->status);
-		goto take_done;
+		fcs_plat_dma_addr_unmap(priv, &fcs_dma_handle_dst,
+					FCS_AES_CRYPT_BLOCK_SZ, FCS_DMA_FROM_DEVICE);
+		fcs_plat_dma_addr_unmap(priv, &fcs_dma_handle_src,
+					FCS_AES_CRYPT_BLOCK_SZ, FCS_DMA_TO_DEVICE);
+
+		goto task_done;
 	}
 
 	fcs_plat_dma_addr_unmap(priv, &fcs_dma_handle_dst,
@@ -1559,27 +1683,41 @@ hal_aes_crypt_update(FCS_HAL_CHAR *ip_ptr, FCS_HAL_UINT src_len,
 	fcs_plat_dma_addr_unmap(priv, &fcs_dma_handle_src,
 				FCS_AES_CRYPT_BLOCK_SZ, FCS_DMA_TO_DEVICE);
 
-	if (k_ctx->aes.mode != FCS_AES_BLOCK_MODE_GHASH) {
+	if (mode != FCS_AES_BLOCK_MODE_GHASH) {
+		LOG_DBG("AES copy Data to destination buffer %p  data_size = %d\n",
+			op_ptr, src_len + pad2);
 		/* Copy the destination buffer to the user space */
-		ret = fcs_plat_copy_to_user(op_ptr, d_buf, dst_len);
+		ret = fcs_plat_copy_to_user(op_ptr, d_buf, src_len + pad2);
 		if (ret)
 			LOG_ERR("Failed to copy AES data from kernel to user buffer ret: %d\n",
 				ret);
 	}
 
+	if (dst_tag_len) {
+		if (tag) {
+			LOG_DBG("AES copy tag value to Tag buffer %p  data_size = %d\n",
+				tag, dst_tag_len);
+			ret = fcs_plat_copy_to_user(tag, d_buf + src_len + pad2,
+						    dst_tag_len);
+			if (ret) {
+				LOG_ERR("Failed to copy TAG value to tag buffer ret: %d\n",
+					ret);
+				goto task_done;
+			}
+		} else {
+			LOG_ERR("Invalid TAG data buffer address %d\n", ret);
+			goto task_done;
+		}
+	}
+
+	LOG_DBG("AES Update/final Success\n");
+
+task_done:
 	priv->plat_data->svc_task_done(priv);
-
-	return ret;
-
-take_done:
-	priv->plat_data->svc_task_done(priv);
-unmap:
-	fcs_plat_dma_addr_unmap(priv, &fcs_dma_handle_dst,
-				FCS_AES_CRYPT_BLOCK_SZ, FCS_DMA_FROM_DEVICE);
-unmap_src:
-	fcs_plat_dma_addr_unmap(priv, &fcs_dma_handle_src,
-				FCS_AES_CRYPT_BLOCK_SZ, FCS_DMA_TO_DEVICE);
-
+free_dst:
+	priv->plat_data->svc_free_memory(priv, d_buf);
+free_src:
+	priv->plat_data->svc_free_memory(priv, s_buf);
 	return ret;
 }
 
@@ -1587,11 +1725,10 @@ FCS_HAL_INT hal_aes_crypt(struct fcs_cmd_context *const k_ctx)
 {
 	FCS_HAL_INT ret = 0;
 	struct fcs_cmd_context ctx;
-	FCS_HAL_CHAR *ip_ptr = NULL, *op_ptr = NULL, *s_buf = NULL,
-		     *d_buf = NULL;
-	FCS_HAL_UINT ip_len = 0, op_len = 0, src_len = 0, dst_len = 0;
-	FCS_HAL_UINT total_op_len = 0, aes_req_mx_sz = FCS_AES_CRYPT_BLOCK_SZ;
-	FCS_HAL_UINT pad1 = 0, tag_len = 0;
+	FCS_HAL_CHAR *ip_ptr = NULL, *op_ptr = NULL;
+	FCS_HAL_UINT ip_len = 0, op_len = 0, src_len = 0;
+	FCS_HAL_UINT total_op_len = 0;
+	FCS_HAL_UINT pad1 = 0, aad_size = 0, src_tag_len = 0, dst_tag_len = 0;
 
 	fcs_plat_memcpy(&ctx, k_ctx, sizeof(struct fcs_cmd_context));
 
@@ -1612,111 +1749,103 @@ FCS_HAL_INT hal_aes_crypt(struct fcs_cmd_context *const k_ctx)
 		return ret;
 	}
 
-	s_buf = priv->plat_data->svc_alloc_memory(priv, FCS_AES_CRYPT_BLOCK_SZ);
-	if (IS_ERR(s_buf)) {
-		ret = -ENOMEM;
-		LOG_ERR("Failed to allocate memory for AES source buffer ret: %d\n",
-			ret);
-		return ret;
-	}
+	/* Calculate AAD data padding length. AAD data shall be 16 bytes aligned.
+	 * Applicable for only GCM for other modes aad_len will be 0 hence pad1 will be 0
+	 */
+	aad_size = k_ctx->aes.aad_len;
+	pad1 = (aad_size % GCM_AAD_ALIGN) ?
+		       GCM_AAD_ALIGN - (k_ctx->aes.aad_len % GCM_AAD_ALIGN) : 0;
 
-	d_buf = priv->plat_data->svc_alloc_memory(priv, FCS_AES_CRYPT_BLOCK_SZ);
-	if (IS_ERR(d_buf)) {
-		ret = -ENOMEM;
-		LOG_ERR("Failed to allocate memory for AES destination buffer ret: %d\n",
-			ret);
-		goto free_src;
-	}
-
-	/* initialize the variables */
-	ip_len = ctx.aes.ip_len;
+	ip_len = (ctx.aes.ip_len + aad_size + pad1);
 	k_ctx->aes.op_len = &op_len;
 	ip_ptr = ctx.aes.input;
 	op_ptr = ctx.aes.output;
+	k_ctx->aes.input_pad = 0;
 
-	/* GCM/GHASH */
+	while (ip_len > FCS_AES_CRYPT_BLOCK_SZ) {
+		src_len = FCS_AES_CRYPT_BLOCK_SZ - (aad_size + pad1);
+
+		ret = hal_aes_crypt_update_final(ip_ptr, src_len,
+						 k_ctx->aes.aad, aad_size,
+						 NULL, src_tag_len,  dst_tag_len,
+						 op_ptr, k_ctx->aes.mode, k_ctx,
+						 FCS_DEV_CRYPTO_AES_CRYPT_UPDATE);
+		if (ret) {
+			LOG_ERR("Failed to perform AES crypt update ret: %d\n",
+				ret);
+			return ret;
+		}
+
+		ip_ptr += src_len;
+		op_ptr += src_len;
+		ip_len -= (src_len + aad_size + pad1);
+		total_op_len += src_len;
+		aad_size = 0;
+		pad1 = 0;
+	}
+
 	if (k_ctx->aes.mode == FCS_AES_BLOCK_MODE_GCM ||
 	    k_ctx->aes.mode == FCS_AES_BLOCK_MODE_GHASH) {
-		pad1 = (k_ctx->aes.aad_len % 8) ? 8 - (k_ctx->aes.aad_len % 8) :
-						  0;
+		if (ip_len > (FCS_AES_CRYPT_BLOCK_SZ - GCM_TAG_LEN)) {
+			src_len = FCS_AES_CRYPT_BLOCK_SZ - GCM_TAG_LEN -
+				  (aad_size + pad1);
+
+			ret = hal_aes_crypt_update_final(ip_ptr, src_len,
+							 k_ctx->aes.aad, aad_size,
+							 NULL, src_tag_len,  dst_tag_len,
+							 op_ptr, k_ctx->aes.mode, k_ctx,
+							 FCS_DEV_CRYPTO_AES_CRYPT_UPDATE);
+			if (ret) {
+				LOG_ERR("Failed to perform AES crypt update ret: %d\n",
+					ret);
+				return ret;
+			}
+
+			ip_ptr += src_len;
+			op_ptr += src_len;
+			ip_len -= (src_len + aad_size + pad1);
+			total_op_len += src_len;
+			aad_size = 0;
+			pad1 = 0;
+		}
+
 		if (k_ctx->aes.crypt == FCS_AES_ENCRYPT) {
-			tag_len = 16;
-			aes_req_mx_sz = FCS_AES_CRYPT_BLOCK_SZ -
-					k_ctx->aes.aad_len - pad1 - tag_len;
-			dst_len = aes_req_mx_sz + tag_len;
+			src_tag_len = 0;
+			dst_tag_len = GCM_TAG_LEN;
 		} else {
-			tag_len = -16;
-			aes_req_mx_sz = FCS_AES_CRYPT_BLOCK_SZ -
-					k_ctx->aes.aad_len - pad1;
-			dst_len = aes_req_mx_sz + tag_len;
+			src_tag_len = GCM_TAG_LEN;
+			dst_tag_len = 0;
 		}
-		src_len = aes_req_mx_sz + k_ctx->aes.aad_len + pad1;
-
-		/* Copy the user space source data to the kernel source buffer */
-		ret = fcs_plat_copy_from_user(s_buf, k_ctx->aes.aad,
-					      k_ctx->aes.aad_len);
-		if (ret) {
-			LOG_ERR("Failed to copy AES data from user to kernel buffer ret: %d\n",
-				ret);
-			goto free_mem;
-		}
-
-		fcs_plat_memset(s_buf + k_ctx->aes.aad_len, 0, pad1);
-	} else {
-		k_ctx->aes.aad_len = 0;
-		pad1 = 0;
-		tag_len = 0;
-		src_len = aes_req_mx_sz;
-		dst_len = aes_req_mx_sz;
 	}
 
-	/* Perform AES crypt update in blocks of FCS_AES_CRYPT_BLOCK_SZ */
-	while (ip_len > aes_req_mx_sz) {
-		/* Perform the AES crypt update */
-		ret = hal_aes_crypt_update(ip_ptr, src_len, s_buf, dst_len,
-					   d_buf, op_ptr, k_ctx,
-					   FCS_DEV_CRYPTO_AES_CRYPT_UPDATE);
-		if (ret) {
-			LOG_ERR("Failed to perform AES crypt update ret: %d\n",
-				ret);
-			goto free_mem;
-		}
-
-		ip_ptr += aes_req_mx_sz;
-		op_ptr += dst_len;
-		ip_len -= aes_req_mx_sz;
-		total_op_len += dst_len;
-	}
-
-	/* Check if there is any remaining data to be processed */
 	if (ip_len) {
-		/* Perform the final AES crypt update */
-		src_len = ip_len + k_ctx->aes.aad_len + pad1;
-		dst_len = ip_len + tag_len;
-		ret = hal_aes_crypt_update(ip_ptr, src_len, s_buf, dst_len,
-					   d_buf, op_ptr, k_ctx,
-					   FCS_DEV_CRYPTO_AES_CRYPT_FINAL);
+		src_len = ip_len - (aad_size + pad1);
+
+		ret = hal_aes_crypt_update_final(ip_ptr, src_len,
+						 k_ctx->aes.aad, aad_size,
+						 k_ctx->aes.tag, src_tag_len, dst_tag_len,
+						 op_ptr, k_ctx->aes.mode, k_ctx,
+						 FCS_DEV_CRYPTO_AES_CRYPT_FINAL);
 		if (ret) {
 			LOG_ERR("Failed to perform AES crypt update ret: %d\n",
 				ret);
-			goto free_mem;
+			return ret;
 		}
-		total_op_len += dst_len;
+
+		if (k_ctx->aes.mode != FCS_AES_BLOCK_MODE_GHASH)
+			total_op_len += src_len;
+		else
+			total_op_len = 0;
 	}
 
+	/* Copy the destination buffer to the user space */
 	ret = fcs_plat_copy_to_user(ctx.aes.op_len, &total_op_len,
-				    sizeof(ip_len));
+				    sizeof(ctx.aes.op_len));
 	if (ret) {
 		LOG_ERR("Failed to copy AES data from kernel to user buffer ret: %d\n",
 			ret);
 	}
 
-	/* TODO: Copy the IV data to IV buffer if IV source is set to internal */
-
-free_mem:
-	priv->plat_data->svc_free_memory(priv, d_buf);
-free_src:
-	priv->plat_data->svc_free_memory(priv, s_buf);
 	return ret;
 }
 EXPORT_SYMBOL(hal_aes_crypt);
