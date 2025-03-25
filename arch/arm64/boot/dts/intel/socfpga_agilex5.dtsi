@@ -793,6 +793,7 @@
 			snps,multi-irq-en;
 			snps,tso;
 			snps,rx-vlan-offload;
+			snps,pagepool-tx-buf-quirk;
 			altr,sysmgr-syscon = <&sysmgr 0x44 0>;
 			altr,smtg-hub;
 			iommus = <&smmu 1>;
@@ -946,6 +947,7 @@
 			snps,multi-irq-en;
 			snps,tso;
 			snps,rx-vlan-offload;
+			snps,pagepool-tx-buf-quirk;
 			altr,sysmgr-syscon = <&sysmgr 0x48 0>;
 			altr,smtg-hub;
 			iommus = <&smmu 2>;
@@ -1099,6 +1101,7 @@
 			snps,multi-irq-en;
 			snps,tso;
 			snps,rx-vlan-offload;
+			snps,pagepool-tx-buf-quirk;
 			altr,sysmgr-syscon = <&sysmgr 0x4c 0>;
 			altr,smtg-hub;
 			iommus = <&smmu 3>;
