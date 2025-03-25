@@ -551,6 +551,12 @@ properties:
       Enables the TSO feature otherwise it will be managed by MAC HW capability
       register.
 
+
+  snps,pagepool-tx-buf-quirk:
+    $ref: /schemas/types.yaml#/definitions/flag
+    description:
+      Enable use of page pool buffers instead of streaming buffers for transmit
+
   mdio:
     $ref: mdio.yaml#
     unevaluatedProperties: false
