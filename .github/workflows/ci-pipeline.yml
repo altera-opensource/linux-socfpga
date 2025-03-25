@@ -70,13 +70,18 @@ jobs:
           cd application.devops.github.pr.workflow
           bash workflow_Coverity.sh ${{ github.workspace }} ${{ github.event.repository.name }} linux-socfpga-github-workflow ${{ github.head_ref }} ${{ github.base_ref }}
 
-      - name: linux-coverity-report
-        if: always()
+      - name: linux-coverity-prechange-report
         uses: actions/upload-artifact@v4
         with:
-          name: linux-coverity-report
-          path: |
-            linux_output_defect.json
+          name: linux-coverity-prechange-report
+          path: linux_output_defect_prechange.json
+          retention-days: 1
+
+      - name: linux-coverity-postchange-report
+        uses: actions/upload-artifact@v4
+        with:
+          name: linux-coverity-postchange-report
+          path: linux_output_defect_postchange.json
           retention-days: 1
 
   ci-coverity-parse-result:
@@ -86,16 +91,24 @@ jobs:
         image: amr-registry-pre.caas.intel.com/pse-pswe-software-ba/embedded_coverity:ubuntu20.04.0_6
 
     steps:
-      - name: Download coverity result
+      - name: Download prechange coverity result
         uses: actions/download-artifact@v4
         with:
-          name: linux-coverity-report
+          name: linux-coverity-prechange-report
       - run: |
           ls
           pwd
           rm -rf /tmp/coverity-result-json
           mkdir /tmp/coverity-result-json
-          cp linux_output_defect.json /tmp/coverity-result-json/
+          cp linux_output_defect_prechange.json /tmp/coverity-result-json/
+          ls /tmp/coverity-result-json/*
+
+      - name: Download postchange coverity result
+        uses: actions/download-artifact@v4
+        with:
+          name: linux-coverity-postchange-report
+      - run: |
+          cp linux_output_defect_postchange.json /tmp/coverity-result-json/
           ls /tmp/coverity-result-json/*
 
       - uses: actions/checkout@v4
