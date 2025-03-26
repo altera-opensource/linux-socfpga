@@ -72,6 +72,11 @@
 				compatible = "intel,agilex-soc-fpga-mgr";
 			};
 
+			fcs: fcs {
+				compatible = "intel,agilex-soc-fcs";
+				status = "disabled";
+			};
+
 			temp_volt: hwmon {
 				compatible = "intel,soc64-hwmon";
 			};
