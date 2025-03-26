@@ -455,22 +455,11 @@ static void socfpga_crypto_unregister(void)
 static int socfpga_crypto_probe(struct platform_device *pdev)
 {
 	int ret;
-	/* device node pointer */
-	struct device_node *np = pdev->dev.of_node;
-	struct device_node *fcs_hal_np;
 	struct device *dev = &pdev->dev;
 
-	fcs_hal_np = of_parse_phandle(np, "dependent-on", 0);
-	if (!fcs_hal_np) {
-		pr_err("Failed to find HAL Driver device\n");
-		return -ENODEV;
-	}
-
-	if (of_device_is_compatible(fcs_hal_np, "intel,agilex5-soc-fcs-hal") &&
-	    !of_device_is_available(fcs_hal_np)) {
-		pr_err("FCS HAL is not available.\n");
-		of_node_put(fcs_hal_np);
-		return -ENODEV;
+	if (!hal_fcs_is_ready()) {
+		pr_err(" FCS HAL driver is not ready");
+		return -EPROBE_DEFER;
 	}
 
 	/* Algorithms Registration */
@@ -480,11 +469,14 @@ static int socfpga_crypto_probe(struct platform_device *pdev)
 		return ret;
 	}
 
+	pr_info("%s is successfully completed", __func__);
+
 	return 0;
 }
 
 static const struct of_device_id socfpga_crypto_of_match[] = {
 	{ .compatible = "intel,agilex5-soc-fcs-crypto" },
+	{ .compatible = "intel,agilex-soc-fcs-crypto" },
 	{},
 };
 
@@ -503,7 +495,7 @@ static int __init socfpga_crypto_init(void)
 	struct device_node *np;
 	int ret;
 
-	svc_np = of_find_node_by_name(NULL, "svc");
+	svc_np = of_find_node_by_name(NULL, "firmware");
 	if (!svc_np)
 		return -ENODEV;
 
