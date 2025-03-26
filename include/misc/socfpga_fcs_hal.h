@@ -871,6 +871,14 @@ FCS_HAL_INT hal_ecdsa_sha2_data_verify(struct fcs_cmd_context *const ctx);
 
 FCS_HAL_INT hal_hps_img_validate(struct fcs_cmd_context *const ctx);
 
+/**
+ * Check if the fcs hal is loaded in kernel.
+ *
+ * @return true, if the module is loaded successfully
+ *         false, on error.
+ */
+FCS_HAL_BOOL hal_fcs_is_ready(void);
+
 #ifdef __cplusplus
 }
 #endif /* __cplusplus */
