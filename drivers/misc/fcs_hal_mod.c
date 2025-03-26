@@ -11,6 +11,14 @@
 struct socfpga_fcs_priv *priv;
 EXPORT_SYMBOL(priv);
 
+static FCS_HAL_BOOL initialized;
+
+FCS_HAL_BOOL hal_fcs_is_ready(void)
+{
+	return initialized;
+}
+EXPORT_SYMBOL(hal_fcs_is_ready);
+
 static int fcs_hal_driver_probe(struct platform_device *pdev)
 {
 	struct device *dev = &pdev->dev;
@@ -28,13 +36,16 @@ static int fcs_hal_driver_probe(struct platform_device *pdev)
 		return ret;
 	}
 
+	initialized = true;
+
+	pr_info("%s is successfully completed", __func__);
+
 	return 0;
 }
 
 static const struct of_device_id fcs_hal_of_match[] = {
-	{.compatible = "intel,agilex5-soc-fcs-hal",
-	 .data = NULL,
-	},
+	{.compatible = "intel,agilex5-soc-fcs-hal"},
+	{.compatible = "intel,agilex-soc-fcs-hal"},
 	{},
 };
 
@@ -53,6 +64,8 @@ static int __init fcs_hal_init(void)
 	struct device_node *fw_np;
 	struct device_node *np;
 	int ret;
+
+	initialized = false;
 
 	fw_np = of_find_node_by_name(NULL, "svc");
 	if (!fw_np)
