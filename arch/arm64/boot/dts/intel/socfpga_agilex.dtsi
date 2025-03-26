@@ -75,6 +75,7 @@
 			fcs: fcs {
 				compatible = "intel,agilex-soc-fcs";
 				platform = "agilex";
+				status = "disabled";
 			};
 
 			temp_volt: hwmon {

@@ -175,4 +175,9 @@
 &fcs {
 	compatible = "intel,n5x-soc-fcs";
 	platform = "n5x";
+	status = "okay";
+};
+
+&fcs_hal {
+	status = "disabled";
 };
