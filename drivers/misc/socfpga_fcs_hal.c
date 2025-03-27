@@ -157,7 +157,6 @@ FCS_HAL_INT hal_import_key(struct fcs_cmd_context *const k_ctx)
 	FCS_HAL_INT ret = 0;
 	FCS_HAL_UINT sbuf_size;
 	FCS_HAL_VOID *s_buf = NULL;
-	FCS_HAL_DMA_ADDR fcs_dma_handle_src;
 	struct fcs_cmd_context ctx;
 
 	fcs_plat_memcpy(&ctx, k_ctx, sizeof(struct fcs_cmd_context));
@@ -192,14 +191,6 @@ FCS_HAL_INT hal_import_key(struct fcs_cmd_context *const k_ctx)
 		goto free_mem;
 	}
 
-	ret = fcs_plat_dma_addr_map(priv, &fcs_dma_handle_src, s_buf, sbuf_size,
-				    FCS_DMA_TO_DEVICE);
-	if (ret) {
-		LOG_ERR("Failed perform dma address map for the kernel source buffer ret: %d\n",
-			ret);
-		goto free_mem;
-	}
-
 	k_ctx->import_key.key = s_buf;
 	k_ctx->import_key.key_len = sbuf_size;
 
@@ -209,7 +200,7 @@ FCS_HAL_INT hal_import_key(struct fcs_cmd_context *const k_ctx)
 		LOG_ERR("Failed to send the cmd=%d,ret=%d\n",
 			FCS_DEV_CRYPTO_IMPORT_KEY, ret);
 		ret = -EFAULT;
-		goto unmap;
+		goto free_mem;
 	}
 
 	if (priv->status) {
@@ -234,9 +225,6 @@ copy_mbox_status:
 		ret = -EFAULT;
 	}
 	priv->plat_data->svc_task_done(priv);
-unmap:
-	fcs_plat_dma_addr_unmap(priv, &fcs_dma_handle_src, sbuf_size,
-				FCS_DMA_TO_DEVICE);
 free_mem:
 	priv->plat_data->svc_free_memory(priv, s_buf);
 
@@ -249,7 +237,6 @@ FCS_HAL_INT hal_export_key(struct fcs_cmd_context *const k_ctx)
 	FCS_HAL_INT ret = 0;
 	FCS_HAL_VOID *d_buf = NULL;
 	FCS_HAL_UINT key_len = CRYPTO_EXPORTED_KEY_OBJECT_MAX_SZ;
-	FCS_HAL_DMA_ADDR fcs_dma_handle_dst;
 	struct fcs_cmd_context ctx;
 
 	fcs_plat_memcpy(&ctx, k_ctx, sizeof(struct fcs_cmd_context));
@@ -270,12 +257,6 @@ FCS_HAL_INT hal_export_key(struct fcs_cmd_context *const k_ctx)
 		return ret;
 	}
 
-	ret = fcs_plat_dma_addr_map(priv, &fcs_dma_handle_dst, d_buf,
-				    key_len + FCS_STATUS_LEN,
-				    FCS_DMA_FROM_DEVICE);
-	if (ret)
-		goto free_dest;
-
 	k_ctx->export_key.key = d_buf;
 	k_ctx->export_key.key_len = &key_len;
 
@@ -284,7 +265,7 @@ FCS_HAL_INT hal_export_key(struct fcs_cmd_context *const k_ctx)
 	if (ret) {
 		LOG_ERR("Failed to send the cmd=%d,ret=%d\n",
 			FCS_DEV_CRYPTO_EXPORT_KEY, ret);
-		goto unmap;
+		goto free_dest;
 	}
 
 	if (priv->status) {
@@ -315,10 +296,6 @@ copy_mbox_status:
 			ret);
 	}
 	priv->plat_data->svc_task_done(priv);
-unmap:
-	fcs_plat_dma_addr_unmap(priv, &fcs_dma_handle_dst,
-				CRYPTO_EXPORTED_KEY_OBJECT_MAX_SZ,
-				FCS_DMA_FROM_DEVICE);
 free_dest:
 	priv->plat_data->svc_free_memory(priv, d_buf);
 
@@ -371,7 +348,6 @@ FCS_HAL_INT hal_get_key_info(struct fcs_cmd_context *const k_ctx)
 	FCS_HAL_INT ret = 0;
 	FCS_HAL_UINT info_len = CRYPTO_KEY_INFO_MAX_SZ;
 	FCS_HAL_VOID *d_buf = NULL;
-	FCS_HAL_DMA_ADDR fcs_dma_handle_dst;
 	struct fcs_cmd_context ctx;
 
 	fcs_plat_memcpy(&ctx, k_ctx, sizeof(struct fcs_cmd_context));
@@ -392,16 +368,6 @@ FCS_HAL_INT hal_get_key_info(struct fcs_cmd_context *const k_ctx)
 		return ret;
 	}
 
-	/* Map the destination buffer for DMA */
-	ret = fcs_plat_dma_addr_map(priv, &fcs_dma_handle_dst, d_buf,
-				    CRYPTO_KEY_INFO_MAX_SZ,
-				    FCS_DMA_FROM_DEVICE);
-	if (ret) {
-		LOG_ERR("Failed perform dma address map for the key info kernel buffer ret: %d\n",
-			ret);
-		goto free_dest;
-	}
-
 	k_ctx->key_info.info = d_buf;
 	k_ctx->key_info.info_len = &info_len;
 
@@ -411,7 +377,7 @@ FCS_HAL_INT hal_get_key_info(struct fcs_cmd_context *const k_ctx)
 	if (ret) {
 		LOG_ERR("Failed to send the cmd=%d,ret=%d\n",
 			FCS_DEV_CRYPTO_GET_KEY_INFO, ret);
-		goto unmap;
+		goto free_dest;
 	}
 
 	/* Check if there was a mailbox error during key info retrieval */
@@ -445,9 +411,6 @@ copy_mbox_status:
 			ret);
 	}
 	priv->plat_data->svc_task_done(priv);
-unmap:
-	fcs_plat_dma_addr_unmap(priv, &fcs_dma_handle_dst,
-				CRYPTO_KEY_INFO_MAX_SZ, FCS_DMA_FROM_DEVICE);
 free_dest:
 	priv->plat_data->svc_free_memory(priv, d_buf);
 
@@ -459,7 +422,6 @@ FCS_HAL_INT hal_create_key(struct fcs_cmd_context *const k_ctx)
 {
 	FCS_HAL_INT ret = 0;
 	FCS_HAL_VOID *s_buf = NULL;
-	FCS_HAL_DMA_ADDR fcs_dma_handle_src;
 	struct fcs_cmd_context ctx;
 
 	fcs_plat_memcpy(&ctx, k_ctx, sizeof(struct fcs_cmd_context));
@@ -499,15 +461,6 @@ FCS_HAL_INT hal_create_key(struct fcs_cmd_context *const k_ctx)
 		goto free_mem;
 	}
 
-	/* Map the source buffer for DMA */
-	ret = fcs_plat_dma_addr_map(priv, &fcs_dma_handle_src, s_buf,
-				    ctx.create_key.key_len, FCS_DMA_TO_DEVICE);
-	if (ret) {
-		LOG_ERR("Failed perform dma address map for the key object ret: %d\n",
-			ret);
-		goto free_mem;
-	}
-
 	k_ctx->create_key.key = s_buf;
 
 	/* Send the request to create key */
@@ -516,7 +469,7 @@ FCS_HAL_INT hal_create_key(struct fcs_cmd_context *const k_ctx)
 	if (ret) {
 		LOG_ERR("Failed to send the cmd=%d,ret=%d\n",
 			FCS_DEV_CRYPTO_CREATE_KEY, ret);
-		goto unmap;
+		goto free_mem;
 	}
 
 	/* Check if there was a mailbox error during key creation */
@@ -541,11 +494,6 @@ copy_mbox_status:
 			ret);
 	}
 	priv->plat_data->svc_task_done(priv);
-
-unmap:
-	fcs_plat_dma_addr_unmap(priv, &fcs_dma_handle_src,
-				ctx.create_key.key_len, FCS_DMA_TO_DEVICE);
-
 free_mem:
 	priv->plat_data->svc_free_memory(priv, s_buf);
 
@@ -558,7 +506,6 @@ FCS_HAL_INT hal_get_provision_data(struct fcs_cmd_context *const k_ctx)
 	FCS_HAL_INT ret = 0;
 	FCS_HAL_U32 data_len = CRYPTO_PROVISION_DATA_MAX_SZ;
 	FCS_HAL_VOID *d_buf = NULL;
-	FCS_HAL_DMA_ADDR fcs_dma_handle_dst;
 	struct fcs_cmd_context ctx;
 
 	fcs_plat_memcpy(&ctx, k_ctx, sizeof(struct fcs_cmd_context));
@@ -571,11 +518,6 @@ FCS_HAL_INT hal_get_provision_data(struct fcs_cmd_context *const k_ctx)
 		return ret;
 	}
 
-	ret = fcs_plat_dma_addr_map(priv, &fcs_dma_handle_dst, d_buf, data_len,
-				    FCS_DMA_FROM_DEVICE);
-	if (ret)
-		goto free_dest;
-
 	k_ctx->prov_data.data = d_buf;
 	k_ctx->prov_data.data_len = &data_len;
 
@@ -584,7 +526,7 @@ FCS_HAL_INT hal_get_provision_data(struct fcs_cmd_context *const k_ctx)
 	if (ret) {
 		LOG_ERR("Failed to send the cmd=%d,ret=%d\n",
 			FCS_DEV_GET_PROVISION_DATA, ret);
-		goto unmap;
+		goto free_dest;
 	}
 
 	if (priv->status) {
@@ -616,10 +558,6 @@ copy_mbox_status:
 			ret);
 
 	priv->plat_data->svc_task_done(priv);
-unmap:
-	fcs_plat_dma_addr_unmap(priv, &fcs_dma_handle_dst,
-				CRYPTO_PROVISION_DATA_MAX_SZ,
-				FCS_DMA_FROM_DEVICE);
 free_dest:
 	priv->plat_data->svc_free_memory(priv, d_buf);
 
@@ -632,7 +570,6 @@ FCS_HAL_INT hal_counter_set(struct fcs_cmd_context *const k_ctx)
 	FCS_HAL_INT tsz, datasz;
 	FCS_HAL_INT ret = 0;
 	FCS_HAL_VOID *s_buf = NULL;
-	FCS_HAL_DMA_ADDR fcs_dma_handle_src;
 	struct fcs_cmd_context ctx;
 
 	fcs_plat_memcpy(&ctx, k_ctx, sizeof(struct fcs_cmd_context));
@@ -663,14 +600,6 @@ FCS_HAL_INT hal_counter_set(struct fcs_cmd_context *const k_ctx)
 		goto free_mem;
 	}
 
-	ret = fcs_plat_dma_addr_map(priv, &fcs_dma_handle_src, s_buf, datasz,
-				    FCS_DMA_TO_DEVICE);
-	if (ret) {
-		LOG_ERR("Failed to map dma address for kernel buffer ret: %d\n",
-			ret);
-		goto free_mem;
-	}
-
 	k_ctx->ctr_set.ccert = s_buf;
 	k_ctx->ctr_set.ccert_len = datasz;
 
@@ -679,7 +608,7 @@ FCS_HAL_INT hal_counter_set(struct fcs_cmd_context *const k_ctx)
 	if (ret) {
 		LOG_ERR("Failed to send the cmd=%d,ret=%d\n",
 			FCS_DEV_COUNTER_SET, ret);
-		goto unmap;
+		goto free_mem;
 	}
 
 	if (priv->status) {
@@ -703,9 +632,6 @@ copy_mbox_status:
 			ret);
 	}
 	priv->plat_data->svc_task_done(priv);
-unmap:
-	fcs_plat_dma_addr_unmap(priv, &fcs_dma_handle_src, datasz,
-				FCS_DMA_TO_DEVICE);
 free_mem:
 	priv->plat_data->svc_free_memory(priv, s_buf);
 
@@ -754,7 +680,6 @@ FCS_HAL_INT hal_random_number(struct fcs_cmd_context *const k_ctx)
 {
 	FCS_HAL_INT ret = 0;
 	FCS_HAL_VOID *s_buf = NULL;
-	FCS_HAL_DMA_ADDR fcs_dma_handle_src;
 	struct fcs_cmd_context ctx;
 
 	fcs_plat_memcpy(&ctx, k_ctx, sizeof(struct fcs_cmd_context));
@@ -782,21 +707,12 @@ FCS_HAL_INT hal_random_number(struct fcs_cmd_context *const k_ctx)
 
 	k_ctx->rng.rng = s_buf;
 
-	ret = fcs_plat_dma_addr_map(priv, &fcs_dma_handle_src, k_ctx->rng.rng,
-				    k_ctx->rng.rng_len +
-					    RANDOM_NUMBER_EXT_HDR_SIZE,
-				    FCS_DMA_TO_DEVICE);
-	if (ret) {
-		LOG_ERR("Failed to map dma address for buffer. ret: %d\n", ret);
-		goto free_mem;
-	}
-
 	ret = priv->plat_data->svc_send_request(priv, FCS_DEV_RANDOM_NUMBER_GEN,
 						FCS_REQUEST_TIMEOUT);
 	if (ret) {
 		LOG_ERR("Failed to send the cmd=%d,ret=%d\n",
 			FCS_DEV_RANDOM_NUMBER_GEN, ret);
-		goto unmap;
+		goto free_mem;
 	}
 
 	if (priv->status) {
@@ -820,9 +736,6 @@ copy_mbox_status:
 			ret);
 	}
 	priv->plat_data->svc_task_done(priv);
-unmap:
-	fcs_plat_dma_addr_unmap(priv, &fcs_dma_handle_src, k_ctx->rng.rng_len,
-				FCS_DMA_TO_DEVICE);
 free_mem:
 	priv->plat_data->svc_free_memory(priv, s_buf);
 
@@ -834,7 +747,6 @@ FCS_HAL_INT hal_hkdf_request(struct fcs_cmd_context *const k_ctx)
 {
 	FCS_HAL_INT ret = 0;
 	FCS_HAL_VOID *s_buf = NULL, *src_ptr = NULL;
-	FCS_HAL_DMA_ADDR fcs_dma_handle_src;
 	struct fcs_cmd_context ctx;
 
 	fcs_plat_memcpy(&ctx, k_ctx, sizeof(struct fcs_cmd_context));
@@ -907,15 +819,6 @@ FCS_HAL_INT hal_hkdf_request(struct fcs_cmd_context *const k_ctx)
 		goto free_mem;
 	}
 
-	/* Map buffer for DMA */
-	ret = fcs_plat_dma_addr_map(priv, &fcs_dma_handle_src, s_buf,
-				    FCS_KDK_MAX_SZ, FCS_DMA_TO_DEVICE);
-	if (ret) {
-		LOG_ERR("Failed perform dma address map for the HKDF kernel buffer ret: %d\n",
-			ret);
-		goto free_mem;
-	}
-
 	k_ctx->hkdf_req.ikm = s_buf;
 
 	ret = priv->plat_data->svc_send_request(priv,
@@ -924,7 +827,7 @@ FCS_HAL_INT hal_hkdf_request(struct fcs_cmd_context *const k_ctx)
 	if (ret) {
 		LOG_ERR("Failed to send the cmd=%d,ret=%d\n",
 			FCS_DEV_CRYPTO_HKDF_REQUEST, ret);
-		goto unmap;
+		goto free_mem;
 	}
 
 	if (priv->status) {
@@ -945,9 +848,6 @@ FCS_HAL_INT hal_hkdf_request(struct fcs_cmd_context *const k_ctx)
 		LOG_ERR("Failed to copy HKDF status to user ret: %d\n", ret);
 
 	priv->plat_data->svc_task_done(priv);
-unmap:
-	fcs_plat_dma_addr_unmap(priv, &fcs_dma_handle_src, FCS_KDK_MAX_SZ,
-				FCS_DMA_TO_DEVICE);
 free_mem:
 	priv->plat_data->svc_free_memory(priv, s_buf);
 
@@ -990,7 +890,6 @@ static FCS_HAL_INT hal_digest_update(struct fcs_cmd_context *const k_ctx)
 {
 	FCS_HAL_INT ret = 0;
 	FCS_HAL_VOID *d_buf = NULL;
-	FCS_HAL_DMA_ADDR fcs_dma_handle_src, fcs_dma_handle_dst;
 	struct fcs_cmd_context ctx;
 	FCS_HAL_U32 ldigest_len = DIGEST_CMD_MAX_SZ;
 
@@ -998,45 +897,21 @@ static FCS_HAL_INT hal_digest_update(struct fcs_cmd_context *const k_ctx)
 
 	k_ctx->dgst.digest_len = &ldigest_len;
 
-	/* Map the input data kernel buffer for DMA */
-	ret = fcs_plat_dma_addr_map(priv, &fcs_dma_handle_src, k_ctx->dgst.src,
-				    DIGEST_CMD_MAX_SZ, FCS_DMA_TO_DEVICE);
-	if (ret) {
-		LOG_ERR("Failed to perform dma address map for the input buffer. ret: %d\n",
-			ret);
-		return ret;
-	}
 
 	d_buf = priv->plat_data->svc_alloc_memory(priv, DIGEST_CMD_MAX_SZ);
 	if (IS_ERR(d_buf)) {
 		ret = -ENOMEM;
 		LOG_ERR("Failed to allocate memory for digest output kernel buffer. ret: %d\n",
 			ret);
-		goto unmap_src;
+		return ret;
 	}
-	k_ctx->dgst.digest = d_buf;
 
-	ret = fcs_plat_dma_addr_map(priv, &fcs_dma_handle_dst, d_buf,
-				    DIGEST_CMD_MAX_SZ, FCS_DMA_FROM_DEVICE);
-	if (ret) {
-		LOG_ERR("Failed perform dma address map for the digest output data kernel buffer ret: %d\n",
-			ret);
-		goto free_dest;
-	}
+	k_ctx->dgst.digest = d_buf;
 
 	/* Send the request to perform digest */
 	ret = priv->plat_data->svc_send_request(
 		priv, FCS_DEV_CRYPTO_GET_DIGEST_UPDATE,
 		10 * FCS_REQUEST_TIMEOUT);
-
-	fcs_plat_dma_addr_unmap(priv, &fcs_dma_handle_dst, DIGEST_CMD_MAX_SZ,
-				FCS_DMA_FROM_DEVICE);
-
-	if (ret) {
-		LOG_ERR("Failed to send the cmd=%d,ret=%d\n",
-			FCS_DEV_CRYPTO_GET_DIGEST_UPDATE, ret);
-		goto free_dest;
-	}
 
 	if (priv->status) {
 		ret = -EIO;
@@ -1054,11 +929,7 @@ copy_mbox_status:
 	}
 	priv->plat_data->svc_task_done(priv);
 
-free_dest:
 	priv->plat_data->svc_free_memory(priv, d_buf);
-unmap_src:
-	fcs_plat_dma_addr_unmap(priv, &fcs_dma_handle_src, DIGEST_CMD_MAX_SZ,
-				FCS_DMA_TO_DEVICE);
 	return ret;
 }
 
@@ -1066,20 +937,10 @@ static FCS_HAL_INT hal_digest_final(struct fcs_cmd_context *const k_ctx)
 {
 	FCS_HAL_INT ret = 0;
 	FCS_HAL_VOID *d_buf = NULL;
-	FCS_HAL_DMA_ADDR fcs_dma_handle_src, fcs_dma_handle_dst;
 	struct fcs_cmd_context ctx;
 	FCS_HAL_U32 ldigest_len = DIGEST_CMD_MAX_SZ;
 
 	fcs_plat_memcpy(&ctx, k_ctx, sizeof(struct fcs_cmd_context));
-
-	/* Map the input data kernel buffer for DMA */
-	ret = fcs_plat_dma_addr_map(priv, &fcs_dma_handle_src, k_ctx->dgst.src,
-				    k_ctx->dgst.src_len, FCS_DMA_TO_DEVICE);
-	if (ret) {
-		LOG_ERR("Failed perform dma address map for the digest input data kernel buffer ret: %d\n",
-			ret);
-		goto return_fun;
-	}
 
 	d_buf = priv->plat_data->svc_alloc_memory(priv, DIGEST_CMD_MAX_SZ);
 	if (IS_ERR(d_buf)) {
@@ -1087,15 +948,6 @@ static FCS_HAL_INT hal_digest_final(struct fcs_cmd_context *const k_ctx)
 		LOG_ERR("Failed to allocate memory for digest output kernel buffer ret: %d\n",
 			ret);
 		goto return_fun;
-	}
-
-	/* Map the digest output kernel buffer for DMA */
-	ret = fcs_plat_dma_addr_map(priv, &fcs_dma_handle_dst, d_buf,
-				    DIGEST_CMD_MAX_SZ, FCS_DMA_FROM_DEVICE);
-	if (ret) {
-		LOG_ERR("Failed perform dma address map for the digest output data kernel buffer ret: %d\n",
-			ret);
-		goto unmap_src;
 	}
 
 	k_ctx->dgst.digest = d_buf;
@@ -1106,14 +958,6 @@ static FCS_HAL_INT hal_digest_final(struct fcs_cmd_context *const k_ctx)
 						FCS_DEV_CRYPTO_GET_DIGEST_FINAL,
 						10 * FCS_REQUEST_TIMEOUT);
 
-	fcs_plat_dma_addr_unmap(priv, &fcs_dma_handle_dst, CRYPTO_DIGEST_MAX_SZ,
-				FCS_DMA_FROM_DEVICE);
-
-	if (ret) {
-		LOG_ERR("Failed to send the cmd=%d,ret=%d\n",
-			FCS_DEV_CRYPTO_GET_DIGEST_FINAL, ret);
-		goto unmap_src;
-	}
 	if (priv->status) {
 		ret = -EIO;
 		LOG_ERR("Mailbox error, Failed to finalize digest ret: %d\n",
@@ -1147,10 +991,6 @@ copy_mbox_status:
 		LOG_ERR("Failed to copy mailbox status code to user ret: %d\n",
 			ret);
 	}
-
-unmap_src:
-	fcs_plat_dma_addr_unmap(priv, &fcs_dma_handle_src, k_ctx->dgst.src_len,
-				FCS_DMA_TO_DEVICE);
 
 return_fun:
 	priv->plat_data->svc_free_memory(priv, k_ctx->dgst.src);
@@ -1222,7 +1062,6 @@ FCS_HAL_INT hal_mac_verify(struct fcs_cmd_context *const k_ctx)
 {
 	FCS_HAL_INT ret = 0;
 	FCS_HAL_VOID *s_buf = NULL, *d_buf = NULL;
-	FCS_HAL_DMA_ADDR fcs_dma_handle_src, fcs_dma_handle_dst;
 	struct fcs_cmd_context ctx;
 	FCS_HAL_VOID *input_buffer;
 	FCS_HAL_U32 remaining_size;
@@ -1316,24 +1155,6 @@ FCS_HAL_INT hal_mac_verify(struct fcs_cmd_context *const k_ctx)
 			goto free_dest;
 		}
 
-		ret = fcs_plat_dma_addr_map(priv, &fcs_dma_handle_src, s_buf,
-					    MAC_CMD_MAX_SZ, FCS_DMA_TO_DEVICE);
-		if (ret) {
-			LOG_ERR("Failed to perform dma address for the counter set kernel buffer ret: %d\n",
-				ret);
-			goto free_dest;
-		}
-
-		ret = fcs_plat_dma_addr_map(priv, &fcs_dma_handle_dst, d_buf,
-					    MAC_CMD_MAX_SZ,
-					    FCS_DMA_FROM_DEVICE);
-		if (ret) {
-			fcs_plat_dma_addr_unmap(priv, &fcs_dma_handle_src,
-						MAC_CMD_MAX_SZ,
-						FCS_DMA_TO_DEVICE);
-			goto free_dest;
-		}
-
 		k_ctx->mac_verify.src = s_buf;
 		k_ctx->mac_verify.src_size = data_size;
 		k_ctx->mac_verify.dst = d_buf;
@@ -1344,13 +1165,6 @@ FCS_HAL_INT hal_mac_verify(struct fcs_cmd_context *const k_ctx)
 			ret = priv->plat_data->svc_send_request(
 				priv, FCS_DEV_CRYPTO_MAC_VERIFY_UPDATE,
 				100 * FCS_REQUEST_TIMEOUT);
-
-			fcs_plat_dma_addr_unmap(priv, &fcs_dma_handle_dst,
-						MAC_CMD_MAX_SZ,
-						FCS_DMA_FROM_DEVICE);
-			fcs_plat_dma_addr_unmap(priv, &fcs_dma_handle_src,
-						MAC_CMD_MAX_SZ,
-						FCS_DMA_TO_DEVICE);
 
 			if (ret) {
 				LOG_ERR("Failed to send the cmd=%d,ret=%d\n",
@@ -1364,12 +1178,6 @@ FCS_HAL_INT hal_mac_verify(struct fcs_cmd_context *const k_ctx)
 				priv, FCS_DEV_CRYPTO_MAC_VERIFY_FINAL,
 				100 * FCS_REQUEST_TIMEOUT);
 
-			fcs_plat_dma_addr_unmap(priv, &fcs_dma_handle_dst,
-						MAC_CMD_MAX_SZ,
-						FCS_DMA_FROM_DEVICE);
-			fcs_plat_dma_addr_unmap(priv, &fcs_dma_handle_src,
-						MAC_CMD_MAX_SZ,
-						FCS_DMA_TO_DEVICE);
 			if (ret) {
 				LOG_ERR("Failed to send the cmd=%d,ret=%d\n",
 					FCS_DEV_CRYPTO_MAC_VERIFY_FINAL, ret);
@@ -1433,7 +1241,6 @@ static FCS_HAL_INT hal_aes_crypt_init(struct fcs_cmd_context *const k_ctx)
 	FCS_HAL_INT ret = 0;
 	FCS_HAL_CHAR *aes_parms = NULL;
 	FCS_HAL_UINT aes_parms_len = FCS_AES_PARAMS_ECB_SZ + FCS_AES_IV_SZ;
-	FCS_HAL_DMA_ADDR fcs_dma_handle_aesparms;
 
 	aes_parms = priv->plat_data->svc_alloc_memory(priv, aes_parms_len);
 	if (IS_ERR(aes_parms)) {
@@ -1467,26 +1274,16 @@ static FCS_HAL_INT hal_aes_crypt_init(struct fcs_cmd_context *const k_ctx)
 	}
 	k_ctx->aes.input = aes_parms;
 
-	ret = fcs_plat_dma_addr_map(priv, &fcs_dma_handle_aesparms, aes_parms,
-				    aes_parms_len, FCS_DMA_TO_DEVICE);
-	if (ret) {
-		LOG_ERR("Failed perform dma address map for the AES poll service buffer ret: %d\n",
-			ret);
-		goto free_mem;
-	}
-
 	ret = priv->plat_data->svc_send_request(
 		priv, FCS_DEV_CRYPTO_AES_CRYPT_INIT, FCS_REQUEST_TIMEOUT);
 	if (ret) {
 		LOG_ERR("Failed to send the cmd=%d,ret=%d\n",
 			FCS_DEV_CRYPTO_AES_CRYPT_INIT, ret);
-		goto unmap;
+		goto free_mem;
 	}
 
 	priv->plat_data->svc_task_done(priv);
-unmap:
-	fcs_plat_dma_addr_unmap(priv, &fcs_dma_handle_aesparms, aes_parms_len,
-				FCS_DMA_TO_DEVICE);
+
 free_mem:
 	priv->plat_data->svc_free_memory(priv, aes_parms);
 
@@ -1503,7 +1300,6 @@ static FCS_HAL_INT hal_aes_crypt_update_final(FCS_HAL_CHAR *ip_ptr, FCS_HAL_UINT
 {
 	FCS_HAL_INT ret = 0, pad1 = 0, pad2 = 0, s_buf_size = 0, d_buf_size = 0;
 	FCS_HAL_CHAR *s_buf = NULL, *s_buf_wr_ptr = NULL, *d_buf = NULL;
-	FCS_HAL_DMA_ADDR fcs_dma_handle_src, fcs_dma_handle_dst;
 
 	if (mode == FCS_AES_BLOCK_MODE_GCM ||
 	    mode == FCS_AES_BLOCK_MODE_GHASH) {
@@ -1614,27 +1410,6 @@ static FCS_HAL_INT hal_aes_crypt_update_final(FCS_HAL_CHAR *ip_ptr, FCS_HAL_UINT
 		goto free_src;
 	}
 
-	/* Map the source buffer for DMA */
-	ret = fcs_plat_dma_addr_map(priv, &fcs_dma_handle_src, s_buf,
-				    FCS_AES_CRYPT_BLOCK_SZ, FCS_DMA_TO_DEVICE);
-	if (ret) {
-		LOG_ERR("Failed perform dma address map for the AES source buffer ret: %d\n",
-			ret);
-		goto free_dst;
-	}
-
-	/* Map the destination buffer for DMA */
-	ret = fcs_plat_dma_addr_map(priv, &fcs_dma_handle_dst, d_buf,
-				    FCS_AES_CRYPT_BLOCK_SZ,
-				    FCS_DMA_FROM_DEVICE);
-	if (ret) {
-		LOG_ERR("Failed perform dma address map for the AES destination buffer ret: %d\n",
-			ret);
-		fcs_plat_dma_addr_unmap(priv, &fcs_dma_handle_src,
-					FCS_AES_CRYPT_BLOCK_SZ, FCS_DMA_TO_DEVICE);
-		goto free_dst;
-	}
-
 	k_ctx->aes.ip_len = s_buf_size;
 	*k_ctx->aes.op_len = d_buf_size;
 	k_ctx->aes.input = s_buf;
@@ -1646,10 +1421,6 @@ static FCS_HAL_INT hal_aes_crypt_update_final(FCS_HAL_CHAR *ip_ptr, FCS_HAL_UINT
 				FCS_AES_REQUEST_TIMEOUT);
 	if (ret) {
 		LOG_ERR("Failed to send the cmd=%d,ret=%d\n", command, ret);
-		fcs_plat_dma_addr_unmap(priv, &fcs_dma_handle_dst,
-					FCS_AES_CRYPT_BLOCK_SZ, FCS_DMA_FROM_DEVICE);
-		fcs_plat_dma_addr_unmap(priv, &fcs_dma_handle_src,
-					FCS_AES_CRYPT_BLOCK_SZ, FCS_DMA_TO_DEVICE);
 		goto free_dst;
 	}
 
@@ -1659,10 +1430,6 @@ static FCS_HAL_INT hal_aes_crypt_update_final(FCS_HAL_CHAR *ip_ptr, FCS_HAL_UINT
 	if (ret) {
 		LOG_ERR("Failed to copy mailbox status code to user ret: %d\n",
 			ret);
-		fcs_plat_dma_addr_unmap(priv, &fcs_dma_handle_dst,
-					FCS_AES_CRYPT_BLOCK_SZ, FCS_DMA_FROM_DEVICE);
-		fcs_plat_dma_addr_unmap(priv, &fcs_dma_handle_src,
-					FCS_AES_CRYPT_BLOCK_SZ, FCS_DMA_TO_DEVICE);
 		goto task_done;
 	}
 
@@ -1670,18 +1437,9 @@ static FCS_HAL_INT hal_aes_crypt_update_final(FCS_HAL_CHAR *ip_ptr, FCS_HAL_UINT
 		ret = -EIO;
 		LOG_ERR("Mailbox error, Failed to perform AES crypt Mbox status: 0x%x\n",
 			priv->status);
-		fcs_plat_dma_addr_unmap(priv, &fcs_dma_handle_dst,
-					FCS_AES_CRYPT_BLOCK_SZ, FCS_DMA_FROM_DEVICE);
-		fcs_plat_dma_addr_unmap(priv, &fcs_dma_handle_src,
-					FCS_AES_CRYPT_BLOCK_SZ, FCS_DMA_TO_DEVICE);
-
 		goto task_done;
 	}
 
-	fcs_plat_dma_addr_unmap(priv, &fcs_dma_handle_dst,
-				FCS_AES_CRYPT_BLOCK_SZ, FCS_DMA_FROM_DEVICE);
-	fcs_plat_dma_addr_unmap(priv, &fcs_dma_handle_src,
-				FCS_AES_CRYPT_BLOCK_SZ, FCS_DMA_TO_DEVICE);
 
 	if (mode != FCS_AES_BLOCK_MODE_GHASH) {
 		LOG_DBG("AES copy Data to destination buffer %p  data_size = %d\n",
@@ -1854,7 +1612,6 @@ FCS_HAL_INT hal_ecdh_req(struct fcs_cmd_context *const k_ctx)
 {
 	FCS_HAL_INT ret = 0;
 	FCS_HAL_VOID *s_buf = NULL, *d_buf = NULL;
-	FCS_HAL_DMA_ADDR fcs_dma_handle_src, fcs_dma_handle_dst;
 	struct fcs_cmd_context ctx;
 	FCS_HAL_UINT d_buf_len = 0;
 
@@ -1902,15 +1659,6 @@ FCS_HAL_INT hal_ecdh_req(struct fcs_cmd_context *const k_ctx)
 		goto free_src;
 	}
 
-	/* Map the source buffer for DMA */
-	ret = fcs_plat_dma_addr_map(priv, &fcs_dma_handle_src, s_buf,
-				    ctx.ecdh_req.pubkey_len, FCS_DMA_TO_DEVICE);
-	if (ret) {
-		LOG_ERR("Failed to map dma address for the ECDH source buffer ret: %d\n",
-			ret);
-		goto free_src;
-	}
-
 	/* 1 byte for format indicator + pk len bytes for X coordinate + pk len
 	 * bytes for Y coordinate
 	 */
@@ -1921,16 +1669,7 @@ FCS_HAL_INT hal_ecdh_req(struct fcs_cmd_context *const k_ctx)
 		ret = -ENOMEM;
 		LOG_ERR("Failed to allocate memory for ECDH destination buffer ret: %d\n",
 			ret);
-		goto unmap_src;
-	}
-
-	/* Map the destination buffer for DMA */
-	ret = fcs_plat_dma_addr_map(priv, &fcs_dma_handle_dst, d_buf, d_buf_len,
-				    FCS_DMA_FROM_DEVICE);
-	if (ret) {
-		LOG_ERR("Failed to map dma address for the ECDH destination buffer ret: %d\n",
-			ret);
-		goto free_dst;
+		goto free_src;
 	}
 
 	k_ctx->ecdh_req.pubkey = s_buf;
@@ -1942,7 +1681,7 @@ FCS_HAL_INT hal_ecdh_req(struct fcs_cmd_context *const k_ctx)
 	if (ret) {
 		LOG_ERR("Failed to send the cmd=%d,ret=%d\n",
 			FCS_DEV_CRYPTO_ECDH_REQUEST_INIT, ret);
-		goto unmap_dst;
+		goto free_dst;
 	}
 
 	if (priv->status) {
@@ -1957,7 +1696,7 @@ FCS_HAL_INT hal_ecdh_req(struct fcs_cmd_context *const k_ctx)
 	if (ret) {
 		LOG_ERR("Failed to send the cmd=%d,ret=%d\n",
 			FCS_DEV_CRYPTO_ECDH_REQUEST_FINALIZE, ret);
-		goto unmap_dst;
+		goto copy_mbox_status;
 	}
 
 	if (priv->status) {
@@ -1988,14 +1727,8 @@ copy_mbox_status:
 	}
 	priv->plat_data->svc_task_done(priv);
 
-unmap_dst:
-	fcs_plat_dma_addr_unmap(priv, &fcs_dma_handle_dst, d_buf_len,
-				FCS_DMA_FROM_DEVICE);
 free_dst:
 	priv->plat_data->svc_free_memory(priv, d_buf);
-unmap_src:
-	fcs_plat_dma_addr_unmap(priv, &fcs_dma_handle_src,
-				ctx.ecdh_req.pubkey_len, FCS_DMA_TO_DEVICE);
 free_src:
 	priv->plat_data->svc_free_memory(priv, s_buf);
 
@@ -2056,7 +1789,6 @@ FCS_HAL_INT hal_attestation_get_certificate(struct fcs_cmd_context *const k_ctx)
 	FCS_HAL_INT ret = 0;
 	FCS_HAL_U32 cert_len = CERTIFICATE_RSP_MAX_SZ;
 	FCS_HAL_VOID *d_buf = NULL;
-	FCS_HAL_DMA_ADDR fcs_dma_handle_dst;
 	struct fcs_cmd_context ctx;
 
 	fcs_plat_memcpy(&ctx, k_ctx, sizeof(struct fcs_cmd_context));
@@ -2069,11 +1801,6 @@ FCS_HAL_INT hal_attestation_get_certificate(struct fcs_cmd_context *const k_ctx)
 		return ret;
 	}
 
-	ret = fcs_plat_dma_addr_map(priv, &fcs_dma_handle_dst, d_buf, cert_len,
-				    FCS_DMA_FROM_DEVICE);
-	if (ret)
-		goto free_dest;
-
 	k_ctx->attestation_cert.cert = d_buf;
 	k_ctx->attestation_cert.cert_size = &cert_len;
 
@@ -2083,7 +1810,7 @@ FCS_HAL_INT hal_attestation_get_certificate(struct fcs_cmd_context *const k_ctx)
 	if (ret) {
 		LOG_ERR("Failed to send the cmd=%d,ret=%d\n",
 			FCS_DEV_ATTESTATION_GET_CERTIFICATE, ret);
-		goto unmap;
+		goto free_dest;
 	}
 
 	if (priv->status) {
@@ -2116,9 +1843,6 @@ copy_mbox_status:
 			ret);
 	}
 	priv->plat_data->svc_task_done(priv);
-unmap:
-	fcs_plat_dma_addr_unmap(priv, &fcs_dma_handle_dst,
-				CERTIFICATE_RSP_MAX_SZ, FCS_DMA_FROM_DEVICE);
 free_dest:
 	priv->plat_data->svc_free_memory(priv, d_buf);
 
@@ -2167,7 +1891,6 @@ FCS_HAL_INT hal_mctp_request(struct fcs_cmd_context *const k_ctx)
 	FCS_HAL_INT ret = 0;
 	FCS_HAL_UINT mctp_len = MCTP_MAX_LEN;
 	FCS_HAL_VOID *s_buf = NULL, *d_buf = NULL;
-	FCS_HAL_DMA_ADDR fcs_dma_handle_src, fcs_dma_handle_dst;
 	struct fcs_cmd_context ctx;
 
 	fcs_plat_memcpy(&ctx, k_ctx, sizeof(struct fcs_cmd_context));
@@ -2194,28 +1917,12 @@ FCS_HAL_INT hal_mctp_request(struct fcs_cmd_context *const k_ctx)
 		goto free_mem;
 	}
 
-	ret = fcs_plat_dma_addr_map(priv, &fcs_dma_handle_src, s_buf,
-				    ctx.mctp.mctp_req_len, FCS_DMA_TO_DEVICE);
-	if (ret) {
-		LOG_ERR("Failed to map dma address for source buffer ret: %d\n",
-			ret);
-		goto free_mem;
-	}
-
 	d_buf = priv->plat_data->svc_alloc_memory(priv, mctp_len);
 	if (IS_ERR(d_buf)) {
 		ret = -ENOMEM;
 		LOG_ERR("Failed to allocate memory for destination buffer ret: %d\n",
 			ret);
-		goto unmap;
-	}
-
-	ret = fcs_plat_dma_addr_map(priv, &fcs_dma_handle_dst, d_buf, mctp_len,
-				    FCS_DMA_FROM_DEVICE);
-	if (ret) {
-		LOG_ERR("Failed to map dma address for destination buffer ret: %d\n",
-			ret);
-		goto free_dest;
+		goto free_mem;
 	}
 
 	k_ctx->mctp.mctp_req = s_buf;
@@ -2225,14 +1932,6 @@ FCS_HAL_INT hal_mctp_request(struct fcs_cmd_context *const k_ctx)
 	ret = priv->plat_data->svc_send_request(priv, FCS_DEV_MCTP_REQUEST,
 						10 * FCS_REQUEST_TIMEOUT);
 
-	fcs_plat_dma_addr_unmap(priv, &fcs_dma_handle_dst, MCTP_MAX_LEN,
-				FCS_DMA_FROM_DEVICE);
-
-	if (ret) {
-		LOG_ERR("Failed to send the cmd=%d,ret=%d\n",
-			FCS_DEV_MCTP_REQUEST, ret);
-		goto unmap;
-	}
 
 	if (priv->status) {
 		ret = -EIO;
@@ -2262,13 +1961,7 @@ copy_mbox_status:
 	}
 
 	priv->plat_data->svc_task_done(priv);
-
-free_dest:
 	priv->plat_data->svc_free_memory(priv, d_buf);
-
-unmap:
-	fcs_plat_dma_addr_unmap(priv, &fcs_dma_handle_src,
-				ctx.mctp.mctp_req_len, FCS_DMA_TO_DEVICE);
 
 free_mem:
 	priv->plat_data->svc_free_memory(priv, s_buf);
@@ -2323,7 +2016,6 @@ FCS_HAL_INT hal_get_device_identity(struct fcs_cmd_context *const k_ctx)
 	FCS_HAL_U32 ret;
 	struct fcs_cmd_context ctx;
 	FCS_HAL_VOID *d_buf = NULL;
-	FCS_HAL_DMA_ADDR fcs_dma_handle_dst;
 	FCS_HAL_U32 devid_len = DEVICE_IDENTITY_MAX_LEN;
 
 	fcs_plat_memcpy(&ctx, k_ctx, sizeof(struct fcs_cmd_context));
@@ -2336,19 +2028,11 @@ FCS_HAL_INT hal_get_device_identity(struct fcs_cmd_context *const k_ctx)
 		return ret;
 	}
 
-	ret = fcs_plat_dma_addr_map(priv, &fcs_dma_handle_dst, d_buf, devid_len,
-				    FCS_DMA_FROM_DEVICE);
-	if (ret)
-		goto free_dest;
-
 	k_ctx->device_identity.identity = d_buf;
 	k_ctx->device_identity.identity_len = &devid_len;
 
 	ret = priv->plat_data->svc_send_request(
 		priv, FCS_DEV_GET_DEVICE_IDENTITY, FCS_REQUEST_TIMEOUT);
-
-	fcs_plat_dma_addr_unmap(priv, &fcs_dma_handle_dst,
-				DEVICE_IDENTITY_MAX_LEN, FCS_DMA_FROM_DEVICE);
 
 	if (ret) {
 		LOG_ERR("Failed to send the cmd=%d,ret=%d\n",
@@ -2504,7 +2188,6 @@ FCS_HAL_INT hal_qspi_read(struct fcs_cmd_context *const k_ctx)
 	struct fcs_cmd_context ctx;
 	FCS_HAL_VOID *d_buf = NULL;
 	FCS_HAL_U32 resp_len = QSPI_READ_LEN_MAX;
-	FCS_HAL_DMA_ADDR fcs_dma_handle_dst;
 
 	fcs_plat_memcpy(&ctx, k_ctx, sizeof(struct fcs_cmd_context));
 
@@ -2516,19 +2199,12 @@ FCS_HAL_INT hal_qspi_read(struct fcs_cmd_context *const k_ctx)
 		return ret;
 	}
 
-	ret = fcs_plat_dma_addr_map(priv, &fcs_dma_handle_dst, d_buf, resp_len,
-				    FCS_DMA_FROM_DEVICE);
-	if (ret)
-		goto free_dest;
 
 	k_ctx->qspi_read.qspi_data = d_buf;
 	k_ctx->qspi_read.qspi_data_len = &resp_len;
 
 	ret = priv->plat_data->svc_send_request(priv, FCS_DEV_QSPI_READ,
 						FCS_REQUEST_TIMEOUT);
-
-	fcs_plat_dma_addr_unmap(priv, &fcs_dma_handle_dst, QSPI_READ_LEN_MAX,
-				FCS_DMA_FROM_DEVICE);
 
 	if (ret) {
 		LOG_ERR("Failed to send the cmd=%d,ret=%d\n", FCS_DEV_QSPI_READ,
@@ -2577,7 +2253,6 @@ FCS_HAL_INT hal_qspi_write(struct fcs_cmd_context *const k_ctx)
 	FCS_HAL_INT ret = 0;
 	struct fcs_cmd_context ctx;
 	FCS_HAL_VOID *s_buf = NULL;
-	FCS_HAL_DMA_ADDR fcs_dma_handle_src;
 	FCS_HAL_U32 s_buf_sz = 0;
 
 	fcs_plat_memcpy(&ctx, k_ctx, sizeof(struct fcs_cmd_context));
@@ -2615,14 +2290,6 @@ FCS_HAL_INT hal_qspi_write(struct fcs_cmd_context *const k_ctx)
 		goto free_src_mem;
 	}
 
-	ret = fcs_plat_dma_addr_map(priv, &fcs_dma_handle_src, s_buf, s_buf_sz,
-				    FCS_DMA_TO_DEVICE);
-	if (ret) {
-		LOG_ERR("Failed to map dma address for the QSPI write ret: %d\n",
-			ret);
-		goto free_src_mem;
-	}
-
 	k_ctx->qspi_write.qspi_data = s_buf;
 	k_ctx->qspi_write.qspi_data_len = &s_buf_sz;
 
@@ -2632,7 +2299,7 @@ FCS_HAL_INT hal_qspi_write(struct fcs_cmd_context *const k_ctx)
 	if (ret) {
 		LOG_ERR("Failed to send the cmd=%d,ret=%d\n",
 			FCS_DEV_QSPI_WRITE, ret);
-		goto unmap;
+		goto free_src_mem;
 	}
 
 	if (priv->status) {
@@ -2648,9 +2315,6 @@ FCS_HAL_INT hal_qspi_write(struct fcs_cmd_context *const k_ctx)
 	}
 
 	priv->plat_data->svc_task_done(priv);
-unmap:
-	fcs_plat_dma_addr_unmap(priv, &fcs_dma_handle_src, s_buf_sz,
-				FCS_DMA_TO_DEVICE);
 free_src_mem:
 	priv->plat_data->svc_free_memory(priv, s_buf);
 
@@ -2694,7 +2358,6 @@ EXPORT_SYMBOL(hal_qspi_erase);
 
 FCS_HAL_INT hal_sdos_crypt(struct fcs_cmd_context *const k_ctx)
 {
-	FCS_HAL_DMA_ADDR fcs_dma_handle_src, fcs_dma_handle_dst;
 	FCS_HAL_VOID *s_buf = NULL, *d_buf = NULL;
 	struct fcs_cmd_context ctx;
 	FCS_HAL_U32 output_size;
@@ -2752,34 +2415,16 @@ FCS_HAL_INT hal_sdos_crypt(struct fcs_cmd_context *const k_ctx)
 
 	k_ctx->sdos.own = owner_id;
 
-	/* Map the input data kernel buffer for DMA */
-	ret = fcs_plat_dma_addr_map(priv, &fcs_dma_handle_src, s_buf,
-				    k_ctx->sdos.src_size, FCS_DMA_TO_DEVICE);
-	if (ret) {
-		LOG_ERR("Failed to map dma address for the digest input data kernel buffer ret: %d\n",
-			ret);
-		goto free_dbuf;
-	}
-
-	ret = fcs_plat_dma_addr_map(priv, &fcs_dma_handle_dst, d_buf,
-				    *k_ctx->sdos.dst_size, FCS_DMA_FROM_DEVICE);
-	if (ret) {
-		LOG_ERR("Failed to perform dma address map for output buffer ret: %d\n",
-			ret);
-		goto unmap_sbuf;
-	}
 
 	k_ctx->sdos.src = s_buf;
 	k_ctx->sdos.dst = d_buf;
 
 	ret = priv->plat_data->svc_send_request(priv, FCS_DEV_SDOS_DATA_EXT,
 						FCS_REQUEST_TIMEOUT);
-	fcs_plat_dma_addr_unmap(priv, &fcs_dma_handle_dst,
-				*k_ctx->sdos.dst_size, FCS_DMA_FROM_DEVICE);
 	if (ret) {
 		LOG_ERR("Failed to send the cmd=%d,ret=%d\n",
 			FCS_DEV_SDOS_DATA_EXT, ret);
-		goto unmap_sbuf;
+		goto free_dbuf;
 	}
 	if (priv->status) {
 		LOG_ERR("Mailbox error, Failed to perform SDOS operation ret: %d priv->status = %d\n",
@@ -2812,10 +2457,6 @@ copy_mbox_status:
 			ret);
 	}
 	priv->plat_data->svc_task_done(priv);
-	goto unmap_sbuf;
-unmap_sbuf:
-	fcs_plat_dma_addr_unmap(priv, &fcs_dma_handle_src, k_ctx->sdos.src_size,
-				FCS_DMA_TO_DEVICE);
 free_dbuf:
 	priv->plat_data->svc_free_memory(priv, d_buf);
 free_sbuf:
@@ -2830,7 +2471,6 @@ FCS_HAL_INT hal_ecdsa_get_pubkey(struct fcs_cmd_context *const k_ctx)
 	FCS_HAL_INT ret = 0;
 	FCS_HAL_UINT pubkey_len = FCS_ECC_PUBKEY_LEN;
 	FCS_HAL_VOID *d_buf = NULL;
-	FCS_HAL_DMA_ADDR fcs_dma_handle_dst;
 	struct fcs_cmd_context ctx;
 
 	fcs_plat_memcpy(&ctx, k_ctx, sizeof(struct fcs_cmd_context));
@@ -2872,20 +2512,12 @@ FCS_HAL_INT hal_ecdsa_get_pubkey(struct fcs_cmd_context *const k_ctx)
 		return ret;
 	}
 
-	ret = fcs_plat_dma_addr_map(priv, &fcs_dma_handle_dst, d_buf,
-				    pubkey_len, FCS_DMA_FROM_DEVICE);
-	if (ret)
-		goto free_dest;
-
 	k_ctx->ecdsa_pub_key.pubkey = d_buf;
 	k_ctx->ecdsa_pub_key.pubkey_len = &pubkey_len;
 
 	ret = priv->plat_data->svc_send_request(
 		priv, FCS_DEV_CRYPTO_ECDSA_GET_PUBLIC_KEY_FINALIZE,
 		10 * FCS_REQUEST_TIMEOUT);
-
-	fcs_plat_dma_addr_unmap(priv, &fcs_dma_handle_dst, FCS_ECC_PUBKEY_LEN,
-				FCS_DMA_FROM_DEVICE);
 
 	if (ret) {
 		LOG_ERR("Failed to send the cmd=%d,ret=%d\n",
@@ -2937,7 +2569,6 @@ FCS_HAL_INT hal_ecdsa_hash_sign(struct fcs_cmd_context *const k_ctx)
 {
 	FCS_HAL_INT ret = 0;
 	FCS_HAL_VOID *s_buf = NULL, *d_buf = NULL;
-	FCS_HAL_DMA_ADDR fcs_dma_handle_src, fcs_dma_handle_dst;
 	FCS_HAL_UINT hash_len = FCS_ECDSA_HASH_SIGN_MAX_LEN;
 	struct fcs_cmd_context ctx;
 
@@ -2989,31 +2620,14 @@ FCS_HAL_INT hal_ecdsa_hash_sign(struct fcs_cmd_context *const k_ctx)
 		goto free_sbuf;
 	}
 
-	/* Map the input data kernel buffer for DMA */
-	ret = fcs_plat_dma_addr_map(priv, &fcs_dma_handle_src, s_buf,
-				    ctx.ecdsa_hash_sign.src_len,
-				    FCS_DMA_TO_DEVICE);
-	if (ret) {
-		LOG_ERR("ECDSA hash sign for src buf failed to map dma address ret: %d\n",
-			ret);
-		goto free_sbuf;
-	}
-
 	d_buf = priv->plat_data->svc_alloc_memory(priv, hash_len);
 	if (IS_ERR(d_buf)) {
 		ret = -ENOMEM;
 		LOG_ERR("Failed to allocate memory for ECDSA hash sign dst buffer ret: %d\n",
 			ret);
-		goto unmap;
+		goto free_sbuf;
 	}
 
-	ret = fcs_plat_dma_addr_map(priv, &fcs_dma_handle_dst, d_buf, hash_len,
-				    FCS_DMA_FROM_DEVICE);
-	if (ret) {
-		LOG_ERR("ECDSA hash sign for dst buf failed to map dma address ret: %d\n",
-			ret);
-		goto free_dbuf;
-	}
 
 	k_ctx->ecdsa_hash_sign.src = s_buf;
 	k_ctx->ecdsa_hash_sign.dst = d_buf;
@@ -3022,10 +2636,6 @@ FCS_HAL_INT hal_ecdsa_hash_sign(struct fcs_cmd_context *const k_ctx)
 	ret = priv->plat_data->svc_send_request(
 		priv, FCS_DEV_CRYPTO_ECDSA_HASH_SIGNING_FINALIZE,
 		10 * FCS_REQUEST_TIMEOUT);
-
-	fcs_plat_dma_addr_unmap(priv, &fcs_dma_handle_dst,
-				FCS_ECDSA_HASH_SIGN_MAX_LEN,
-				FCS_DMA_FROM_DEVICE);
 
 	if (ret) {
 		LOG_ERR("Failed to send the cmd=%d,ret=%d\n",
@@ -3065,10 +2675,6 @@ copy_mbox_status:
 
 free_dbuf:
 	priv->plat_data->svc_free_memory(priv, d_buf);
-unmap:
-	fcs_plat_dma_addr_unmap(priv, &fcs_dma_handle_src,
-				k_ctx->ecdsa_hash_sign.src_len,
-				FCS_DMA_TO_DEVICE);
 free_sbuf:
 	priv->plat_data->svc_free_memory(priv, s_buf);
 
@@ -3081,7 +2687,6 @@ FCS_HAL_INT hal_ecdsa_hash_verify(struct fcs_cmd_context *const k_ctx)
 	FCS_HAL_INT ret = 0;
 	FCS_HAL_VOID *s_buf = NULL, *d_buf = NULL;
 	FCS_HAL_U32 total_sz;
-	FCS_HAL_DMA_ADDR fcs_dma_handle_src, fcs_dma_handle_dst;
 	FCS_HAL_UINT hash_len = FCS_ECDSA_HASH_SIGN_MAX_LEN;
 	struct fcs_cmd_context ctx;
 
@@ -3160,29 +2765,12 @@ FCS_HAL_INT hal_ecdsa_hash_verify(struct fcs_cmd_context *const k_ctx)
 		}
 	}
 
-	/* Map the input data kernel buffer for DMA */
-	ret = fcs_plat_dma_addr_map(priv, &fcs_dma_handle_src, s_buf, total_sz,
-				    FCS_DMA_TO_DEVICE);
-	if (ret) {
-		LOG_ERR("Failed to map dma address for the ECDSA verify src buffer ret: %d\n",
-			ret);
-		goto free_sbuf;
-	}
-
 	d_buf = priv->plat_data->svc_alloc_memory(priv, hash_len);
 	if (IS_ERR(d_buf)) {
 		ret = -ENOMEM;
 		LOG_ERR("Failed to allocate memory for ECDSA verify dst buffer ret: %d\n",
 			ret);
-		goto unmap;
-	}
-
-	ret = fcs_plat_dma_addr_map(priv, &fcs_dma_handle_dst, d_buf, hash_len,
-				    FCS_DMA_FROM_DEVICE);
-	if (ret) {
-		LOG_ERR("Failed to map dma address for the ECDSA verify dst buffer ret: %d\n",
-			ret);
-		goto free_dbuf;
+		goto free_sbuf;
 	}
 
 	k_ctx->ecdsa_hash_verify.src = s_buf;
@@ -3193,10 +2781,6 @@ FCS_HAL_INT hal_ecdsa_hash_verify(struct fcs_cmd_context *const k_ctx)
 	ret = priv->plat_data->svc_send_request(
 		priv, FCS_DEV_CRYPTO_ECDSA_HASH_VERIFY_FINALIZE,
 		10 * FCS_REQUEST_TIMEOUT);
-
-	fcs_plat_dma_addr_unmap(priv, &fcs_dma_handle_dst,
-				FCS_ECDSA_HASH_SIGN_MAX_LEN,
-				FCS_DMA_FROM_DEVICE);
 
 	if (ret) {
 		LOG_ERR("Failed to send the cmd=%d,ret=%d\n",
@@ -3237,9 +2821,6 @@ copy_mbox_status:
 
 free_dbuf:
 	priv->plat_data->svc_free_memory(priv, d_buf);
-unmap:
-	fcs_plat_dma_addr_unmap(priv, &fcs_dma_handle_src, total_sz,
-				FCS_DMA_TO_DEVICE);
 free_sbuf:
 	priv->plat_data->svc_free_memory(priv, s_buf);
 
@@ -3254,7 +2835,6 @@ hal_ecdsa_sha2data_sign_upfinal(FCS_HAL_VOID *src, FCS_HAL_U32 src_len,
 				FCS_HAL_U32 command)
 {
 	FCS_HAL_INT ret = 0;
-	FCS_HAL_DMA_ADDR fcs_dma_handle_src;
 
 	k_ctx->ecdsa_sha2_data_sign.src_len = src_len;
 
@@ -3266,20 +2846,11 @@ hal_ecdsa_sha2data_sign_upfinal(FCS_HAL_VOID *src, FCS_HAL_U32 src_len,
 		return ret;
 	}
 
-	ret = fcs_plat_dma_addr_map(priv, &fcs_dma_handle_src,
-				    k_ctx->ecdsa_sha2_data_sign.src, src_len,
-				    FCS_DMA_TO_DEVICE);
-	if (ret) {
-		LOG_ERR("Failed to map dma address for the ECDSA sign src buf ret: %d\n",
-			ret);
-		return ret;
-	}
-
 	ret = priv->plat_data->svc_send_request(priv, command,
 						10 * FCS_REQUEST_TIMEOUT);
 	if (ret) {
 		LOG_ERR("Failed to send the cmd=%d,ret=%d\n", command, ret);
-		goto unmap;
+		goto goto_ret;
 	}
 
 	ret = fcs_plat_copy_to_user(k_ctx->error_code_addr, &priv->status,
@@ -3287,7 +2858,7 @@ hal_ecdsa_sha2data_sign_upfinal(FCS_HAL_VOID *src, FCS_HAL_U32 src_len,
 	if (ret) {
 		LOG_ERR("Failed to copy mailbox status code to user ret: %d\n",
 			ret);
-		goto unmap;
+		goto goto_ret;
 	}
 
 	if (priv->status) {
@@ -3298,10 +2869,7 @@ hal_ecdsa_sha2data_sign_upfinal(FCS_HAL_VOID *src, FCS_HAL_U32 src_len,
 
 	priv->plat_data->svc_task_done(priv);
 
-unmap:
-	fcs_plat_dma_addr_unmap(priv, &fcs_dma_handle_src, src_len,
-				FCS_DMA_TO_DEVICE);
-
+goto_ret:
 	return ret;
 }
 
@@ -3336,7 +2904,6 @@ FCS_HAL_INT hal_ecdsa_sha2_data_sign(struct fcs_cmd_context *const k_ctx)
 	FCS_HAL_VOID *ip_ptr = NULL;
 	FCS_HAL_U32 s_buf_sz, d_buf_sz;
 	FCS_HAL_U32 remaining_sz;
-	FCS_HAL_DMA_ADDR fcs_dma_handle_dst;
 	struct fcs_cmd_context ctx;
 
 	fcs_plat_memcpy(&ctx, k_ctx, sizeof(struct fcs_cmd_context));
@@ -3382,13 +2949,6 @@ FCS_HAL_INT hal_ecdsa_sha2_data_sign(struct fcs_cmd_context *const k_ctx)
 		goto free_sbuf;
 	}
 
-	ret = fcs_plat_dma_addr_map(priv, &fcs_dma_handle_dst, d_buf, d_buf_sz,
-				    FCS_DMA_FROM_DEVICE);
-	if (ret) {
-		LOG_ERR("Failed to map dma address for the ECDSA sign dst buffer ret: %d\n",
-			ret);
-		goto free_mem;
-	}
 
 	remaining_sz = ctx.ecdsa_sha2_data_sign.src_len;
 	ip_ptr = ctx.ecdsa_sha2_data_sign.src;
@@ -3414,9 +2974,6 @@ FCS_HAL_INT hal_ecdsa_sha2_data_sign(struct fcs_cmd_context *const k_ctx)
 		if (ret) {
 			LOG_ERR("Failed to perform SHA2 data sign update ret: %d\n",
 				ret);
-			fcs_plat_dma_addr_unmap(priv, &fcs_dma_handle_dst,
-						FCS_ECDSA_HASH_SIGN_MAX_LEN,
-						FCS_DMA_FROM_DEVICE);
 			goto copy_mbox_status;
 		}
 		remaining_sz -= FCS_ECDSA_HSHA2_DATA_SIGN_BLOCK_SZ;
@@ -3429,15 +2986,8 @@ FCS_HAL_INT hal_ecdsa_sha2_data_sign(struct fcs_cmd_context *const k_ctx)
 	if (ret) {
 		LOG_ERR("Failed to perform ECDSA SHA2 Data Signing final ret: %d\n",
 			ret);
-			fcs_plat_dma_addr_unmap(priv, &fcs_dma_handle_dst,
-						FCS_ECDSA_HASH_SIGN_MAX_LEN,
-						FCS_DMA_FROM_DEVICE);
 		goto copy_mbox_status;
 	}
-
-	fcs_plat_dma_addr_unmap(priv, &fcs_dma_handle_dst,
-				FCS_ECDSA_HASH_SIGN_MAX_LEN,
-				FCS_DMA_FROM_DEVICE);
 
 	priv->resp -= RESPONSE_HEADER_SIZE;
 
@@ -3466,7 +3016,6 @@ copy_mbox_status:
 
 	priv->plat_data->svc_task_done(priv);
 
-free_mem:
 	priv->plat_data->svc_free_memory(priv, d_buf);
 free_sbuf:
 	priv->plat_data->svc_free_memory(priv, s_buf);
@@ -3482,7 +3031,6 @@ static FCS_HAL_INT hal_ecdsa_sha2data_verify_upfinal(
 	struct fcs_cmd_context *const k_ctx, FCS_HAL_U32 command)
 {
 	FCS_HAL_INT ret = 0;
-	FCS_HAL_DMA_ADDR fcs_dma_handle_src;
 	FCS_HAL_U32 copy_sz = ip_len;
 
 	ret = fcs_plat_copy_from_user(k_ctx->ecdsa_sha2_data_verify.src, ip_ptr,
@@ -3518,20 +3066,11 @@ static FCS_HAL_INT hal_ecdsa_sha2data_verify_upfinal(
 		}
 	}
 
-	ret = fcs_plat_dma_addr_map(priv, &fcs_dma_handle_src,
-				    k_ctx->ecdsa_sha2_data_verify.src, copy_sz,
-				    FCS_DMA_TO_DEVICE);
-	if (ret) {
-		LOG_ERR("Failed to map(src) dma address for the ECDSA sha2verify ret: %d\n",
-			ret);
-		return ret;
-	}
-
 	ret = priv->plat_data->svc_send_request(priv, command,
 						10 * FCS_REQUEST_TIMEOUT);
 	if (ret) {
 		LOG_ERR("Failed to send the cmd=%d,ret=%d\n", command, ret);
-		goto unmap;
+		goto goto_ret;
 	}
 
 	ret = fcs_plat_copy_to_user(k_ctx->error_code_addr, &priv->status,
@@ -3539,7 +3078,7 @@ static FCS_HAL_INT hal_ecdsa_sha2data_verify_upfinal(
 	if (ret) {
 		LOG_ERR("Failed to copy mailbox status code to user ret: %d\n",
 			ret);
-		goto unmap;
+		goto goto_ret;
 	}
 
 	if (priv->status) {
@@ -3549,11 +3088,7 @@ static FCS_HAL_INT hal_ecdsa_sha2data_verify_upfinal(
 	}
 
 	priv->plat_data->svc_task_done(priv);
-
-unmap:
-	fcs_plat_dma_addr_unmap(priv, &fcs_dma_handle_src, copy_sz,
-				FCS_DMA_TO_DEVICE);
-
+goto_ret:
 	return ret;
 }
 
@@ -3589,7 +3124,6 @@ FCS_HAL_INT hal_ecdsa_sha2_data_verify(struct fcs_cmd_context *const k_ctx)
 	FCS_HAL_U32 s_buf_sz, d_buf_sz = FCS_ECDSA_SHA2_DATA_VERIFY_RSP_SZ;
 	FCS_HAL_U32 remaining_sz;
 	FCS_HAL_VOID *ip_ptr = NULL;
-	FCS_HAL_DMA_ADDR fcs_dma_handle_dst;
 	FCS_HAL_U32 command;
 	struct fcs_cmd_context ctx;
 
@@ -3635,14 +3169,6 @@ FCS_HAL_INT hal_ecdsa_sha2_data_verify(struct fcs_cmd_context *const k_ctx)
 		LOG_ERR("Failed to allocate memory for ECDSA sha2verify dst buffer ret: %d\n",
 			ret);
 		goto free_sbuf;
-	}
-
-	ret = fcs_plat_dma_addr_map(priv, &fcs_dma_handle_dst, d_buf, d_buf_sz,
-				    FCS_DMA_FROM_DEVICE);
-	if (ret) {
-		LOG_ERR("Failed to map(dbuf) dma address for the ECDSA sha2verify ret: %d\n",
-			ret);
-		goto free_mem;
 	}
 
 	k_ctx->ecdsa_sha2_data_verify.src = s_buf;
@@ -3711,9 +3237,6 @@ FCS_HAL_INT hal_ecdsa_sha2_data_verify(struct fcs_cmd_context *const k_ctx)
 		if (ret) {
 			LOG_ERR("Failed to perform SHA2 Data verify final ret: %d\n",
 				ret);
-			fcs_plat_dma_addr_unmap(priv, &fcs_dma_handle_dst,
-						FCS_ECDSA_SHA2_DATA_VERIFY_RSP_SZ,
-						FCS_DMA_FROM_DEVICE);
 			goto free_mem;
 		}
 
@@ -3721,9 +3244,6 @@ FCS_HAL_INT hal_ecdsa_sha2_data_verify(struct fcs_cmd_context *const k_ctx)
 		remaining_sz -= k_ctx->ecdsa_sha2_data_verify.src_len;
 	}
 
-	fcs_plat_dma_addr_unmap(priv, &fcs_dma_handle_dst,
-				FCS_ECDSA_SHA2_DATA_VERIFY_RSP_SZ,
-				FCS_DMA_FROM_DEVICE);
 
 	priv->resp -= RESPONSE_HEADER_SIZE;
 
@@ -3764,7 +3284,6 @@ FCS_HAL_INT hal_hps_img_validate(struct fcs_cmd_context *const k_ctx)
 {
 	FCS_HAL_INT ret = 0;
 	FCS_HAL_VOID *s_buf = NULL;
-	FCS_HAL_DMA_ADDR fcs_dma_handle_src;
 	struct fcs_cmd_context ctx;
 	FCS_HAL_UINT s_buf_len = 0, tsz = 0;
 
@@ -3794,15 +3313,6 @@ FCS_HAL_INT hal_hps_img_validate(struct fcs_cmd_context *const k_ctx)
 		goto free_mem;
 	}
 
-	/* Map the source buffer for DMA */
-	ret = fcs_plat_dma_addr_map(priv, &fcs_dma_handle_src, s_buf, s_buf_len,
-				    FCS_DMA_TO_DEVICE);
-	if (ret) {
-		LOG_ERR("Failed perform dma address map for the HPS image buffer ret: %d\n",
-			ret);
-		goto free_mem;
-	}
-
 	k_ctx->hps_img_validate.vab_cert = s_buf;
 	k_ctx->hps_img_validate.vab_cert_len = s_buf_len;
 
@@ -3811,7 +3321,7 @@ FCS_HAL_INT hal_hps_img_validate(struct fcs_cmd_context *const k_ctx)
 	if (ret) {
 		LOG_ERR("Failed to send the cmd=%d,ret=%d\n",
 			FCS_DEV_HPS_IMG_VALIDATE_REQUEST, ret);
-		goto unmap;
+		goto free_mem;
 	}
 
 	if (priv->status) {
@@ -3838,10 +3348,6 @@ copy_mbox_status:
 	}
 
 	priv->plat_data->svc_task_done(priv);
-
-unmap:
-	fcs_plat_dma_addr_unmap(priv, &fcs_dma_handle_src, s_buf_len,
-				FCS_DMA_TO_DEVICE);
 
 free_mem:
 	priv->plat_data->svc_free_memory(priv, s_buf);

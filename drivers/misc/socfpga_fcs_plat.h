@@ -66,13 +66,6 @@ FCS_HAL_VOID fcs_plat_complete(FCS_HAL_COMPLETION *completion);
  */
 FCS_HAL_VOID fcs_plat_reinit_completion(FCS_HAL_COMPLETION *completion);
 
-FCS_HAL_INT fcs_plat_dma_addr_map(struct socfpga_fcs_priv *priv,
-				  FCS_HAL_DMA_ADDR *dma_handle,
-				  FCS_HAL_VOID *buf, FCS_HAL_SIZE size,
-				  FCS_HAL_UINT direction);
-FCS_HAL_VOID fcs_plat_dma_addr_unmap(struct socfpga_fcs_priv *priv,
-				     FCS_HAL_DMA_ADDR *dma_handle,
-				     FCS_HAL_SIZE size, FCS_HAL_UINT direction);
 FCS_HAL_INT fcs_plat_wait_for_completion(FCS_HAL_COMPLETION *completion,
 					 FCS_HAL_ULONG timeout);
 FCS_HAL_VOID fcs_plat_mutex_lock(struct socfpga_fcs_priv *priv);
