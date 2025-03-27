@@ -49,31 +49,6 @@ static void fcs_atf_version_callback(struct stratix10_svc_client *client,
 	complete(&priv->completion);
 }
 
-FCS_HAL_INT fcs_plat_dma_addr_map(struct socfpga_fcs_priv *priv,
-				  FCS_HAL_DMA_ADDR *dma_handle,
-				  FCS_HAL_VOID *buf, FCS_HAL_SIZE size,
-				  FCS_HAL_UINT direction)
-{
-	struct device *dev = priv->client.dev;
-
-	*dma_handle = dma_map_single(dev, buf, size, direction);
-	if (dma_mapping_error(dev, *dma_handle)) {
-		dev_err(dev, "DMA mapping failed\n");
-		return -EFAULT;
-	}
-
-	return 0;
-}
-
-FCS_HAL_VOID fcs_plat_dma_addr_unmap(struct socfpga_fcs_priv *priv,
-				     FCS_HAL_DMA_ADDR *dma_handle,
-				     FCS_HAL_SIZE size, FCS_HAL_UINT direction)
-{
-	struct device *dev = priv->client.dev;
-
-	dma_unmap_single(dev, *dma_handle, size, direction);
-}
-
 FCS_HAL_INT fcs_plat_copy_to_user(FCS_HAL_VOID *dst, FCS_HAL_VOID *src, FCS_HAL_SIZE size)
 {
 	if (access_ok(dst, size)) {
@@ -897,7 +872,7 @@ FCS_HAL_INT fcs_plat_init(FCS_HAL_DEV *dev, struct socfpga_fcs_priv *priv)
 							  SVC_CLIENT_FCS);
 	if (IS_ERR(priv->chan)) {
 		pr_err("couldn't get service channel %s\n", SVC_CLIENT_FCS);
-		return -ENODEV;
+		return -EPROBE_DEFER;
 	}
 
 	ret = stratix10_svc_add_async_client(priv->chan, true);
