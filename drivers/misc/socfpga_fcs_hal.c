@@ -97,7 +97,6 @@ FCS_HAL_INT hal_session_close(struct fcs_cmd_context *const k_ctx)
 			ret);
 	}
 
-	priv->plat_data->svc_task_done(priv);
 
 	return ret;
 }
@@ -140,7 +139,6 @@ copy_mbox_status:
 		LOG_ERR("Failed to copy mail box status code to user ret: %d\n",
 			ret);
 	}
-	priv->plat_data->svc_task_done(priv);
 
 	return ret;
 }
@@ -224,7 +222,6 @@ copy_mbox_status:
 			ret);
 		ret = -EFAULT;
 	}
-	priv->plat_data->svc_task_done(priv);
 free_mem:
 	priv->plat_data->svc_free_memory(priv, s_buf);
 
@@ -295,7 +292,6 @@ copy_mbox_status:
 		LOG_ERR("Failed to copy mail box status code to user ret: %d\n",
 			ret);
 	}
-	priv->plat_data->svc_task_done(priv);
 free_dest:
 	priv->plat_data->svc_free_memory(priv, d_buf);
 
@@ -336,8 +332,6 @@ FCS_HAL_INT hal_remove_key(struct fcs_cmd_context *const k_ctx)
 		LOG_ERR("Failed to copy mail box status code to user ret: %d\n",
 			ret);
 	}
-
-	priv->plat_data->svc_task_done(priv);
 
 	return ret;
 }
@@ -410,7 +404,6 @@ copy_mbox_status:
 		LOG_ERR("Failed to copy mailbox status code to user ret: %d\n",
 			ret);
 	}
-	priv->plat_data->svc_task_done(priv);
 free_dest:
 	priv->plat_data->svc_free_memory(priv, d_buf);
 
@@ -493,7 +486,6 @@ copy_mbox_status:
 		LOG_ERR("Failed to copy mailbox status code to user ret: %d\n",
 			ret);
 	}
-	priv->plat_data->svc_task_done(priv);
 free_mem:
 	priv->plat_data->svc_free_memory(priv, s_buf);
 
@@ -557,7 +549,6 @@ copy_mbox_status:
 		LOG_ERR("Failed to copy mailbox status code to user ret: %d\n",
 			ret);
 
-	priv->plat_data->svc_task_done(priv);
 free_dest:
 	priv->plat_data->svc_free_memory(priv, d_buf);
 
@@ -631,7 +622,6 @@ copy_mbox_status:
 		LOG_ERR("Failed to copy mailbox status code to user ret: %d\n",
 			ret);
 	}
-	priv->plat_data->svc_task_done(priv);
 free_mem:
 	priv->plat_data->svc_free_memory(priv, s_buf);
 
@@ -669,7 +659,6 @@ copy_mbox_status:
 		LOG_ERR("Failed to copy mailbox status code to user ret: %d\n",
 			ret);
 	}
-	priv->plat_data->svc_task_done(priv);
 
 unmap:
 	return ret;
@@ -735,7 +724,6 @@ copy_mbox_status:
 		LOG_ERR("Failed to copy mail box status code to user ret: %d\n",
 			ret);
 	}
-	priv->plat_data->svc_task_done(priv);
 free_mem:
 	priv->plat_data->svc_free_memory(priv, s_buf);
 
@@ -847,7 +835,6 @@ FCS_HAL_INT hal_hkdf_request(struct fcs_cmd_context *const k_ctx)
 	if (ret)
 		LOG_ERR("Failed to copy HKDF status to user ret: %d\n", ret);
 
-	priv->plat_data->svc_task_done(priv);
 free_mem:
 	priv->plat_data->svc_free_memory(priv, s_buf);
 
@@ -882,7 +869,6 @@ static FCS_HAL_INT hal_digest_init(struct fcs_cmd_context *const k_ctx)
 		LOG_ERR("Failed to copy mailbox status code to user ret: %d\n",
 			ret);
 	}
-	priv->plat_data->svc_task_done(priv);
 	return ret;
 }
 
@@ -927,7 +913,6 @@ copy_mbox_status:
 		LOG_ERR("Failed to copy mailbox status code to user ret: %d\n",
 			ret);
 	}
-	priv->plat_data->svc_task_done(priv);
 
 	priv->plat_data->svc_free_memory(priv, d_buf);
 	return ret;
@@ -995,7 +980,6 @@ copy_mbox_status:
 return_fun:
 	priv->plat_data->svc_free_memory(priv, k_ctx->dgst.src);
 	priv->plat_data->svc_free_memory(priv, d_buf);
-	priv->plat_data->svc_task_done(priv);
 
 	return ret;
 }
@@ -1225,8 +1209,6 @@ copy_mbox_status:
 			ret);
 	}
 
-	priv->plat_data->svc_task_done(priv);
-
 free_dest:
 	priv->plat_data->svc_free_memory(priv, d_buf);
 free_s_buf:
@@ -1281,8 +1263,6 @@ static FCS_HAL_INT hal_aes_crypt_init(struct fcs_cmd_context *const k_ctx)
 			FCS_DEV_CRYPTO_AES_CRYPT_INIT, ret);
 		goto free_mem;
 	}
-
-	priv->plat_data->svc_task_done(priv);
 
 free_mem:
 	priv->plat_data->svc_free_memory(priv, aes_parms);
@@ -1430,14 +1410,14 @@ static FCS_HAL_INT hal_aes_crypt_update_final(FCS_HAL_CHAR *ip_ptr, FCS_HAL_UINT
 	if (ret) {
 		LOG_ERR("Failed to copy mailbox status code to user ret: %d\n",
 			ret);
-		goto task_done;
+		goto free_dst;
 	}
 
 	if (priv->status) {
 		ret = -EIO;
 		LOG_ERR("Mailbox error, Failed to perform AES crypt Mbox status: 0x%x\n",
 			priv->status);
-		goto task_done;
+		goto free_dst;
 	}
 
 
@@ -1460,18 +1440,16 @@ static FCS_HAL_INT hal_aes_crypt_update_final(FCS_HAL_CHAR *ip_ptr, FCS_HAL_UINT
 			if (ret) {
 				LOG_ERR("Failed to copy TAG value to tag buffer ret: %d\n",
 					ret);
-				goto task_done;
+				goto free_dst;
 			}
 		} else {
 			LOG_ERR("Invalid TAG data buffer address %d\n", ret);
-			goto task_done;
+			goto free_dst;
 		}
 	}
 
 	LOG_DBG("AES Update/final Success\n");
 
-task_done:
-	priv->plat_data->svc_task_done(priv);
 free_dst:
 	priv->plat_data->svc_free_memory(priv, d_buf);
 free_src:
@@ -1725,7 +1703,6 @@ copy_mbox_status:
 		LOG_ERR("Failed to copy mailbox status code to user ret: %d\n",
 			ret);
 	}
-	priv->plat_data->svc_task_done(priv);
 
 free_dst:
 	priv->plat_data->svc_free_memory(priv, d_buf);
@@ -1777,8 +1754,6 @@ copy_mbox_status:
 		LOG_ERR("Failed to copy mailbox status code to user ret: %d\n",
 			ret);
 	}
-
-	priv->plat_data->svc_task_done(priv);
 
 	return ret;
 }
@@ -1842,7 +1817,6 @@ copy_mbox_status:
 		LOG_ERR("Failed to copy mailbox status code to user ret: %d\n",
 			ret);
 	}
-	priv->plat_data->svc_task_done(priv);
 free_dest:
 	priv->plat_data->svc_free_memory(priv, d_buf);
 
@@ -1879,8 +1853,6 @@ hal_attestation_certificate_reload(struct fcs_cmd_context *const k_ctx)
 		LOG_ERR("Failed to copy mailbox status code to user ret: %d\n",
 			ret);
 	}
-
-	priv->plat_data->svc_task_done(priv);
 
 	return ret;
 }
@@ -1960,7 +1932,6 @@ copy_mbox_status:
 			ret);
 	}
 
-	priv->plat_data->svc_task_done(priv);
 	priv->plat_data->svc_free_memory(priv, d_buf);
 
 free_mem:
@@ -2004,8 +1975,6 @@ copy_mbox_status:
 		LOG_ERR("Failed to copy mailbox status code to user ret: %d\n",
 			ret);
 	}
-
-	priv->plat_data->svc_task_done(priv);
 
 	return ret;
 }
@@ -2070,8 +2039,6 @@ copy_mbox_status:
 			ret);
 	}
 
-	priv->plat_data->svc_task_done(priv);
-
 free_dest:
 	priv->plat_data->svc_free_memory(priv, d_buf);
 
@@ -2108,8 +2075,6 @@ FCS_HAL_INT hal_qspi_open(struct fcs_cmd_context *const k_ctx)
 				ret);
 		}
 	}
-
-	priv->plat_data->svc_task_done(priv);
 
 	return 0;
 }
@@ -2239,8 +2204,6 @@ copy_mbox_status:
 			ret);
 	}
 
-	priv->plat_data->svc_task_done(priv);
-
 free_dest:
 	priv->plat_data->svc_free_memory(priv, d_buf);
 
@@ -2314,7 +2277,6 @@ FCS_HAL_INT hal_qspi_write(struct fcs_cmd_context *const k_ctx)
 			ret);
 	}
 
-	priv->plat_data->svc_task_done(priv);
 free_src_mem:
 	priv->plat_data->svc_free_memory(priv, s_buf);
 
@@ -2349,8 +2311,6 @@ FCS_HAL_INT hal_qspi_erase(struct fcs_cmd_context *const k_ctx)
 		LOG_ERR("Failed to copy mailbox status code to user ret: %d\n",
 			ret);
 	}
-
-	priv->plat_data->svc_task_done(priv);
 
 	return 0;
 }
@@ -2456,7 +2416,6 @@ copy_mbox_status:
 		LOG_ERR("Failed to copy mailbox status code to user ret: %d\n",
 			ret);
 	}
-	priv->plat_data->svc_task_done(priv);
 free_dbuf:
 	priv->plat_data->svc_free_memory(priv, d_buf);
 free_sbuf:
@@ -2498,7 +2457,6 @@ FCS_HAL_INT hal_ecdsa_get_pubkey(struct fcs_cmd_context *const k_ctx)
 
 	if (priv->status) {
 		ret = -EIO;
-		priv->plat_data->svc_task_done(priv);
 		LOG_ERR("Failed to get public key with mbox status:0x%X\n",
 			priv->status);
 		return ret;
@@ -2556,8 +2514,6 @@ copy_mbox_status:
 			ret);
 	}
 
-	priv->plat_data->svc_task_done(priv);
-
 free_dest:
 	priv->plat_data->svc_free_memory(priv, d_buf);
 
@@ -2596,7 +2552,6 @@ FCS_HAL_INT hal_ecdsa_hash_sign(struct fcs_cmd_context *const k_ctx)
 
 	if (priv->status) {
 		ret = -EIO;
-		priv->plat_data->svc_task_done(priv);
 		LOG_ERR("ECDSA Hash sign initialization failed mbox status:0x%X\n",
 			priv->status);
 		return ret;
@@ -2671,7 +2626,6 @@ copy_mbox_status:
 				  sizeof(priv->status))) {
 		LOG_ERR("Failed to copy mailbox status code to user\n");
 	}
-	priv->plat_data->svc_task_done(priv);
 
 free_dbuf:
 	priv->plat_data->svc_free_memory(priv, d_buf);
@@ -2714,7 +2668,6 @@ FCS_HAL_INT hal_ecdsa_hash_verify(struct fcs_cmd_context *const k_ctx)
 
 	if (priv->status) {
 		ret = -EIO;
-		priv->plat_data->svc_task_done(priv);
 		LOG_ERR("Failed to initialize ECDSA verify, mbox status:0x%X\n",
 			priv->status);
 		return ret;
@@ -2817,8 +2770,6 @@ copy_mbox_status:
 		LOG_ERR("Failed to copy mailbox status code to user\n");
 	}
 
-	priv->plat_data->svc_task_done(priv);
-
 free_dbuf:
 	priv->plat_data->svc_free_memory(priv, d_buf);
 free_sbuf:
@@ -2867,8 +2818,6 @@ hal_ecdsa_sha2data_sign_upfinal(FCS_HAL_VOID *src, FCS_HAL_U32 src_len,
 			priv->status);
 	}
 
-	priv->plat_data->svc_task_done(priv);
-
 goto_ret:
 	return ret;
 }
@@ -2889,7 +2838,6 @@ hal_ecdsa_sha2_data_sign_init(struct fcs_cmd_context *const k_ctx)
 
 	if (priv->status) {
 		ret = -EIO;
-		priv->plat_data->svc_task_done(priv);
 		LOG_ERR("Failed to initialize ECDSA sign ret: %d\n", ret);
 		return ret;
 	}
@@ -3014,8 +2962,6 @@ copy_mbox_status:
 			ret);
 	}
 
-	priv->plat_data->svc_task_done(priv);
-
 	priv->plat_data->svc_free_memory(priv, d_buf);
 free_sbuf:
 	priv->plat_data->svc_free_memory(priv, s_buf);
@@ -3087,7 +3033,6 @@ static FCS_HAL_INT hal_ecdsa_sha2data_verify_upfinal(
 			priv->status);
 	}
 
-	priv->plat_data->svc_task_done(priv);
 goto_ret:
 	return ret;
 }
@@ -3108,7 +3053,6 @@ hal_ecdsa_sha2_data_verify_init(struct fcs_cmd_context *const k_ctx)
 
 	if (priv->status) {
 		ret = -EIO;
-		priv->plat_data->svc_task_done(priv);
 		LOG_ERR("Mailbox error, Failed to initialize ECDSA verify ret: %d\n",
 			ret);
 		return ret;
@@ -3269,8 +3213,6 @@ FCS_HAL_INT hal_ecdsa_sha2_data_verify(struct fcs_cmd_context *const k_ctx)
 			ret);
 	}
 
-	priv->plat_data->svc_task_done(priv);
-
 free_mem:
 	priv->plat_data->svc_free_memory(priv, d_buf);
 free_sbuf:
@@ -3346,8 +3288,6 @@ copy_mbox_status:
 		LOG_ERR("Failed to copy mailbox status code to user ret: %d\n",
 			ret);
 	}
-
-	priv->plat_data->svc_task_done(priv);
 
 free_mem:
 	priv->plat_data->svc_free_memory(priv, s_buf);
