@@ -23,7 +23,10 @@ concurrency:
 jobs:
 #This action extracts the new commits and performs checkpatch checks on it.
   ci-checkpatch:
-    runs-on: [self-hosted,esw_runner]
+    runs-on: [self-hosted,pg-embedded-runner]
+    container:
+      image: amr-registry-pre.caas.intel.com/pse-pswe-software-ba/embedded_coverity:ubuntu20.04.0_6
+      options: -v /mnt/nfs_share/site/proj/psg:/p/psg
     # Check patch only can run at pull request as it is hard to determine the commit during the push event.
     env:
       GITHUB_EVENT_NAME: ${{ github.event_name }}
@@ -36,13 +39,14 @@ jobs:
 
       - name: Checkpatch.pl
         run: |
-          git clone https://github.com/intel-sandbox/application.devops.github.pr.workflow
+          git config --global --add safe.directory /__w/${{ github.event.repository.name }}/${{ github.event.repository.name }}
+          git clone https://${{ secrets.GIT_USER }}:${{ secrets.GIT_TOKEN }}@github.com/intel-sandbox/application.devops.github.pr.workflow
           cd application.devops.github.pr.workflow
           git checkout master
-          bash workflow_Checkpatch.sh ${{ github.workspace }} ${{ github.event.repository.name }} ${{ secrets.GITHUB_TOKEN }} ${{ github.event.pull_request.number }} ${{ github.head_ref }} ${{ github.base_ref }}
+          bash workflow_Checkpatch.sh ../ ${{ github.event.repository.name }} ${{ secrets.GITHUB_TOKEN }} ${{ github.event.pull_request.number }} ${{ github.head_ref }} ${{ github.base_ref }}
 
   ci-coverity:
-    runs-on: [self-hosted,build_server,pswe-ci-runner1.sj.altera.com]
+    runs-on: [self-hosted,pg-embedded-runner]
     container:
         image: amr-registry-pre.caas.intel.com/pse-pswe-software-ba/embedded_coverity:ubuntu20.04.0_6
     env:
@@ -86,7 +90,7 @@ jobs:
 
   ci-coverity-parse-result:
     needs: ci-coverity
-    runs-on: [self-hosted,build_server,pswe-ci-runner1.sj.altera.com]
+    runs-on: [self-hosted,pg-embedded-runner]
     container:
         image: amr-registry-pre.caas.intel.com/pse-pswe-software-ba/embedded_coverity:ubuntu20.04.0_6
 
@@ -138,7 +142,7 @@ jobs:
 #This action performs a build test using an ubuntu container.
   ci-build:
     # The type of runner that the job will run on
-    runs-on: [self-hosted,build_server,pswe-ci-runner1.sj.altera.com]
+    runs-on: [self-hosted,pg-embedded-runner]
     container:
         image: amr-registry-pre.caas.intel.com/pse-pswe-software-ba/embedded_coverity:ubuntu20.04.0_6
     env:
@@ -190,7 +194,7 @@ jobs:
 
 #This action checks if there is any unaddressed comments or change request
   ci-check-reviews:
-    runs-on: [self-hosted,pswe-ci-runner1.sj.altera.com]
+    runs-on: [self-hosted,pg-embedded-runner]
     steps:
      - name: Check for unaddressed change requests
        env:
@@ -208,7 +212,7 @@ jobs:
 
 #This is the commit gate that ensures all required checks are passing before the PR is allowed to be merged.
   ci-check-pr-status:
-    runs-on: [self-hosted,pswe-ci-runner1.sj.altera.com]
+    runs-on: [self-hosted,pg-embedded-runner]
     needs: [ci-coverity-parse-result, ci-verification, ci-checkpatch, ci-check-reviews]
     steps:
      - name: Check for unaddressed change requests
