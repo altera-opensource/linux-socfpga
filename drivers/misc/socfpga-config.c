@@ -1100,7 +1100,7 @@ static DEVICE_ATTR_WO(hps_image_validate);
 static DEVICE_ATTR_RO(atf_version);
 static DEVICE_ATTR_WO(sdos);
 
-static struct attribute *fcs_security_attrs[] = {
+static struct attribute *fcs_config_attrs[] = {
 	&dev_attr_open_session.attr,
 	&dev_attr_close_session.attr,
 	&dev_attr_context_info.attr,
@@ -1140,7 +1140,7 @@ static struct attribute *fcs_security_attrs[] = {
 };
 
 static struct attribute_group fcs_group = {
-	.attrs = fcs_security_attrs,
+	.attrs = fcs_config_attrs,
 };
 
 static const struct attribute_group *fcs_groups[] = {
@@ -1153,21 +1153,10 @@ struct kobject *sysfs_kobj;
 static int fcs_driver_probe(struct platform_device *pdev)
 {
 	int ret;
-	/* device node pointer */
-	struct device_node *np = pdev->dev.of_node;
-	struct device_node *fcs_hal_np;
 
-	fcs_hal_np = of_parse_phandle(np, "dependent-on", 0);
-	if (!fcs_hal_np) {
-		pr_err("Failed to find HAL Driver device\n");
-		return -ENODEV;
-	}
-
-	if (of_device_is_compatible(fcs_hal_np, "intel,agilex5-soc-fcs-hal") &&
-	    !of_device_is_available(fcs_hal_np)) {
-		pr_err("FCS HAL is not available.\n");
-		of_node_put(fcs_hal_np);
-		return -ENODEV;
+	if (!hal_fcs_is_ready()) {
+		pr_err(" FCS HAL driver is not ready");
+		return -EPROBE_DEFER;
 	}
 
 	sysfs_kobj = kobject_create_and_add("fcs_sysfs", kernel_kobj);
@@ -1180,33 +1169,34 @@ static int fcs_driver_probe(struct platform_device *pdev)
 	if (ret)
 		sysfs_remove_groups(sysfs_kobj, fcs_groups);
 
-	pr_info("FCS Security Driver probed successfully\n");
+	pr_info("%s is successfully completed", __func__);
 
 	return ret;
 }
 
 static const struct of_device_id fcs_of_match[] = {
 	{ .compatible = "intel,agilex5-soc-fcs-config" },
+	{ .compatible = "intel,agilex-soc-fcs-config" },
 	{},
 };
 
 static struct platform_driver fcs_driver = {
 	.probe = fcs_driver_probe,
 	.driver = {
-		.name = "socfpga-security",
+		.name = "socfpga-config",
 		.of_match_table = of_match_ptr(fcs_of_match),
 	},
 };
 
 MODULE_DEVICE_TABLE(of, fcs_of_match);
 
-static int __init fcs_security_init(void)
+static int __init fcs_config_init(void)
 {
 	struct device_node *fw_np;
 	struct device_node *np;
 	int ret;
 
-	fw_np = of_find_node_by_name(NULL, "svc");
+	fw_np = of_find_node_by_name(NULL, "firmware");
 	if (!fw_np)
 		return -ENODEV;
 
@@ -1230,7 +1220,7 @@ static int __init fcs_security_init(void)
 	return ret;
 }
 
-static void __exit fcs_security_exit(void)
+static void __exit fcs_config_exit(void)
 {
 	/* Remove sysfs groups */
 	sysfs_remove_groups(sysfs_kobj, fcs_groups);
@@ -1242,9 +1232,9 @@ static void __exit fcs_security_exit(void)
 	return platform_driver_unregister(&fcs_driver);
 }
 
-module_init(fcs_security_init);
-module_exit(fcs_security_exit);
+module_init(fcs_config_init);
+module_exit(fcs_config_exit);
 
 MODULE_LICENSE("GPL v2");
-MODULE_DESCRIPTION("Altera socfpga security driver");
+MODULE_DESCRIPTION("Altera socfpga config driver");
 MODULE_AUTHOR("Balsundar Ponnusamy, Santosh Male, Sagar Khadgi");
