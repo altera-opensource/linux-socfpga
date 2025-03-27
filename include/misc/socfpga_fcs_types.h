@@ -101,8 +101,6 @@ typedef struct mutex FCS_HAL_MUTEX;
 
 typedef struct device FCS_HAL_DEV;
 
-typedef dma_addr_t FCS_HAL_DMA_ADDR;
-
 typedef struct stratix10_svc_client_msg FCS_SVC_CLIENT_MSG;
 typedef struct stratix10_svc_client FCS_SVC_CLIENT;
 typedef struct stratix10_svc_cb_data FCS_SVC_CB_DATA;
