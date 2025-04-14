@@ -2565,15 +2565,8 @@ int stratix10_svc_async_send(struct stratix10_svc_chan *chan, void *msg, void **
 		args.a7 = p_msg->payload_length_output;
 		args.a8 = stratix10_get_smmu_remapped_address(ctrl, p_msg->payload);
 		break;
-	case COMMAND_RSU_GET_DEVICE_INFO:
-		args.a0 = INTEL_SIP_SMC_ASYNC_QSPI_GET_DEV_INFO;
-		args.a2 = stratix10_get_physical_address(ctrl, p_msg->payload_output);
-		args.a3 = (unsigned long)p_msg->payload_length_output;
-		break;
 	case COMMAND_RSU_GET_SPT_TABLE:
 		args.a0 = INTEL_SIP_SMC_ASYNC_RSU_GET_SPT;
-		args.a2 = stratix10_get_physical_address(ctrl, p_msg->payload_output);
-		args.a3 = (unsigned long)p_msg->payload_length_output;
 		break;
 	case COMMAND_MBOX_SEND_CMD:
 		args.a0 = INTEL_SIP_SMC_ASYNC_MBOX_SEND;
@@ -2583,9 +2576,16 @@ int stratix10_svc_async_send(struct stratix10_svc_chan *chan, void *msg, void **
 		args.a5 = stratix10_get_physical_address(ctrl, p_msg->payload_output);
 		args.a6 = p_msg->payload_length_output;
 		break;
+	case COMMAND_RSU_STATUS:
+		args.a0 = INTEL_SIP_SMC_ASYNC_RSU_GET_ERROR_STATUS;
+		break;
+	case COMMAND_RSU_NOTIFY:
+		args.a0 = INTEL_SIP_SMC_ASYNC_RSU_NOTIFY;
+		args.a2 = p_msg->arg[0];
+		break;
 
 	default:
-		dev_err(ctrl->dev, "Invalid command ,%d\n", p_msg->command);
+		dev_err(ctrl->dev, "Invalid command ,%d", p_msg->command);
 		ret = -EINVAL;
 		goto deallocate_id;
 	}
@@ -2697,6 +2697,7 @@ static int stratix10_svc_async_prepare_response(struct stratix10_svc_chan *chan,
 	case COMMAND_QSPI_WRITE:
 	case COMMAND_QSPI_ERASE:
 	case COMMAND_FCS_ATTESTATION_CERTIFICATE_RELOAD:
+	case COMMAND_RSU_NOTIFY:
 		break;
 	case COMMAND_HWMON_READTEMP:
 	case COMMAND_HWMON_READVOLT:
@@ -2728,7 +2729,6 @@ static int stratix10_svc_async_prepare_response(struct stratix10_svc_chan *chan,
 	case COMMAND_FCS_CRYPTO_ECDSA_SHA2_DATA_SIGNING_FINALIZE:
 	case COMMAND_FCS_CRYPTO_GET_DEVICE_IDENTITY:
 	case COMMAND_FCS_SDOS_DATA_EXT:
-	case COMMAND_RSU_GET_DEVICE_INFO:
 	case COMMAND_QSPI_READ:
 	case COMMAND_MBOX_SEND_CMD:
 		data->kaddr1 = (void *)&handle->res.a2;
@@ -2739,12 +2739,20 @@ static int stratix10_svc_async_prepare_response(struct stratix10_svc_chan *chan,
 		data->kaddr1 = (void *)&handle->res.a2;
 		data->kaddr2 = (void *)&handle->res.a3;
 		break;
+	case COMMAND_RSU_STATUS:
+		/* COMMAND_RSU_STATUS has more elements than the cb_data
+		 * can acomodate, so passing the response structure to the
+		 * response function to be handled before done command is
+		 * executed by the client.
+		 */
+		data->kaddr1 = (void *)&handle->res;
+		break;
 
 	default:
 		dev_alert(ctrl->dev, "Invalid command ,%d", p_msg->command);
 		return -ENOENT;
 	}
-	dev_dbg(ctrl->dev, "Async message completed transaction_id 0x%02x\n",
+	dev_dbg(ctrl->dev, "Async message completed transaction_id 0x%02x",
 		handle->transaction_id);
 	return 0;
 }
