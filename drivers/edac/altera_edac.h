@@ -361,6 +361,44 @@ struct altr_sdram_mc_data {
 #define SEU_SAFE_INJECT_DB_UE_MSB		0x20
 #define SEU_SAFE_INJECT_DB_UE_LSB		0x30001
 
+/************ IO96B ECC defines *******/
+#define IO96B_ECC_ENABLE_INFO_OFST		0x240
+#define IO96B_ECC_SCRUB_STAT0_OFST		0x244
+#define IO96B_ECC_ERR_REG_OFST			0x300
+#define IO96B_ECC_ERR_ENTRIES_OFST		0x310
+
+#define IO96B_CMD_RESP_STATUS_OFST		0x45C
+#define IO96B_CMD_RESP_DATA_0_OFST		0x458
+#define IO96B_CMD_RESP_DATA_1_OFST		0x454
+#define IO96B_CMD_RESP_DATA_2_OFST		0x450
+#define IO96B_CMD_REQ_OFST			0x43C
+#define IO96B_CMD_PARAM_0_OFST			0x438
+#define IO96B_CMD_PARAM_1_OFST			0x434
+#define IO96B_CMD_PARAM_2_OFST			0x430
+
+#define IO96B_CMD_TRIG_ECC_ENJECT_OP		0x20040109
+#define IO96B_CMD_ECC_SCRUB_MODE_0		0x20040202
+#define IO96B_ECC_ERROR_QUEUE_CLEAR		0x20040110
+
+#define IO06B_ECC_SCRUB_INTERVAL		0x14
+#define IO06B_ECC_SCRUB_LEN			0x100
+#define IO06B_ECC_SCRUB_FULL_MEM		0x1
+
+#define IO96B_SBE_SYNDROME			0xF4
+#define IO96B_DBE_SYNDROME			0xFF
+
+#define IO96B_ECC_SCRUB_TIMEOUT		400000
+#define IO96B_ECC_SCRUB_POLL_US		500
+#define IO96B_ECC_SCRUB_COMPLETE	BIT(1)
+
+enum io96b_error_type {
+	ECC_SINGLE_DBE = 2,
+	ECC_MULTI_DBE = 3,
+	ECC_WRITE_LINK_DBE = 0xa,
+	ECC_READ_LINK_DBE = 0xc,
+	ECC_READ_LINK_RMW_DBE
+};
+
 struct altr_edac_device_dev;
 struct edac_device_prv_data {
 	int (*setup)(struct altr_edac_device_dev *device);
@@ -392,6 +430,8 @@ struct altr_edac_device_dev {
 	struct edac_device_ctl_info *edac_dev;
 	struct device ddev;
 	int edac_idx;
+	int io96b0_irq;
+	int io96b1_irq;
 	int sdm_qspi_sb_irq;
 	int sdm_qspi_db_irq;
 	u32 sdm_qspi_addr;
@@ -407,6 +447,8 @@ struct altr_arria10_edac {
 	struct irq_chip		irq_chip;
 	struct list_head	a10_ecc_devices;
 	struct notifier_block	panic_notifier;
+	int io96b0_irq;
+	int io96b1_irq;
 	int sdm_qspi_sb_irq;
 	int sdm_qspi_db_irq;
 };
