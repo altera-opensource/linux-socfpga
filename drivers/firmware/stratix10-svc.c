@@ -1949,7 +1949,6 @@ stratix10_get_physical_address(struct stratix10_svc_controller *ctrl,
 	struct stratix10_svc_data_mem *pmem;
 
 	if (!ctrl || !buffer) {
-		WARN_ON_ONCE(1);
 		return (unsigned long)NULL;
 	}
 
@@ -1970,7 +1969,6 @@ stratix10_get_smmu_remapped_address(struct stratix10_svc_controller *ctrl,
 	struct stratix10_svc_data_mem *pmem;
 
 	if (!ctrl || !buffer) {
-		WARN_ON_ONCE(1);
 		return (unsigned long)NULL;
 	}
 
@@ -2440,6 +2438,14 @@ int stratix10_svc_async_send(struct stratix10_svc_chan *chan, void *msg,
 		args.a2 = stratix10_get_physical_address(ctrl, p_msg->payload_output);
 		args.a3 = (unsigned long)p_msg->payload_length_output;
 		break;
+	case COMMAND_MBOX_SEND_CMD:
+		args.a0 = INTEL_SIP_SMC_ASYNC_MBOX_SEND;
+		args.a2 = p_msg->arg[0];
+		args.a3 = stratix10_get_physical_address(ctrl, p_msg->payload);
+		args.a4 = p_msg->payload_length;
+		args.a5 = stratix10_get_physical_address(ctrl, p_msg->payload_output);
+		args.a6 = p_msg->payload_length_output;
+		break;
 
 	default:
 		dev_err(ctrl->dev, "Invalid command ,%d\n", p_msg->command);
@@ -2603,11 +2609,12 @@ static int stratix10_svc_async_prepare_response(struct stratix10_svc_chan *chan,
 	case COMMAND_FCS_SDOS_DATA_EXT:
 	case COMMAND_RSU_GET_DEVICE_INFO:
 	case COMMAND_QSPI_READ:
+	case COMMAND_MBOX_SEND_CMD:
 		data->kaddr1 = (void *)&handle->res.a2;
 		break;
 
 	default:
-		dev_alert(ctrl->dev, "Invalid command\n ,%d", p_msg->command);
+		dev_alert(ctrl->dev, "Invalid command ,%d", p_msg->command);
 		return -ENOENT;
 	}
 	dev_dbg(ctrl->dev, "Async message completed transaction_id 0x%02x\n",
