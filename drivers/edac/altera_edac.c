@@ -670,6 +670,19 @@ altr_edac_cram_inject_fops __maybe_unused = {
 };
 #endif
 
+#ifdef CONFIG_EDAC_ALTERA_IO96B
+static ssize_t __maybe_unused
+altr_edac_io96b_device_trig(struct file *file, const char __user *user_buf,
+			    size_t count, loff_t *ppos);
+
+static const struct file_operations
+altr_edac_io96b_inject_fops __maybe_unused = {
+	.open = simple_open,
+	.write = altr_edac_io96b_device_trig,
+	.llseek = generic_file_llseek,
+};
+#endif
+
 #if IS_ENABLED(CONFIG_EDAC_ALTERA_SDM_QSPI)
 static ssize_t __maybe_unused
 altr_edac_sdm_qspi_device_trig(struct file *file, const char __user *user_buf,
@@ -1147,6 +1160,33 @@ static const struct edac_device_prv_data s10_sdramecc_data = {
 	.inject_fops = &altr_edac_a10_device_inject_fops,
 };
 #endif /* CONFIG_EDAC_ALTERA_SDRAM */
+
+/************************IO96B EDAC *************************************/
+
+#ifdef CONFIG_EDAC_ALTERA_IO96B
+static DEFINE_MUTEX(io96b_mb_mutex);
+
+static int altr_agilex5_io96b_ecc_init(struct altr_edac_device_dev *device)
+{
+	u32 ecc_status;
+
+	ecc_status = readl(device->base + IO96B_ECC_ENABLE_INFO_OFST);
+	ecc_status &= GENMASK(1, 0);
+
+	if (!ecc_status) {
+		edac_printk(KERN_ERR, EDAC_DEVICE,
+			    "%s: No ECC present or ECC disabled.\n",
+			    device->edac_dev_name);
+		return -ENODEV;
+	}
+	return 0;
+}
+
+static const struct edac_device_prv_data agilex5_io96b_data = {
+	.setup = altr_agilex5_io96b_ecc_init,
+	.inject_fops = &altr_edac_io96b_inject_fops,
+};
+#endif /* CONFIG_EDAC_ALTERA_IO96B */
 
 /*********************** OCRAM EDAC Device Functions *********************/
 
@@ -1904,9 +1944,60 @@ static const struct of_device_id altr_edac_a10_device_of_match[] = {
 #ifdef CONFIG_EDAC_ALTERA_SDRAM
 	{ .compatible = "altr,sdram-edac-s10", .data = &s10_sdramecc_data },
 #endif
+#ifdef CONFIG_EDAC_ALTERA_IO96B
+	{ .compatible = "altr,socfpga-io96b0-ecc", .data = &agilex5_io96b_data },
+	{ .compatible = "altr,socfpga-io96b1-ecc", .data = &agilex5_io96b_data },
+#endif
 	{},
 };
 MODULE_DEVICE_TABLE(of, altr_edac_a10_device_of_match);
+
+/*
+ * The IO96B EDAC Device Functions differ from the rest of the
+ * ECC peripherals.
+ */
+
+#ifdef CONFIG_EDAC_ALTERA_IO96B
+static ssize_t __maybe_unused
+altr_edac_io96b_device_trig(struct file *file, const char __user *user_buf,
+			    size_t count, loff_t *ppos)
+{
+	struct edac_device_ctl_info *edac_dci = file->private_data;
+	struct altr_edac_device_dev *drvdata = edac_dci->pvt_info;
+	u8 trig_type;
+	u32 val;
+	struct arm_smccc_res result;
+
+	if (!user_buf || get_user(trig_type, user_buf))
+		return -EFAULT;
+
+	mutex_lock(&io96b_mb_mutex);
+	if (readl(drvdata->base + IO96B_CMD_RESP_STATUS_OFST))
+		writel(0, drvdata->base + IO96B_CMD_RESP_STATUS_OFST);
+
+	arm_smccc_smc(INTEL_SIP_SMC_IO96B_INJECT_ECC_ERR,
+		      (trig_type == ALTR_UE_TRIGGER_CHAR) ?
+		      IO96B_DBE_SYNDROME : IO96B_SBE_SYNDROME,
+		      IO96B_CMD_TRIG_ECC_ENJECT_OP, 0, 0, 0, 0, 0, &result);
+
+	writel(IO06B_ECC_SCRUB_INTERVAL, drvdata->base + IO96B_CMD_PARAM_0_OFST);
+	writel(IO06B_ECC_SCRUB_LEN, drvdata->base + IO96B_CMD_PARAM_1_OFST);
+	writel(IO06B_ECC_SCRUB_FULL_MEM, drvdata->base + IO96B_CMD_PARAM_2_OFST);
+	writel(IO96B_CMD_ECC_SCRUB_MODE_0, drvdata->base + IO96B_CMD_REQ_OFST);
+
+	if (readl_relaxed_poll_timeout(drvdata->base + IO96B_ECC_SCRUB_STAT0_OFST,
+				       val, !(val & IO96B_ECC_SCRUB_COMPLETE),
+				       IO96B_ECC_SCRUB_POLL_US,
+				       IO96B_ECC_SCRUB_TIMEOUT))
+		edac_printk(KERN_ALERT, EDAC_DEVICE,
+			    "IO96B ECC Scrubing timeout - Try again.\n");
+
+	writel(0, drvdata->base + IO96B_CMD_RESP_STATUS_OFST);
+	mutex_unlock(&io96b_mb_mutex);
+
+	return count;
+}
+#endif
 
 /*
  * The Arria10 EDAC Device Functions differ from the Cyclone5/Arria5
@@ -2003,6 +2094,70 @@ altr_edac_a10_device_trig2(struct file *file, const char __user *user_buf,
 	local_irq_restore(flags);
 
 	return count;
+}
+
+static irqreturn_t io96b_irq_handler(int irq, void *dev_id)
+{
+	struct altr_edac_device_dev *dci = dev_id;
+	u32 err_word0;
+	u32 err_word1;
+	u32 cnt = 0;
+	u32 ecc_error_status;
+	u16 rbuf_overflow;
+	u16 err_count = 0;
+	bool dbe = false;
+	enum io96b_error_type error_type;
+	u32 err_queue = IO96B_ECC_ERR_ENTRIES_OFST;
+
+	ecc_error_status = readl(dci->base + IO96B_ECC_ERR_REG_OFST);
+	rbuf_overflow = ecc_error_status & GENMASK(31, 16);
+	err_count = ecc_error_status & GENMASK(15, 0);
+
+	if (!rbuf_overflow) {
+		while (cnt < err_count) {
+			err_word0 = readl(dci->base + err_queue);
+			err_word1 = readl(dci->base + (err_queue + 4));
+
+			error_type = (err_word0 & GENMASK(9, 6)) >> 6;
+			if (error_type == ECC_SINGLE_DBE || error_type == ECC_MULTI_DBE ||
+			    error_type == ECC_WRITE_LINK_DBE ||
+			    error_type == ECC_READ_LINK_DBE ||
+			    error_type == ECC_READ_LINK_RMW_DBE) {
+				edac_printk(KERN_ERR, EDAC_DEVICE,
+					    "%s: DBE: word0:0x%08X, word1:0x%08X\n",
+					    dci->edac_dev_name, err_word0, err_word1);
+				dbe = true;
+			} else {
+				edac_printk(KERN_ERR, EDAC_DEVICE,
+					    "%s: SBE: word0:0x%08X, word1:0x%08X\n",
+					    dci->edac_dev_name, err_word0, err_word1);
+				edac_device_handle_ce(dci->edac_dev, 0, 0,
+						      dci->edac_dev_name);
+			}
+			cnt++;
+			err_queue += 8;
+		}
+		if (dbe)
+			panic("\nEDAC:IO96B[Uncorrectable errors]\n");
+	} else {
+		rbuf_overflow = (err_word0 & GENMASK(9, 6)) >> 6;
+		if (error_type == ECC_SINGLE_DBE || error_type == ECC_MULTI_DBE ||
+		    error_type == ECC_WRITE_LINK_DBE ||
+		    error_type == ECC_READ_LINK_DBE ||
+		    error_type == ECC_READ_LINK_RMW_DBE) {
+			panic("\nEDAC: UE: %s: word0:0x%08X, word1:0x%08X\n",
+			      dci->edac_dev_name, err_word0, err_word1);
+		} else {
+			edac_printk(KERN_ERR, EDAC_DEVICE,
+				    "%s: Buffer Overflow SBE:0x%08X\n",
+				    dci->edac_dev_name, rbuf_overflow);
+			edac_device_handle_ce(dci->edac_dev, 0, 0, dci->edac_dev_name);
+		}
+	}
+
+	//Clear Queue
+	writel(IO96B_ECC_ERROR_QUEUE_CLEAR, dci->base + IO96B_CMD_REQ_OFST);
+	return IRQ_HANDLED;
 }
 
 static irqreturn_t sdm_qspi_irq_handler(int irq, void *dev_id)
@@ -2169,6 +2324,8 @@ static int altr_edac_a10_device_add(struct altr_arria10_edac *edac,
 	int edac_idx;
 	int rc = 0;
 	bool sdm_qspi_ecc = false;
+	bool io96b0_ecc = false;
+	bool io96b1_ecc = false;
 	const struct edac_device_prv_data *prv;
 	/* Get matching node and check for valid result */
 	const struct of_device_id *pdev_id =
@@ -2186,8 +2343,11 @@ static int altr_edac_a10_device_add(struct altr_arria10_edac *edac,
 
 	if (!devres_open_group(edac->dev, altr_edac_a10_device_add, GFP_KERNEL))
 		return -ENOMEM;
-
-	if (of_device_is_compatible(np, "altr,socfpga-sdm-qspi-ecc")) {
+	if (of_device_is_compatible(np, "altr,socfpga-io96b0-ecc")) {
+		io96b0_ecc = true;
+	} else if (of_device_is_compatible(np, "altr,socfpga-io96b1-ecc")) {
+		io96b1_ecc = true;
+	} else if (of_device_is_compatible(np, "altr,socfpga-sdm-qspi-ecc")) {
 		sdm_qspi_ecc = true;
 	} else if (of_device_is_compatible(np, "altr,sdram-edac-s10")) {
 		rc = get_s10_sdram_edac_resource(np, &res);
@@ -2225,7 +2385,17 @@ static int altr_edac_a10_device_add(struct altr_arria10_edac *edac,
 	dci->mod_name = ecc_name;
 	dci->dev_name = ecc_name;
 
-	if (sdm_qspi_ecc) {
+	if (io96b0_ecc || io96b1_ecc) {
+		rc = of_address_to_resource(np, 0, &res);
+		if (rc)
+			goto err_release_group1;
+
+		altdev->base = ioremap(res.start, resource_size(&res));
+		if (IS_ERR(altdev->base)) {
+			rc = PTR_ERR(altdev->base);
+			goto err_release_group1;
+		}
+	} else if (sdm_qspi_ecc) {
 		altdev->sdm_qspi_addr =
 				(u32)of_translate_address(np,
 							  of_get_address(np,
@@ -2264,6 +2434,24 @@ static int altr_edac_a10_device_add(struct altr_arria10_edac *edac,
 			edac_printk(KERN_ERR, EDAC_DEVICE, "No SDM QSPI DBE IRQ resource\n");
 			goto err_release_group1;
 		}
+	} else if (io96b0_ecc) {
+		altdev->io96b0_irq = altdev->edac->io96b0_irq;
+		rc = devm_request_threaded_irq(edac->dev, altdev->io96b0_irq, NULL,
+					       io96b_irq_handler, IRQF_ONESHOT,
+					       ecc_name, altdev);
+		if (rc) {
+			edac_printk(KERN_ERR, EDAC_DEVICE, "No IO96B0 IRQ resource\n");
+			goto err_release_group1;
+		}
+	} else if (io96b1_ecc) {
+		altdev->io96b1_irq = altdev->edac->io96b1_irq;
+		rc = devm_request_threaded_irq(edac->dev, altdev->io96b1_irq, NULL,
+					       io96b_irq_handler, IRQF_ONESHOT,
+					       ecc_name, altdev);
+		if (rc) {
+			edac_printk(KERN_ERR, EDAC_DEVICE, "No IO96B1 IRQ resource\n");
+			goto err_release_group1;
+		}
 	} else {
 		altdev->sb_irq = irq_of_parse_and_map(np, 0);
 		if (!altdev->sb_irq) {
@@ -2277,31 +2465,30 @@ static int altr_edac_a10_device_add(struct altr_arria10_edac *edac,
 			edac_printk(KERN_ERR, EDAC_DEVICE, "No SBERR IRQ resource\n");
 			goto err_release_group1;
 		}
-	}
 
 #ifdef CONFIG_64BIT
-	/* Use IRQ to determine SError origin instead of assigning IRQ */
-	rc = of_property_read_u32_index(np, "interrupts", 0, &altdev->db_irq);
-	if (rc) {
-		edac_printk(KERN_ERR, EDAC_DEVICE,
-			    "Unable to parse DB IRQ index\n");
-		goto err_release_group1;
-	}
+		/* Use IRQ to determine SError origin instead of assigning IRQ */
+		rc = of_property_read_u32_index(np, "interrupts", 0, &altdev->db_irq);
+		if (rc) {
+			edac_printk(KERN_ERR, EDAC_DEVICE,
+				    "Unable to parse DB IRQ index\n");
+			goto err_release_group1;
+		}
 #else
-	altdev->db_irq = irq_of_parse_and_map(np, 1);
-	if (!altdev->db_irq) {
-		edac_printk(KERN_ERR, EDAC_DEVICE, "Error allocating DBIRQ\n");
-		rc = -ENODEV;
-		goto err_release_group1;
-	}
-	rc = devm_request_irq(edac->dev, altdev->db_irq, prv->ecc_irq_handler,
-			      IRQF_TRIGGER_HIGH,
-			      ecc_name, altdev);
-	if (rc) {
-		edac_printk(KERN_ERR, EDAC_DEVICE, "No DBERR IRQ resource\n");
-		goto err_release_group1;
-	}
+		altdev->db_irq = irq_of_parse_and_map(np, 1);
+		if (!altdev->db_irq) {
+			edac_printk(KERN_ERR, EDAC_DEVICE, "Error allocating DBIRQ\n");
+			rc = -ENODEV;
+			goto err_release_group1;
+		}
+		rc = devm_request_irq(edac->dev, altdev->db_irq, prv->ecc_irq_handler,
+				      IRQF_ONESHOT | IRQF_TRIGGER_HIGH, ecc_name, altdev);
+		if (rc) {
+			edac_printk(KERN_ERR, EDAC_DEVICE, "No DBERR IRQ resource\n");
+			goto err_release_group1;
+		}
 #endif
+	}
 
 	rc = edac_device_add_device(dci);
 	if (rc) {
@@ -2513,6 +2700,19 @@ static int altr_edac_a10_probe(struct platform_device *pdev)
 			regmap_write(edac->ecc_mgr_map,
 				     S10_SYSMGR_UE_ADDR_OFST, 0);
 		}
+
+#ifdef CONFIG_EDAC_ALTERA_IO96B
+		edac->io96b0_irq = platform_get_irq_byname(pdev, "io96b0");
+		if (edac->io96b0_irq < 0) {
+			dev_err(&pdev->dev, "No io96b0 IRQ resource\n");
+			return edac->io96b0_irq;
+		}
+		edac->io96b1_irq = platform_get_irq_byname(pdev, "io96b1");
+		if (edac->io96b1_irq < 0) {
+			dev_err(&pdev->dev, "No io96b1 IRQ resource\n");
+			return edac->io96b1_irq;
+		}
+#endif
 
 #if IS_ENABLED(CONFIG_EDAC_ALTERA_SDM_QSPI)
 		edac->sdm_qspi_sb_irq = platform_get_irq_byname(pdev, "sdm_qspi_sbe");
