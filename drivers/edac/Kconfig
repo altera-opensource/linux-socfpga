@@ -408,6 +408,16 @@ config EDAC_ALTERA_SDRAM
 	  preloader must initialize the SDRAM before loading
 	  the kernel.
 
+config EDAC_ALTERA_IO96B
+	bool "Altera I096B ECC"
+	depends on EDAC_ALTERA=y && ARM64
+	help
+	  Support for SERR and DERR detection and correction on the
+	  IO96B memory controller interface for Altera SoCFPGA.
+
+	  I096B memory controller provides dedicated mailbox registers
+	  for error injection and error information.
+
 config EDAC_ALTERA_L2C
 	bool "Altera L2 Cache ECC"
 	depends on EDAC_ALTERA=y && CACHE_L2X0
