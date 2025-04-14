@@ -17,10 +17,6 @@
 #include <linux/sysfs.h>
 #include <linux/delay.h>
 
-#define RSU_STATE_MASK			GENMASK_ULL(31, 0)
-#define RSU_VERSION_MASK		GENMASK_ULL(63, 32)
-#define RSU_ERROR_LOCATION_MASK		GENMASK_ULL(31, 0)
-#define RSU_ERROR_DETAIL_MASK		GENMASK_ULL(63, 32)
 #define RSU_ERASE_SIZE_MASK		GENMASK_ULL(63, 32)
 #define RSU_DCMF0_MASK			GENMASK_ULL(31, 0)
 #define RSU_DCMF1_MASK			GENMASK_ULL(63, 32)
@@ -41,9 +37,6 @@
 
 #define RSU_RETRY_SLEEP_MS		(1U)
 #define RSU_ASYNC_MSG_RETRY		(3U)
-#define RSU_GET_SPT_CMD			0x5A
-#define RSU_GET_DEVICE_INFO_CMD		0x74
-#define RSU_GET_SPT_RESP_LEN		(4 * sizeof(unsigned int))
 
 struct flash_device_info {
 	unsigned int size;
@@ -162,7 +155,6 @@ static void rsu_command_callback(struct stratix10_svc_client *client,
 
 	complete(&priv->completion);
 }
-
 
 /**
  * rsu_max_retry_callback() - Callback from Intel service layer for getting
@@ -405,6 +397,8 @@ static int rsu_send_async_msg(struct device *dev, struct stratix10_rsu_priv *pri
 
 	if (status && !handle) {
 		dev_err(dev, "Failed to send async message\n");
+		if (msg.payload_output)
+			stratix10_svc_free_memory(priv->chan, msg.payload_output);
 		return -ETIMEDOUT;
 	}
 
@@ -444,6 +438,8 @@ static int rsu_send_async_msg(struct device *dev, struct stratix10_rsu_priv *pri
 	}
 
 status_done:
+	if (msg.payload_output)
+		stratix10_svc_free_memory(priv->chan, msg.payload_output);
 	stratix10_svc_async_done(priv->chan, handle);
 	return ret;
 }
