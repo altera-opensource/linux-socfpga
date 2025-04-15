@@ -33,7 +33,16 @@ properties:
 
   interrupts:
     minItems: 1
-    maxItems: 2
+    maxItems: 6
+
+  interrupt-names:
+    items:
+      - const: global_sbe
+      - enum: [global_dbe, io96b0, io96b1, sdm_qspi_sbe, sdm_qspi_dbe, sdm_seu]
+      - enum: [global_dbe, io96b0, io96b1, sdm_qspi_sbe, sdm_qspi_dbe, sdm_seu]
+      - enum: [global_dbe, io96b0, io96b1, sdm_qspi_sbe, sdm_qspi_dbe, sdm_seu]
+      - enum: [global_dbe, io96b0, io96b1, sdm_qspi_sbe, sdm_qspi_dbe, sdm_seu]
+      - enum: [global_dbe, io96b0, io96b1, sdm_qspi_sbe, sdm_qspi_dbe, sdm_seu]
 
   interrupt-controller: true
 
@@ -104,7 +113,7 @@ patternProperties:
       - reg
       - interrupts
 
-  "^usb[0-9]-ecc@[a-f0-9]+$":
+  "^(usb[0-9]-(ecc|[tr]x-ecc|cache-ecc)@[a-f0-9]+)$":
     type: object
     additionalProperties: false
 
@@ -190,6 +199,56 @@ patternProperties:
       - reg
       - interrupts
       - altr,ecc-parent
+
+  "^sdm-qspi-ecc@[a-f0-9]+$":
+    type: object
+    additionalProperties: false
+
+    properties:
+      compatible:
+        items:
+          - const: altr,socfpga-sdm-qspi-ecc
+
+      reg:
+        maxItems: 1
+
+    required:
+      - compatible
+      - reg
+
+  "^io96b[0-9]-ecc@[a-f0-9]+$":
+    type: object
+    additionalProperties: false
+
+    properties:
+      compatible:
+        items:
+          - enum:
+              - altr,socfpga-io96b0-ecc
+              - altr,socfpga-io96b1-ecc
+
+      reg:
+        maxItems: 1
+
+    required:
+      - compatible
+      - reg
+
+  "^cram-seu@[a-f0-9]+$":
+    type: object
+    additionalProperties: false
+
+    properties:
+      compatible:
+        items:
+          - const: altr,socfpga-cram-seu
+
+      reg:
+        maxItems: 1
+
+    required:
+      - compatible
+      - reg
 
   "^l2-ecc@[a-f0-9]+$":
     type: object
