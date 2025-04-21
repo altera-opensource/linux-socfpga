@@ -1529,6 +1529,27 @@ static const struct edac_device_prv_data a10_usbecc_data = {
 	.inject_fops = &altr_edac_a10_device_inject_fops,
 };
 
+static int __init socfpga_init_usb3_ecc(struct altr_edac_device_dev *device)
+{
+	writel(ALTR_A10_ECC_EN, device->base + ALTR_A10_ECC_CTRL_OFST);
+	writel(ALTR_A10_ECC_SERRINTEN, device->base + ALTR_A10_ECC_ERRINTENS_OFST);
+
+	return 0;
+}
+
+static const struct edac_device_prv_data agilex5_usb3ecc_data = {
+	.setup = socfpga_init_usb3_ecc,
+	.ce_clear_mask = ALTR_A10_ECC_SERRPENA,
+	.ue_clear_mask = ALTR_A10_ECC_DERRPENA,
+	.ecc_enable_mask = ALTR_A10_COMMON_ECC_EN_CTL,
+	.ecc_en_ofst = ALTR_A10_ECC_CTRL_OFST,
+	.ce_set_mask = ALTR_A10_ECC_TSERRA,
+	.ue_set_mask = ALTR_A10_ECC_TDERRA,
+	.set_err_ofst = ALTR_A10_ECC_INTTEST_OFST,
+	.ecc_irq_handler = altr_edac_a10_ecc_irq,
+	.inject_fops = &altr_edac_a10_device_inject2_fops,
+};
+
 #endif	/* CONFIG_EDAC_ALTERA_USB */
 
 #if IS_ENABLED(CONFIG_EDAC_ALTERA_CRAM_SEU)
@@ -1932,6 +1953,7 @@ static const struct of_device_id altr_edac_a10_device_of_match[] = {
 #endif
 #ifdef CONFIG_EDAC_ALTERA_USB
 	{ .compatible = "altr,socfpga-usb-ecc", .data = &a10_usbecc_data },
+	{ .compatible = "altr,socfpga-usb3-ecc", .data = &agilex5_usb3ecc_data },
 #endif
 #ifdef CONFIG_EDAC_ALTERA_QSPI
 	{ .compatible = "altr,socfpga-qspi-ecc", .data = &a10_qspiecc_data },
