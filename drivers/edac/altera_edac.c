@@ -2323,6 +2323,7 @@ static int altr_edac_a10_device_add(struct altr_arria10_edac *edac,
 	struct altr_edac_device_dev *altdev;
 	char *ecc_name = (char *)np->name;
 	struct resource res;
+	struct device_node *root_node;
 	int edac_idx;
 	int rc = 0;
 	bool sdm_qspi_ecc = false;
@@ -2469,12 +2470,33 @@ static int altr_edac_a10_device_add(struct altr_arria10_edac *edac,
 		}
 
 #ifdef CONFIG_64BIT
-		/* Use IRQ to determine SError origin instead of assigning IRQ */
-		rc = of_property_read_u32_index(np, "interrupts", 0, &altdev->db_irq);
-		if (rc) {
-			edac_printk(KERN_ERR, EDAC_DEVICE,
-				    "Unable to parse DB IRQ index\n");
-			goto err_release_group1;
+		root_node = of_root;
+		if (of_device_is_compatible(root_node, "intel,socfpga-agilex5")) {
+			altdev->db_irq = irq_of_parse_and_map(np, 1);
+			if (!altdev->db_irq) {
+				edac_printk(KERN_ERR, EDAC_DEVICE,
+					    "Error allocating DBIRQ\n");
+				rc = -ENODEV;
+				goto err_release_group1;
+			}
+			rc = devm_request_irq(edac->dev, altdev->db_irq,
+					      prv->ecc_irq_handler,
+					      IRQF_ONESHOT | IRQF_TRIGGER_HIGH,
+					      ecc_name, altdev);
+			if (rc) {
+				edac_printk(KERN_ERR, EDAC_DEVICE,
+					    "No DBERR IRQ resource\n");
+				goto err_release_group1;
+			}
+		} else {
+			/* Use IRQ to determine SError origin instead of assigning IRQ */
+			rc = of_property_read_u32_index(np, "interrupts", 0,
+							&altdev->db_irq);
+			if (rc) {
+				edac_printk(KERN_ERR, EDAC_DEVICE,
+					    "Unable to parse DB IRQ index\n");
+				goto err_release_group1;
+			}
 		}
 #else
 		altdev->db_irq = irq_of_parse_and_map(np, 1);
@@ -2620,6 +2642,7 @@ static int altr_edac_a10_probe(struct platform_device *pdev)
 {
 	struct altr_arria10_edac *edac;
 	struct device_node *child;
+	struct device_node *root_node;
 
 	edac = devm_kzalloc(&pdev->dev, sizeof(*edac), GFP_KERNEL);
 	if (!edac)
@@ -2660,6 +2683,17 @@ static int altr_edac_a10_probe(struct platform_device *pdev)
 	irq_set_chained_handler_and_data(edac->sb_irq,
 					 altr_edac_a10_irq_handler,
 					 edac);
+
+	root_node = of_root;
+	if (of_device_is_compatible(root_node, "intel,socfpga-agilex5")) {
+		edac->db_irq = platform_get_irq_byname(pdev, "global_dbe");
+		if (edac->db_irq < 0)
+			return edac->db_irq;
+
+		irq_set_chained_handler_and_data(edac->db_irq,
+						 altr_edac_a10_irq_handler,
+						 edac);
+	}
 
 #ifdef CONFIG_64BIT
 	{
