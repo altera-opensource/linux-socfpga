@@ -563,12 +563,13 @@
 			#address-cells = <1>;
 			#size-cells = <1>;
 			interrupts = <GIC_SPI 15 IRQ_TYPE_LEVEL_HIGH>,
+				     <GIC_SPI 241 IRQ_TYPE_LEVEL_HIGH>,
 				     <GIC_SPI 95 IRQ_TYPE_EDGE_RISING>,
 				     <GIC_SPI 120 IRQ_TYPE_EDGE_RISING>,
 				     <GIC_SPI 8 IRQ_TYPE_LEVEL_HIGH>,
 				     <GIC_SPI 9 IRQ_TYPE_LEVEL_HIGH>,
 				     <GIC_SPI 7 IRQ_TYPE_LEVEL_HIGH>;
-			interrupt-names = "global_sbe", "io96b0" , "io96b1",
+			interrupt-names = "global_sbe", "global_dbe", "io96b0" , "io96b1",
 					  "sdm_qspi_sbe", "sdm_qspi_dbe", "sdm_seu";
 			interrupt-controller;
 			#interrupt-cells = <2>;
@@ -577,14 +578,14 @@
 			ocram-ecc@108cc000 {
 				compatible = "altr,socfpga-a10-ocram-ecc";
 				reg = <0x108cc000 0x100>;
-				interrupts = <1 IRQ_TYPE_LEVEL_HIGH>;
+				interrupts = <1 IRQ_TYPE_LEVEL_HIGH>, <33 IRQ_TYPE_LEVEL_HIGH>;
 			};
 
 			usb0-ecc@108c4000 {
 				compatible = "altr,socfpga-usb-ecc";
 				reg = <0x108c4000 0x100>;
 				altr,ecc-parent = <&usb0>;
-				interrupts = <2 IRQ_TYPE_LEVEL_HIGH>;
+				interrupts = <2 IRQ_TYPE_LEVEL_HIGH>, <34 IRQ_TYPE_LEVEL_HIGH>;
 				status = "disabled";
 			};
 
@@ -592,63 +593,63 @@
 				compatible = "altr,socfpga-eth-mac-ecc";
 				reg = <0x108c0000 0x100>;
 				altr,ecc-parent = <&gmac0>;
-				interrupts = <4 IRQ_TYPE_LEVEL_HIGH>;
+				interrupts = <4 IRQ_TYPE_LEVEL_HIGH>, <38 IRQ_TYPE_LEVEL_HIGH>;
 			};
 
 			emac0-tx-ecc@108c0400 {
 				compatible = "altr,socfpga-eth-mac-ecc";
 				reg = <0x108c0400 0x100>;
 				altr,ecc-parent = <&gmac0>;
-				interrupts = <5 IRQ_TYPE_LEVEL_HIGH>;
+				interrupts = <5 IRQ_TYPE_LEVEL_HIGH>, <37 IRQ_TYPE_LEVEL_HIGH>;
 			};
 
 			emac1-rx-ecc@108c0800 {
 				compatible = "altr,socfpga-eth-mac-ecc";
 				reg = <0x108c0800 0x100>;
 				altr,ecc-parent = <&gmac1>;
-				interrupts = <6 IRQ_TYPE_LEVEL_HIGH>;
+				interrupts = <6 IRQ_TYPE_LEVEL_HIGH>, <38 IRQ_TYPE_LEVEL_HIGH>;
 			};
 
 			emac1-tx-ecc@108c0c00 {
 				compatible = "altr,socfpga-eth-mac-ecc";
 				reg = <0x108c0c00 0x100>;
 				altr,ecc-parent = <&gmac1>;
-				interrupts = <7 IRQ_TYPE_LEVEL_HIGH>;
+				interrupts = <7 IRQ_TYPE_LEVEL_HIGH>, <39 IRQ_TYPE_LEVEL_HIGH>;
 			};
 
 			emac2-rx-ecc@108c1000 {
 				compatible = "altr,socfpga-eth-mac-ecc";
 				reg = <0x108c1000 0x100>;
 				altr,ecc-parent = <&gmac2>;
-				interrupts = <8 IRQ_TYPE_LEVEL_HIGH>;
+				interrupts = <8 IRQ_TYPE_LEVEL_HIGH>, <40 IRQ_TYPE_LEVEL_HIGH>;
 			};
 
 			emac2-tx-ecc@108c1400 {
 				compatible = "altr,socfpga-eth-mac-ecc";
 				reg = <0x108c1400 0x100>;
 				altr,ecc-parent = <&gmac2>;
-				interrupts = <9 IRQ_TYPE_LEVEL_HIGH>;
+				interrupts = <9 IRQ_TYPE_LEVEL_HIGH>, <41 IRQ_TYPE_LEVEL_HIGH>;
 			};
 
 			usb1-rx-ecc@108c4400 {
 				compatible = "altr,socfpga-usb-ecc";
 				reg = <0x108c4400 0x100>;
 				altr,ecc-parent = <&usb31>;
-				interrupts = <12 IRQ_TYPE_LEVEL_HIGH>;
+				interrupts = <12 IRQ_TYPE_LEVEL_HIGH>, <44 IRQ_TYPE_LEVEL_HIGH>;
 			};
 
 			usb1-tx-ecc@108c4800 {
 				compatible = "altr,socfpga-usb-ecc";
 				reg = <0x108c4800 0x100>;
 				altr,ecc-parent = <&usb31>;
-				interrupts = <11 IRQ_TYPE_LEVEL_HIGH>;
+				interrupts = <11 IRQ_TYPE_LEVEL_HIGH>, <43 IRQ_TYPE_LEVEL_HIGH>;
 			};
 
 			usb1-cache-ecc@108c4c00 {
 				compatible = "altr,socfpga-usb-ecc";
 				reg = <0x108c4c00 0x100>;
 				altr,ecc-parent = <&usb31>;
-				interrupts = <3 IRQ_TYPE_LEVEL_HIGH>;
+				interrupts = <3 IRQ_TYPE_LEVEL_HIGH>, <35 IRQ_TYPE_LEVEL_HIGH>;
 			};
 
 			io96b0-ecc@18400000 {
