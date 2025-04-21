@@ -125,6 +125,7 @@ patternProperties:
               - const: altr,socfpga-s10-usb-ecc
               - const: altr,socfpga-usb-ecc
           - const: altr,socfpga-usb-ecc
+          - const: altr,socfpga-usb3-ecc
 
       reg:
         maxItems: 1
