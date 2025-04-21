@@ -33,11 +33,12 @@ properties:
 
   interrupts:
     minItems: 1
-    maxItems: 6
+    maxItems: 7
 
   interrupt-names:
     items:
       - const: global_sbe
+      - enum: [global_dbe, io96b0, io96b1, sdm_qspi_sbe, sdm_qspi_dbe, sdm_seu]
       - enum: [global_dbe, io96b0, io96b1, sdm_qspi_sbe, sdm_qspi_dbe, sdm_seu]
       - enum: [global_dbe, io96b0, io96b1, sdm_qspi_sbe, sdm_qspi_dbe, sdm_seu]
       - enum: [global_dbe, io96b0, io96b1, sdm_qspi_sbe, sdm_qspi_dbe, sdm_seu]
