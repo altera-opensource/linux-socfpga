@@ -59,6 +59,8 @@
 /* HKDF input payload size with 1st and 2nd input */
 #define HKDF_INPUT_DATA_SIZE		80
 
+#define FCS_MAX_RESP_MS			50
+
 FCS_HAL_INT hal_session_close(struct fcs_cmd_context *const k_ctx)
 {
 	FCS_HAL_INT ret = 0;
@@ -3295,6 +3297,118 @@ free_mem:
 	return ret;
 }
 EXPORT_SYMBOL(hal_hps_img_validate);
+
+#ifdef CONFIG_ALTERA_SOCFPGA_FCS_DEBUG
+FCS_HAL_INT hal_generic_mbox(struct fcs_cmd_context *const k_ctx)
+{
+	FCS_HAL_INT ret = 0;
+	FCS_HAL_INT resp_size = 0, max_res_size = MBOX_SEND_RSP_MAX_SZ;
+	FCS_HAL_VOID *s_buf = NULL, *d_buf = NULL;
+	struct fcs_cmd_context ctx;
+
+	fcs_plat_memcpy(&ctx, k_ctx, sizeof(struct fcs_cmd_context));
+
+	if (ctx.mbox.cmd_data_sz % 4) {
+		pr_err("Command data size %d is Invalid, must be 4 byte aligned\n",
+		       ctx.mbox.cmd_data_sz);
+		return -EINVAL;
+	}
+
+	ret = fcs_plat_copy_from_user(&resp_size, ctx.mbox.resp_data_sz,
+				      sizeof(FCS_HAL_INT));
+	if (ret) {
+		pr_err("Failed to copy response data size from user to kernel buffer ret: %d\n",
+		       ret);
+		return ret;
+	}
+
+	if (k_ctx->mbox.cmd_data_sz) {
+		s_buf = priv->plat_data->svc_alloc_memory(priv,
+							  ctx.mbox.cmd_data_sz);
+		if (IS_ERR(s_buf)) {
+			ret = -ENOMEM;
+			pr_err("Failed to allocate memory for generic mailbox source buffer ret: %d\n",
+			       ret);
+			return ret;
+		}
+
+		k_ctx->mbox.cmd_data = s_buf;
+
+		ret = fcs_plat_copy_from_user(s_buf, ctx.mbox.cmd_data,
+					      ctx.mbox.cmd_data_sz);
+		if (ret) {
+			pr_err("Failed to copy generic mailbox data from user to kernel buffer ret: %d\n",
+			       ret);
+			goto free_mem;
+		}
+	}
+
+	if (k_ctx->mbox.resp_data_sz) {
+		d_buf = priv->plat_data->svc_alloc_memory(priv, max_res_size);
+		if (IS_ERR(d_buf)) {
+			ret = -ENOMEM;
+			pr_err("Failed to allocate memory for generic mailbox destination buffer ret: %d\n",
+			       ret);
+			goto free_src;
+		}
+
+		k_ctx->mbox.resp_data = d_buf;
+		k_ctx->mbox.resp_data_sz = &max_res_size;
+	}
+
+	ret = priv->plat_data->svc_send_request(priv, FCS_DEV_MBOX_SEND,
+						FCS_MAX_RESP_MS *
+							FCS_COMPLETED_TIMEOUT);
+	if (ret) {
+		pr_err("Failed to send the cmd=%d,ret=%d\n", FCS_DEV_MBOX_SEND,
+		       ret);
+		goto free_mem;
+	}
+
+	if (priv->status) {
+		ret = -EIO;
+		pr_err("Mailbox error, generic mailbox request failed ret: %d\n",
+		       ret);
+		goto copy_mbox_status;
+	}
+
+	if (d_buf) {
+		ret = fcs_plat_copy_to_user(ctx.mbox.resp_data, d_buf,
+					    priv->resp);
+		if (ret) {
+			pr_err("Failed to copy generic mailbox response to user ret: %d\n",
+			       ret);
+			goto copy_mbox_status;
+		}
+
+		ret = fcs_plat_copy_to_user(ctx.mbox.resp_data_sz,
+					    &priv->resp,
+					    sizeof(priv->resp));
+		if (ret) {
+			pr_err("Failed to copy generic mailbox response size to user ret: %d\n",
+			       ret);
+		}
+	}
+
+copy_mbox_status:
+	ret = fcs_plat_copy_to_user(ctx.error_code_addr, &priv->status,
+				    sizeof(priv->status));
+	if (ret) {
+		pr_err("Failed to copy mailbox status code to user ret: %d\n",
+		       ret);
+	}
+
+free_mem:
+	if (d_buf)
+		priv->plat_data->svc_free_memory(priv, d_buf);
+free_src:
+	if (s_buf)
+		priv->plat_data->svc_free_memory(priv, s_buf);
+
+	return ret;
+}
+EXPORT_SYMBOL(hal_generic_mbox);
+#endif
 
 struct fcs_cmd_context *hal_get_fcs_cmd_ctx(void)
 {
