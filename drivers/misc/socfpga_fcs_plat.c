@@ -775,6 +775,17 @@ static FCS_HAL_INT plat_sip_svc_send_request(struct socfpga_fcs_priv *priv,
 		msg->command = COMMAND_FCS_SEND_CERTIFICATE;
 		break;
 
+#ifdef CONFIG_ALTERA_SOCFPGA_FCS_DEBUG
+	case FCS_DEV_MBOX_SEND:
+		msg->command = COMMAND_MBOX_SEND_CMD;
+		msg->arg[0] = k_ctx->mbox.mbox_cmd;
+		msg->payload = k_ctx->mbox.cmd_data;
+		msg->payload_length = k_ctx->mbox.cmd_data_sz;
+		msg->payload_output = k_ctx->mbox.resp_data;
+		msg->payload_length_output = *k_ctx->mbox.resp_data_sz;
+		break;
+#endif
+
 	default:
 		pr_err("Unknown command: 0x%x\n", command);
 		ret = -EINVAL;
