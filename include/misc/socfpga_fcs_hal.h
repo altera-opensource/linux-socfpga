@@ -214,16 +214,15 @@ struct fcs_cmd_context {
 		struct {
 			FCS_HAL_INT cert_request;
 		} attestation_cert_reload;
-
+#ifdef CONFIG_ALTERA_SOCFPGA_FCS_DEBUG
 		struct {
 			FCS_HAL_U32 mbox_cmd;
-			FCS_HAL_U8 urgent;
 			FCS_HAL_VOID *cmd_data;
 			FCS_HAL_U32 cmd_data_sz;
 			FCS_HAL_VOID *resp_data;
 			FCS_HAL_U32 *resp_data_sz;
 		} mbox;
-
+#endif
 		struct {
 			FCS_HAL_CHAR *mctp_req;
 			FCS_HAL_U32 mctp_req_len;
@@ -473,7 +472,11 @@ enum fcs_command_code {
 	FCS_DEV_QSPI_READ,
 	FCS_DEV_QSPI_WRITE,
 	FCS_DEV_QSPI_ERASE,
-	FCS_DEV_ATF_VERSION
+	FCS_DEV_ATF_VERSION,
+
+#ifdef CONFIG_ALTERA_SOCFPGA_FCS_DEBUG
+	FCS_DEV_MBOX_SEND,
+#endif
 };
 
 /**
@@ -878,6 +881,16 @@ FCS_HAL_INT hal_hps_img_validate(struct fcs_cmd_context *const ctx);
  *         false, on error.
  */
 FCS_HAL_BOOL hal_fcs_is_ready(void);
+
+#ifdef CONFIG_ALTERA_SOCFPGA_FCS_DEBUG
+/**
+ * @brief Sends a generic mailbox command
+ *
+ * @param k_ctx Pointer to the command context structure.
+ * @return FCS_HAL_INT Result of the mailbox operation.
+ */
+FCS_HAL_INT hal_generic_mbox(struct fcs_cmd_context *k_ctx);
+#endif
 
 #ifdef __cplusplus
 }
