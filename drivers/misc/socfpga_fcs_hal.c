@@ -934,7 +934,7 @@ static FCS_HAL_INT hal_digest_final(struct fcs_cmd_context *const k_ctx)
 		ret = -ENOMEM;
 		LOG_ERR("Failed to allocate memory for digest output kernel buffer ret: %d\n",
 			ret);
-		goto return_fun;
+		goto free_src;
 	}
 
 	k_ctx->dgst.digest = d_buf;
@@ -944,7 +944,11 @@ static FCS_HAL_INT hal_digest_final(struct fcs_cmd_context *const k_ctx)
 	ret = priv->plat_data->svc_send_request(priv,
 						FCS_DEV_CRYPTO_GET_DIGEST_FINAL,
 						10 * FCS_REQUEST_TIMEOUT);
-
+	if (ret) {
+		LOG_ERR("Failed to send the cmd=%d,ret=%d\n",
+			FCS_DEV_CRYPTO_GET_DIGEST_FINAL, ret);
+		goto free_dst;
+	}
 	if (priv->status) {
 		ret = -EIO;
 		LOG_ERR("Mailbox error, Failed to finalize digest ret: %d\n",
@@ -979,9 +983,10 @@ copy_mbox_status:
 			ret);
 	}
 
-return_fun:
-	priv->plat_data->svc_free_memory(priv, k_ctx->dgst.src);
+free_dst:
 	priv->plat_data->svc_free_memory(priv, d_buf);
+free_src:
+	priv->plat_data->svc_free_memory(priv, k_ctx->dgst.src);
 
 	return ret;
 }
