@@ -197,6 +197,36 @@ jobs:
           git checkout master
           bash workflow_Regtest.sh ${{ github.workspace }} ${{ github.event.repository.name }} ${{ github.event.pull_request.number }}
 
+#This action runs the on-board regression test
+  ci-on-board-verification:
+    runs-on: [self-hosted,emb-arc-runner]
+    needs: ci-build
+    env:
+      # Disable the warnings of Security violation. We need to check why this is trigger later, plaintext password.
+      EC_DISABLE_VAL: project,system
+      GITHUB_EVENT_NAME: ${{ github.event_name }}
+    steps:
+    - name: Cleaning workspace
+      run: |
+        rm -rf application.devops.github.pr.workflow
+        rm -rf ${GITHUB_WORKSPACE}/.git*
+
+    - name: Download linux artifacts
+      uses: actions/download-artifact@v4
+      with:
+        name: linux-image
+    - run: |
+        tar -xvf linux_output.tar
+        ls
+        pwd
+
+    - name: On-board Regtest
+      run: |
+        git clone https://github.com/intel-sandbox/application.devops.github.pr.workflow
+        cd application.devops.github.pr.workflow
+        git checkout master
+        bash workflow_On_Board_Regtest.sh ${{ github.workspace }} ${{ github.event.repository.name }} ${{ github.event.pull_request.number }}
+
 #This action checks if there is any unaddressed comments or change request
   ci-check-reviews:
     runs-on: [self-hosted,pg-embedded-runner]
@@ -240,7 +270,7 @@ jobs:
 #This is the commit gate that ensures all required checks are passing before the PR is allowed to be merged.
   ci-check-pr-status:
     runs-on: [self-hosted,pg-embedded-runner]
-    needs: [ci-coverity-parse-result, ci-verification, ci-checkpatch, ci-check-reviews, ci-check-tag]
+    needs: [ci-coverity-parse-result, ci-verification, ci-checkpatch, ci-check-reviews, ci-check-tag, ci-on-board-verification]
     steps:
      - name: Check for unaddressed change requests
        env:
@@ -257,7 +287,7 @@ jobs:
           rm -rf $tmp_dir
 
      - name: On failure
-       if: ${{ needs.ci-coverity-parse-result.result != 'success' || needs.ci-verification.result != 'success' || needs.ci-checkpatch.result != 'success' || needs.ci-check-reviews.result != 'success' || needs.ci-check-tag.result != 'success'}}
+       if: ${{ needs.ci-coverity-parse-result.result != 'success' || needs.ci-verification.result != 'success' || needs.ci-checkpatch.result != 'success' || needs.ci-check-reviews.result != 'success' || needs.ci-check-tag.result != 'success' || needs.ci-on-board-verification.result != 'success'}}
        run: |
           echo "Status check has failed."
           exit 1
