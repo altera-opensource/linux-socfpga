@@ -125,6 +125,10 @@
 	status = "okay";
 };
 
+&usb31 {
+	maximum-speed = "high-speed";
+};
+
 &watchdog0 {
 	status = "okay";
 };
