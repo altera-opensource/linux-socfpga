@@ -105,6 +105,13 @@ struct cvp_priv {
 	int	user_time_us;
 };
 
+static int altera_read_config_byte(struct altera_cvp_conf *conf,
+				   int where, u8 *val)
+{
+	return pci_read_config_byte(conf->pci_dev, conf->vsec_offset + where,
+				    val);
+}
+
 static int altera_read_config_dword(struct altera_cvp_conf *conf,
 				    int where, u32 *val)
 {
@@ -247,7 +254,13 @@ static int altera_cvp_v2_wait_for_credit(struct fpga_manager *mgr,
 	}
 
 	do {
-		ret = altera_read_config_dword(conf, vse_cvp_tx_credits_offset, &val);
+		/* READ DWORD is required for Agilex5 but READ BYTE is required for non-Agilex5 */
+		if (conf->device_family_type == SOCFPGA_CVP_V2_AGILEX5) {
+			ret = altera_read_config_dword(conf, vse_cvp_tx_credits_offset, &val);
+		} else {
+			ret = altera_read_config_byte(conf, vse_cvp_tx_credits_offset, (u8 *) &val);
+		}
+
 		if (ret) {
 			dev_err(&conf->pci_dev->dev,
 				"Error reading CVP Credit Register\n");
