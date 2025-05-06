@@ -36,3 +36,6 @@
 	};
 };
 
+&usb31 {
+	maximum-speed = "high-speed";
+};
