@@ -75,6 +75,8 @@
 
 /* Tear-down retry */
 #define CVP_TEARDOWN_MAX_RETRY 10
+/* Sleep duration before polling CVP status for CVP recovery */
+#define CVP_STATUS_POLL_SLEEP 50
 /* Optional CvP config error status check for debugging */
 static bool altera_cvp_chkcfg;
 
@@ -310,6 +312,9 @@ static int altera_cvp_teardown(struct fpga_manager *mgr,
 	val &= ~VSE_CVP_PROG_CTRL_CONFIG;
 	altera_write_config_dword(conf, VSE_CVP_PROG_CTRL, val);
 
+	/* Sleep before polling for CFG_RDY from CVP_STATUS */
+	usleep_range(CVP_STATUS_POLL_SLEEP, CVP_STATUS_POLL_SLEEP + 1);
+
 	/*
 	 * STEP 14
 	 * - set CVP_NUMCLKS to 1 and then issue CVP_DUMMY_WR dummy
@@ -336,7 +341,6 @@ error_path:
 	altera_write_config_dword(conf, VSE_CVP_MODE_CTRL, val);
 
 	return -EAGAIN;
-
 }
 
 static int altera_cvp_recovery(struct fpga_manager *mgr,
@@ -428,6 +432,9 @@ static int altera_cvp_write_init(struct fpga_manager *mgr,
 	/* request control block to begin transfer using CVP */
 	val |= VSE_CVP_PROG_CTRL_CONFIG;
 	altera_write_config_dword(conf, VSE_CVP_PROG_CTRL, val);
+
+	/* Sleep before polling for CFG_RDY from CVP_STATUS */
+	usleep_range(CVP_STATUS_POLL_SLEEP, CVP_STATUS_POLL_SLEEP + 1);
 
 	/* STEP 5 - poll CVP_CONFIG READY for 1 with timeout */
 	ret = altera_cvp_wait_status(conf, VSE_CVP_STATUS_CFG_RDY,
