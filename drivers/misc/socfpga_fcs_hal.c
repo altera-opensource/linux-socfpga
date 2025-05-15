@@ -4047,6 +4047,196 @@ FCS_HAL_INT hal_get_digest(struct fcs_cmd_context *const k_ctx)
 }
 EXPORT_SYMBOL(hal_get_digest);
 
+FCS_HAL_INT hal_mac_verify_streaming_init(struct fcs_cmd_context *const k_ctx)
+{
+	FCS_HAL_INT ret = 0;
+	struct fcs_cmd_context ctx;
+
+	fcs_plat_memcpy(&ctx, k_ctx, sizeof(struct fcs_cmd_context));
+
+	ret = fcs_plat_uuid_compare(&priv->uuid_id, &k_ctx->rng.suuid);
+	if (!ret) {
+		ret = -EINVAL;
+		LOG_ERR("session UUID Mismatch ret: %d\n", ret);
+		return ret;
+	}
+
+	ret = priv->plat_data->svc_send_request(
+		priv, FCS_DEV_CRYPTO_MAC_VERIFY_INIT, FCS_REQUEST_TIMEOUT);
+	if (ret) {
+		LOG_ERR("Failed to send the cmd=%d,ret=%d\n",
+			FCS_DEV_CRYPTO_MAC_VERIFY_INIT, ret);
+		return ret;
+	}
+
+	if (priv->status) {
+		ret = -EIO;
+		LOG_ERR("Mailbox error, Failed to initialize digest ret: %d\n",
+			ret);
+	}
+
+	ret = fcs_plat_copy_to_user(ctx.error_code_addr, &priv->status,
+				    sizeof(priv->status));
+	if (ret) {
+		LOG_ERR("Failed to copy mailbox status code to user ret: %d\n",
+			ret);
+	}
+
+	return ret;
+}
+EXPORT_SYMBOL(hal_mac_verify_streaming_init);
+
+FCS_HAL_INT hal_mac_verify_streaming_update(struct fcs_cmd_context *const k_ctx)
+{
+	FCS_HAL_INT ret = 0;
+	FCS_HAL_VOID *s_buf = NULL, *d_buf = NULL;
+	struct fcs_cmd_context ctx;
+	FCS_HAL_U32 data_size = MAC_CMD_MAX_SZ;
+	FCS_HAL_U32 out_sz = 32;
+
+	fcs_plat_memcpy(&ctx, k_ctx, sizeof(struct fcs_cmd_context));
+
+	s_buf = priv->plat_data->svc_alloc_memory(priv, MAC_CMD_MAX_SZ);
+	if (IS_ERR(s_buf)) {
+		ret = -ENOMEM;
+		LOG_ERR("Failed to allocate memory for mac input data kernel buffer ret: %d\n",
+			ret);
+		return ret;
+	}
+
+	d_buf = priv->plat_data->svc_alloc_memory(priv, MAC_CMD_MAX_SZ);
+	if (IS_ERR(d_buf)) {
+		ret = -ENOMEM;
+		LOG_ERR("Failed to allocate memory for mac output kernel buffer ret: %d\n",
+			ret);
+		goto free_s_buf;
+	}
+
+	ret = fcs_plat_copy_from_user(s_buf, k_ctx->mac_verify.src, data_size);
+	if (ret) {
+		LOG_ERR("Failed to copy input data from user to kernel buffer ret: %d\n",
+			ret);
+		goto free_dest;
+	}
+
+	k_ctx->mac_verify.src = s_buf;
+	k_ctx->mac_verify.dst = d_buf;
+	k_ctx->mac_verify.dst_size = &out_sz;
+
+	ret = priv->plat_data->svc_send_request(
+		priv, FCS_DEV_CRYPTO_MAC_VERIFY_UPDATE,
+		100 * FCS_REQUEST_TIMEOUT);
+	if (ret) {
+		LOG_ERR("Failed to send the cmd=%d,ret=%d\n",
+			FCS_DEV_CRYPTO_MAC_VERIFY_UPDATE, ret);
+		goto free_dest;
+	}
+	if (priv->status) {
+		ret = -EIO;
+		LOG_ERR("Mailbox error, Failed to perform MAC verify ret: %d\n",
+			ret);
+	}
+
+	ret = fcs_plat_copy_to_user(ctx.error_code_addr, &priv->status,
+				    sizeof(priv->status));
+	if (ret) {
+		LOG_ERR("Failed to copy mailbox status code to user ret: %d\n",
+			ret);
+	}
+free_dest:
+	priv->plat_data->svc_free_memory(priv, d_buf);
+free_s_buf:
+	priv->plat_data->svc_free_memory(priv, s_buf);
+	return ret;
+}
+EXPORT_SYMBOL(hal_mac_verify_streaming_update);
+
+FCS_HAL_INT hal_mac_verify_streaming_final(struct fcs_cmd_context *const k_ctx)
+{
+	FCS_HAL_INT ret = 0;
+	FCS_HAL_VOID *s_buf = NULL, *d_buf = NULL;
+	struct fcs_cmd_context ctx;
+	FCS_HAL_U32 data_size = MAC_CMD_MAX_SZ;
+	FCS_HAL_U32 out_sz = 32;
+
+	fcs_plat_memcpy(&ctx, k_ctx, sizeof(struct fcs_cmd_context));
+
+	s_buf = priv->plat_data->svc_alloc_memory(priv, MAC_CMD_MAX_SZ);
+	if (IS_ERR(s_buf)) {
+		ret = -ENOMEM;
+		LOG_ERR("Failed to allocate memory for mac input data kernel buffer ret: %d\n",
+			ret);
+		return ret;
+	}
+
+	d_buf = priv->plat_data->svc_alloc_memory(priv, MAC_CMD_MAX_SZ);
+	if (IS_ERR(d_buf)) {
+		ret = -ENOMEM;
+		LOG_ERR("Failed to allocate memory for mac output kernel buffer ret: %d\n",
+			ret);
+		goto free_s_buf;
+	}
+
+	data_size =
+		k_ctx->mac_verify.src_size - k_ctx->mac_verify.user_data_size;
+
+	ret = fcs_plat_copy_from_user(s_buf, k_ctx->mac_verify.src,
+				      k_ctx->mac_verify.src_size);
+	if (ret) {
+		LOG_ERR("Failed to copy input data from user to kernel buffer ret: %d\n",
+			ret);
+		goto free_dest;
+	}
+
+	k_ctx->mac_verify.src = s_buf;
+	k_ctx->mac_verify.dst = d_buf;
+	k_ctx->mac_verify.dst_size = &out_sz;
+
+	ret = priv->plat_data->svc_send_request(priv,
+						FCS_DEV_CRYPTO_MAC_VERIFY_FINAL,
+						100 * FCS_REQUEST_TIMEOUT);
+	if (ret) {
+		LOG_ERR("Failed to send the cmd=%d,ret=%d\n",
+			FCS_DEV_CRYPTO_MAC_VERIFY_FINAL, ret);
+		goto free_dest;
+	}
+	if (priv->status) {
+		ret = -EIO;
+		LOG_ERR("Mailbox error, Failed to perform MAC verify ret: %d\n",
+			ret);
+		goto copy_mbox_status;
+	}
+
+	ret = fcs_plat_copy_to_user(
+		ctx.mac_verify.dst,
+		k_ctx->mac_verify.dst + RESPONSE_HEADER_SIZE, priv->resp);
+	if (ret) {
+		LOG_ERR("Failed to copy digest output to user ret: %d\n", ret);
+		goto copy_mbox_status;
+	}
+
+	ret = fcs_plat_copy_to_user(ctx.mac_verify.dst_size, &priv->resp,
+				    sizeof(priv->resp));
+	if (ret) {
+		LOG_ERR("Failed to copy digest output length to user ret: %d\n",
+			ret);
+	}
+
+copy_mbox_status:
+	ret = fcs_plat_copy_to_user(ctx.error_code_addr, &priv->status,
+				    sizeof(priv->status));
+	if (ret) {
+		LOG_ERR("Failed to copy mailbox status code to user ret: %d\n",
+			ret);
+	}
+free_dest:
+	priv->plat_data->svc_free_memory(priv, d_buf);
+free_s_buf:
+	priv->plat_data->svc_free_memory(priv, s_buf);
+	return ret;
+}
+EXPORT_SYMBOL(hal_mac_verify_streaming_final);
+
 struct fcs_cmd_context *hal_get_fcs_cmd_ctx(void)
 {
 	fcs_plat_mutex_lock(priv);
