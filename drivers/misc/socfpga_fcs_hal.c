@@ -56,6 +56,16 @@
 #define FCS_STATUS_LEN			4
 #define FCS_ECDSA_CRYPTO_BLOCK_SZ	FCS_CRYPTO_BLOCK_SZ
 
+/* AES GCM tag length */
+#define GCS_TAG_LEN_32			4
+#define GCS_TAG_LEN_64			8
+#define GCS_TAG_LEN_96			12
+#define GCS_TAG_LEN_128			16
+#define MAP_GCM_TAG_32_TO_SDM_TAG	0
+#define MAP_GCM_TAG_64_TO_SDM_TAG	1
+#define MAP_GCM_TAG_96_TO_SDM_TAG	2
+#define MAP_GCM_TAG_128_TO_SDM_TAG	3
+
 /* HKDF input payload size with 1st and 2nd input */
 #define HKDF_INPUT_DATA_SIZE		80
 
@@ -1337,7 +1347,7 @@ static FCS_HAL_INT hal_aes_crypt_update_final(FCS_HAL_CHAR *ip_ptr, FCS_HAL_UINT
 
 	if (aad_size) {
 		if (aad) {
-			LOG_ERR("AES Update/final copy AAD at %p aad_size = %d\n",
+			LOG_DBG("AES Update/final copy AAD at %p aad_size = %d\n",
 				s_buf, aad_size);
 
 			ret = fcs_plat_copy_from_user(s_buf, aad, aad_size);
@@ -1398,7 +1408,11 @@ static FCS_HAL_INT hal_aes_crypt_update_final(FCS_HAL_CHAR *ip_ptr, FCS_HAL_UINT
 	}
 
 	k_ctx->aes.ip_len = s_buf_size;
-	*k_ctx->aes.op_len = d_buf_size;
+	if (mode == FCS_AES_BLOCK_MODE_GHASH)
+		*k_ctx->aes.op_len = 0;
+	else
+		*k_ctx->aes.op_len = d_buf_size;
+
 	k_ctx->aes.input = s_buf;
 	k_ctx->aes.output = d_buf;
 	k_ctx->aes.input_pad = pad2;
@@ -3414,6 +3428,144 @@ free_src:
 }
 EXPORT_SYMBOL(hal_generic_mbox);
 #endif
+
+FCS_HAL_INT hal_aes_streaming_init(struct fcs_cmd_context *const k_ctx)
+{
+	FCS_HAL_INT ret = 0;
+
+	if (k_ctx->aes.mode == FCS_AES_BLOCK_MODE_GHASH ||
+	    k_ctx->aes.mode == FCS_AES_BLOCK_MODE_GCM) {
+		if (k_ctx->aes.tag_len == GCS_TAG_LEN_32) {
+			k_ctx->aes.tag_len = MAP_GCM_TAG_32_TO_SDM_TAG;
+		} else if (k_ctx->aes.tag_len == GCS_TAG_LEN_64) {
+			k_ctx->aes.tag_len = MAP_GCM_TAG_64_TO_SDM_TAG;
+		} else if (k_ctx->aes.tag_len == GCS_TAG_LEN_96) {
+			k_ctx->aes.tag_len = MAP_GCM_TAG_96_TO_SDM_TAG;
+		} else if (k_ctx->aes.tag_len == GCS_TAG_LEN_128) {
+			k_ctx->aes.tag_len = MAP_GCM_TAG_128_TO_SDM_TAG;
+		} else {
+			ret = -EINVAL;
+			LOG_ERR("Invalid tag length in AES streaming request ret: %d\n",
+				ret);
+			return ret;
+		}
+	}
+
+	/* Compare the session UUIDs to check for a match.*/
+	ret = fcs_plat_uuid_compare(&priv->uuid_id,
+				    &k_ctx->ecdsa_sha2_data_verify.suuid);
+	if (!ret) {
+		ret = -EINVAL;
+		LOG_ERR("session UUID Mismatch in aes crypt request ret: %d\n",
+			ret);
+		return ret;
+	}
+
+	/* Initialize the AES crypt */
+	ret = hal_aes_crypt_init(k_ctx);
+	if (ret)
+		LOG_ERR("Failed to perform AES crypt init ret: %d\n", ret);
+
+	return ret;
+}
+EXPORT_SYMBOL(hal_aes_streaming_init);
+
+FCS_HAL_INT hal_aes_streaming_update(struct fcs_cmd_context *const k_ctx)
+{
+	FCS_HAL_INT ret = 0;
+	struct fcs_cmd_context ctx;
+	FCS_HAL_U32 op_len = 0;
+
+	/* Compare the session UUIDs to check for a match.*/
+	ret = fcs_plat_uuid_compare(&priv->uuid_id,
+				    &k_ctx->ecdsa_sha2_data_verify.suuid);
+	if (!ret) {
+		ret = -EINVAL;
+		LOG_ERR("session UUID Mismatch in aes crypt request ret: %d\n",
+			ret);
+		return ret;
+	}
+
+	fcs_plat_memcpy(&ctx, k_ctx, sizeof(struct fcs_cmd_context));
+
+	k_ctx->aes.op_len = &op_len;
+
+	ret = hal_aes_crypt_update_final(k_ctx->aes.input, k_ctx->aes.ip_len,
+					 k_ctx->aes.aad, k_ctx->aes.aad_len,
+					 NULL, 0, 0, k_ctx->aes.output,
+					 k_ctx->aes.mode, k_ctx,
+					 FCS_DEV_CRYPTO_AES_CRYPT_UPDATE);
+	if (ret)
+		LOG_ERR("Failed to perform AES crypt update ret: %d\n", ret);
+
+	if (k_ctx->aes.mode != FCS_AES_BLOCK_MODE_GHASH) {
+		ret = fcs_plat_copy_to_user(ctx.aes.op_len, &op_len, sizeof(op_len));
+		if (ret)
+			LOG_ERR("Failed to copy AES data from kernel to user buffer ret: %d\n",
+				ret);
+	}
+
+	return ret;
+}
+EXPORT_SYMBOL(hal_aes_streaming_update);
+
+FCS_HAL_INT hal_aes_streaming_final(struct fcs_cmd_context *const k_ctx)
+{
+	FCS_HAL_INT ret = 0;
+	struct fcs_cmd_context ctx;
+	FCS_HAL_UINT src_tag_len = 0, dst_tag_len = 0;
+	FCS_HAL_U32 op_len = 0;
+
+	/* Compare the session UUIDs to check for a match.*/
+	ret = fcs_plat_uuid_compare(&priv->uuid_id,
+				    &k_ctx->ecdsa_sha2_data_verify.suuid);
+	if (!ret) {
+		ret = -EINVAL;
+		LOG_ERR("session UUID Mismatch in aes crypt request ret: %d\n",
+			ret);
+		return ret;
+	}
+
+	fcs_plat_memcpy(&ctx, k_ctx, sizeof(struct fcs_cmd_context));
+
+	if (k_ctx->aes.crypt == FCS_AES_ENCRYPT) {
+		src_tag_len = 0;
+		dst_tag_len = GCM_TAG_LEN;
+	} else {
+		src_tag_len = GCM_TAG_LEN;
+		dst_tag_len = 0;
+	}
+
+	k_ctx->aes.op_len = &op_len;
+
+	ret = hal_aes_crypt_update_final(k_ctx->aes.input, k_ctx->aes.ip_len,
+					 k_ctx->aes.aad, k_ctx->aes.aad_len,
+					 k_ctx->aes.tag, src_tag_len,
+					 dst_tag_len, k_ctx->aes.output,
+					 k_ctx->aes.mode, k_ctx,
+					 FCS_DEV_CRYPTO_AES_CRYPT_FINAL);
+	if (ret) {
+		LOG_ERR("Failed to perform AES crypt finalize ret: %d\n", ret);
+		return ret;
+	}
+
+	if (k_ctx->aes.mode == FCS_AES_BLOCK_MODE_GCM)
+		op_len -= dst_tag_len;
+	else if (k_ctx->aes.mode == FCS_AES_BLOCK_MODE_GHASH)
+		op_len = 0;
+
+	/* Copy the output tag to the user buffer */
+	if (k_ctx->aes.mode != FCS_AES_BLOCK_MODE_GHASH) {
+		ret = fcs_plat_copy_to_user(ctx.aes.op_len, &op_len,
+					    sizeof(op_len));
+		if (ret)
+			LOG_ERR("Failed to copy AES data from kernel to user buffer ret: %d\n",
+				ret);
+	}
+
+	return ret;
+}
+EXPORT_SYMBOL(hal_aes_streaming_final);
 
 struct fcs_cmd_context *hal_get_fcs_cmd_ctx(void)
 {
