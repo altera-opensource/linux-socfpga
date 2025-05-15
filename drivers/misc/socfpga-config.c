@@ -1273,6 +1273,96 @@ out:
 	return ret;
 }
 
+static ssize_t ecdsa_data_verify_init_store(struct device *dev,
+					    struct device_attribute *attr,
+					    const char *buf, size_t buf_size)
+{
+	struct fcs_cmd_context *const u_ctx = *(struct fcs_cmd_context **)buf;
+	struct fcs_cmd_context *k_ctx;
+	int ret;
+
+	k_ctx = hal_get_fcs_cmd_ctx();
+	if (!k_ctx) {
+		pr_err("Failed get context. Context is in use\n");
+		ret = -EFAULT;
+		goto out;
+	}
+
+	if (copy_from_user(k_ctx, u_ctx, sizeof(struct fcs_cmd_context))) {
+		pr_err("Failed to copy context from user space\n");
+		ret = -EFAULT;
+		goto out;
+	}
+
+	ret = hal_ecdsa_data_verify_streaming_init(k_ctx);
+	if (ret)
+		pr_err("Failed to perform ecdsa data sign init\n");
+
+out:
+	hal_release_fcs_cmd_ctx(k_ctx);
+	return ret;
+}
+
+static ssize_t ecdsa_data_verify_up_store(struct device *dev,
+					  struct device_attribute *attr,
+					  const char *buf, size_t buf_size)
+{
+	struct fcs_cmd_context *const u_ctx = *(struct fcs_cmd_context **)buf;
+	struct fcs_cmd_context *k_ctx;
+	int ret;
+
+	k_ctx = hal_get_fcs_cmd_ctx();
+	if (!k_ctx) {
+		pr_err("Failed get context. Context is in use\n");
+		ret = -EFAULT;
+		goto out;
+	}
+
+	if (copy_from_user(k_ctx, u_ctx, sizeof(struct fcs_cmd_context))) {
+		pr_err("Failed to copy context from user space\n");
+		ret = -EFAULT;
+		goto out;
+	}
+
+	ret = hal_ecdsa_data_verify_streaming_update(k_ctx);
+	if (ret)
+		pr_err("Failed to perform ecdsa data verify update\n");
+
+out:
+	hal_release_fcs_cmd_ctx(k_ctx);
+	return ret;
+}
+
+static ssize_t ecdsa_data_verify_final_store(struct device *dev,
+					     struct device_attribute *attr,
+					     const char *buf, size_t buf_size)
+{
+	struct fcs_cmd_context *const u_ctx = *(struct fcs_cmd_context **)buf;
+	struct fcs_cmd_context *k_ctx;
+	int ret;
+
+	k_ctx = hal_get_fcs_cmd_ctx();
+	if (!k_ctx) {
+		pr_err("Failed get context. Context is in use\n");
+		ret = -EFAULT;
+		goto out;
+	}
+
+	if (copy_from_user(k_ctx, u_ctx, sizeof(struct fcs_cmd_context))) {
+		pr_err("Failed to copy context from user space\n");
+		ret = -EFAULT;
+		goto out;
+	}
+
+	ret = hal_ecdsa_data_verify_streaming_final(k_ctx);
+	if (ret)
+		pr_err("ECDSA SHA2 Data verify final stage failed\n");
+
+out:
+	hal_release_fcs_cmd_ctx(k_ctx);
+	return ret;
+}
+
 static DEVICE_ATTR_WO(open_session);
 static DEVICE_ATTR_WO(close_session);
 static DEVICE_ATTR_WO(context_info);
@@ -1317,6 +1407,9 @@ static DEVICE_ATTR_WO(aes_crypt_final);
 static DEVICE_ATTR_WO(ecdsa_data_sign_init);
 static DEVICE_ATTR_WO(ecdsa_data_sign_up);
 static DEVICE_ATTR_WO(ecdsa_data_sign_final);
+static DEVICE_ATTR_WO(ecdsa_data_verify_init);
+static DEVICE_ATTR_WO(ecdsa_data_verify_up);
+static DEVICE_ATTR_WO(ecdsa_data_verify_final);
 
 static struct attribute *fcs_config_attrs[] = {
 	&dev_attr_open_session.attr,
@@ -1363,6 +1456,9 @@ static struct attribute *fcs_config_attrs[] = {
 	&dev_attr_ecdsa_data_sign_init.attr,
 	&dev_attr_ecdsa_data_sign_up.attr,
 	&dev_attr_ecdsa_data_sign_final.attr,
+	&dev_attr_ecdsa_data_verify_init.attr,
+	&dev_attr_ecdsa_data_verify_up.attr,
+	&dev_attr_ecdsa_data_verify_final.attr,
 	NULL
 };
 
