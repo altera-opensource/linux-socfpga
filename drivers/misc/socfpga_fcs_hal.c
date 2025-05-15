@@ -1001,64 +1001,6 @@ free_src:
 	return ret;
 }
 
-FCS_HAL_INT hal_digest(struct fcs_cmd_context *const k_ctx)
-{
-	FCS_HAL_INT ret = 0;
-	struct fcs_cmd_context ctx;
-	FCS_HAL_VOID *s_buf = NULL;
-
-	fcs_plat_memcpy(&ctx, k_ctx, sizeof(struct fcs_cmd_context));
-
-	if (k_ctx->dgst.stage == FCS_DIGEST_STAGE_INIT) {
-		/* Compare the session UUIDs to check for a match */
-		ret = fcs_plat_uuid_compare(&priv->uuid_id, &k_ctx->dgst.suuid);
-		if (!ret) {
-			ret = -EINVAL;
-			LOG_ERR("session UUID Mismatch ret: %d\n", ret);
-			return ret;
-		}
-		ret = hal_digest_init(k_ctx);
-		if (ret) {
-			LOG_ERR("Failed to initialize get digest command ret: %d\n",
-				ret);
-			return ret;
-		}
-
-		s_buf = priv->plat_data->svc_alloc_memory(priv,
-							  DIGEST_CMD_MAX_SZ);
-		if (IS_ERR(s_buf)) {
-			ret = -ENOMEM;
-			LOG_ERR("Failed to allocate memory for digest input data kernel buffer ret: %d\n",
-				ret);
-			return ret;
-		}
-
-		k_ctx->dgst.src = s_buf;
-		return ret;
-	}
-
-	if (k_ctx->dgst.stage == FCS_DIGEST_STAGE_UPDATE) {
-		ret = hal_digest_update(k_ctx);
-		if (ret) {
-			LOG_ERR("Failed to update get digest command ret: %d\n",
-				ret);
-		}
-		return ret;
-	}
-
-	if (k_ctx->dgst.stage == FCS_DIGEST_STAGE_FINAL) {
-		ret = hal_digest_final(k_ctx);
-		if (ret) {
-			LOG_ERR("Failed to finalize get digest command ret: %d\n",
-				ret);
-			return ret;
-		}
-	}
-
-	return ret;
-}
-EXPORT_SYMBOL(hal_digest);
-
 FCS_HAL_INT hal_mac_verify(struct fcs_cmd_context *const k_ctx)
 {
 	FCS_HAL_INT ret = 0;
@@ -3873,6 +3815,237 @@ free_src:
 	return ret;
 }
 EXPORT_SYMBOL(hal_ecdsa_data_verify_streaming_final);
+
+FCS_HAL_INT hal_digest_streaming_init(struct fcs_cmd_context *const k_ctx)
+{
+	FCS_HAL_INT ret = 0;
+	struct fcs_cmd_context ctx;
+
+	fcs_plat_memcpy(&ctx, k_ctx, sizeof(struct fcs_cmd_context));
+
+	ret = fcs_plat_uuid_compare(&priv->uuid_id, &k_ctx->dgst.suuid);
+	if (!ret) {
+		ret = -EINVAL;
+		LOG_ERR("session UUID Mismatch ret: %d\n", ret);
+		return ret;
+	}
+
+	ret = priv->plat_data->svc_send_request(
+		priv, FCS_DEV_CRYPTO_GET_DIGEST_INIT, FCS_REQUEST_TIMEOUT);
+	if (ret) {
+		LOG_ERR("Failed to send the cmd=%d,ret=%d\n",
+			FCS_DEV_CRYPTO_GET_DIGEST_INIT, ret);
+		return ret;
+	}
+
+	if (priv->status) {
+		ret = -EIO;
+		LOG_ERR("Mailbox error, Failed to initialize digest ret: %d\n",
+			ret);
+	}
+
+	ret = fcs_plat_copy_to_user(ctx.error_code_addr, &priv->status,
+				    sizeof(priv->status));
+	if (ret) {
+		LOG_ERR("Failed to copy mailbox status code to user ret: %d\n",
+			ret);
+		return ret;
+	}
+	return ret;
+}
+EXPORT_SYMBOL(hal_digest_streaming_init);
+
+FCS_HAL_INT hal_digest_streaming_update(struct fcs_cmd_context *const k_ctx)
+{
+	FCS_HAL_INT ret = 0;
+	FCS_HAL_VOID *d_buf = NULL, *s_buf = NULL;
+	struct fcs_cmd_context ctx;
+	FCS_HAL_U32 ldigest_len = DIGEST_CMD_MAX_SZ;
+
+	fcs_plat_memcpy(&ctx, k_ctx, sizeof(struct fcs_cmd_context));
+
+	k_ctx->dgst.digest_len = &ldigest_len;
+
+	s_buf = priv->plat_data->svc_alloc_memory(priv, DIGEST_CMD_MAX_SZ);
+	if (IS_ERR(s_buf)) {
+		ret = -ENOMEM;
+		LOG_ERR("Failed to allocate memory for digest input data kernel buffer ret: %d\n",
+			ret);
+		return ret;
+	}
+
+	ret = fcs_plat_copy_from_user(s_buf, k_ctx->dgst.src,
+				      k_ctx->dgst.src_len);
+	if (ret) {
+		LOG_ERR("Failed to copy data from user ret: %d\n", ret);
+		goto free_sbuf;
+	}
+	k_ctx->dgst.src = s_buf;
+
+	d_buf = priv->plat_data->svc_alloc_memory(priv,
+						  *k_ctx->dgst.digest_len);
+	if (IS_ERR(d_buf)) {
+		ret = -ENOMEM;
+		LOG_ERR("Failed to allocate memory for digest output kernel buffer. ret: %d\n",
+			ret);
+		goto free_sbuf;
+	}
+	k_ctx->dgst.digest = d_buf;
+
+	ret = priv->plat_data->svc_send_request(
+		priv, FCS_DEV_CRYPTO_GET_DIGEST_UPDATE,
+		10 * FCS_REQUEST_TIMEOUT);
+	if (ret) {
+		LOG_ERR("Failed to send the cmd=%d,ret=%d\n",
+			FCS_DEV_CRYPTO_GET_DIGEST_UPDATE, ret);
+		goto free_dest;
+	}
+
+	if (priv->status) {
+		ret = -EIO;
+		LOG_ERR("Mailbox error, Failed to perform digest ret: %d\n",
+			ret);
+	}
+
+	ret = fcs_plat_copy_to_user(ctx.error_code_addr, &priv->status,
+				    sizeof(priv->status));
+	if (ret) {
+		LOG_ERR("Failed to copy mailbox status code to user ret: %d\n",
+			ret);
+	}
+
+free_dest:
+	priv->plat_data->svc_free_memory(priv, d_buf);
+free_sbuf:
+	priv->plat_data->svc_free_memory(priv, s_buf);
+
+	return ret;
+}
+EXPORT_SYMBOL(hal_digest_streaming_update);
+
+FCS_HAL_INT hal_digest_streaming_final(struct fcs_cmd_context *const k_ctx)
+{
+	FCS_HAL_INT ret = 0;
+	FCS_HAL_VOID *d_buf = NULL, *s_buf = NULL;
+	struct fcs_cmd_context ctx;
+	FCS_HAL_U32 ldigest_len = DIGEST_CMD_MAX_SZ;
+
+	fcs_plat_memcpy(&ctx, k_ctx, sizeof(struct fcs_cmd_context));
+
+	s_buf = priv->plat_data->svc_alloc_memory(priv, DIGEST_CMD_MAX_SZ);
+	if (IS_ERR(s_buf)) {
+		ret = -ENOMEM;
+		LOG_ERR("Failed to allocate memory for digest input data kernel buffer ret: %d\n",
+			ret);
+		return ret;
+	}
+
+	ret = fcs_plat_copy_from_user(s_buf, k_ctx->dgst.src,
+				      k_ctx->dgst.src_len);
+	if (ret) {
+		LOG_ERR("Failed to copy data from user ret: %d\n", ret);
+		goto free_sbuf;
+	}
+
+	k_ctx->dgst.src = s_buf;
+
+	d_buf = priv->plat_data->svc_alloc_memory(priv, DIGEST_CMD_MAX_SZ);
+	if (IS_ERR(d_buf)) {
+		ret = -ENOMEM;
+		LOG_ERR("Failed to allocate memory for digest output kernel buffer ret: %d\n",
+			ret);
+		goto free_sbuf;
+	}
+
+	k_ctx->dgst.digest = d_buf;
+	k_ctx->dgst.digest_len = &ldigest_len;
+
+	ret = priv->plat_data->svc_send_request(priv,
+						FCS_DEV_CRYPTO_GET_DIGEST_FINAL,
+						10 * FCS_REQUEST_TIMEOUT);
+	if (ret) {
+		LOG_ERR("Failed to send the cmd=%d,ret=%d\n",
+			FCS_DEV_CRYPTO_GET_DIGEST_FINAL, ret);
+		goto copy_mbox_status;
+	}
+	if (priv->status) {
+		ret = -EIO;
+		LOG_ERR("Mailbox error, Failed to finalize digest ret: %d\n",
+			ret);
+		goto copy_mbox_status;
+	}
+
+	priv->resp -= RESPONSE_HEADER_SIZE;
+
+	ret = fcs_plat_copy_to_user(ctx.dgst.digest,
+				    k_ctx->dgst.digest + RESPONSE_HEADER_SIZE,
+				    priv->resp);
+	if (ret) {
+		LOG_ERR("Failed to copy digest output to user ret: %d\n", ret);
+		goto copy_mbox_status;
+	}
+
+	ret = fcs_plat_copy_to_user(ctx.dgst.digest_len, &priv->resp,
+				    sizeof(priv->resp));
+	if (ret) {
+		LOG_ERR("Failed to copy digest output length to user ret: %d\n",
+			ret);
+	}
+
+copy_mbox_status:
+	ret = fcs_plat_copy_to_user(ctx.error_code_addr, &priv->status,
+				    sizeof(priv->status));
+	if (ret) {
+		LOG_ERR("Failed to copy mailbox status code to user ret: %d\n",
+			ret);
+	}
+
+	priv->plat_data->svc_free_memory(priv, d_buf);
+
+free_sbuf:
+	priv->plat_data->svc_free_memory(priv, s_buf);
+
+	return ret;
+}
+EXPORT_SYMBOL(hal_digest_streaming_final);
+
+FCS_HAL_INT hal_get_digest(struct fcs_cmd_context *const k_ctx)
+{
+	FCS_HAL_INT ret = 0;
+	struct fcs_cmd_context ctx;
+	FCS_HAL_U32 remaining_bytes = 0, bytes_transfered = 0;
+
+	fcs_plat_memcpy(&ctx, k_ctx, sizeof(struct fcs_cmd_context));
+	ret = hal_digest_init(k_ctx);
+	if (ret) {
+		LOG_ERR("Failed to initialize digest ret: %d\n", ret);
+		return ret;
+	}
+
+	remaining_bytes = k_ctx->dgst.src_len;
+	while (remaining_bytes > 0) {
+		if (remaining_bytes > CRYPTO_DIGEST_MAX_SZ) {
+			k_ctx->dgst.src_len = CRYPTO_DIGEST_MAX_SZ;
+			ret = hal_digest_update(k_ctx);
+		} else {
+			k_ctx->dgst.src_len = remaining_bytes;
+			ret = hal_digest_final(k_ctx);
+		}
+		if (ret) {
+			LOG_ERR("Failed to perform digest ret: %d\n", ret);
+			return ret;
+		}
+
+		remaining_bytes -= k_ctx->dgst.src_len;
+		bytes_transfered += k_ctx->dgst.src_len;
+		k_ctx->dgst.src = ctx.dgst.src + bytes_transfered;
+		k_ctx->dgst.digest = ctx.dgst.digest;
+		k_ctx->dgst.digest_len = ctx.dgst.digest_len;
+	}
+
+	return ret;
+}
+EXPORT_SYMBOL(hal_get_digest);
 
 struct fcs_cmd_context *hal_get_fcs_cmd_ctx(void)
 {
