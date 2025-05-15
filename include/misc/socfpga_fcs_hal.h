@@ -892,6 +892,33 @@ FCS_HAL_BOOL hal_fcs_is_ready(void);
 FCS_HAL_INT hal_generic_mbox(struct fcs_cmd_context *k_ctx);
 #endif
 
+/**
+ * @brief API sends the init command for the AES encryption/decryption request
+ *
+ * @param ctx A pointer to the command context structure.
+ * @return An integer indicating the success or failure of AES
+ * encryption/decryption init stage.
+ */
+FCS_HAL_INT hal_aes_streaming_init(struct fcs_cmd_context *const k_ctx);
+
+/**
+ * @brief API sends data update for AES encryption/decryption request
+ *
+ * @param ctx A pointer to the command context structure.
+ * @return An integer indicating the success or failure of the AES
+ * encryption/decryption update stage.
+ */
+FCS_HAL_INT hal_aes_streaming_update(struct fcs_cmd_context *const k_ctx);
+
+/**
+ * @brief API sends AES encryption/decryption final request
+ *
+ * @param ctx A pointer to the command context structure.
+ * @return An integer indicating the success or failure of the AES
+ * encryption/decryption final stage
+ */
+FCS_HAL_INT hal_aes_streaming_final(struct fcs_cmd_context *const k_ctx);
+
 #ifdef __cplusplus
 }
 #endif /* __cplusplus */
