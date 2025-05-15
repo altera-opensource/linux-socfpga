@@ -1021,6 +1021,40 @@ FCS_HAL_INT hal_digest_streaming_final(struct fcs_cmd_context *const k_ctx);
  */
 FCS_HAL_INT hal_get_digest(struct fcs_cmd_context *const k_ctx);
 
+/**
+ * @brief Initializes the MAC verification operation: Init stage.
+ *
+ * This function initializes the MAC verification operation for the given
+ * command context.
+ *
+ * @param k_ctx Pointer to the command context structure.
+ * @return FCS_HAL_INT Result of the initialization.
+ */
+FCS_HAL_INT hal_mac_verify_streaming_init(struct fcs_cmd_context *const k_ctx);
+
+/**
+ * @brief Updates the MAC verification operation: Update stage.
+ *
+ * This function updates the MAC verification operation with the provided data
+ * for the given command context.
+ *
+ * @param k_ctx Pointer to the command context structure.
+ * @return FCS_HAL_INT Result of the update.
+ */
+FCS_HAL_INT
+hal_mac_verify_streaming_update(struct fcs_cmd_context *const k_ctx);
+
+/**
+ * @brief Finalizes the MAC verification operation: Final stage.
+ *
+ * This function finalizes the MAC verification operation and retrieves the
+ * final result for the given command context.
+ *
+ * @param k_ctx Pointer to the command context structure.
+ * @return FCS_HAL_INT Result of the finalization.
+ */
+FCS_HAL_INT hal_mac_verify_streaming_final(struct fcs_cmd_context *const k_ctx);
+
 #ifdef __cplusplus
 }
 #endif /* __cplusplus */
