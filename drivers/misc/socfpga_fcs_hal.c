@@ -3719,6 +3719,161 @@ free_src:
 }
 EXPORT_SYMBOL(hal_ecdsa_data_sign_streaming_final);
 
+FCS_HAL_INT
+hal_ecdsa_data_verify_streaming_init(struct fcs_cmd_context *const k_ctx)
+{
+	FCS_HAL_INT ret;
+
+	/* Compare the session UUIDs to check for a match.
+	 */
+	ret = fcs_plat_uuid_compare(&priv->uuid_id,
+				    &k_ctx->ecdsa_sha2_data_verify.suuid);
+	if (!ret) {
+		ret = -EINVAL;
+		LOG_ERR("session UUID Mismatch in sha2 data verify request ret: %d\n",
+			ret);
+		return ret;
+	}
+
+	ret = hal_ecdsa_sha2_data_verify_init(k_ctx);
+	if (ret) {
+		LOG_ERR("Failed to initialize ECDSA verify ret: %d\n", ret);
+		return ret;
+	}
+
+	return ret;
+}
+EXPORT_SYMBOL(hal_ecdsa_data_verify_streaming_init);
+
+FCS_HAL_INT
+hal_ecdsa_data_verify_streaming_update(struct fcs_cmd_context *const k_ctx)
+{
+	FCS_HAL_INT ret = 0;
+	struct fcs_cmd_context ctx;
+	FCS_HAL_VOID *s_buf = NULL;
+	FCS_HAL_VOID *d_buf = NULL;
+	FCS_HAL_U32 d_buf_sz = 0;
+	FCS_HAL_CHAR *ip_ptr = NULL;
+
+	fcs_plat_memcpy(&ctx, k_ctx, sizeof(struct fcs_cmd_context));
+
+	s_buf = priv->plat_data->svc_alloc_memory(
+		priv, ctx.ecdsa_sha2_data_verify.src_len);
+	if (IS_ERR(s_buf)) {
+		ret = -ENOMEM;
+		LOG_ERR("Failed to allocate memory for ECDSA sign src buffer ret: %d\n",
+			ret);
+		return ret;
+	}
+
+	d_buf_sz = FCS_ECDSA_HASH_SIGN_MAX_LEN;
+	d_buf = priv->plat_data->svc_alloc_memory(priv, d_buf_sz);
+	if (IS_ERR(d_buf)) {
+		ret = -ENOMEM;
+		LOG_ERR("Failed to allocate memory for ECDSA sign dst buffer ret: %d\n",
+			ret);
+		goto free_sbuf;
+	}
+
+	ip_ptr = k_ctx->ecdsa_sha2_data_verify.src;
+	k_ctx->ecdsa_sha2_data_verify.src = s_buf;
+	k_ctx->ecdsa_sha2_data_verify.dst = d_buf;
+	k_ctx->ecdsa_sha2_data_verify.dst_len = &d_buf_sz;
+
+	ret = hal_ecdsa_sha2data_verify_upfinal(
+		ip_ptr, ctx.ecdsa_sha2_data_verify.user_data_sz, NULL, 0, NULL,
+		0, d_buf, d_buf_sz, k_ctx,
+		FCS_DEV_CRYPTO_ECDSA_SHA2_DATA_VERIFY_UPDATE);
+	if (ret)
+		LOG_ERR("Failed to perform ECDSA sha2 data verify update ret: %d\n",
+			ret);
+
+	priv->plat_data->svc_free_memory(priv, d_buf);
+free_sbuf:
+	priv->plat_data->svc_free_memory(priv, s_buf);
+	return ret;
+}
+EXPORT_SYMBOL(hal_ecdsa_data_verify_streaming_update);
+
+FCS_HAL_INT
+hal_ecdsa_data_verify_streaming_final(struct fcs_cmd_context *const k_ctx)
+{
+	FCS_HAL_INT ret = 0;
+	struct fcs_cmd_context ctx;
+	FCS_HAL_VOID *s_buf = NULL;
+	FCS_HAL_U32 s_buf_sz = 0;
+	FCS_HAL_VOID *d_buf = NULL;
+	FCS_HAL_U32 d_buf_sz = 0;
+	FCS_HAL_CHAR *ip_ptr = NULL;
+	FCS_HAL_U32 ip_len = 0;
+
+	fcs_plat_memcpy(&ctx, k_ctx, sizeof(struct fcs_cmd_context));
+
+	s_buf_sz = ctx.ecdsa_sha2_data_verify.src_len;
+	s_buf = priv->plat_data->svc_alloc_memory(priv, s_buf_sz);
+	if (IS_ERR(s_buf)) {
+		ret = -ENOMEM;
+		LOG_ERR("Failed to allocate memory for ECDSA sign src buffer ret: %d\n",
+			ret);
+		return ret;
+	}
+
+	d_buf_sz = FCS_ECDSA_HASH_SIGN_MAX_LEN;
+	d_buf = priv->plat_data->svc_alloc_memory(priv, d_buf_sz);
+	if (IS_ERR(d_buf)) {
+		ret = -ENOMEM;
+		LOG_ERR("Failed to allocate memory for ECDSA sign dst buffer ret: %d\n",
+			ret);
+		goto free_src;
+	}
+
+	ip_ptr = k_ctx->ecdsa_sha2_data_verify.src;
+	ip_len = ctx.ecdsa_sha2_data_verify.user_data_sz;
+
+	k_ctx->ecdsa_sha2_data_verify.src = s_buf;
+	k_ctx->ecdsa_sha2_data_verify.src_len = s_buf_sz;
+	k_ctx->ecdsa_sha2_data_verify.dst = d_buf;
+	k_ctx->ecdsa_sha2_data_verify.src_len = s_buf_sz;
+	k_ctx->ecdsa_sha2_data_verify.dst_len = &d_buf_sz;
+
+	ret = hal_ecdsa_sha2data_verify_upfinal(
+		ip_ptr, ip_len, k_ctx->ecdsa_sha2_data_verify.signature,
+		k_ctx->ecdsa_sha2_data_verify.signature_len,
+		k_ctx->ecdsa_sha2_data_verify.pubkey,
+		k_ctx->ecdsa_sha2_data_verify.pubkey_len, d_buf, d_buf_sz,
+		k_ctx, FCS_DEV_CRYPTO_ECDSA_SHA2_DATA_VERIFY_FINALIZE);
+	if (ret) {
+		LOG_ERR("Failed to perform ECDSA sha2 data sign finalize ret: %d\n",
+			ret);
+		goto free_dst;
+	}
+
+	priv->resp -= RESPONSE_HEADER_SIZE;
+
+	ret = fcs_plat_copy_to_user(ctx.ecdsa_sha2_data_verify.dst_len,
+				    &priv->resp, sizeof(priv->resp));
+	if (ret) {
+		LOG_ERR("Failed to copy ECDSA verify data length to user ret: %d\n",
+			ret);
+		goto free_dst;
+	}
+
+	ret = fcs_plat_copy_to_user(ctx.ecdsa_sha2_data_verify.dst,
+				    d_buf + RESPONSE_HEADER_SIZE, priv->resp);
+	if (ret) {
+		LOG_ERR("Failed to copy ECDSA verify data to user ret: %d\n",
+			ret);
+	}
+
+free_dst:
+	priv->plat_data->svc_free_memory(priv, d_buf);
+free_src:
+	priv->plat_data->svc_free_memory(priv, s_buf);
+
+	return ret;
+}
+EXPORT_SYMBOL(hal_ecdsa_data_verify_streaming_final);
+
 struct fcs_cmd_context *hal_get_fcs_cmd_ctx(void)
 {
 	fcs_plat_mutex_lock(priv);
