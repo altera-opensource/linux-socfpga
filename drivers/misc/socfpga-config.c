@@ -1096,6 +1096,93 @@ out:
 }
 #endif
 
+static ssize_t aes_crypt_init_store(struct device *dev,
+				    struct device_attribute *attr,
+				    const char *buf, size_t buf_size)
+{
+	struct fcs_cmd_context *const u_ctx = *(struct fcs_cmd_context **)buf;
+	struct fcs_cmd_context *k_ctx;
+	int ret;
+
+	k_ctx = hal_get_fcs_cmd_ctx();
+	if (!k_ctx) {
+		pr_err("Failed get context. Context is in use\n");
+		ret = -EFAULT;
+		goto out;
+	}
+
+	if (copy_from_user(k_ctx, u_ctx, sizeof(struct fcs_cmd_context))) {
+		pr_err("Failed to copy context from user space\n");
+		ret = -EFAULT;
+		goto out;
+	}
+
+	ret = hal_aes_streaming_init(k_ctx);
+	if (ret)
+		pr_err("AES crypt streaming init failed\n");
+out:
+	hal_release_fcs_cmd_ctx(k_ctx);
+	return ret;
+}
+
+static ssize_t aes_crypt_update_store(struct device *dev,
+				      struct device_attribute *attr,
+				      const char *buf, size_t buf_size)
+{
+	struct fcs_cmd_context *const u_ctx = *(struct fcs_cmd_context **)buf;
+	struct fcs_cmd_context *k_ctx;
+	int ret;
+
+	k_ctx = hal_get_fcs_cmd_ctx();
+	if (!k_ctx) {
+		pr_err("Failed get context. Context is in use\n");
+		ret = -EFAULT;
+		goto out;
+	}
+
+	if (copy_from_user(k_ctx, u_ctx, sizeof(struct fcs_cmd_context))) {
+		pr_err("Failed to copy context from user space\n");
+		ret = -EFAULT;
+		goto out;
+	}
+
+	ret = hal_aes_streaming_update(k_ctx);
+	if (ret)
+		pr_err("AES crypt update failed\n");
+out:
+	hal_release_fcs_cmd_ctx(k_ctx);
+	return ret;
+}
+
+static ssize_t aes_crypt_final_store(struct device *dev,
+				     struct device_attribute *attr,
+				     const char *buf, size_t buf_size)
+{
+	struct fcs_cmd_context *const u_ctx = *(struct fcs_cmd_context **)buf;
+	struct fcs_cmd_context *k_ctx;
+	int ret;
+
+	k_ctx = hal_get_fcs_cmd_ctx();
+	if (!k_ctx) {
+		pr_err("Failed get context. Context is in use\n");
+		ret = -EFAULT;
+		goto out;
+	}
+
+	if (copy_from_user(k_ctx, u_ctx, sizeof(struct fcs_cmd_context))) {
+		pr_err("Failed to copy context from user space\n");
+		ret = -EFAULT;
+		goto out;
+	}
+
+	ret = hal_aes_streaming_final(k_ctx);
+	if (ret)
+		pr_err("AES crypt final failed\n");
+out:
+	hal_release_fcs_cmd_ctx(k_ctx);
+	return ret;
+}
+
 static DEVICE_ATTR_WO(open_session);
 static DEVICE_ATTR_WO(close_session);
 static DEVICE_ATTR_WO(context_info);
@@ -1134,6 +1221,9 @@ static DEVICE_ATTR_WO(sdos);
 #ifdef CONFIG_ALTERA_SOCFPGA_FCS_DEBUG
 static DEVICE_ATTR_WO(generic_mbox);
 #endif
+static DEVICE_ATTR_WO(aes_crypt_init);
+static DEVICE_ATTR_WO(aes_crypt_update);
+static DEVICE_ATTR_WO(aes_crypt_final);
 
 static struct attribute *fcs_config_attrs[] = {
 	&dev_attr_open_session.attr,
@@ -1174,6 +1264,9 @@ static struct attribute *fcs_config_attrs[] = {
 #ifdef CONFIG_ALTERA_SOCFPGA_FCS_DEBUG
 	&dev_attr_generic_mbox.attr,
 #endif
+	&dev_attr_aes_crypt_init.attr,
+	&dev_attr_aes_crypt_update.attr,
+	&dev_attr_aes_crypt_final.attr,
 	NULL
 };
 
