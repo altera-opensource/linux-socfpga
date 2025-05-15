@@ -919,6 +919,36 @@ FCS_HAL_INT hal_aes_streaming_update(struct fcs_cmd_context *const k_ctx);
  */
 FCS_HAL_INT hal_aes_streaming_final(struct fcs_cmd_context *const k_ctx);
 
+/**
+ * @brief API sends the init command for the ECDSA sha2 data signing request
+ *
+ * @param ctx A pointer to the command context structure.
+ * @return An integer indicating the success or failure of the ECDSA
+ * data signing operation.
+ */
+FCS_HAL_INT
+hal_ecdsa_data_sign_streaming_init(struct fcs_cmd_context *const k_ctx);
+
+/**
+ * @brief API sends data update for ECDSA sha2 data signing request
+ *
+ * @param ctx A pointer to the command context structure.
+ * @return An integer indicating the success or failure of the ECDSA
+ * data signing operation.
+ */
+FCS_HAL_INT
+hal_ecdsa_data_sign_streaming_update(struct fcs_cmd_context *const k_ctx);
+
+/**
+ * @brief API sends ECDSA sha2 data signing final request
+ *
+ * @param ctx A pointer to the command context structure.
+ * @return An integer indicating the success or failure of the ECDSA
+ * data signing operation.
+ */
+FCS_HAL_INT
+hal_ecdsa_data_sign_streaming_final(struct fcs_cmd_context *const k_ctx);
+
 #ifdef __cplusplus
 }
 #endif /* __cplusplus */
