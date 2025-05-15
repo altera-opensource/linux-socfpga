@@ -657,16 +657,6 @@ FCS_HAL_INT hal_counter_set(struct fcs_cmd_context *const ctx);
 FCS_HAL_INT hal_counter_set_preauth(struct fcs_cmd_context *const ctx);
 
 /**
- * @brief Computes the digest for the given command context.
- *
- * This function calculates the digest based on the provided command context.
- *
- * @param k_ctx Pointer to the command context structure.
- * @return FCS_HAL_INT Result of the digest computation.
- */
-FCS_HAL_INT hal_digest(struct fcs_cmd_context *const k_ctx);
-
-/**
  * hal_digest_free_resource - Frees resources associated with the digest operation.
  * @k_ctx: Pointer to the FCS command context structure.
  *
@@ -988,6 +978,48 @@ hal_ecdsa_data_verify_streaming_update(struct fcs_cmd_context *const k_ctx);
  */
 FCS_HAL_INT
 hal_ecdsa_data_verify_streaming_final(struct fcs_cmd_context *const k_ctx);
+
+/**
+ * @brief Initializes the digest generation operation: Init stage.
+ *
+ * This function initializes the digest operation for the given command context.
+ *
+ * @param k_ctx Pointer to the command context structure.
+ * @return FCS_HAL_INT Result of the initialization.
+ */
+FCS_HAL_INT hal_digest_streaming_init(struct fcs_cmd_context *const k_ctx);
+
+/**
+ * @brief Updates the digest operation with new data.
+ *
+ * This function updates the digest operation with the provided data for the
+ * given command context.
+ *
+ * @param k_ctx Pointer to the command context structure.
+ * @return FCS_HAL_INT Result of the update.
+ */
+FCS_HAL_INT hal_digest_streaming_update(struct fcs_cmd_context *const k_ctx);
+
+/**
+ * @brief Finalizes the digest operation.
+ *
+ * This function finalizes the digest operation and retrieves the final digest
+ * for the given command context.
+ *
+ * @param k_ctx Pointer to the command context structure.
+ * @return FCS_HAL_INT Result of the finalization.
+ */
+FCS_HAL_INT hal_digest_streaming_final(struct fcs_cmd_context *const k_ctx);
+
+/**
+ * @brief Computes the digest for the given command context.
+ *
+ * This function calculates the digest based on the provided command context.
+ *
+ * @param k_ctx Pointer to the command context structure.
+ * @return FCS_HAL_INT Result of the digest computation.
+ */
+FCS_HAL_INT hal_get_digest(struct fcs_cmd_context *const k_ctx);
 
 #ifdef __cplusplus
 }
