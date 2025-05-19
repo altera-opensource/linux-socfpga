@@ -1286,7 +1286,7 @@ out:
 }
 
 static int etile_get_ts_info(struct net_device *dev,
-			     struct ethtool_ts_info *info)
+			     struct kernel_ethtool_ts_info *info)
 {
 	intel_fpga_xtile_eth_private *priv = netdev_priv(dev);
 

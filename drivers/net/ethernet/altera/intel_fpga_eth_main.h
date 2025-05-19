@@ -131,6 +131,7 @@ typedef struct intel_fpga_xtile_eth_private {
 	struct work_struct  ui_worker;
 	struct timer_list fec_timer;
 	struct altera_dma_private dma_priv;
+	struct phylink_pcs pcs;
 	struct phylink_config phylink_config;
 	struct intel_fpga_tod_private *ptp_priv;
 	hssi_eth_port_attr hssi_port_x_attr;

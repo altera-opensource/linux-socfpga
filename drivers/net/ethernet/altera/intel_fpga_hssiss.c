@@ -13,7 +13,9 @@
 #include <linux/module.h>
 #include <linux/delay.h>
 
+#include <linux/mod_devicetable.h>
 #include <linux/of_device.h>
+#include <linux/of.h>
 #include <linux/platform_device.h>
 
 #include "altera_utils.h"
@@ -388,13 +390,11 @@ static int hssiss_probe(struct platform_device *pdev)
 	return 0;
 }
 
-static int hssiss_remove(struct platform_device *pdev)
+static void hssiss_remove(struct platform_device *pdev)
 {
 	platform_set_drvdata(pdev, NULL);
 
 	/* TODO: REMOVE dbgfs */
-
-	return 0;
 }
 
 static struct platform_driver hssiss_driver = {

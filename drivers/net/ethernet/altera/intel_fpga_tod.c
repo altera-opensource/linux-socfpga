@@ -426,7 +426,7 @@ err:
 }
 
 /* Remove/unregister the ptp clock driver from the kernel */
-static int intel_fpga_tod_unregister(struct platform_device *pdev)
+static void intel_fpga_tod_unregister(struct platform_device *pdev)
 {
 	struct intel_fpga_tod_private *priv = dev_get_drvdata(&pdev->dev);
 
@@ -437,7 +437,6 @@ static int intel_fpga_tod_unregister(struct platform_device *pdev)
 
 	if (priv->tod_clk)
 		clk_disable_unprepare(priv->tod_clk);
-	return 0;
 }
 
 /* Common PTP probe function */

@@ -10,5 +10,5 @@
 #define HAVE_INTEL_FREQUENCY_CONTROL_ZL30733_DEBUGFS_H
 
 struct zarlink_pll_dbg *zl30733_dbgfs_init(struct i2c_client *i2c_cli);
-
+void zl30733_dbgfs_remove(struct zarlink_pll_dbg *d);
 #endif //HAVE_INTEL_FREQUENCY_CONTROL_ZL30793_DEBUGFS_H

@@ -50,11 +50,13 @@ struct intf_type {
 	struct spi_device *spi_dev;
 };
 
+struct zarlink_pll_dbg;
 struct xtile_intf_ops {
 	int (*client_validator)(struct clock_cleaner *cc);
 	void (*clock_cleaner)(struct work_struct *ws);
 	int (*clock_check)(struct intel_freq_control_private *fq);
 	int (*reset_pll_state)(struct intel_freq_control_private *priv);
+	void (*shutdown_handler)(struct zarlink_pll_dbg *d);
 };
 
 struct intel_freq_control_private {
@@ -66,6 +68,7 @@ struct intel_freq_control_private {
 	struct ptp_freq_ctrl_info freqctrl_ops;
 	struct delayed_work pll_lock_dwork;
 	int pll_lock_check_ctr;
+	struct zarlink_pll_dbg *pll_dbg;
 };
 
 void schedule_pll_lock_check(struct intel_freq_control_private *priv);

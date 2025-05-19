@@ -29,7 +29,7 @@ static int spi_dev_check(struct device *dev, void *data)
 		goto spi_client_ret;
 	}
 
-	if ((clockcleaner_info->bus_num != spi->master->bus_num) ||
+	if ((clockcleaner_info->bus_num != spi->controller->bus_num) ||
 	    (clockcleaner_info->chip_select != spi->chip_select)) {
 		ret = INTEL_FPGA_SPI_ERROR;
 		goto spi_client_ret;

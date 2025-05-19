@@ -51,4 +51,5 @@
 void intel_freq_control_zl30793(struct work_struct *work);
 int spi_dev_check_zl30793_clock(struct intel_freq_control_private *priv);
 int reset_dpll_mode(struct intel_freq_control_private *priv);
+void zl30733_dbgfs_remove(struct zarlink_pll_dbg *d);
 #endif

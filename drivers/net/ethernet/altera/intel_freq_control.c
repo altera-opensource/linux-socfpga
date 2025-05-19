@@ -13,11 +13,14 @@
 #include <linux/module.h>
 #include <linux/workqueue.h>
 #include <linux/of_platform.h>
+#include <linux/platform_device.h>
 #include "intel_freq_control.h"
 #include "intel_freq_ctrl_common_spi.h"
 #include "intel_freq_ctrl_zl30793_spi.h"
 #include "intel_freq_ctrl_zl30733_i2c.h"
 #include "intel_freq_ctrl_common_i2c.h"
+
+struct platform_device;
 
 void schedule_pll_lock_check(struct intel_freq_control_private *priv)
 {
@@ -174,14 +177,15 @@ clk_cleaner_err:
 	return ret;
 }
 
-static int intel_fpga_fs_remove(struct platform_device *pdev)
+static void intel_fpga_fs_remove(struct platform_device *pdev)
 {
 	struct intel_freq_control_private *priv =
 		dev_get_drvdata(&pdev->dev);
 
-	intel_frequency_control_close(priv);
+	if (priv->intf_ops->shutdown_handler)
+		priv->intf_ops->shutdown_handler(priv->pll_dbg);
 
-	return 0;
+	intel_frequency_control_close(priv);
 }
 
 static const struct xtile_intf_ops zl_spi_data = {
@@ -189,6 +193,7 @@ static const struct xtile_intf_ops zl_spi_data = {
 	.clock_cleaner = intel_freq_control_zl30793,
 	.clock_check = spi_dev_check_zl30793_clock,
 	.reset_pll_state = reset_dpll_mode,
+	.shutdown_handler = zl30733_dbgfs_remove,
 };
 
 static const struct xtile_intf_ops zl_i2c_data = {

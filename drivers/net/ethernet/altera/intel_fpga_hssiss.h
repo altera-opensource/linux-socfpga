@@ -304,6 +304,10 @@ struct hssiss_private {
 #endif
 };
 
+int hssiss_enable_disable_loopback(struct platform_device *pdev, u32 cmdid,
+                                   void *data, bool atomic);
+int hssiss_hotplug_disable_status(struct platform_device *pdev);
+int hssiss_set_ethport_status(struct platform_device *pdev, int port, u32 data);
 int hssiss_execute_sal_cmd(struct platform_device *pdev,
 			   enum hssiss_salcmd cmd, void *data);
 int hssiss_execute_sal_cmd_atomic(struct platform_device *pdev,

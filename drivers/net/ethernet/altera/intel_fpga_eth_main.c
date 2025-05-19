@@ -1564,25 +1564,26 @@ static const struct net_device_ops intel_fpga_xtile_netdev_ops = {
 	.ndo_select_queue	= xtile_select_queue
 };
 
-static void intel_fpga_xtile_validate(struct phylink_config *config,
+static int intel_fpga_xtile_validate(struct phylink_pcs* pcs,
 				      unsigned long *supported,
-				      struct phylink_link_state *state)
+				      const struct phylink_link_state *state_validate)
 {
-	struct intel_fpga_xtile_eth_private *priv =
-		netdev_priv(to_net_dev(config->dev));
+	struct phylink_link_state *state = (struct phylink_link_state *)state_validate;
+        intel_fpga_xtile_eth_private *priv =
+                container_of(pcs, intel_fpga_xtile_eth_private, pcs);
 
 	__ETHTOOL_DECLARE_LINK_MODE_MASK(mac_supported) = { 0, };
 	__ETHTOOL_DECLARE_LINK_MODE_MASK(mask) = { 0, };
 
 	if (!priv)
-		return;
+		return -EINVAL;
 
 	if (state->interface != PHY_INTERFACE_MODE_NA &&
 	    state->interface != PHY_INTERFACE_MODE_10GKR &&
 	    state->interface != PHY_INTERFACE_MODE_10GBASER &&
 	    state->interface != PHY_INTERFACE_MODE_25GKR) {
 		bitmap_zero(supported, __ETHTOOL_LINK_MODE_MASK_NBITS);
-		return;
+		return 0;
 	}
 
 	if (priv->autoneg) {
@@ -1638,41 +1639,56 @@ static void intel_fpga_xtile_validate(struct phylink_config *config,
 		   __ETHTOOL_LINK_MODE_MASK_NBITS);
 	bitmap_and(state->advertising, state->advertising, mac_supported,
 		   __ETHTOOL_LINK_MODE_MASK_NBITS);
+
+	return 0;
 }
 
-static void intel_fpga_xtile_mac_pcs_get_state(struct phylink_config *config,
-					       struct phylink_link_state *state)
+static void intel_fpga_xtile_mac_pcs_get_state(struct phylink_pcs *pcs,
+                                               struct phylink_link_state *state)
 {
-	/* fixed speed for now */
-	struct intel_fpga_xtile_eth_private *priv =
-		netdev_priv(to_net_dev(config->dev));
+        /* fixed speed for now */
+        intel_fpga_xtile_eth_private *priv =
+                container_of(pcs, intel_fpga_xtile_eth_private, pcs);
 
-	if (!priv)
-		return;
+        if (!priv)
+                return;
 
-	state->speed = priv->link_speed;
-	state->duplex = DUPLEX_FULL;
-	state->link = 1;
+        state->speed = priv->link_speed;
+        state->duplex = DUPLEX_FULL;
+        state->link = 1;
 }
 
-static void intel_fpga_xtile_mac_an_restart(struct phylink_config *config)
+static void intel_fpga_xtile_mac_an_restart(struct phylink_pcs *config)
 {
 	/* Not Supported */
+}
+
+static struct phylink_pcs *intel_fpga_xtile_mac_select_pcs(struct phylink_config *config,
+                                                           phy_interface_t iface)
+{
+        intel_fpga_xtile_eth_private *priv =
+                netdev_priv(to_net_dev(config->dev));
+
+        if (!priv)
+                return NULL;
+
+        return &priv->pcs;
 }
 
 static void intel_fpga_xtile_get_pcs_fixed_state(struct phylink_config *config,
 						 struct phylink_link_state *state)
 {
-	struct intel_fpga_xtile_eth_private *priv =
-		netdev_priv(to_net_dev(config->dev));
+        intel_fpga_xtile_eth_private *priv =
+                netdev_priv(to_net_dev(config->dev));
 
-	if (!priv)
-		return;
+        if (!priv)
+                return;
 
-	state->speed = priv->link_speed;
-	state->duplex = DUPLEX_FULL;
-	if (priv->autoneg)
-		state->an_enabled = AUTONEG_DISABLE;
+        state->speed = priv->link_speed;
+        state->duplex = DUPLEX_FULL;
+        state->an_complete = AUTONEG_ENABLE;
+        if (priv->autoneg)
+                state->an_complete = AUTONEG_DISABLE;
 }
 
 static void intel_fpga_xtile_mac_config(struct phylink_config *config,
@@ -1705,10 +1721,14 @@ static void intel_fpga_xtile_mac_link_up(struct phylink_config *config,
 	phylink_mac_change(priv->phylink, true);
 }
 
+static const struct phylink_pcs_ops intel_fpga_xtile_pcs_ops = {
+        .pcs_get_state = intel_fpga_xtile_mac_pcs_get_state,
+        .pcs_an_restart = intel_fpga_xtile_mac_an_restart,
+	.pcs_validate = intel_fpga_xtile_validate,
+};
+
 static const struct phylink_mac_ops intel_fpga_xtile_phylink_ops = {
-	.validate = intel_fpga_xtile_validate,
-	.mac_pcs_get_state = intel_fpga_xtile_mac_pcs_get_state,
-	.mac_an_restart = intel_fpga_xtile_mac_an_restart,
+	.mac_select_pcs = intel_fpga_xtile_mac_select_pcs,
 	.mac_config = intel_fpga_xtile_mac_config,
 	.mac_link_down = intel_fpga_xtile_mac_link_down,
 	.mac_link_up = intel_fpga_xtile_mac_link_up,
@@ -1755,6 +1775,10 @@ static int intel_fpga_xtile_probe(struct platform_device *pdev)
 	priv->phylink_config.dev = &priv->dev->dev;
 	priv->phylink_config.type = PHYLINK_NETDEV;
 	priv->phylink_config.get_fixed_state = intel_fpga_xtile_get_pcs_fixed_state;
+
+        priv->pcs.ops = &intel_fpga_xtile_pcs_ops;
+        priv->pcs.neg_mode = true;
+        priv->pcs.poll = true;
 
 	op_ptr = of_device_get_match_data(&pdev->dev);
 
@@ -2064,6 +2088,11 @@ static int intel_fpga_xtile_probe(struct platform_device *pdev)
 		dev_info(&pdev->dev, "\tPTP Clock: %s\n", priv->ptp_priv->ptp_clock_ops.name);
 	}
 
+        __set_bit(PHY_INTERFACE_MODE_10GBASER,
+                  priv->phylink_config.supported_interfaces);
+        __set_bit(PHY_INTERFACE_MODE_25GBASER,
+                  priv->phylink_config.supported_interfaces);
+
 	/* create phylink */
 	priv->phylink = phylink_create(&priv->phylink_config, pdev->dev.fwnode,
 				       priv->phy_iface, &intel_fpga_xtile_phylink_ops);
@@ -2124,7 +2153,7 @@ err_free_netdev:
 }
 
 /* Remove MAC device */
-static int intel_fpga_xtile_remove(struct platform_device *pdev)
+static void intel_fpga_xtile_remove(struct platform_device *pdev)
 {
 	struct intel_fpga_xtile_eth_private *priv;
 	struct net_device *ndev;
@@ -2138,8 +2167,6 @@ static int intel_fpga_xtile_remove(struct platform_device *pdev)
 	platform_set_drvdata(pdev, NULL);
 	unregister_netdev(ndev);
 	free_netdev(ndev);
-
-	return 0;
 }
 
 static const struct altera_dmaops altera_dtype_prefetcher = {

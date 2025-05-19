@@ -268,7 +268,7 @@ int i2c_dev_check_zl30733_clock(struct intel_freq_control_private *priv)
 
 		if (((rdbuf[0] << 8) | rdbuf[1]) == ZL30733_ID_VALUE) {
 #ifdef CONFIG_DEBUG_FS
-			zl30733_dbgfs_init(i2c_cli);
+			priv->pll_dbg = zl30733_dbgfs_init(i2c_cli);
 #endif
 			priv->pll_lock_check_ctr = 0;
 			INIT_DELAYED_WORK(&priv->pll_lock_dwork, pll_lock_handler);
