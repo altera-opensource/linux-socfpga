@@ -267,7 +267,7 @@ int hssidrv_get_mtu(struct platform_device *pdev, u32 cmd,
 
 	ret = hssidrv_sal_execute(pdev, ctrl_addr, cmd_sts, &val, atomic);
 	if (ret == 0) {
-		data->max_tx_frame_size = val & GENMASK(31, 16) >> 16;
+		data->max_tx_frame_size = (val & GENMASK(31, 16)) >> 16;
 		data->max_rx_frame_size = val & GENMASK(15, 0);
 	}
 

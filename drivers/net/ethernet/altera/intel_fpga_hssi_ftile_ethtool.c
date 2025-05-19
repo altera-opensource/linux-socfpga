@@ -21,6 +21,7 @@
 #include "intel_fpga_eth_main.h"
 #include "intel_fpga_eth_ftile.h"
 #include "intel_fpga_eth_hssi_itf.h"
+#include "intel_fpga_ftile_driver.h"
 
 #define FTILE_STATS_LEN	ARRAY_SIZE(stat_gstrings)
 #define FTILE_NUM_REGS	555

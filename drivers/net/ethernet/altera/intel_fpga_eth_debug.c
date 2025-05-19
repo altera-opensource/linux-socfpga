@@ -417,7 +417,7 @@ static ssize_t eth_poll_monitoring_interval_store(struct device *dev,
 
 static DEVICE_ATTR(msgdma_reg_dump, 0644, msgdma_reg_dump_show, NULL);
 static DEVICE_ATTR(msgdma_tx_desc_dump, 0644, msgdma_tx_desc_dump_show, NULL);
-static DEVICE_ATTR(msgdma_tx_irq, 0644, msgdma_tx_irq_show, msgdma_tx_irq_store);
+static DEVICE_ATTR_RW(msgdma_tx_irq);
 static DEVICE_ATTR(link_state, 0644, link_state_show, NULL);
 static DEVICE_ATTR_RW(ui_interval);
 static DEVICE_ATTR(en_dis_sec_ip, 0644, NULL, en_dis_sec_ip_store);

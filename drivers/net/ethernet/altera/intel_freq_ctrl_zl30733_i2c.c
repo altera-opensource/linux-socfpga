@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: GPL
+// SPDX-License-Identifier: GPL-2.0
 /* Intel zarlink i2c driver
  * Copyright (C) 2023 Intel Corporation. All rights reserved
  *
@@ -178,9 +178,9 @@ void intel_freq_control_zl30733(struct work_struct *work)
 							  &data[i], 1);
 		}
 		pr_devel("%s:ZL30733  scaled ppm %lx  writing data %x-%x-%x-%x-%x-%x in work queue",
-			 __func__, scaled_ppm, data[0], data[1], data[2], data[3], data[4], data[5]);
+			 __func__, scaled_ppm, data[0], data[1], data[2],
+			 data[3], data[4], data[5]);
 	}
-	//(void)i2c_zl30733_write_byte_data(i2c_cli, ZL30733_REG_DPLL_DF_OFFSET_0_0, data, 6);
 }
 
 static int zl30733_dpll_nco_modeset(struct i2c_client *i2c_cli)
@@ -250,7 +250,6 @@ static void pll_lock_handler(struct work_struct *work)
 	}
 }
 
-
 int i2c_dev_check_zl30733_clock(struct intel_freq_control_private *priv)
 {
 	struct i2c_client *i2c_cli = NULL;
@@ -274,9 +273,7 @@ int i2c_dev_check_zl30733_clock(struct intel_freq_control_private *priv)
 			INIT_DELAYED_WORK(&priv->pll_lock_dwork, pll_lock_handler);
 			schedule_delayed_work(&priv->pll_lock_dwork,
 					      msecs_to_jiffies(1));
-
 		}
 	}
-
 	return ret;
 }

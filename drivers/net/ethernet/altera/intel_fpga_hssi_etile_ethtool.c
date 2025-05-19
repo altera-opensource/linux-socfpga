@@ -22,7 +22,7 @@
 
 #define ARRAY_LEN(arr) ((int)((int)sizeof(arr) / (int)sizeof(arr[0])))
 
-static char const stat_gstrings[][ETH_GSTRING_LEN] = {
+static const char stat_gstrings[][ETH_GSTRING_LEN] = {
 	"tx_packets",
 	"rx_packets",
 	"rx_crc_errors",
@@ -1370,8 +1370,7 @@ static int etile_get_link_ext_state(struct net_device *net_dev,
 	return 0;
 }
 
-static const struct ethtool_ops etile_ethtool_ops =
-{
+static const struct ethtool_ops etile_ethtool_ops = {
 	.get_drvinfo = etile_get_drvinfo,
 	.get_regs_len = etile_reglen,
 	.get_regs = etile_get_regs,

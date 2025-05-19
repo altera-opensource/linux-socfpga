@@ -9,6 +9,7 @@
 
 #include <linux/phylink.h>
 #include "intel_fpga_eth_etile.h"
+#include "intel_fpga_etile_driver.h"
 #include "intel_fpga_eth_hssi_itf.h"
 #include "intel_fpga_hssi_driver.h"
 #include <linux/interrupt.h>
@@ -39,7 +40,7 @@ bool etile_get_link_fault_status(intel_fpga_xtile_eth_private *priv)
 		etile_check_local_remote_fault_status(priv);
 }
 
-void etile_enable_mac(intel_fpga_xtile_eth_private *priv)
+static void etile_enable_mac(intel_fpga_xtile_eth_private *priv)
 {
 	struct platform_device *pdev = priv->pdev_hssi;
 	u32 chan = priv->tile_chan;
@@ -54,7 +55,7 @@ void etile_enable_mac(intel_fpga_xtile_eth_private *priv)
 		       ETH_RX_MAC_CRC_FORWARD);
 }
 
-void etile_disable_mac(intel_fpga_xtile_eth_private *priv)
+static void etile_disable_mac(intel_fpga_xtile_eth_private *priv)
 {
 	struct platform_device *pdev = priv->pdev_hssi;
 	u32 chan = priv->tile_chan;

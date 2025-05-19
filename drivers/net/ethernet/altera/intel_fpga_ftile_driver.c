@@ -11,6 +11,7 @@
 #include <linux/phylink.h>
 #include "intel_fpga_eth_ftile.h"
 #include "intel_fpga_eth_hssi_itf.h"
+#include "intel_fpga_ftile_driver.h"
 #include "intel_fpga_hssi_driver.h"
 #include <linux/interrupt.h>
 
@@ -108,7 +109,7 @@ int ftile_ehip_deassert_reset(intel_fpga_xtile_eth_private *priv)
 	return ftile_wait_reset_ack(pdev, chan, rst_ack_mask, maskval);
 }
 
-void ftile_enable_mac(intel_fpga_xtile_eth_private *priv)
+static void ftile_enable_mac(intel_fpga_xtile_eth_private *priv)
 {
 	struct platform_device *pdev = priv->pdev_hssi;
 	u32 chan = priv->tile_chan;
@@ -123,7 +124,7 @@ void ftile_enable_mac(intel_fpga_xtile_eth_private *priv)
 			  ETH_RX_MAC_CRC_FORWARD);
 }
 
-void ftile_disable_mac(intel_fpga_xtile_eth_private *priv)
+static void ftile_disable_mac(intel_fpga_xtile_eth_private *priv)
 {
 	struct platform_device *pdev = priv->pdev_hssi;
 	u32 chan = priv->tile_chan;
@@ -346,7 +347,7 @@ static u32 get_gb_33_66_occupancy(const u32 speed, const u32 rvld_lsb, const u32
 /* CAUTION: This function would be called in the context of link monitoring thread and
  * in case of the failure it would be handled by the link monitoring thread by
  * reiterating over until the condition passes. A while loop with a long operation
- * or delay should be avoided as it  might delay the overall operation performance 
+ * or delay should be avoided as it  might delay the overall operation performance
  * but a short loop with minimal delay should not cause any issue.
  */
 int ftile_check_counter_complete(intel_fpga_xtile_eth_private *priv, u32 regbank,
@@ -359,11 +360,11 @@ int ftile_check_counter_complete(intel_fpga_xtile_eth_private *priv, u32 regbank
 
 	if (set_bit) {
 		if (!hssi_bit_is_set_ba(pdev, regbank, chan,
-				       offs, bit_mask))
+					offs, bit_mask))
 			return -EINVAL;
 	} else {
 		if (!hssi_bit_is_clear_ba(pdev, regbank, chan,
-					 offs, bit_mask))
+					  offs, bit_mask))
 			return -EINVAL;
 	}
 
@@ -1247,27 +1248,6 @@ static int eth_ftile_tx_rx_user_flow(intel_fpga_xtile_eth_private *priv)
 	/* Step 12 RX PTP is up and running */
 
 	return 0;
-}
-
-void ftile_pma_digital_reset(intel_fpga_xtile_eth_private *priv,
-			     bool tx_reset,
-			     bool rx_reset)
-{
-	struct platform_device *pdev = priv->pdev_hssi;
-	u32 chan = priv->tile_chan;
-
-	/* Trigger RX digital reset
-	 * 1.   EHIP CSR Write, Offset = 0x310, value = 0x4
-	 * Trigger TX digital reset
-	 * 1.   EHIP CSR Write, Offset = 0x310, value = 0x2
-	 */
-	if (rx_reset)
-		hssi_csrwr32_ba(pdev, HSSI_ETH_RECONFIG,
-				chan, eth_soft_csroffs(eth_reset), ETH_SOFT_RX_RST);
-	if (tx_reset)
-
-		hssi_csrwr32_ba(pdev, HSSI_ETH_RECONFIG,
-				chan, eth_soft_csroffs(eth_reset), ETH_SOFT_TX_RST);
 }
 
 void ftile_get_stats64(struct net_device *dev,

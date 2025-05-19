@@ -478,7 +478,7 @@ static DEVICE_ATTR(zl30793_dpll_manual_freq_offset, 0644,
 		   zl30793_dpll_manual_freq_offset_show,
 		   zl30793_dpll_manual_freq_offset_store);
 
-static DEVICE_ATTR(zl30793_reg_dump, 0444, zl30793_reg_dump_show, NULL);
+static DEVICE_ATTR_RO(zl30793_reg_dump);
 
 static struct attribute *zl30793_sysfs_attrs[] = {
 	&dev_attr_zl30793_dpll_manual_freq_offset.attr,
