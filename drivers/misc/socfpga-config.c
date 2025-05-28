@@ -1568,6 +1568,35 @@ out:
 	return ret;
 }
 
+static ssize_t get_rng_store(struct device *dev,
+			      struct device_attribute *attr, const char *buf,
+			      size_t buf_size)
+{
+	struct fcs_cmd_context *const u_ctx = *(struct fcs_cmd_context **)buf;
+	struct fcs_cmd_context *k_ctx;
+	int ret = buf_size;
+
+	k_ctx = hal_get_fcs_cmd_ctx();
+	if (!k_ctx) {
+		pr_err("Failed to get context, context is in use\n");
+		ret = -EFAULT;
+		return ret;
+	}
+
+	if (copy_from_user(k_ctx, u_ctx, sizeof(struct fcs_cmd_context))) {
+		pr_err("Failed to copy context from user space\n");
+		ret = -EFAULT;
+		goto out;
+	}
+
+	ret = hal_random_number(k_ctx);
+	if (ret)
+		pr_err("Failed to get random number\n");
+out:
+	hal_release_fcs_cmd_ctx(k_ctx);
+	return ret;
+}
+
 static DEVICE_ATTR_WO(open_session);
 static DEVICE_ATTR_WO(close_session);
 static DEVICE_ATTR_WO(context_info);
@@ -1622,6 +1651,7 @@ static DEVICE_ATTR_WO(get_digest);
 static DEVICE_ATTR_WO(mac_verify_init);
 static DEVICE_ATTR_WO(mac_verify_update);
 static DEVICE_ATTR_WO(mac_verify_final);
+static DEVICE_ATTR_WO(get_rng);
 
 static struct attribute *fcs_config_attrs[] = {
 	&dev_attr_open_session.attr,
@@ -1678,6 +1708,7 @@ static struct attribute *fcs_config_attrs[] = {
 	&dev_attr_mac_verify_init.attr,
 	&dev_attr_mac_verify_update.attr,
 	&dev_attr_mac_verify_final.attr,
+	&dev_attr_get_rng.attr,
 	NULL
 };
 
@@ -1695,11 +1726,7 @@ struct kobject *sysfs_kobj;
 static int fcs_driver_probe(struct platform_device *pdev)
 {
 	int ret;
-
-	if (!hal_fcs_is_ready()) {
-		pr_err(" FCS HAL driver is not ready");
-		return -EPROBE_DEFER;
-	}
+	struct device *dev = &pdev->dev;
 
 	sysfs_kobj = kobject_create_and_add("fcs_sysfs", kernel_kobj);
 	if (!sysfs_kobj) {
@@ -1708,10 +1735,21 @@ static int fcs_driver_probe(struct platform_device *pdev)
 	}
 
 	ret = sysfs_create_groups(sysfs_kobj, fcs_groups);
-	if (ret)
-		sysfs_remove_groups(sysfs_kobj, fcs_groups);
+	if (ret) {
+		dev_err(dev, "Failed to create sysfs groups\n");
+		kobject_put(sysfs_kobj);
+		return ret;
+	}
 
-	pr_info("%s is successfully completed", __func__);
+	ret = hal_fcs_init(dev);
+	if (ret) {
+		dev_err(dev, "Failed to initialize FCS HAL\n");
+		sysfs_remove_groups(sysfs_kobj, fcs_groups);
+		kobject_put(sysfs_kobj);
+		return ret;
+	}
+
+	pr_info("FCS config probing successfully completed");
 
 	return ret;
 }
