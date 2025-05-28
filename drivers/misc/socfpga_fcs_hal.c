@@ -71,6 +71,8 @@
 
 #define FCS_MAX_RESP_MS			50
 
+static struct socfpga_fcs_priv *priv;
+
 FCS_HAL_INT hal_session_close(struct fcs_cmd_context *const k_ctx)
 {
 	FCS_HAL_INT ret = 0;
@@ -2695,8 +2697,9 @@ FCS_HAL_INT hal_ecdsa_hash_verify(struct fcs_cmd_context *const k_ctx)
 	k_ctx->ecdsa_hash_verify.dst_len = &hash_len;
 
 	ret = priv->plat_data->svc_send_request(
-		priv, FCS_DEV_CRYPTO_ECDSA_HASH_VERIFY_FINALIZE,
-		10 * FCS_REQUEST_TIMEOUT);
+						priv,
+						FCS_DEV_CRYPTO_ECDSA_HASH_VERIFY_FINALIZE,
+						10 * FCS_REQUEST_TIMEOUT);
 
 	if (ret) {
 		LOG_ERR("Failed to send the cmd=%d,ret=%d\n",
@@ -4283,6 +4286,10 @@ FCS_HAL_INT hal_fcs_init(FCS_HAL_DEV *dev)
 {
 	FCS_HAL_INT ret;
 
+	priv = devm_kzalloc(dev, sizeof(struct socfpga_fcs_priv), GFP_KERNEL);
+	if (!priv)
+		return -ENOMEM;
+
 	ret = fcs_plat_init(dev, priv);
 	if (ret) {
 		LOG_ERR("Failed to initialize platform data ret: %d\n", ret);
@@ -4297,4 +4304,5 @@ FCS_HAL_INT hal_fcs_init(FCS_HAL_DEV *dev)
 FCS_HAL_VOID hal_fcs_cleanup(void)
 {
 	fcs_plat_cleanup(priv);
+	priv = NULL;
 }

@@ -38,8 +38,6 @@ extern "C" {
 #define SDOS_ENCRYPTED_MIN_SZ	(SDOS_PLAINDATA_MIN_SZ + SDOS_HEADER_SZ + SDOS_HMAC_SZ)
 #define SDOS_ENCRYPTED_MAX_SZ	(SDOS_PLAINDATA_MAX_SZ + SDOS_HEADER_SZ + SDOS_HMAC_SZ)
 
-extern struct socfpga_fcs_priv *priv;
-
 #pragma pack(push, 1)
 struct fcs_cmd_context {
 	/* Error status variable address */
