@@ -178,6 +178,6 @@
 	status = "okay";
 };
 
-&fcs_hal {
+&fcs_config {
 	status = "disabled";
 };
