@@ -72,8 +72,8 @@
 				compatible = "intel,agilex-soc-fpga-mgr";
 			};
 
-			fcs_hal: fcs-hal {
-				compatible = "intel,agilex-soc-fcs-hal";
+			fcs_config: fcs-config {
+				compatible = "intel,agilex-soc-fcs-config";
 			};
 
 			fcs: fcs {
@@ -85,14 +85,6 @@
 			temp_volt: hwmon {
 				compatible = "intel,soc64-hwmon";
 			};
-		};
-
-		fcs_crypto: fcs-crypto {
-			compatible = "intel,agilex-soc-fcs-crypto";
-		};
-
-		fcs_config: fcs-config {
-			compatible = "intel,agilex-soc-fcs-config";
 		};
 	};
 
