@@ -350,7 +350,7 @@ static struct ptp_clock_info intel_fpga_tod_clock_ops = {
 };
 
 /* Register the PTP clock driver to kernel */
-static int intel_fpga_tod_register(struct intel_fpga_tod_private *priv,
+int intel_fpga_tod_register(struct intel_fpga_tod_private *priv,
 				   struct device *device)
 {
 	int ret = 0;
@@ -424,9 +424,10 @@ static int intel_fpga_tod_register(struct intel_fpga_tod_private *priv,
 err:
 	return ret;
 }
+EXPORT_SYMBOL(intel_fpga_tod_register);
 
 /* Remove/unregister the ptp clock driver from the kernel */
-static void intel_fpga_tod_unregister(struct platform_device *pdev)
+void intel_fpga_tod_unregister(struct platform_device *pdev)
 {
 	struct intel_fpga_tod_private *priv = dev_get_drvdata(&pdev->dev);
 
@@ -438,9 +439,10 @@ static void intel_fpga_tod_unregister(struct platform_device *pdev)
 	if (priv->tod_clk)
 		clk_disable_unprepare(priv->tod_clk);
 }
+EXPORT_SYMBOL(intel_fpga_tod_unregister);
 
 /* Common PTP probe function */
-static int intel_fpga_tod_probe(struct platform_device *pdev)
+int intel_fpga_tod_probe(struct platform_device *pdev)
 {
 	s32 pps_irq;
 	bool pps_support = false;
@@ -552,6 +554,7 @@ no_clock_cleaner:
 err:
 	return ret;
 }
+EXPORT_SYMBOL(intel_fpga_tod_probe);
 
 static const struct of_device_id intel_fpga_tod_ids[] = {
 		{.compatible = "intel, tod",},

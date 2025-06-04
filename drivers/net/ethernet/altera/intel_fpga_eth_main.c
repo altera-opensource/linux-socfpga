@@ -28,6 +28,7 @@
 #include "intel_fpga_eth_main.h"
 #include "intel_fpga_ftile_driver.h"
 #include "intel_fpga_etile_driver.h"
+#include "intel_fpga_gts_driver.h"
 #include "intel_fpga_eth_hssi_itf.h"
 #include "intel_fpga_eth_tile_ops.h"
 #include <linux/sched.h>
@@ -325,9 +326,11 @@ static int xtile_init_rx_buffer(struct intel_fpga_xtile_eth_private *priv,
 				struct altera_dma_buffer *rxbuffer,
 				int len)
 {
-	rxbuffer->skb = netdev_alloc_skb_ip_align(priv->dev, len);
-	if (!rxbuffer->skb)
-		return -ENOMEM;
+       rxbuffer->skb = netdev_alloc_skb(priv->dev, len);
+       skb_reserve(rxbuffer->skb, SKB_DMA_REALIGN);
+
+       if (!rxbuffer->skb)
+                return -ENOMEM;
 
 	rxbuffer->dma_addr = dma_map_single(priv->device,
 					    rxbuffer->skb->data,
@@ -342,8 +345,6 @@ static int xtile_init_rx_buffer(struct intel_fpga_xtile_eth_private *priv,
 		return -EINVAL;
 	}
 
-	/* align the address on 4 byte boundary */
-	rxbuffer->dma_addr &= (dma_addr_t)~3;
 	rxbuffer->len = len;
 
 	return 0;
@@ -360,7 +361,8 @@ static void xtile_free_rx_buffer(struct intel_fpga_xtile_eth_private *priv,
 			dma_unmap_single(priv->device, dma_addr,
 					 rxbuffer->len,
 					 DMA_FROM_DEVICE);
-		dev_kfree_skb_any(skb);
+		
+		dev_consume_skb_any(skb);
 		rxbuffer->skb = NULL;
 		rxbuffer->dma_addr = 0;
 	}
@@ -381,7 +383,7 @@ static void xtile_free_tx_buffer(struct intel_fpga_xtile_eth_private *priv,
 		buffer->dma_addr = 0;
 	}
 	if (buffer->skb) {
-		dev_kfree_skb_any(buffer->skb);
+		dev_consume_skb_any(buffer->skb);
 		buffer->skb = NULL;
 	}
 }
@@ -1101,6 +1103,9 @@ static int xtile_open(struct net_device *dev)
 
 	/* clear the MAC layer statistics to start afresh */
 	xtile_clear_mac_statistics(pdev, hssi_port);
+   
+   	/* we need to clear the dev stats so that the ifconfig on interface shouldn't show old data */
+        memset(&dev->stats, 0, sizeof(dev->stats));
 
 	for (queue = 0; queue < priv->num_channels; queue++) {
 		priv->spec_ops->dma_ops->quiese_pref(&priv->dma_info[queue].dma_priv);
@@ -1321,6 +1326,8 @@ static int xtile_start_xmit(struct sk_buff *skb, struct net_device *dev)
 		print_hex_dump(KERN_ERR, "data: ", DUMP_PREFIX_OFFSET,
 			       16, 1, skb->data, skb->len, true);
 	}
+
+	skb_reserve(skb, SKB_DMA_REALIGN);
 
 	/* Map the first skb fragment */
 	entry = priv->dma_info[queue].dma_priv.tx_prod % txsize;
@@ -1740,8 +1747,6 @@ static int intel_fpga_xtile_probe(struct platform_device *pdev)
 	int ret = -ENODEV;
 	struct device_node *np, *dmanp;
 	struct net_device *ndev;
-	//struct resource *rx_fifo;
-	//struct resource *tx_fifo;
 	struct device_node *dev_hssi;
 	u8 macaddr[ETH_ALEN];
 	struct fwnode_handle *fixed_node;
@@ -1752,7 +1757,9 @@ static int intel_fpga_xtile_probe(struct platform_device *pdev)
 	struct platform_device *pdev_tod;
 	char dma_nodename[6];
 	int queue = 0;
+	const char *if_name = NULL;
 	char irq_name[12];
+	struct set_mtu_data mtu;
 
 	np = pdev->dev.of_node;
 
@@ -1983,7 +1990,11 @@ static int intel_fpga_xtile_probe(struct platform_device *pdev)
 				 &priv->dev->max_mtu)) {
 		dev_warn(&pdev->dev, "Not able to get max-frame-size. Defaulting max_mtu to %d\n",
 			 priv->dev->max_mtu);
-	}
+	} else {
+                mtu.port = priv->hssi_port;
+                mtu.max_tx_frame_size = mtu.max_rx_frame_size = priv->dev->max_mtu;
+                hssiss_set_mtu(priv->pdev_hssi, SAL_SET_MTU, &mtu);
+        }
 
 	/* The DMA buffer size already accounts for an alignment bias
 	 * to avoid unaligned access exceptions for the NIOS processor,
@@ -2104,19 +2115,30 @@ static int intel_fpga_xtile_probe(struct platform_device *pdev)
 
 	priv->autoneg = true;
 
-	/* read the fixed link properties*/
-	fixed_node = fwnode_get_named_child_node(pdev->dev.fwnode, "fixed-link");
-	if (fixed_node) {
-		fwnode_property_read_u32(fixed_node, "speed", &priv->link_speed);
+       fixed_node = fwnode_get_named_child_node(pdev->dev.fwnode, "fixed-link");
+       if (fixed_node) {
+                fwnode_property_read_u32(fixed_node, "speed", &priv->link_speed);
+		/* read the fixed link properties*/
 		priv->duplex = DUPLEX_FULL;
 		priv->autoneg = false;
 
 		dev_info(&pdev->dev, "\tfixed link speed:%d full duplex:%d\n",
 			 priv->link_speed, priv->duplex);
+
+		fwnode_handle_put(fixed_node);
 	} else {
 		dev_err(&pdev->dev, "fixed link property undefined\n");
+		ret = -ENODEV;
 		goto err_free_netdev;
 	}
+
+        ret  = of_property_read_string(pdev->dev.of_node, "if_name",
+                                       &if_name);
+
+        if (if_name) {
+                memset(&ndev->name, 0, 16);
+                memcpy(ndev->name, if_name, strlen(if_name));
+        }
 
 	ret = register_netdev(ndev);
 	if (ret) {
@@ -2163,7 +2185,7 @@ static void intel_fpga_xtile_remove(struct platform_device *pdev)
 
 	/* perform the proper cleaning up */
 	xtile_shutdown(ndev);
-
+	kfree(priv->dma_info);
 	platform_set_drvdata(pdev, NULL);
 	unregister_netdev(ndev);
 	free_netdev(ndev);
@@ -2230,6 +2252,24 @@ static const struct xtile_spec_ops ftile_data = {
 	},
 };
 
+static const struct xtile_spec_ops gts_data = {
+        .dma_ops   = &altera_dtype_prefetcher,
+        .tile = {
+                .reset            = gts_ehip_reset,
+                .deassert_reset   = gts_ehip_deassert_reset,
+                .init             = gts_init,
+                .uninit           = gts_uninit,
+                .start            = gts_start,
+                .stop             = gts_stop,
+                .run_check        = gts_run_check,
+                .update_mac_addr  = gts_update_mac_addr,
+                .link_fault_status = gts_get_link_fault_status,
+                .reg_ethtool_ops  =
+                        intel_fpga_gts_set_ethtool_ops,
+                .check_dts_param = gts_check_dts_param,
+        },
+};
+
 static const struct of_device_id intel_fpga_xtile_ll_ids[] = {
 	{.compatible = "altr,hssi-etile-1.0",
 	 .data = &etile_data,
@@ -2237,7 +2277,9 @@ static const struct of_device_id intel_fpga_xtile_ll_ids[] = {
 	{.compatible = "altr,hssi-ftile-1.0",
 	 .data = &ftile_data,
 	},
-
+        {.compatible = "altr,msgdma-gts-1.0",
+         .data = &gts_data,
+        },
 };
 
 MODULE_DEVICE_TABLE(of, intel_fpga_xtile_ll_ids);

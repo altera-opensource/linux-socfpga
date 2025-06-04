@@ -1498,16 +1498,9 @@ static int altera_tse_probe(struct platform_device *pdev)
 
 	if (priv->ptp_enable) {
 		/* MAP PTP */
-		ret = intel_fpga_tod_probe(pdev, &priv->ptp_priv);
+		ret = intel_fpga_tod_probe(pdev);
 		if (ret) {
 			dev_err(&pdev->dev, "cannot map PTP\n");
-			goto err_init_phy;
-		}
-		ret = intel_fpga_tod_register(&priv->ptp_priv,
-					      priv->device);
-		if (ret) {
-			dev_err(&pdev->dev, "Failed to register PTP clock\n");
-			ret = -ENXIO;
 			goto err_init_phy;
 		}
 	}

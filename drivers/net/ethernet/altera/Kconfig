@@ -64,6 +64,16 @@ config INTEL_FPGA_HSSI_XTILE
 	  To compile this driver as a module, choose M here. The module
 	  will be called intel_fpga_hssi_xtile.
 
+config INTEL_FPGA_GTS_TILE
+        tristate "Intel FPGA HSSI based 10/25G GTS driver support"
+        select PTP_1588_CLOCK
+        select PHYLINK
+        help
+          This driver supports the Intel FPGA GTS Ethernet MAC.
+
+          To compile this driver as a module, choose M here. The module
+          will be called intel_fpga_hssi_xtile.
+
 config INTEL_FPGA_TOD
 	tristate "Intel FPGA ToD driver support"
 	help
@@ -71,6 +81,12 @@ config INTEL_FPGA_TOD
 
 	  To compile this driver as a module, choose M here. The module
 	  will be called intel_fpga_tod.
+
+config INTEL_FPGA_FREQ_CTRL
+        depends on INTEL_FPGA_TOD
+        tristate "Intel FPGA frequency control device specific driver calls"
+        help
+          This driver supports the Intel FPGA frequency steering
 
 endif
 

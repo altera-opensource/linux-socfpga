@@ -52,6 +52,8 @@
 /* Link Stability check */
 #define PRELOAD_LINK_STABILITY_COUNT 10
 
+#define SKB_DMA_REALIGN         ((PAGE_SIZE - NET_SKB_PAD) % SMP_CACHE_BYTES)
+
 enum {
 	ETH_LINK_STATE_RESET = 0,
 	ETH_LINK_STATE_START,

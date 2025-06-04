@@ -76,7 +76,7 @@ struct intel_fpga_tod_private {
 
 };
 
-int intel_fpga_tod_init(struct intel_fpga_tod_private *priv);
-void intel_fpga_tod_uinit(struct intel_fpga_tod_private *priv);
-
+int intel_fpga_tod_probe(struct platform_device *pdev);
+void intel_fpga_tod_unregister(struct platform_device *pdev);
+int intel_fpga_tod_register(struct intel_fpga_tod_private *priv, struct device *device);
 #endif /* __INTEL_FPGA_TOD_H__ */

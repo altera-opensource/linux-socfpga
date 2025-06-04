@@ -15,10 +15,11 @@
 #include <linux/of_platform.h>
 #include <linux/platform_device.h>
 #include "intel_freq_control.h"
-#include "intel_freq_ctrl_common_spi.h"
-#include "intel_freq_ctrl_zl30793_spi.h"
-#include "intel_freq_ctrl_zl30733_i2c.h"
-#include "intel_freq_ctrl_common_i2c.h"
+#include "dpll/intel_freq_ctrl_common_spi.h"
+#include "dpll/intel_freq_ctrl_zl30793_spi.h"
+#include "dpll/intel_freq_ctrl_zl30733_i2c.h"
+#include "dpll/intel_freq_ctrl_common_i2c.h"
+#include "dpll/intel_freq_ctrl_zl30733_debugfs.h"
 
 struct platform_device;
 
