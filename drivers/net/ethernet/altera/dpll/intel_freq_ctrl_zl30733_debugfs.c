@@ -14,9 +14,9 @@
 #include <linux/i2c.h>
 #include <linux/kernel.h>
 #include <linux/debugfs.h>
-#include "intel_freq_control.h"
+#include "../intel_freq_control.h"
 #include "intel_freq_ctrl_zl30733_i2c.h"
-#include "intel_freq_control_zl30733_debugfs.h"
+#include "intel_freq_ctrl_zl30733_debugfs.h"
 
 /* Register Map Page 0, General */
 u16 zl30733_reg_page_0[] = {

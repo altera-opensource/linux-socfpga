@@ -8,7 +8,7 @@
 #define HAVE_INTEL_FREQ_CONTROL_ZL30793_SPI_H
 
 #include <linux/of_platform.h>
-#include "intel_freq_control_zl30793.h"
+#include "intel_freq_ctrl_zl30793.h"
 
 /* bit 15:8  :0x0001 bit  7:0  :0x0002 */
 #define ZL30793_PAGE0_REG_GENERAL_ID_0          0x0001
@@ -51,5 +51,4 @@
 void intel_freq_control_zl30793(struct work_struct *work);
 int spi_dev_check_zl30793_clock(struct intel_freq_control_private *priv);
 int reset_dpll_mode(struct intel_freq_control_private *priv);
-void zl30733_dbgfs_remove(struct zarlink_pll_dbg *d);
 #endif

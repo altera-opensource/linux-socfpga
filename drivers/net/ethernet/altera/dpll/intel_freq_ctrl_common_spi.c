@@ -7,7 +7,7 @@
  *
  */
 
-#include "intel_freq_control.h"
+#include "../intel_freq_control.h"
 #include "intel_freq_ctrl_common_spi.h"
 
 static int spi_dev_check(struct device *dev, void *data)
@@ -30,7 +30,7 @@ static int spi_dev_check(struct device *dev, void *data)
 	}
 
 	if ((clockcleaner_info->bus_num != spi->controller->bus_num) ||
-	    (clockcleaner_info->chip_select != spi->chip_select)) {
+	    (clockcleaner_info->chip_select != spi_get_chipselect(spi, 0))) {
 		ret = INTEL_FPGA_SPI_ERROR;
 		goto spi_client_ret;
 	}

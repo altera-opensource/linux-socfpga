@@ -1,5 +1,5 @@
-/* SPDX-License-Identifier: GPL */
-/* Copyright (C) 2023 Intel Corporation. All rights reserved.
+// SPDX-License-Identifier: GPL
+ /* Copyright (C) 2023 Intel Corporation. All rights reserved.
  *
  * Author(s):
  */
@@ -11,7 +11,6 @@
 #include <linux/i2c.h>
 
 struct clock_cleaner;
-int determine_i2c_client(struct clock_cleaner *clockcleaner_info);
+int determine_i2c_client(struct clock_cleaner *);
 
 #endif
-

@@ -6,8 +6,8 @@
  *
  */
 
-#include "intel_freq_control.h"
-#include "intel_freq_control_zl30793.h"
+#include "../intel_freq_control.h"
+#include "intel_freq_ctrl_zl30793.h"
 #include "intel_freq_ctrl_zl30793_spi.h"
 #include "intel_freq_ctrl_common_spi.h"
 
