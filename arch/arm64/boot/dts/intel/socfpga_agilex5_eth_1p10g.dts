@@ -1,0 +1,7 @@
+// SPDX-License-Identifier:     GPL-2.0
+/*
+ * Copyright (C) 2024 Intel Corporation
+ */
+#include "socfpga_agilex5_socdk.dts"
+#include "socfpga_agilex5_eth_1p10g.dtsi"
+
