@@ -18,6 +18,7 @@ enum hssiss_salcmd {
 	SAL_SET_HSSI_PROFILE,
 	SAL_READ_MAC_STAT,
 	SAL_GET_MTU,
+	SAL_SET_MTU,
 	SAL_SET_CSR,
 	SAL_GET_CSR,
 	SAL_ENABLE_LOOPBACK,
@@ -33,6 +34,8 @@ enum hssiss_mac_stat_counter_type {
 	MACSTAT_RX_PACKETS,
 	MACSTAT_RX_CRC_ERRORS,
 	MACSTAT_RX_ALIGN_ERRORS,
+	MACSTAT_TX_CRC_ERRORS,
+	MACSTAT_TX_ALIGN_ERRORS,
 	MACSTAT_TX_BYTES,
 	MACSTAT_RX_BYTES,
 	MACSTAT_TX_PAUSE,
@@ -46,11 +49,25 @@ enum hssiss_mac_stat_counter_type {
 	MACSTAT_TX_UNICAST,
 	MACSTAT_TX_MULTICAST,
 	MACSTAT_TX_BROADCAST,
+	MACSTAT_TX_ETHER_DROPS,
 	MACSTAT_ETHER_DROPS,
 	MACSTAT_RX_TOTAL_BYTES,
+	MACSTAT_TX_TOTAL_BYTES,
 	MACSTAT_RX_TOTAL_PACKETS,
+	MACSTAT_TX_TOTAL_PACKETS,
 	MACSTAT_RX_UNDERSIZE,
+        MACSTAT_TX_UNDERSIZE,
 	MACSTAT_RX_OVERSIZE,
+        MACSTAT_TX_OVERSIZE,
+	MACSTAT_TX_64_BYTES,
+	MACSTAT_TX_65_127_BYTES,
+	MACSTAT_TX_128_255_BYTES,
+	MACSTAT_TX_256_511_BYTES,
+	MACSTAT_TX_512_1023_BYTES,
+	MACSTAT_TX_1024_1518_BYTES,
+	MACSTAT_TX_GTE_1519_BYTES,
+	MACSTAT_TX_JABBERS,
+	MACSTAT_TX_RUNTS,
 	MACSTAT_RX_64_BYTES,
 	MACSTAT_RX_65_127_BYTES,
 	MACSTAT_RX_128_255_BYTES,
@@ -60,6 +77,24 @@ enum hssiss_mac_stat_counter_type {
 	MACSTAT_RX_GTE_1519_BYTES,
 	MACSTAT_RX_JABBERS,
 	MACSTAT_RX_RUNTS,
+	MACSTAT_TX_SOP_COUNT,
+	MACSTAT_RX_SOP_COUNT,
+};
+
+enum hssiss_loopback_type {
+	FAREND_PAR_PCS_LOOPBACK,
+	NEAREND_PAR_PCS_LOOPBACK,
+	NEAREND_MAC_LOOPBACK,
+	NEAREND_XCVRIF_LOOPBACK,
+	FAREND_PAR_PMA_LOOPBACK,
+	NEAREND_SER_PMA_LOOPBACK,
+	NEAREND_PAR_PMA_LOOPBACK,
+	NEAREND_FEC_LOOPBACK,
+};
+
+struct set_loopback_data {
+	enum hssiss_loopback_type type;
+	int port;
 };
 
 struct hssiss_salcmd_to_name {
@@ -159,12 +194,6 @@ typedef union eth_port_attr {
 	u32 full;
 } hssi_eth_port_attr;
 
-enum hssiss_hip_type {
-	HSSISS_ETILE = 1,
-	HSSISS_FTILE = 2,
-	HSSISS_TILE_INDEPENDENT = 3,
-};
-
 enum hssi_port_profile {
 	HSSI_PORT_PROFILE_10GBE = 20,
 	HSSI_PORT_PROFILE_25GBE,
@@ -181,6 +210,9 @@ enum hssi_port_profile {
 	HSSI_PORT_PROFILE_400GAUI_8,
 };
 
+/* CAUTION: Do not change the order of the enum, maintaining the order is
+ * important for backward compatibility
+ */
 enum hssiss_tile_regbank {
 	HSSI_ETH_RECONFIG,
 	HSSI_RSFEC,
@@ -188,6 +220,16 @@ enum hssiss_tile_regbank {
 	HSSI_PHY_XCVR_PMAAVMM,
 	HSSI_SOFTIP,
 	HSSI_PTP_PACKET_CLASSIFIER,
+	HSSI_ANLT,
+	HSSI_DRCTRL,
+	HSSI_BASE_SOFTIP,
+	HSSI_PTP_SOFTIP,
+	HSSI_EMAC_HARDIP,
+	HSSI_PTP_HARDIP,
+	HSSI_PCS_FEC_HARDIP,
+	HSSI_XCVR_PMA_HARDIP,
+	HSSI_PMA_HARDIP,
+	USERSPACE_CSR,
 	HSSI_RSVD,
 };
 
@@ -206,6 +248,12 @@ struct get_mtu_data {
 	unsigned int port;
 	u16 max_tx_frame_size;
 	u16 max_rx_frame_size;
+};
+
+struct set_mtu_data {
+        unsigned int port;
+        u16 max_tx_frame_size;
+        u16 max_rx_frame_size;
 };
 
 union hssiss_feature_list {
@@ -268,6 +316,11 @@ struct hssiss_csr_v5_only {
 
 #define feature_offs(x) (offsetof(struct hssiss_csr_v5_only, x))
 
+enum access_type {
+	BYTE_ACCESS,
+	WORD_ACCESS
+};
+
 struct cold_reset_register {
 	u32 ofs;
 	u32 rst_bit;
@@ -284,6 +337,8 @@ struct hssiss_private {
 
 	/* HSSI SS CSR address space */
 	void __iomem *sscsr;
+	/* Transceiver specific address space if any */
+	void __iomem *usrcsr;
 
 	struct hssi_spec_ops *spec_ops;
 	/* private data */
@@ -302,12 +357,9 @@ struct hssiss_private {
 #ifdef CONFIG_DEBUG_FS
 	struct hssiss_dbg *dbgfs;
 #endif
+	void *dev_specific;
 };
 
-int hssiss_enable_disable_loopback(struct platform_device *pdev, u32 cmdid,
-                                   void *data, bool atomic);
-int hssiss_hotplug_disable_status(struct platform_device *pdev);
-int hssiss_set_ethport_status(struct platform_device *pdev, int port, u32 data);
 int hssiss_execute_sal_cmd(struct platform_device *pdev,
 			   enum hssiss_salcmd cmd, void *data);
 int hssiss_execute_sal_cmd_atomic(struct platform_device *pdev,
@@ -320,7 +372,13 @@ enum hssiss_hip_type hssiss_get_hip_type(struct platform_device *pdev);
 hssi_eth_port_sts get_ethport_status(struct platform_device *pdev, int port);
 int set_ethport_status(struct platform_device *pdev, int port, u32 data);
 int hssiss_cold_rst(struct platform_device *pdev);
-
+int hssiss_lock_stats(struct platform_device *pdev, int port);
+int hssiss_unlock_stats(struct platform_device *pdev, int port);
+void hssiss_reset_port(struct platform_device *pdev, int port);
+int hssiss_set_mtu(struct platform_device *pdev, u32 cmd, void* mtu_data);
+int hssiss_set_ethport_status(struct platform_device *pdev, int port, u32 data);
+int hssiss_hotplug_disable_status(struct platform_device *pdev);
+int hssiss_enable_disable_loopback(struct platform_device *pdev, u32 cmdid,void *data);
 #ifdef CONFIG_DEBUG_FS
 struct hssiss_dbg *hssiss_dbgfs_init(struct platform_device *pdev);
 void hssiss_dbgfs_remove(struct hssiss_dbg *d);

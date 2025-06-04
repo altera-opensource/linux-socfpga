@@ -14,11 +14,6 @@
 
 #include "intel_fpga_hssiss.h"
 
-enum access_type {
-	BYTE_ACCESS,
-	WORD_ACCESS
-};
-
 #define INTEL_FPGA_RET_SUCCESS 0
 
 u32  hssi_csrrd32(struct platform_device *pdev,
@@ -66,9 +61,11 @@ void hssi_reset_mac_stats(struct platform_device *pdev,
 			  bool rx_rst);
 
 int hssi_en_serial_loopback(struct platform_device *pdev,
+			    enum hssiss_loopback_type type,
 			    u32 port);
 
 int hssi_dis_serial_loopback(struct platform_device *pdev,
+			     enum hssiss_loopback_type type,
 			     u32 port);
 
 bool hssi_ethport_is_stable(struct platform_device *pdev,
@@ -133,4 +130,10 @@ bool hssi_bit_is_clear(struct platform_device *pdev,
 		       u32 chan,
 		       u32 offset,
 		       u32 bit_mask);
+
+int hssi_lock_mac_stats(struct platform_device *pdev, u32 port);
+int hssi_unlock_mac_stats(struct platform_device *pdev, u32 port);
+void hssi_reset_port(struct platform_device *pdev, u32 port);
+int hssi_set_mtu(struct platform_device *pdev, u32 cmd, void* mtu_data);
+int hssi_get_mtu(struct platform_device *pdev, u32 cmd, void* mtu_data);
 #endif

@@ -321,9 +321,9 @@ static u64  hssi_read_mac_stats(struct platform_device *pdev,
 						  };
 	int ret_status;
 
-		ret_status = hssiss_execute_sal_cmd(pdev,
-						    SAL_READ_MAC_STAT,
-						    (void *)&mac_stat_data);
+	ret_status = hssiss_execute_sal_cmd(pdev,
+					    SAL_READ_MAC_STAT,
+					    (void *)&mac_stat_data);
 
 	if (ret_status != INTEL_FPGA_RET_SUCCESS) {
 		dev_err(&pdev->dev,
@@ -340,13 +340,34 @@ u64 hssi_read_mac_stats64(struct platform_device *pdev, u32 port,
 		     hssi_read_mac_stats(pdev, port, stat_type, true);
 }
 
-int hssi_en_serial_loopback(struct platform_device *pdev, u32 port)
+int hssi_lock_mac_stats(struct platform_device *pdev, u32 port)
+{
+	return hssiss_lock_stats(pdev, port);
+}
+
+int hssi_set_mtu(struct platform_device *pdev, u32 cmd, void* mtu_data)
+{
+	return hssiss_set_mtu(pdev, cmd, mtu_data);
+}
+
+int hssi_unlock_mac_stats(struct platform_device *pdev, u32 port)
+{
+        return hssiss_unlock_stats(pdev, port);
+}
+
+int hssi_en_serial_loopback(struct platform_device *pdev,
+			    enum hssiss_loopback_type type,
+			    u32 port)
 {
 	int ret_status;
+	struct set_loopback_data data;
+
+	data.type = type;
+	data.port = port;
 
 	ret_status = hssiss_execute_sal_cmd(pdev,
 					    SAL_ENABLE_LOOPBACK,
-					    (void *)&port);
+					    (void *)&data);
 
 	if (ret_status != INTEL_FPGA_RET_SUCCESS) {
 		dev_err(&pdev->dev,
@@ -356,13 +377,18 @@ int hssi_en_serial_loopback(struct platform_device *pdev, u32 port)
 	return ret_status;
 }
 
-int hssi_dis_serial_loopback(struct platform_device *pdev, u32 port)
+int hssi_dis_serial_loopback(struct platform_device *pdev, enum hssiss_loopback_type type,
+			     u32 port)
 {
 	int ret_status;
+	struct set_loopback_data data;
+
+	data.type = type;
+	data.port = port;
 
 	ret_status = hssiss_execute_sal_cmd(pdev,
 					    SAL_DISABLE_LOOPBACK,
-					    (void *)&port);
+					    (void *)&data);
 
 	if (ret_status != INTEL_FPGA_RET_SUCCESS) {
 		dev_err(&pdev->dev,
@@ -415,4 +441,9 @@ bool hssi_ethport_is_stable(struct platform_device *pdev, u32 port, bool logging
 		pstatus.part.tx_pll_locked);
 res:
 	return retstatus;
+}
+
+void hssi_reset_port(struct platform_device *pdev, u32 port)
+{
+	hssiss_reset_port(pdev, port);
 }

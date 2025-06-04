@@ -23,7 +23,7 @@ static u32 ftile_addrmap[] = {
 	0x0200000, 0, 0x0300000, 0, 0, 0x0261000, 0};
 
 static int read_poll_timeout(void __iomem *base,
-			     unsigned int csr_addroff, u32 offs, u32 sel, bool atomic)
+			     unsigned int csr_addroff, u32 offs, u32 sel)
 {
 	u32 val;
 	unsigned long timeout, start;
@@ -31,10 +31,7 @@ static int read_poll_timeout(void __iomem *base,
 	start = jiffies;
 	timeout = start + usecs_to_jiffies(FW_ACK_POLL_TIMEOUT_US);
 	do {
-		if (atomic)
-			udelay(2 * FW_ACK_POLL_INTERVAL_US);
-		else
-			usleep_range(FW_ACK_POLL_INTERVAL_US, 2 * FW_ACK_POLL_INTERVAL_US);
+		usleep_range(FW_ACK_POLL_INTERVAL_US, 2 * FW_ACK_POLL_INTERVAL_US);
 		val = csrrd32_withoffset(base, csr_addroff, offs);
 		if ((val & sel) == sel)
 			return val;
@@ -45,7 +42,7 @@ static int read_poll_timeout(void __iomem *base,
 }
 
 static int hssidrv_mailbox_reg_set(void __iomem *base,
-				   unsigned int csr_addroff, u32 offs, u32 setval, bool atomic)
+				   unsigned int csr_addroff, u32 offs, u32 setval)
 {
 	u32 val;
 	unsigned long timeout, start;
@@ -54,10 +51,7 @@ static int hssidrv_mailbox_reg_set(void __iomem *base,
 	timeout = start + usecs_to_jiffies(FW_ACK_POLL_TIMEOUT_US);
 	csrwr32_withoffset(setval, base, csr_addroff, offs);
 	do {
-		if (atomic)
-			udelay(2 * FW_ACK_POLL_INTERVAL_US);
-		else
-			usleep_range(FW_ACK_POLL_INTERVAL_US, 2 * FW_ACK_POLL_INTERVAL_US);
+		usleep_range(FW_ACK_POLL_INTERVAL_US, 2 * FW_ACK_POLL_INTERVAL_US);
 
 		val = csrrd32_withoffset(base, csr_addroff, offs);
 		if (val == setval)
@@ -68,21 +62,18 @@ static int hssidrv_mailbox_reg_set(void __iomem *base,
 }
 
 static int hssidrv_sal_execute(struct platform_device *pdev, u32 ctrl_addr,
-			       u32 cmd_sts, u32 *val, bool atomic)
+			       u32 cmd_sts, u32 *val)
 {
 	int ret;
 	struct hssiss_private *priv = platform_get_drvdata(pdev);
 	unsigned int csr_addroff = priv->csr_addroff;
 	void __iomem *base = priv->sscsr;
 
-	if (atomic)
-		spin_lock(&priv->sal_spinlock);
-	else
-		mutex_lock(&priv->sal_mutex);
+	mutex_lock(&priv->sal_mutex);
 
 	if ((cmd_sts & HSSI_SAL_CMDSTS_WR) && val) {
 		ret = hssidrv_mailbox_reg_set(base, csr_addroff,
-					      HSSISS_CSR_WR_DATA, *val, atomic);
+					      HSSISS_CSR_WR_DATA, *val);
 		if (ret < 0)
 			goto unlock;
 	}
@@ -90,7 +81,7 @@ static int hssidrv_sal_execute(struct platform_device *pdev, u32 ctrl_addr,
 	csrwr32_withoffset(ctrl_addr, base, csr_addroff, HSSISS_CSR_CTRLADDR);
 	csrwr32_withoffset(cmd_sts, base, csr_addroff, HSSISS_CSR_CMDSTS);
 	ret = read_poll_timeout(base, csr_addroff,
-				HSSISS_CSR_CMDSTS, HSSI_SAL_CMDSTS_ACK, atomic);
+				HSSISS_CSR_CMDSTS, HSSI_SAL_CMDSTS_ACK);
 
 	/* WA: f-tile loopback enable sets the error bit */
 	/* Ignore for now if both ack and error set.     */
@@ -118,21 +109,23 @@ static int hssidrv_sal_execute(struct platform_device *pdev, u32 ctrl_addr,
 	}
 
 unlock:
-	if (atomic)
-		spin_unlock(&priv->sal_spinlock);
-	else
-		mutex_unlock(&priv->sal_mutex);
+	mutex_unlock(&priv->sal_mutex);
 
 	return ret;
 }
 
 int hssidrv_enable_disable_loopback(struct platform_device *pdev, u32 cmdid,
-				    void *data, bool atomic)
+				    void *data)
 {
 	struct hssiss_private *priv = platform_get_drvdata(pdev);
-	unsigned int port = (*(unsigned int *)data);
+	unsigned int port = ((struct set_loopback_data *)data)->port;
 	u32 ctrl_addr = 0;
 	u32 cmd_sts = 0;
+
+	if (((struct set_loopback_data *)data)->type != NEAREND_SER_PMA_LOOPBACK) {
+		dev_err(&pdev->dev,
+			"Only supported loopback type is PMA SERIAL LOOPBACK defaulting to it");
+	}
 
 	if (!test_reg_bits(priv->feature_list.part.port_enable_mask, port, 1))
 		return -EIO;
@@ -141,7 +134,7 @@ int hssidrv_enable_disable_loopback(struct platform_device *pdev, u32 cmdid,
 	ctrl_addr |= port << HSSI_SAL_CTRLADDR_PORT_SHIFT;
 	cmd_sts |= HSSI_SAL_CMDSTS_WR;
 
-	return hssidrv_sal_execute(pdev, ctrl_addr, cmd_sts, NULL, atomic);
+	return hssidrv_sal_execute(pdev, ctrl_addr, cmd_sts, NULL);
 }
 
 /* Calculate ctrl address field for get/set csr */
@@ -154,7 +147,7 @@ static u32 hssidrv_make_get_set_csr_addr(u32 base, u32 offs, bool word)
 }
 
 int hssidrv_get_set_csr(struct platform_device *pdev, u32 cmd, void *csr_data,
-			bool rd, bool atomic)
+			bool rd)
 {
 	u32 ctrl_addr = 0;
 	u32 cmd_sts = 0;
@@ -180,12 +173,12 @@ int hssidrv_get_set_csr(struct platform_device *pdev, u32 cmd, void *csr_data,
 
 	cmd_sts |= rd ? HSSI_SAL_CMDSTS_RD : HSSI_SAL_CMDSTS_WR;
 
-	ret = hssidrv_sal_execute(pdev, ctrl_addr, cmd_sts, &data->data, atomic);
+	ret = hssidrv_sal_execute(pdev, ctrl_addr, cmd_sts, &data->data);
 
 	return ret;
 }
 
-int hssidrv_test_nios(struct platform_device *pdev, u32 cmd, bool atomic)
+int hssidrv_test_nios(struct platform_device *pdev, u32 cmd)
 {
 	u32 ctrl_addr = 0;
 	u32 cmd_sts = 0;
@@ -195,11 +188,11 @@ int hssidrv_test_nios(struct platform_device *pdev, u32 cmd, bool atomic)
 
 	dev_info(&pdev->dev, "ctrl_addr: %x, cmd_sts: %x\n", ctrl_addr, cmd_sts);
 
-	return hssidrv_sal_execute(pdev, ctrl_addr, cmd_sts, NULL, atomic);
+	return hssidrv_sal_execute(pdev, ctrl_addr, cmd_sts, NULL);
 }
 
 int hssidrv_get_set_dr_profile(struct platform_device *pdev, u32 cmd, void *dr_data,
-			       bool rd, bool atomic)
+			       bool rd)
 {
 	int ret;
 	u32 ctrl_addr = 0;
@@ -218,9 +211,9 @@ int hssidrv_get_set_dr_profile(struct platform_device *pdev, u32 cmd, void *dr_d
 		val |= (data->dr_grp << DR_GRP_INDEX) & HSSI_DR_GRP_MASK;
 	}
 
-	ret = hssidrv_sal_execute(pdev, ctrl_addr, cmd_sts, &val, atomic);
+	ret = hssidrv_sal_execute(pdev, ctrl_addr, cmd_sts, &val);
 
-	if (rd && (ret == 0)) {
+	if (rd && !ret) {
 		data->dr_grp = (val & HSSI_DR_GRP_MASK) >> DR_GRP_INDEX;
 		data->profile = val & HSSI_DR_PROFILE_MASK;
 	}
@@ -229,7 +222,7 @@ int hssidrv_get_set_dr_profile(struct platform_device *pdev, u32 cmd, void *dr_d
 }
 
 int hssidrv_reset_mac_stat(struct platform_device *pdev, u32 cmd,
-			   void *priv_data, bool atomic)
+			   void *priv_data)
 {
 	int ret;
 	u32 ctrl_addr = 0;
@@ -247,13 +240,13 @@ int hssidrv_reset_mac_stat(struct platform_device *pdev, u32 cmd,
 	ctrl_addr |= cmd;
 	cmd_sts |= HSSI_SAL_CMDSTS_WR;
 
-	ret = hssidrv_sal_execute(pdev, ctrl_addr, cmd_sts, NULL, atomic);
+	ret = hssidrv_sal_execute(pdev, ctrl_addr, cmd_sts, NULL);
 
 	return ret;
 }
 
 int hssidrv_get_mtu(struct platform_device *pdev, u32 cmd,
-		    void *priv_data, bool atomic)
+		    void *priv_data)
 {
 	int ret;
 	u32 ctrl_addr = 0;
@@ -265,7 +258,7 @@ int hssidrv_get_mtu(struct platform_device *pdev, u32 cmd,
 	ctrl_addr |= cmd;
 	cmd_sts |= HSSI_SAL_CMDSTS_RD;
 
-	ret = hssidrv_sal_execute(pdev, ctrl_addr, cmd_sts, &val, atomic);
+	ret = hssidrv_sal_execute(pdev, ctrl_addr, cmd_sts, &val);
 	if (ret == 0) {
 		data->max_tx_frame_size = (val & GENMASK(31, 16)) >> 16;
 		data->max_rx_frame_size = val & GENMASK(15, 0);
@@ -275,7 +268,7 @@ int hssidrv_get_mtu(struct platform_device *pdev, u32 cmd,
 }
 
 int hssidrv_read_mac_stat(struct platform_device *pdev, u32 cmd,
-			  void *priv_data, bool atomic)
+			  void *priv_data)
 {
 	int ret;
 	u32 ctrl_addr = 0;
@@ -289,13 +282,13 @@ int hssidrv_read_mac_stat(struct platform_device *pdev, u32 cmd,
 	ctrl_addr |= data->lsb << HSSI_SAL_CTRLADDR_LSB_SHIFT;
 	cmd_sts |= HSSI_SAL_CMDSTS_RD;
 
-	ret = hssidrv_sal_execute(pdev, ctrl_addr, cmd_sts, &data->port_data, atomic);
+	ret = hssidrv_sal_execute(pdev, ctrl_addr, cmd_sts, &data->port_data);
 
 	return ret;
 }
 
 int hssidrv_ncsi_link_status(struct platform_device *pdev, u32 cmd,
-			     void *priv_data, bool atomic)
+			     void *priv_data)
 {
 	int ret;
 	u32 ctrl_addr = 0;
@@ -307,13 +300,13 @@ int hssidrv_ncsi_link_status(struct platform_device *pdev, u32 cmd,
 	ctrl_addr |= cmd;
 	cmd_sts |= HSSI_SAL_CMDSTS_RD;
 
-	ret = hssidrv_sal_execute(pdev, ctrl_addr, cmd_sts, &data->full, atomic);
+	ret = hssidrv_sal_execute(pdev, ctrl_addr, cmd_sts, &data->full);
 
 	return ret;
 }
 
 int hssidrv_get_fw_version(struct platform_device *pdev, u32 cmd,
-			   void *priv_data, bool atomic)
+			   void *priv_data)
 {
 	int ret;
 	u32 ctrl_addr = 0;
@@ -323,7 +316,7 @@ int hssidrv_get_fw_version(struct platform_device *pdev, u32 cmd,
 	ctrl_addr |= cmd;
 	cmd_sts |= HSSI_SAL_CMDSTS_RD;
 
-	ret = hssidrv_sal_execute(pdev, ctrl_addr, cmd_sts, data, atomic);
+	ret = hssidrv_sal_execute(pdev, ctrl_addr, cmd_sts, data);
 
 	return ret;
 }
@@ -440,7 +433,7 @@ int hssidrv_cold_rst(struct platform_device *pdev)
 			   base, csr_addroff, cold_rst->ofs);
 
 	read_poll_timeout(base, csr_addroff,
-			  cold_rst->ofs, (1 << cold_rst->rst_ack), false);
+			  cold_rst->ofs, (1 << cold_rst->rst_ack));
 	atomic_set(&priv->coldrst_inprogress, 0);
 	mutex_unlock(&priv->coldrst_mutex);
 
@@ -471,7 +464,7 @@ static unsigned int get_csr_addroff(void __iomem *base,
 	}
 }
 
-void hssidrv_probe_init(struct platform_device *pdev)
+int hssidrv_probe_init(struct platform_device *pdev)
 {
 	struct hssiss_private *priv = platform_get_drvdata(pdev);
 	unsigned int version;
@@ -491,4 +484,6 @@ void hssidrv_probe_init(struct platform_device *pdev)
 	version = csrrd32_withoffset(priv->sscsr, priv->csr_addroff, HSSISS_CSR_VER);
 	priv->ver = (version & HSSISS_VER_CSR_ADDR_MASK) >>
 				HSSISS_VER_CSR_ADDR_SHIFT;
+
+	return 0;
 }

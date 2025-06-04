@@ -9,6 +9,8 @@
 #ifndef __INTEL_FPGA_HSSISS_DRV_H__
 #define __INTEL_FPGA_HSSISS_DRV_H__
 
+#define HSSISS_FTILE 2
+
 /* Registers and macros */
 
 /* csr_offset = value@csr_addr_offset + offset
@@ -105,29 +107,29 @@
 #define FW_ACK_POLL_TIMEOUT_US          10000
 
 /* CSR read/write macros */
-#define csrrd32_withoffset(base, csroff, offs) csrrd32(base, offs + csroff)
+#define csrrd32_withoffset(base, csroff, offs) csrrd32(base, (offs) + (csroff))
 #define csrwr32_withoffset(val, base, csroff, offs) \
-		csrwr32(val, base, offs + csroff)
+		csrwr32(val, base, (offs) + (csroff))
 
-#define MASK(idx, nr) (((1 << nr) - 1) << ((idx + 1) - nr))
-#define test_reg_bits(val, idx, numbits) (val & MASK(idx, numbits))
-#define clear_reg_bits(val, idx, numbits) (val & ~(MASK(idx, numbits)))
+#define MASK(idx, nr) (((1 << (nr)) - 1) << (((idx) + 1) - (nr)))
+#define test_reg_bits(val, idx, numbits) ((val) & MASK(idx, numbits))
+#define clear_reg_bits(val, idx, numbits) ((val) & ~(MASK(idx, numbits)))
 
 int hssidrv_cold_rst(struct platform_device *pdev);
 void hssidrv_hotplug_enable(struct platform_device *pdev, bool enable);
-void hssidrv_probe_init(struct platform_device *pdev);
-int hssidrv_get_fw_version(struct platform_device *pdev, u32 cmd, void *priv_data, bool atomic);
-int hssidrv_ncsi_link_status(struct platform_device *pdev, u32 cmd, void *priv_data, bool atomic);
-int hssidrv_read_mac_stat(struct platform_device *pdev, u32 cmd, void *priv_data, bool atomic);
-int hssidrv_get_mtu(struct platform_device *pdev, u32 cmd, void *priv_data, bool atomic);
-int hssidrv_reset_mac_stat(struct platform_device *pdev, u32 cmd, void *priv_data, bool atomic);
+int hssidrv_probe_init(struct platform_device *pdev);
+int hssidrv_get_fw_version(struct platform_device *pdev, u32 cmd, void *priv_data);
+int hssidrv_ncsi_link_status(struct platform_device *pdev, u32 cmd, void *priv_data);
+int hssidrv_read_mac_stat(struct platform_device *pdev, u32 cmd, void *priv_data);
+int hssidrv_get_mtu(struct platform_device *pdev, u32 cmd, void *priv_data);
+int hssidrv_reset_mac_stat(struct platform_device *pdev, u32 cmd, void *priv_data);
 int hssidrv_get_set_dr_profile(struct platform_device *pdev, u32 cmd, void *dr_data,
-			       bool rd, bool atomic);
-int hssidrv_test_nios(struct platform_device *pdev, u32 cmd, bool atomic);
+			       bool rd);
+int hssidrv_test_nios(struct platform_device *pdev, u32 cmd);
 int hssidrv_get_set_csr(struct platform_device *pdev, u32 cmd, void *csr_data,
-			bool rd, bool atomic);
+			bool rd);
 int hssidrv_enable_disable_loopback(struct platform_device *pdev, u32 cmdid,
-				    void *data, bool atomic);
+				    void *data);
 hssi_eth_port_attr hssidrv_get_ethport_attr(struct platform_device *pdev, int port);
 int hssidrv_set_ethport_status(struct platform_device *pdev, int port, u32 data);
 hssi_eth_port_sts hssidrv_get_ethport_status(struct platform_device *pdev, int port);
