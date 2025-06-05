@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL
- /* Copyright (C) 2023 Intel Corporation. All rights reserved.
+ /* Copyright (C) 2023 Altera Corporation. All rights reserved.
  *
  * Author(s):
  */

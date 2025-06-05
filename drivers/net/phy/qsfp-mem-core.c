@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: GPL
 
-/* Intel(R) Memory based QSFP driver.
+/* Altera(R) Memory based QSFP driver.
  *
- * Copyright (C) 2020,2024 Intel Corporation. All rights reserved.
+ * Copyright (C) 2020,2024 Altera Corporation. All rights reserved.
  */
 
 #include <linux/bitfield.h>
@@ -183,7 +183,7 @@ static int qsfp_init(struct qsfp *qsfp)
 	if (qsfp_is_i2c_init_done(qsfp))
 		goto i2c_init_done;
 
-	/* Initialize Intel FPGA Avalon I2C (Master) Core */
+	/* Initialize Altera FPGA Avalon I2C (Master) Core */
 	qsfp_init_i2c(qsfp);
 
 	writel(I2C_ISR_CLEAR_FLAGS, qsfp->base + I2C_ISR);

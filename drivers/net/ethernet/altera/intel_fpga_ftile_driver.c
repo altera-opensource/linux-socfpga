@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-2.0
-/* Intel FPGA E-tile Ethernet MAC driver
- * Copyright (C) 2022, 2024 Intel Corporation. All rights reserved
+/* Altera FPGA E-tile Ethernet MAC driver
+ * Copyright (C) 2022, 2025 Altera Corporation. All rights reserved
  *
  * Contributors:
  *   Preetam Narayan

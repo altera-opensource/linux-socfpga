@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-2.0
-/* Intel FPGA Network debug interface API
- * Copyright (C) 2022,2024 Intel Corporation. All rights reserved
+/* Altera FPGA Network debug interface API
+ * Copyright (C) 2022, 2025 Altera Corporation. All rights reserved
  *
    Contributors:
    Preetam Narayan

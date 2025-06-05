@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-2.0
-/* Intel FPGA ToD PTP Hardware Clock (PHC) Linux driver
+/* Altera FPGA ToD PTP Hardware Clock (PHC) Linux driver
  * Copyright (C) 2015-2016 Altera Corporation. All rights reserved.
- * Copyright (C) 2017-2023 Intel Corporation. All rights reserved.
+ * Copyright (C) 2017-2023 Altera Corporation. All rights reserved.
  *
  * Author(s):
  *	Dalon Westergreen <dalon.westergreen@intel.com>
@@ -576,6 +576,6 @@ static struct platform_driver intel_fpga_tod_driver = {
 };
 
 module_platform_driver(intel_fpga_tod_driver);
-MODULE_DESCRIPTION("Intel FPGA ToD driver");
-MODULE_AUTHOR("Intel Corporation");
+MODULE_DESCRIPTION("Altera FPGA ToD driver");
+MODULE_AUTHOR("Altera Corporation");
 MODULE_LICENSE("GPL");

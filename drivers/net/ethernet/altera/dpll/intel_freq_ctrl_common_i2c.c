@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-2.0
-/* Intel FPGA I2C client code
- * Copyright (C) 2023,2024 Intel Corporation. All rights reserved
+/* Altera FPGA I2C client code
+ * Copyright (C) 2023, 2025 Altera Corporation. All rights reserved
  *
  * Contributors:
  *

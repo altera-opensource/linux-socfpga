@@ -1,6 +1,6 @@
 /* SPDX-License-Identifier: GPL-2.0 */
-/* Intel FPGA HSSI Interface API
- * Copyright (C) 2022 Intel Corporation. All rights reserved
+/* Altera FPGA HSSI Interface API
+ * Copyright (C) 2022 Altera Corporation. All rights reserved
  *
  * Contributors:
  *   Preetam Narayan

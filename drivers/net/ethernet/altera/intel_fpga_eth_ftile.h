@@ -1,6 +1,6 @@
 /* SPDX-License-Identifier: GPL-2.0 */
-/* Intel FPGA F-tile Ethernet MAC driver
- * Copyright (C) 2020-2024 Intel Corporation. All rights reserved.
+/* Altera FPGA F-tile Ethernet MAC driver
+ * Copyright (C) 2020, 2025 Altera Corporation. All rights reserved.
  *
  * Contributors:
  *   Roman Bulgakov
@@ -12,7 +12,7 @@
  * Original driver contributed by GlobalLogic.
  *
  * This file is ported from intel_fpga_etile.h with updates
- * to match Intel FPGA F-tile register definitions
+ * to match Altera FPGA F-tile register definitions
  *
  */
 

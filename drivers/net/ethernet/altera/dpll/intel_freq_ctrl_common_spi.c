@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-2.0
-/* Intel FPGA SPI access code
- * Copyright (C) 2023 Intel Corporation. All rights reserved
+/* Altera FPGA SPI access code
+ * Copyright (C) 2023 Altera Corporation. All rights reserved
  *
  * Contributors:
  *	Preetam Narayan

@@ -1,7 +1,7 @@
 /* SPDX-License-Identifier: GPL-2.0 */
 /* MSGDMA Prefetcher driver for Altera ethernet devices
  *
- * Copyright (C) 2020 Intel Corporation.
+ * Copyright (C) 2020 Altera Corporation.
  * Contributors:
  *   Dalon Westergreen
  *   Thomas Chou

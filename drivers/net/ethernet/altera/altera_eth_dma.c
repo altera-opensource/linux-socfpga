@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-2.0
-/* DMA support for Intel FPGA Quad-Speed Ethernet MAC driver
- * Copyright (C) 2019 Intel Corporation. All rights reserved
+/* DMA support for Altera FPGA Quad-Speed Ethernet MAC driver
+ * Copyright (C) 2019 Altera Corporation. All rights reserved
  *
  * Contributors:
  *   Dalon Westergreen

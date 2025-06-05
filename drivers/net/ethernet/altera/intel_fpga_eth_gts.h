@@ -1,6 +1,6 @@
 /* SPDX-License-Identifier: GPL-2.0 */
-/* Intel FPGA SM Ethernet MAC driver
- * Copyright (C) 2024 Intel Corporation. All rights reserved.
+/* Altera FPGA SM Ethernet MAC driver
+ * Copyright (C) 2024, 2025 Altera Corporation. All rights reserved.
  *
  * Contributors:
  *   Preetam Narayan

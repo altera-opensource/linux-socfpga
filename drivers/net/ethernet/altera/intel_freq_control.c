@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-2.0
-/* Intel FPGA Clock Cleaner Frequency Adjustment Driver
+/* Altera FPGA Clock Cleaner Frequency Adjustment Driver
  * Copyright (C) 2015-2016 Altera Corporation. All rights reserved.
- * Copyright (C) 2017-2023 Intel Corporation. All rights reserved.
+ * Copyright (C) 2017-2023 Altera Corporation. All rights reserved.
  *
  * Author(s):
  *	Markos Papadonikolakis <markos.papadonikolakis@intel.com>
@@ -229,6 +229,6 @@ static struct platform_driver intel_fpga_fs_driver = {
 
 module_platform_driver(intel_fpga_fs_driver);
 
-MODULE_DESCRIPTION("Intel FPGA Frequency steering");
-MODULE_AUTHOR("Intel Corporation");
+MODULE_DESCRIPTION("Altera FPGA Frequency steering");
+MODULE_AUTHOR("Altera Corporation");
 MODULE_LICENSE("GPL");

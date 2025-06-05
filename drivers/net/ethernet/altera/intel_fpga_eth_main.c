@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-2.0
-/* Intel FPGA Ethernet MAC driver
- * Copyright (C) 2022,2024 Intel Corporation. All rights reserved
+/* Altera FPGA Ethernet MAC driver
+ * Copyright (C) 2022,2025 Altera Corporation. All rights reserved
  *
  * Contributors:
  *	Preetam Narayan
@@ -2301,6 +2301,6 @@ static struct platform_driver intel_fpga_xtile_driver = {
 
 module_platform_driver(intel_fpga_xtile_driver);
 
-MODULE_AUTHOR("Intel Corporation");
+MODULE_AUTHOR("Altera Corporation");
 MODULE_DESCRIPTION("Altera HSSI based MAC driver");
 MODULE_LICENSE("GPL v2");

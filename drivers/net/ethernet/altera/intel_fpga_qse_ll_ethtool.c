@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-2.0
-/* Ethtool support for Intel FPGA Quad-Speed Ethernet MAC driver
- * Copyright (C) 2019 Intel Corporation. All rights reserved
+/* Ethtool support for Altera FPGA Quad-Speed Ethernet MAC driver
+ * Copyright (C) 2019 Altera Corporation. All rights reserved
  *
  * Contributors:
  *   Roman Bulgakov

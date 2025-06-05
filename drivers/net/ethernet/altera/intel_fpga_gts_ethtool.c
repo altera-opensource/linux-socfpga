@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-2.0
-/* Ethtool support for Intel FPGA GTS Ethernet MAC driver
- * Copyright (C) 2024 Intel Corporation. All rights reserved
+/* Ethtool support for Altera FPGA GTS Ethernet MAC driver
+ * Copyright (C) 2024, 2025 Altera Corporation. All rights reserved
  *
  * Contributors:
  *   Roman Bulgakov
@@ -20,6 +20,7 @@
 #include "altera_eth_dma.h"
 #include "intel_fpga_eth_main.h"
 #include "intel_fpga_eth_gts.h"
+#include "intel_fpga_gts_driver.h"
 #include "intel_fpga_eth_hssi_itf.h"
 
 #define GTS_STATS_LEN	ARRAY_SIZE(stat_gstrings)

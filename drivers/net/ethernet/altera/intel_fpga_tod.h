@@ -1,7 +1,7 @@
 /* SPDX-License-Identifier: GPL-2.0 */
 /* Altera PTP Hardware Clock (PHC) Linux driver
  * Copyright (C) 2015-2016 Altera Corporation. All rights reserved.
- * Copyright (C) 2017-2020 Intel Corporation. All rights reserved.
+ * Copyright (C) 2017-2020 Altera Corporation. All rights reserved.
  *
  * Author(s):
  *	Dalon Westergreen <dalon.westergreen@intel.com>

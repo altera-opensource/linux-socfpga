@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-2.0
-/* Intel FPGA HSSI platform driver
- * Copyright (C) 2022, 2024 Intel Corporation. All rights reserved
+/* Altera FPGA HSSI platform driver
+ * Copyright (C) 2022, 2025 Altera Corporation. All rights reserved
  *
  * Contributors:
  *   Subhransu S. Prusty
@@ -444,6 +444,6 @@ static struct platform_driver hssiss_driver = {
 
 module_platform_driver(hssiss_driver);
 
-MODULE_AUTHOR("Intel Corporation");
-MODULE_DESCRIPTION("Intel HSSI SS interface driver");
+MODULE_AUTHOR("Altera Corporation");
+MODULE_DESCRIPTION("Altera HSSI SS interface driver");
 MODULE_LICENSE("GPL v2");

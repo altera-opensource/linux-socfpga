@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL
-/* Intel zarlink i2c driver
- * Copyright (C) 2023 Intel Corporation. All rights reserved
+/* Altera zarlink i2c driver
+ * Copyright (C) 2023 Altera Corporation. All rights reserved
  *
  * Contributors:
  *

@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-2.0
-/* Ethtool support for Intel FPGA E-tile Ethernet MAC driver
- * Copyright (C) 2022,2023 Intel Corporation. All rights reserved
+/* Ethtool support for Altera FPGA E-tile Ethernet MAC driver
+ * Copyright (C) 2022,2023 Altera Corporation. All rights reserved
  *
  * Contributors:
  *   Preetam Narayan

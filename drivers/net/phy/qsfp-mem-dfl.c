@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: GPL-2.0
 
-/* Intel(R) Memory based QSFP driver For DFL based devices.
+/* Altera(R) Memory based QSFP driver For DFL based devices.
  *
- * Copyright (C) 2022 Intel Corporation. All rights reserved.
+ * Copyright (C) 2022, 2025 Altera Corporation. All rights reserved.
  */
 #include <linux/dfl.h>
 #include <linux/module.h>
@@ -75,6 +75,6 @@ static struct dfl_driver qsfp_driver = {
 
 module_dfl_driver(qsfp_driver);
 MODULE_DEVICE_TABLE(dfl, qsfp_ids);
-MODULE_DESCRIPTION("Intel(R) Memory based QSFP DFL driver");
-MODULE_AUTHOR("Intel Corporation");
+MODULE_DESCRIPTION("Altera(R) Memory based QSFP DFL driver");
+MODULE_AUTHOR("Altera Corporation");
 MODULE_LICENSE("GPL");

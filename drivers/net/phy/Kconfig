@@ -81,24 +81,24 @@ config QSFP_MEM_CORE
 	tristate "QSFP Controller subsystem core code" if COMPILE_TEST
 	depends on HWMON || HWMON=n
 	help
-	  The core code for the QSFP Controller subsystem for Intel FPGAs used
+	  The core code for the QSFP Controller subsystem for Altera FPGAs used
 	  by other interafce module drivers for access to the QSFP controller
 	  subsystem registers
 
 config QSFP_MEM
-	tristate "Memory based platform driver for QSFP Controller subsystem in Intel FPGAs"
+	tristate "Memory based platform driver for QSFP Controller subsystem in Altera FPGAs"
 	select QSFP_MEM_CORE
 	help
 	  Adds support for a QSFP controller subsystem that shadows the QSFP module's
 	  memory pages in memory
 
 config QSFP_MEM_DFL
-	tristate "DFL bus driver for QSFP Controller subsystem in Intel FPGAs"
+	tristate "DFL bus driver for QSFP Controller subsystem in Altera FPGAs"
 	depends on FPGA_DFL
 	select QSFP_MEM_CORE
 	help
 	  This is a Device Feature List (DFL) bus driver for the
-	  QSFP Controller subsystem in Intel FPGAs.
+	  QSFP Controller subsystem in Altera FPGAs.
 
 comment "MII PHY device drivers"
 
@@ -248,9 +248,9 @@ config LXT_PHY
 config INTEL_XWAY_PHY
 	tristate "Intel XWAY PHYs"
 	help
-	  Supports the Intel XWAY (former Lantiq) 11G and 22E PHYs.
+	  Supports the Altera XWAY (former Lantiq) 11G and 22E PHYs.
 	  These PHYs are marked as standalone chips under the names
-	  PEF 7061, PEF 7071 and PEF 7072 or integrated into the Intel
+	  PEF 7061, PEF 7071 and PEF 7072 or integrated into the Altera
 	  SoCs xRX200, xRX300, xRX330, xRX350 and xRX550.
 
 config LSI_ET1011C_PHY
