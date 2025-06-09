@@ -70,6 +70,8 @@
 #define HKDF_INPUT_DATA_SIZE		80
 
 #define FCS_MAX_RESP_MS			50
+#define SDOS_DECRYPTION_REPROVISION_KEY_WARN		0x102
+#define SDOS_DECRYPTION_NOT_LATEST_KEY_WARN		0x103
 
 static struct socfpga_fcs_priv *priv;
 
@@ -2351,8 +2353,10 @@ FCS_HAL_INT hal_sdos_crypt(struct fcs_cmd_context *const k_ctx)
 			FCS_DEV_SDOS_DATA_EXT, ret);
 		goto free_dbuf;
 	}
-	if (priv->status) {
-		LOG_ERR("Mailbox error, Failed to perform SDOS operation ret: %d priv->status = %d\n",
+	if ((priv->status) &&
+	    (priv->status != SDOS_DECRYPTION_REPROVISION_KEY_WARN) &&
+	    (priv->status != SDOS_DECRYPTION_NOT_LATEST_KEY_WARN)) {
+		LOG_ERR("Failed to perform SDOS operation ret: %d Mailbox Status = %d\n",
 			ret, priv->status);
 		ret = -EIO;
 		goto copy_mbox_status;
