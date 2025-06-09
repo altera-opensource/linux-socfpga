@@ -2254,6 +2254,7 @@ static const struct xtile_spec_ops ftile_data = {
 
 static const struct xtile_spec_ops gts_data = {
         .dma_ops   = &altera_dtype_prefetcher,
+#ifdef CONFIG_INTEL_FPGA_GTS_TILE
         .tile = {
                 .reset            = gts_ehip_reset,
                 .deassert_reset   = gts_ehip_deassert_reset,
@@ -2268,6 +2269,7 @@ static const struct xtile_spec_ops gts_data = {
                         intel_fpga_gts_set_ethtool_ops,
                 .check_dts_param = gts_check_dts_param,
         },
+#endif
 };
 
 static const struct of_device_id intel_fpga_xtile_ll_ids[] = {
