@@ -1,6 +1,6 @@
 /* SPDX-License-Identifier: GPL-2.0 */
-/* Altera FPGA HSSI SS interface driver
- * Copyright (C) 2022, 2025 Altera Corporation. All rights reserved
+/* Intel FPGA HSSI SS interface driver
+ * Copyright (C) 2022, 2024 Intel Corporation. All rights reserved
  *
  * Contributors:
  *   Subhransu S. Prusty
@@ -18,7 +18,6 @@ enum hssiss_salcmd {
 	SAL_SET_HSSI_PROFILE,
 	SAL_READ_MAC_STAT,
 	SAL_GET_MTU,
-	SAL_SET_MTU,
 	SAL_SET_CSR,
 	SAL_GET_CSR,
 	SAL_ENABLE_LOOPBACK,
@@ -27,6 +26,7 @@ enum hssiss_salcmd {
 	SAL_RSVD,
 	SAL_NCSI_GET_LINK_STS,
 	SAL_FW_VERSION,
+	SAL_SET_MTU,
 };
 
 enum hssiss_mac_stat_counter_type {
@@ -220,6 +220,7 @@ enum hssiss_tile_regbank {
 	HSSI_PHY_XCVR_PMAAVMM,
 	HSSI_SOFTIP,
 	HSSI_PTP_PACKET_CLASSIFIER,
+	HSSI_RSVD,
 	HSSI_ANLT,
 	HSSI_DRCTRL,
 	HSSI_BASE_SOFTIP,
@@ -230,7 +231,6 @@ enum hssiss_tile_regbank {
 	HSSI_XCVR_PMA_HARDIP,
 	HSSI_PMA_HARDIP,
 	USERSPACE_CSR,
-	HSSI_RSVD,
 };
 
 /* data for get/set csr
