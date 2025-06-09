@@ -1055,7 +1055,7 @@ static ssize_t sdos_store(struct device *dev, struct device_attribute *attr,
 
 	ret = hal_sdos_crypt(k_ctx);
 	if (ret)
-		pr_err("Failed to get device identity\n");
+		pr_err("Failed to perform SDOS operation\n");
 
 out:
 
