@@ -119,8 +119,8 @@ static int soc64_async_read(struct device *dev, enum hwmon_sensor_types type,
 		if (ret > 0)
 			dev_dbg(dev, "Received async interrupt\n");
 		else if (ret == 0)
-			dev_warn(dev,
-				 "Timeout occurred.trying to poll the response\n");
+			dev_dbg(dev,
+				"Timeout occurred.trying to poll the response\n");
 
 		for (index = 0; index < HWMON_ASYNC_MSG_RETRY; index++) {
 			status = stratix10_svc_async_poll(priv->chan, handle,
