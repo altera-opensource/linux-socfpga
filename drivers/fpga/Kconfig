@@ -54,7 +54,7 @@ config FPGA_MGR_ALTERA_PS_SPI
 
 config FPGA_MGR_ALTERA_CVP
 	tristate "Altera CvP FPGA Manager"
-	depends on PCI
+	depends on PCI && FPGA
 	help
 	  FPGA manager driver support for Arria-V, Cyclone-V, Stratix-V,
 	  Arria 10 and Stratix10 Altera FPGAs using the CvP interface over PCIe.
