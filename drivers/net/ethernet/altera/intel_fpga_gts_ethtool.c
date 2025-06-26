@@ -16,6 +16,7 @@
 #include <linux/net_tstamp.h>
 #include <linux/netdevice.h>
 #include <linux/phy.h>
+#include <linux/sfp.h>
 #include <linux/phylink.h>
 #include "altera_eth_dma.h"
 #include "intel_fpga_eth_main.h"
@@ -93,7 +94,36 @@ static void gts_gstrings(struct net_device *dev, u32 stringset, u8 *buf)
 	memcpy(buf, stat_gstrings, GTS_STATS_LEN * ETH_GSTRING_LEN);
 }
 
-static void gts_fill_stats(struct net_device *dev, struct ethtool_stats *dummy,
+static int gts_get_module_info (struct net_device *dev,
+				struct ethtool_modinfo *info)
+{
+	intel_fpga_xtile_eth_private *priv = netdev_priv(dev);
+	if (!priv)
+		return -ENODEV;
+
+	if (!priv->phylink || !priv->dev || !priv->dev->sfp_bus) {
+		return -ENODEV;
+	}
+
+	return sfp_get_module_info(priv->dev->sfp_bus, info);
+}
+
+static int gts_get_module_eeprom(struct net_device *dev,
+				 struct ethtool_eeprom *eeprom, u8 *data)
+{
+	intel_fpga_xtile_eth_private *priv = netdev_priv(dev);
+	if (!priv)
+		return -ENODEV;
+
+	if (!priv->phylink || !priv->dev || !priv->dev->sfp_bus) {
+		return -ENODEV;
+	}
+
+	return sfp_get_module_eeprom(priv->dev->sfp_bus, eeprom, data);
+}
+
+static void gts_fill_stats(struct net_device *dev,
+			   struct ethtool_stats *dummy,
 			   u64 *buf)
 {
 	intel_fpga_xtile_eth_private *priv = netdev_priv(dev);
@@ -1598,6 +1628,8 @@ static int gts_get_ts_info(struct net_device *dev,
 {
 	intel_fpga_xtile_eth_private *priv = netdev_priv(dev);
 
+	return -EOPNOTSUPP;
+
 	info->so_timestamping = SOF_TIMESTAMPING_TX_HARDWARE |
 				SOF_TIMESTAMPING_RX_HARDWARE |
 				SOF_TIMESTAMPING_RAW_HARDWARE;
@@ -1657,6 +1689,9 @@ static const struct ethtool_ops gts_ethtool_ops = {
 	.get_ts_info = gts_get_ts_info,
 	.get_link_ksettings = gts_get_link_ksettings,
 	.set_link_ksettings = gts_set_link_ksettings,
+	.get_module_info = gts_get_module_info,
+	.get_module_eeprom = gts_get_module_eeprom,
+
 };
 
 void intel_fpga_gts_set_ethtool_ops(struct net_device *netdev)
