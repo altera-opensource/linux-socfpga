@@ -1033,7 +1033,8 @@ static int dw_i3c_master_reattach_i3c_dev(struct i3c_dev_desc *dev,
 	if (master->dev_nack_retry_cnt) {
 		reg = readl(master->regs +
 			DEV_ADDR_TABLE_LOC(master->datstartaddr, data->index));
-		reg |= DEV_ADDR_TABLE_DEV_NACK_RETRY_CNT(master->dev_nack_retry_cnt);
+		reg |= DEV_ADDR_TABLE_DEV_NACK_RETRY_CNT(master->dev_nack_retry_cnt) |
+				DEV_ADDR_TABLE_SIR_REJECT;
 		writel(reg, master->regs +
 			DEV_ADDR_TABLE_LOC(master->datstartaddr, data->index));
 	}
@@ -1071,7 +1072,8 @@ static int dw_i3c_master_attach_i3c_dev(struct i3c_dev_desc *dev)
 	if (master->dev_nack_retry_cnt) {
 		reg = readl(master->regs +
 			DEV_ADDR_TABLE_LOC(master->datstartaddr, data->index));
-		reg |= DEV_ADDR_TABLE_DEV_NACK_RETRY_CNT(master->dev_nack_retry_cnt);
+		reg |= DEV_ADDR_TABLE_DEV_NACK_RETRY_CNT(master->dev_nack_retry_cnt) |
+				DEV_ADDR_TABLE_SIR_REJECT;
 		writel(reg, master->regs +
 			DEV_ADDR_TABLE_LOC(master->datstartaddr, data->index));
 	}
