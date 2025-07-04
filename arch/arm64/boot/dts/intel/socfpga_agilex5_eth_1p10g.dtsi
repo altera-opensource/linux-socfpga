@@ -67,6 +67,13 @@
                         status = "okay";
                 };
 
+                sfp_eth0: sfp-eth0 {
+                        compatible = "altera,sfp-mem";
+                        reg-names = "sfp-mem-ctrl";
+                        reg = <0x44040000 0x00001000>;
+                        status = "okay";
+                };
+
 		msgdma_gts_0_eth: msgdma_gts_0_eth {
 			compatible = "altr,msgdma-gts-1.0";
 			#address-cells = <1>;
@@ -83,6 +90,9 @@
 			interrupts = <GIC_SPI 19 IRQ_TYPE_LEVEL_HIGH>, <GIC_SPI 20 IRQ_TYPE_LEVEL_HIGH>;
 			status = "okay";
 			qsfp-lane = <0x0>;
+			sfp-lane = <0x0>;
+			qsfp = <&qsfp_eth0>;
+			sfp = <&sfp_eth0>;
 			fec-type="no-fec";
 			phy-mode = "10gbase-r";
 			fec-cw-pos-rx = <0x0>;

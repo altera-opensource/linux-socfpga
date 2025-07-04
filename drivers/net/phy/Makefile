@@ -41,6 +41,9 @@ obj-$(CONFIG_QSFP_MEM_CORE)     += qsfp-mem-core.o
 obj-$(CONFIG_QSFP_MEM_DFL)      += qsfp-mem-dfl.o
 obj-$(CONFIG_QSFP_MEM)          += qsfp-mem-platform.o
 
+obj-$(CONFIG_SFP_MEM_CORE)     += sfp-mem-core.o
+obj-$(CONFIG_SFP_MEM)          += sfp-mem-platform.o
+
 obj-$(CONFIG_ADIN_PHY)		+= adin.o
 obj-$(CONFIG_ADIN1100_PHY)	+= adin1100.o
 obj-$(CONFIG_AIR_EN8811H_PHY)   += air_en8811h.o
