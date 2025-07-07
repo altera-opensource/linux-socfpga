@@ -212,6 +212,7 @@
 #define DEV_ADDR_TABLE_DYNAMIC_ADDR(x)	(((x) << 16) & GENMASK(23, 16))
 #define DEV_ADDR_TABLE_STATIC_ADDR(x)	((x) & GENMASK(6, 0))
 #define DEV_ADDR_TABLE_LOC(start, idx)	((start) + ((idx) << 2))
+#define DEV_ADDR_TABLE_GET_DYNAMIC_ADDR(x) (((x) & GENMASK(23, 16)) >> 16)
 
 #define I3C_BUS_SDR1_SCL_RATE		8000000
 #define I3C_BUS_SDR2_SCL_RATE		6000000
@@ -231,6 +232,8 @@
 /* List of quirks */
 #define AMD_I3C_OD_PP_TIMING		BIT(1)
 #define DW_I3C_DISABLE_RUNTIME_PM_QUIRK	BIT(2)
+
+#define GET_IBI_SIR_BIT_INDEX(x) ((((x) & 0x1F) + (((x) >> 5) & 0x03)) % 32)
 
 struct dw_i3c_cmd {
 	u32 cmd_lo;
@@ -1274,11 +1277,14 @@ static void dw_i3c_master_set_sir_enabled(struct dw_i3c_master *master,
 	unsigned long flags;
 	u32 dat_entry, reg;
 	bool global;
+	u8 dynamic_addr;
 
 	dat_entry = DEV_ADDR_TABLE_LOC(master->datstartaddr, idx);
 
 	spin_lock_irqsave(&master->devs_lock, flags);
 	reg = readl(master->regs + dat_entry);
+	dynamic_addr = DEV_ADDR_TABLE_GET_DYNAMIC_ADDR(reg);
+
 	if (enable) {
 		reg &= ~DEV_ADDR_TABLE_SIR_REJECT;
 		if (dev->info.bcr & I3C_BCR_IBI_PAYLOAD)
@@ -1291,11 +1297,11 @@ static void dw_i3c_master_set_sir_enabled(struct dw_i3c_master *master,
 
 	if (enable) {
 		global = (master->sir_rej_mask == IBI_REQ_REJECT_ALL);
-		master->sir_rej_mask &= ~BIT(idx);
+		master->sir_rej_mask &= ~BIT(GET_IBI_SIR_BIT_INDEX(dynamic_addr));
 	} else {
 		bool hj_rejected = !!(readl(master->regs + DEVICE_CTRL) & DEV_CTRL_HOT_JOIN_NACK);
 
-		master->sir_rej_mask |= BIT(idx);
+		master->sir_rej_mask |= BIT(GET_IBI_SIR_BIT_INDEX(dynamic_addr));
 		global = (master->sir_rej_mask == IBI_REQ_REJECT_ALL) && hj_rejected;
 	}
 	writel(master->sir_rej_mask, master->regs + IBI_SIR_REQ_REJECT);
