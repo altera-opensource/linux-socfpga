@@ -17,6 +17,7 @@
 #include <linux/netdevice.h>
 #include <linux/phy.h>
 #include <linux/sfp.h>
+#include <linux/phy/sfp-mem.h>
 #include <linux/phylink.h>
 #include "altera_eth_dma.h"
 #include "intel_fpga_eth_main.h"
@@ -94,10 +95,16 @@ static void gts_gstrings(struct net_device *dev, u32 stringset, u8 *buf)
 	memcpy(buf, stat_gstrings, GTS_STATS_LEN * ETH_GSTRING_LEN);
 }
 
+static int gts_get_eeprom_len(struct net_device *dev)
+{
+	return A0_EEPROM_SIZE;
+}
+
 static int gts_get_module_info (struct net_device *dev,
 				struct ethtool_modinfo *info)
 {
 	intel_fpga_xtile_eth_private *priv = netdev_priv(dev);
+
 	if (!priv)
 		return -ENODEV;
 
@@ -112,6 +119,7 @@ static int gts_get_module_eeprom(struct net_device *dev,
 				 struct ethtool_eeprom *eeprom, u8 *data)
 {
 	intel_fpga_xtile_eth_private *priv = netdev_priv(dev);
+
 	if (!priv)
 		return -ENODEV;
 
@@ -120,6 +128,21 @@ static int gts_get_module_eeprom(struct net_device *dev,
 	}
 
 	return sfp_get_module_eeprom(priv->dev->sfp_bus, eeprom, data);
+}
+
+static int gts_get_module_eeprom_by_page(struct net_device *dev,
+                                         const struct ethtool_module_eeprom *page,
+                                         struct netlink_ext_ack *extack)
+{
+        intel_fpga_xtile_eth_private *priv = netdev_priv(dev);
+
+	if (!priv)
+                return -ENODEV;
+
+        if (!priv->phylink || !priv->dev || !priv->dev->sfp_bus) {
+                return -ENODEV;
+        }
+    	return sfp_get_module_eeprom_by_page(priv->dev->sfp_bus, page, extack);
 }
 
 static void gts_fill_stats(struct net_device *dev,
@@ -1690,7 +1713,10 @@ static const struct ethtool_ops gts_ethtool_ops = {
 	.get_link_ksettings = gts_get_link_ksettings,
 	.set_link_ksettings = gts_set_link_ksettings,
 	.get_module_info = gts_get_module_info,
+	.get_eeprom = gts_get_module_eeprom,
+	.get_eeprom_len = gts_get_eeprom_len,
 	.get_module_eeprom = gts_get_module_eeprom,
+	.get_module_eeprom_by_page = gts_get_module_eeprom_by_page,
 
 };
 
