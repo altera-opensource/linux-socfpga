@@ -33,6 +33,7 @@ properties:
               - intel,socfpga-agilex5-socdk
               - intel,socfpga-agilex5-socdk-013b
               - intel,socfpga-agilex5-socdk-nand
+              - intel,socfpga-agilex5-socdk-013b
           - const: intel,socfpga-agilex5
 
 additionalProperties: true
