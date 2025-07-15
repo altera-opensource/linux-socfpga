@@ -26,6 +26,7 @@ properties:
           - enum:
               - intel,socfpga-agilex5-socdk
               - intel,socfpga-agilex5-socdk-nand
+              - intel,socfpga-agilex5-socdk-013b
           - const: intel,socfpga-agilex5
       - description: Agilex3 boards
         items:
