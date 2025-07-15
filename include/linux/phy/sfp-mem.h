@@ -27,7 +27,8 @@
 #define A2_EEPROM_SIZE (ETH_MODULE_SFF_8472_LEN/2) * IMPLEMENTED_A2PAGES
 
 enum sfp_init_status {
-	SFP_INIT_RESET = 0,
+	SFP_DETECT = 0,
+	SFP_INIT_RESET,
 	SFP_INIT_DONE,
 	SFP_A0PAGE_UPDATE_INPROG,
 	SFP_A0PAGE_UPDATE_COMPLETE,
@@ -52,7 +53,7 @@ union sfp_a0_page {
  * @regmap: regmap for device.
  * @dwork: work struct for checking sfp plugin status.
  * @dev: point to device.
- * @init: sfp init status.
+ * @state: sfp status.
  * @lock: lock for sfp initial function and status.
  */
 struct sfp {
@@ -60,7 +61,7 @@ struct sfp {
 	struct regmap *regmap;
 	struct delayed_work dwork;
 	struct device *dev;
-	enum sfp_init_status init;
+	enum sfp_init_status state;
 	struct mutex lock;
 	u32 tolerance_count;
 	struct sfp_bus *sfp_bus;

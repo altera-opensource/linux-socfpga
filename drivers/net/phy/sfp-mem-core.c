@@ -158,7 +158,7 @@ static ssize_t sfp_connected_show(struct device *dev, struct device_attribute *a
 	bool plugin;
 
 	mutex_lock(&sfp->lock);
-	plugin = check_sfp_plugin(sfp) && (sfp->init == SFP_INIT_DONE);
+	plugin = check_sfp_plugin(sfp) && (sfp->state == SFP_INIT_DONE);
 	mutex_unlock(&sfp->lock);
 
 	return sysfs_emit(buf, "%u\n", plugin);
@@ -201,27 +201,31 @@ static void sfp_check_hotplug(struct work_struct *work)
 	
 	is_sfp_pluggedin = check_sfp_plugin(sfp);
 
-	if ((!is_sfp_pluggedin) && (sfp->init != SFP_INIT_RESET)) {
-		dev_info(sfp->dev, "detected SFP unplugin\n");
-		WRITE_ONCE(sfp->init, SFP_INIT_RESET);
+	if ((!is_sfp_pluggedin) && (sfp->state != SFP_DETECT)) {
+		dev_info_ratelimited(sfp->dev, "detected SFP plug out\n");
+		WRITE_ONCE(sfp->state, SFP_DETECT);
 	}
 
 	/* in case of error observed then we need to take defensive action */
 	if (stat_off & A2_UPD_ERROR)
-                WRITE_ONCE(sfp->init, SFP_A2_UPDATE_ERROR);
+                WRITE_ONCE(sfp->state, SFP_A2_UPDATE_ERROR);
 
 	if (stat_off & A0_UPD_ERROR)
-		WRITE_ONCE(sfp->init, SFP_A0_UPDATE_ERROR);
+		WRITE_ONCE(sfp->state, SFP_A0_UPDATE_ERROR);
 	
-	switch(sfp->init) {
+	switch(sfp->state) {
 
-	case SFP_INIT_RESET:
+	case SFP_DETECT:
 		if (is_sfp_pluggedin) {
-			dev_info(sfp->dev, "detected SFP plugin\n");
-			if(sfp_init(sfp))
-				WRITE_ONCE(sfp->init, SFP_INIT_DONE);
-			sfp->tolerance_count = IP_RESPONSE_TOLERANCE_LIMIT;
+			dev_info_ratelimited(sfp->dev, "detected SFP plugin\n");
+			WRITE_ONCE(sfp->state, SFP_INIT_RESET);
 		}
+		break;
+	
+	case SFP_INIT_RESET:
+		if(sfp_init(sfp))
+			WRITE_ONCE(sfp->state, SFP_INIT_DONE);
+		sfp->tolerance_count = IP_RESPONSE_TOLERANCE_LIMIT;
 		break;
 
 	case SFP_INIT_DONE:
@@ -236,8 +240,9 @@ static void sfp_check_hotplug(struct work_struct *work)
 					    		  (stat_off & A0_UPD_IN_PROG)),
 							  10, I2C_MAX_TIMEOUT);
 			if (!poll_timeout) {
-				WRITE_ONCE(sfp->init, SFP_A0PAGE_UPDATE_INPROG);
+				WRITE_ONCE(sfp->state, SFP_A0PAGE_UPDATE_INPROG);
 				sfp->tolerance_count = IP_RESPONSE_TOLERANCE_LIMIT;
+				break;
 			} else {
 				dev_warn_ratelimited(sfp->dev,
 					 "SFP FSM state change to SFP_A0PAGE_UPDATE_INPROG"
@@ -245,7 +250,7 @@ static void sfp_check_hotplug(struct work_struct *work)
 			}
 
 			if (--sfp->tolerance_count == IP_IRRESPONSIVE) {
-				WRITE_ONCE(sfp->init, SFP_INIT_RESET);
+				WRITE_ONCE(sfp->state, SFP_INIT_RESET);
 				break;
 			}
 		}
@@ -266,35 +271,35 @@ static void sfp_check_hotplug(struct work_struct *work)
 			 */
 			writeq(sfp_sel, sfp->base + CONF_OFF);
 
-			WRITE_ONCE(sfp->init, SFP_A0PAGE_UPDATE_COMPLETE);
+			WRITE_ONCE(sfp->state, SFP_A0PAGE_UPDATE_COMPLETE);
 		}
 		break;
 
 	case SFP_A0PAGE_UPDATE_COMPLETE:
 
 		writeq(CONF_POLL_EN, sfp->base + CONF_OFF);
-		WRITE_ONCE(sfp->init, SFP_A2PAGE_UPDATE_INPROG);
+		WRITE_ONCE(sfp->state, SFP_A2PAGE_UPDATE_INPROG);
 		sfp->tolerance_count = IP_RESPONSE_TOLERANCE_LIMIT;
 	
 		break;
 
 	case SFP_A2PAGE_UPDATE_INPROG:
 		if (stat_off & A2_UPD_COMPLETE) {
-			WRITE_ONCE(sfp->init, SFP_A2PAGE_UPDATE_COMPLETE);
+			WRITE_ONCE(sfp->state, SFP_A2PAGE_UPDATE_COMPLETE);
 		} else {
 		       	if (--sfp->tolerance_count == IP_IRRESPONSIVE)
-				WRITE_ONCE(sfp->init, SFP_INIT_RESET);
+				WRITE_ONCE(sfp->state, SFP_INIT_RESET);
 		}
 		break;
 
 	case SFP_A0_UPDATE_ERROR:
 		dev_err(sfp->dev, "SFP: A0 Page error observed, restarting A0 page operation\n");
-		WRITE_ONCE(sfp->init, SFP_INIT_RESET);
+		WRITE_ONCE(sfp->state, SFP_INIT_RESET);
 		break;
 
 	case SFP_A2_UPDATE_ERROR:
 		dev_err(sfp->dev, "SFP: A2 Page error observed, restarting A2 page operation\n");
-		WRITE_ONCE(sfp->init, SFP_A0PAGE_UPDATE_COMPLETE);
+		WRITE_ONCE(sfp->state, SFP_A0PAGE_UPDATE_COMPLETE);
 		break;
 
 	case SFP_A2PAGE_UPDATE_COMPLETE:	
@@ -348,7 +353,7 @@ static void sfp_page_copy(struct sfp *sfp)
 static int sfp_module_info(struct sfp *sfp, struct ethtool_modinfo *modinfo)
 {
 	/* Atleast A0 page update is completed */
-	if (!(sfp->init >= SFP_A0PAGE_UPDATE_COMPLETE))
+	if (!(sfp->state >= SFP_A0PAGE_UPDATE_COMPLETE))
 		return -EIO;
 
 	sfp_page_copy(sfp);
@@ -450,7 +455,7 @@ static const struct sfp_socket_ops sfp_module_ops = {
 
 int sfp_init_work(struct sfp *sfp)
 {
-	sfp->init = SFP_INIT_RESET;
+	sfp->state = SFP_DETECT;
 
 	sfp->sfp_bus = sfp_register_socket(sfp->dev, sfp, &sfp_module_ops);
 	if (!sfp->sfp_bus)
