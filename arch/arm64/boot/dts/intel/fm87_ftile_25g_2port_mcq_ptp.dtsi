@@ -254,7 +254,7 @@
 						"dma2_tx_irq", "dma2_rx_irq";
 			interrupts =	<0 34 4>, <0 35 4>,
 					<0 32 4>, <0 33 4>,
-					<0 31 4>, <0 30 4>;
+					<0 30 4>, <0 31 4>;
 			fixed-link {
 				speed =<25000>;
 				full-duplex;
