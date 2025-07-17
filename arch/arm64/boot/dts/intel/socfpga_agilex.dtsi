@@ -506,32 +506,28 @@
 			compatible = "snps,dw-apb-timer";
 			interrupts = <GIC_SPI 113 IRQ_TYPE_LEVEL_HIGH>;
 			reg = <0xffc03000 0x100>;
-			clocks = <&clkmgr AGILEX_L4_SP_CLK>;
-			clock-names = "timer";
+			clock-freq = <100000000>;
 		};
 
 		timer1: timer1@ffc03100 {
 			compatible = "snps,dw-apb-timer";
 			interrupts = <GIC_SPI 114 IRQ_TYPE_LEVEL_HIGH>;
 			reg = <0xffc03100 0x100>;
-			clocks = <&clkmgr AGILEX_L4_SP_CLK>;
-			clock-names = "timer";
+			clock-freq = <100000000>;
 		};
 
 		timer2: timer2@ffd00000 {
 			compatible = "snps,dw-apb-timer";
 			interrupts = <GIC_SPI 115 IRQ_TYPE_LEVEL_HIGH>;
 			reg = <0xffd00000 0x100>;
-			clocks = <&clkmgr AGILEX_L4_SP_CLK>;
-			clock-names = "timer";
+			clock-freq = <100000000>;
 		};
 
 		timer3: timer3@ffd00100 {
 			compatible = "snps,dw-apb-timer";
 			interrupts = <GIC_SPI 116 IRQ_TYPE_LEVEL_HIGH>;
 			reg = <0xffd00100 0x100>;
-			clocks = <&clkmgr AGILEX_L4_SP_CLK>;
-			clock-names = "timer";
+			clock-freq = <100000000>;
 		};
 
 		uart0: serial@ffc02000 {
