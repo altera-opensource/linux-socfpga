@@ -248,9 +248,29 @@ patternProperties:
       reg:
         maxItems: 1
 
+      altr,seu-safe-inject-ce-msb:
+        $ref: /schemas/types.yaml#/definitions/uint32
+        description: MSB of SEU safe error injection command for CE
+
+      altr,seu-safe-inject-ce-lsb:
+        $ref: /schemas/types.yaml#/definitions/uint32
+        description: LSB of SEU safe error injection command for CE
+
+      altr,seu-safe-inject-ue-msb:
+        $ref: /schemas/types.yaml#/definitions/uint32
+        description: MSB of SEU safe error injection command for UE
+
+      altr,seu-safe-inject-ue-lsb:
+        $ref: /schemas/types.yaml#/definitions/uint32
+        description: LSB of SEU safe error injection command for UE
+
     required:
       - compatible
       - reg
+      - altr,seu-safe-inject-ce-msb
+      - altr,seu-safe-inject-ce-lsb
+      - altr,seu-safe-inject-ue-msb
+      - altr,seu-safe-inject-ue-lsb
 
   "^l2-ecc@[a-f0-9]+$":
     type: object
