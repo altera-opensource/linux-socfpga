@@ -668,6 +668,10 @@
 			cram-seu@0 {
 				compatible = "altr,socfpga-cram-seu";
 				reg = <0x0 0x0>;
+				altr,seu-safe-inject-ce-msb = <0x0>;
+				altr,seu-safe-inject-ce-lsb = <0x30000>;
+				altr,seu-safe-inject-ue-msb = <0x20>;
+				altr,seu-safe-inject-ue-lsb = <0x30001>;
 			};
 		};
 
