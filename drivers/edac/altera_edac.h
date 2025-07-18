@@ -356,11 +356,6 @@ struct altr_sdram_mc_data {
 #define S10_COLD_RESET_MASK               0x30002
 #define S10_WARM_RESET_WFI_FLAG           BIT(31)
 
-/* Single Event Upset Defines */
-#define SEU_SAFE_INJECT_SB_CE			0x30000
-#define SEU_SAFE_INJECT_DB_UE_MSB		0x20
-#define SEU_SAFE_INJECT_DB_UE_LSB		0x30001
-
 /************ IO96B ECC defines *******/
 #define IO96B_ECC_ENABLE_INFO_OFST		0x240
 #define IO96B_ECC_SCRUB_STAT0_OFST		0x244
@@ -418,6 +413,13 @@ struct edac_device_prv_data {
 	bool panic;
 };
 
+struct altr_seu {
+	u32 ce_msb;
+	u32 ce_lsb;
+	u32 ue_msb;
+	u32 ue_lsb;
+};
+
 struct altr_edac_device_dev {
 	struct list_head next;
 	void __iomem *base;
@@ -436,6 +438,7 @@ struct altr_edac_device_dev {
 	int sdm_qspi_db_irq;
 	u32 sdm_qspi_addr;
 	int seu_irq;
+	struct altr_seu seu;
 };
 
 struct altr_arria10_edac {
