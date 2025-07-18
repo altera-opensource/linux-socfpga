@@ -1579,6 +1579,8 @@ static ssize_t __maybe_unused
 altr_edac_seu_trig(struct file *file, const char __user *user_buf,
 		   size_t count, loff_t *ppos)
 {
+	struct edac_device_ctl_info *edac_dci = file->private_data;
+	struct altr_edac_device_dev *dev = edac_dci->pvt_info;
 	u8 trig_type;
 	struct arm_smccc_res result;
 
@@ -1587,12 +1589,13 @@ altr_edac_seu_trig(struct file *file, const char __user *user_buf,
 
 	if (trig_type == ALTR_UE_TRIGGER_CHAR)
 		arm_smccc_smc(INTEL_SIP_SMC_SAFE_INJECT_SEU_ERR,
-			      ((uint64_t)SEU_SAFE_INJECT_DB_UE_MSB << 32) |
-			      SEU_SAFE_INJECT_DB_UE_LSB,
+			      ((u64)dev->seu.ue_msb << 32) |
+			      dev->seu.ue_lsb,
 			      2, 0, 0, 0, 0, 0, &result);
 	else
 		arm_smccc_smc(INTEL_SIP_SMC_SAFE_INJECT_SEU_ERR,
-			      SEU_SAFE_INJECT_SB_CE, 2, 0, 0, 0,
+			      ((u64)dev->seu.ce_msb << 32) |
+			      dev->seu.ce_lsb, 2, 0, 0, 0,
 			      0, 0, &result);
 
 	return count;
@@ -2260,10 +2263,11 @@ static int get_s10_sdram_edac_resource(struct device_node *np,
 
 #if IS_ENABLED(CONFIG_EDAC_ALTERA_CRAM_SEU)
 static int altr_edac_device_add(struct altr_arria10_edac *edac,
-				struct platform_device *pdev, char *ecc_name)
+				struct platform_device *pdev, struct device_node *dev_node)
 {
 	struct edac_device_ctl_info *dci;
 	struct altr_edac_device_dev *altdev;
+	char *ecc_name = kstrdup(dev_node->name, GFP_KERNEL);
 	int edac_idx;
 	int seu_irq;
 	int rc = 0;
@@ -2295,6 +2299,38 @@ static int altr_edac_device_add(struct altr_arria10_edac *edac,
 	dci->ctl_name = "Altera ECC Manager";
 	dci->mod_name = ecc_name;
 	dci->dev_name = ecc_name;
+
+	rc = of_property_read_u32(dev_node, "altr,seu-safe-inject-ce-msb",
+				  &altdev->seu.ce_msb);
+	if (rc) {
+		edac_printk(KERN_ERR, EDAC_DEVICE,
+			    "Missing - altr,seu-safe-inject-ce-msb\n");
+		return -EINVAL;
+	}
+
+	rc = of_property_read_u32(dev_node, "altr,seu-safe-inject-ce-lsb",
+				  &altdev->seu.ce_lsb);
+	if (rc) {
+		edac_printk(KERN_ERR, EDAC_DEVICE,
+			    "Missing - altr,seu-safe-inject-ce-lsb\n");
+		return -EINVAL;
+	}
+
+	rc = of_property_read_u32(dev_node, "altr,seu-safe-inject-ue-msb",
+				  &altdev->seu.ue_msb);
+	if (rc) {
+		edac_printk(KERN_ERR, EDAC_DEVICE,
+			    "Missing - altr,seu-safe-inject-ue-msb\n");
+		return -EINVAL;
+	}
+
+	rc = of_property_read_u32(dev_node, "altr,seu-safe-inject-ue-lsb",
+				  &altdev->seu.ue_lsb);
+	if (rc) {
+		edac_printk(KERN_ERR, EDAC_DEVICE,
+			    "Missing - altr,seu-safe-inject-ue-lsb\n");
+		return -EINVAL;
+	}
 
 	altdev->seu_irq = seu_irq;
 	rc = devm_request_threaded_irq(edac->dev, altdev->seu_irq, NULL,
@@ -2802,7 +2838,7 @@ static int altr_edac_a10_probe(struct platform_device *pdev)
 			altr_edac_a10_device_add(edac, child);
 #if IS_ENABLED(CONFIG_EDAC_ALTERA_CRAM_SEU)
 		else if (of_device_is_compatible(child, "altr,socfpga-cram-seu"))
-			altr_edac_device_add(edac, pdev, (char *)child->name);
+			altr_edac_device_add(edac, pdev, child);
 #endif
 
 #ifdef CONFIG_EDAC_ALTERA_SDRAM
