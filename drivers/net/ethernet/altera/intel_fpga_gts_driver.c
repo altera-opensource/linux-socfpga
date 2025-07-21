@@ -168,10 +168,6 @@ void gts_update_mac_addr(intel_fpga_xtile_eth_private *priv)
         hssi_csrwr32(pdev, HSSI_EMAC_HARDIP, chan,
                      eth_hardip_emac_csroffs(txmac_saddrh), msb);
 
-        /* Enable Source address insertion */
-        hssi_set_bit(pdev, HSSI_EMAC_HARDIP, chan,
-                     eth_hardip_emac_csroffs(txmac_control), ETH_TX_MAC_ENABLE_S_ADDR_EN);
-
         netdev_info(priv->dev, "Device MAC address %pM\n", priv->dev->dev_addr);
 }
 
