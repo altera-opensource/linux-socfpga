@@ -326,12 +326,12 @@ static int xtile_init_rx_buffer(struct intel_fpga_xtile_eth_private *priv,
 				struct altera_dma_buffer *rxbuffer,
 				int len)
 {
-       rxbuffer->skb = netdev_alloc_skb(priv->dev, len);
-       skb_reserve(rxbuffer->skb, SKB_DMA_REALIGN);
+	rxbuffer->skb = netdev_alloc_skb(priv->dev, len);
 
-       if (!rxbuffer->skb)
-                return -ENOMEM;
+	if (!rxbuffer->skb)
+		return -ENOMEM;
 
+	skb_reserve(rxbuffer->skb, SKB_DMA_REALIGN);
 	rxbuffer->dma_addr = dma_map_single(priv->device,
 					    rxbuffer->skb->data,
 					    len, DMA_FROM_DEVICE);
@@ -1576,14 +1576,15 @@ static int intel_fpga_xtile_validate(struct phylink_pcs *pcs,
 				      const struct phylink_link_state *state_validate)
 {
 	struct phylink_link_state *state = (struct phylink_link_state *)state_validate;
-	intel_fpga_xtile_eth_private *priv =
-		container_of(pcs, intel_fpga_xtile_eth_private, pcs);
+	intel_fpga_xtile_eth_private *priv = NULL;
+
+	if (!pcs)
+		return -EINVAL;
+
+	priv = container_of(pcs, intel_fpga_xtile_eth_private, pcs);
 
 	__ETHTOOL_DECLARE_LINK_MODE_MASK(mac_supported) = { 0, };
 	__ETHTOOL_DECLARE_LINK_MODE_MASK(mask) = { 0, };
-
-	if (!priv)
-		return -EINVAL;
 
 	if (state->interface != PHY_INTERFACE_MODE_NA &&
 	    state->interface != PHY_INTERFACE_MODE_10GKR &&
@@ -1653,12 +1654,11 @@ static int intel_fpga_xtile_validate(struct phylink_pcs *pcs,
 static void intel_fpga_xtile_mac_pcs_get_state(struct phylink_pcs *pcs,
 					       struct phylink_link_state *state)
 {
+	if (!pcs)
+		return;
 	/* fixed speed for now */
 	intel_fpga_xtile_eth_private *priv =
 		container_of(pcs, intel_fpga_xtile_eth_private, pcs);
-
-	if (!priv)
-		return;
 
 	state->speed = priv->link_speed;
 	state->duplex = DUPLEX_FULL;
@@ -2135,8 +2135,8 @@ static int intel_fpga_xtile_probe(struct platform_device *pdev)
         ret  = of_property_read_string(pdev->dev.of_node, "if_name",
                                        &if_name);
 
-        if (if_name) {
-                memset(&ndev->name, 0, 16);
+        if (if_name && (strlen(if_name) < ARRAY_SIZE(ndev->name)-1)) {
+                memset(&ndev->name, 0, ARRAY_SIZE(ndev->name));
                 memcpy(ndev->name, if_name, strlen(if_name));
         }
 

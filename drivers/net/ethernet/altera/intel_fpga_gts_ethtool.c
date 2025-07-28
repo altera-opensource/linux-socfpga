@@ -1649,9 +1649,9 @@ out:
 static int gts_get_ts_info(struct net_device *dev,
 			   struct kernel_ethtool_ts_info *info)
 {
-	intel_fpga_xtile_eth_private *priv = netdev_priv(dev);
-
 	return -EOPNOTSUPP;
+#if 0
+	intel_fpga_xtile_eth_private *priv = netdev_priv(dev);
 
 	info->so_timestamping = SOF_TIMESTAMPING_TX_HARDWARE |
 				SOF_TIMESTAMPING_RX_HARDWARE |
@@ -1668,8 +1668,8 @@ static int gts_get_ts_info(struct net_device *dev,
 
 	info->rx_filters = (1 << HWTSTAMP_FILTER_NONE) |
 			   (1 << HWTSTAMP_FILTER_ALL);
-
 	return 0;
+#endif
 }
 
 /* Set link ksettings (phy address, speed) for ethtools */

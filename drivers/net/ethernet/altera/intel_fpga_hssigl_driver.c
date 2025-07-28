@@ -40,7 +40,7 @@ int hssigldrv_probe_init(struct platform_device *pdev)
 		return -ENOENT;
 	
 	pdev_tr = of_find_device_by_node(dev_tr);
-        if (!dev_tr) {
+        if (!pdev_tr) {
                 of_node_put(dev_tr);
                 return -ENODEV;
         }
