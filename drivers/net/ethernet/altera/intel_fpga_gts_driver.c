@@ -208,29 +208,33 @@ int gts_init(intel_fpga_xtile_eth_private *priv)
 	/* Set/Config source MAC address */
 	gts_update_mac_addr(priv);
 
-	return 0;
-}
-
-int gts_start(intel_fpga_xtile_eth_private *priv)
-{
 	/* Enable MAC datapath */
 	gts_enable_mac(priv);
 
 	return 0;
 }
 
+int gts_start(intel_fpga_xtile_eth_private *priv)
+{
+	//Nothing to do as of now
+	return 0;
+}
+
 int gts_stop(intel_fpga_xtile_eth_private *priv)
 {
-	/* Disable Ftile MAC datapath */
-	gts_disable_mac(priv);
-
+	//Nothing to do as of now
 	return 0;
 }
 
 int gts_uninit(intel_fpga_xtile_eth_private *priv)
 {
 	/* Just to make sure Ftile feature are disabled */
-	return gts_stop(priv);
+	(void)gts_stop(priv);
+
+	/* Disable MAC datapath */
+	gts_disable_mac(priv);
+
+	return 0;
 }
 
 int gts_run_check(intel_fpga_xtile_eth_private *priv)
