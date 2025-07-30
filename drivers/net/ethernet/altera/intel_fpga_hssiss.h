@@ -7,10 +7,10 @@
  *   Preetam Narayan
  */
 
-#ifndef __INTEL_FPGA_HSSISS_H__
-#define __INTEL_FPGA_HSSISS_H__
+ #ifndef __INTEL_FPGA_HSSISS_H__
+ #define __INTEL_FPGA_HSSISS_H__
 
-#include <linux/io.h>
+ #include <linux/io.h>
 
 enum hssiss_salcmd {
 	SAL_NOP,
@@ -72,8 +72,8 @@ enum hssiss_mac_stat_counter_type {
 	MACSTAT_TX_RUNTS,
 	MACSTAT_TX_ETHER_DROPS,
 	MACSTAT_TX_TOTAL_PACKETS,
-        MACSTAT_TX_UNDERSIZE,
-        MACSTAT_TX_OVERSIZE,
+	MACSTAT_TX_UNDERSIZE,
+	MACSTAT_TX_OVERSIZE,
 	MACSTAT_TX_TOTAL_BYTES,
 	MACSTAT_TX_SOP_COUNT,
 	MACSTAT_RX_SOP_COUNT,
@@ -251,9 +251,9 @@ struct get_mtu_data {
 };
 
 struct set_mtu_data {
-        unsigned int port;
-        u16 max_tx_frame_size;
-        u16 max_rx_frame_size;
+	unsigned int port;
+	u16 max_tx_frame_size;
+	u16 max_rx_frame_size;
 };
 
 union hssiss_feature_list {
@@ -314,7 +314,7 @@ struct hssiss_csr_v5_only {
 	u32 feature_csr_size_msb;		//0x24
 };
 
-#define feature_offs(x) (offsetof(struct hssiss_csr_v5_only, x))
+ #define feature_offs(x) (offsetof(struct hssiss_csr_v5_only, x))
 
 enum access_type {
 	BYTE_ACCESS,
@@ -354,9 +354,9 @@ struct hssiss_private {
 	struct hssiss_sysfs_data sysfs;
 	struct cold_reset_register cold_rst_reg;
 	int hssi_err_wa;
-#ifdef CONFIG_DEBUG_FS
+ #ifdef CONFIG_DEBUG_FS
 	struct hssiss_dbg *dbgfs;
-#endif
+ #endif
 	void *dev_specific;
 };
 
@@ -375,14 +375,14 @@ int hssiss_cold_rst(struct platform_device *pdev);
 int hssiss_lock_stats(struct platform_device *pdev, int port);
 int hssiss_unlock_stats(struct platform_device *pdev, int port);
 void hssiss_reset_port(struct platform_device *pdev, int port);
-int hssiss_set_mtu(struct platform_device *pdev, u32 cmd, void* mtu_data);
+int hssiss_set_mtu(struct platform_device *pdev, u32 cmd, void *mtu_data);
 int hssiss_set_ethport_status(struct platform_device *pdev, int port, u32 data);
 int hssiss_hotplug_disable_status(struct platform_device *pdev);
-int hssiss_enable_disable_loopback(struct platform_device *pdev, u32 cmdid,void *data);
-#ifdef CONFIG_DEBUG_FS
+int hssiss_enable_disable_loopback(struct platform_device *pdev, u32 cmdid, void *data);
+ #ifdef CONFIG_DEBUG_FS
 struct hssiss_dbg *hssiss_dbgfs_init(struct platform_device *pdev);
 void hssiss_dbgfs_remove(struct hssiss_dbg *d);
-#endif /* CONFIG_DEBUG_FS */
+ #endif /* CONFIG_DEBUG_FS */
 
-#endif /* __INTEL_FPGA_HSSISS_H__ */
+ #endif /* __INTEL_FPGA_HSSISS_H__ */
 

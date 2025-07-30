@@ -8,20 +8,20 @@
  *	Preetam Narayan   <preetam.narayan@intel.com>
  */
 
-#include <linux/clk.h>
-#include <linux/delay.h>
-#include <linux/gcd.h>
-#include <linux/module.h>
-#include <linux/math64.h>
-#include <linux/irq.h>
-#include <linux/irqdesc.h>
-#include <linux/interrupt.h>
-#include <linux/net_tstamp.h>
-#include <linux/of_platform.h>
-#include <linux/platform_device.h>
+ #include <linux/clk.h>
+ #include <linux/delay.h>
+ #include <linux/gcd.h>
+ #include <linux/module.h>
+ #include <linux/math64.h>
+ #include <linux/irq.h>
+ #include <linux/irqdesc.h>
+ #include <linux/interrupt.h>
+ #include <linux/net_tstamp.h>
+ #include <linux/of_platform.h>
+ #include <linux/platform_device.h>
 
-#include "altera_utils.h"
-#include "intel_fpga_tod.h"
+ #include "altera_utils.h"
+ #include "intel_fpga_tod.h"
 
 /* A fine ToD HW clock offset adjustment.
  * To perform the fine offset adjustment the AdjustPeriod register is used
@@ -351,7 +351,7 @@ static struct ptp_clock_info intel_fpga_tod_clock_ops = {
 
 /* Register the PTP clock driver to kernel */
 int intel_fpga_tod_register(struct intel_fpga_tod_private *priv,
-				   struct device *device)
+			    struct device *device)
 {
 	int ret = 0;
 	struct timespec64 ts = { 0, 0 };

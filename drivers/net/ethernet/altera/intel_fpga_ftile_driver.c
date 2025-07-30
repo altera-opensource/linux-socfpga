@@ -8,15 +8,15 @@
  * Original driver contributed by GlobalLogic.
  */
 
-#include <linux/phylink.h>
-#include "intel_fpga_eth_ftile.h"
-#include "intel_fpga_eth_hssi_itf.h"
-#include "intel_fpga_ftile_driver.h"
-#include "intel_fpga_hssi_driver.h"
-#include <linux/interrupt.h>
+ #include <linux/phylink.h>
+ #include "intel_fpga_eth_ftile.h"
+ #include "intel_fpga_eth_hssi_itf.h"
+ #include "intel_fpga_ftile_driver.h"
+ #include "intel_fpga_hssi_driver.h"
+ #include <linux/interrupt.h>
 
-#define FTILE_EHIP_RESET_TO		10000 /* in us */
-#define FTILE_EHIP_RESET_POLL_INTERVAL	5 /* in us */
+ #define FTILE_EHIP_RESET_TO		10000 /* in us */
+ #define FTILE_EHIP_RESET_POLL_INTERVAL	5 /* in us */
 
 static int ftile_wait_reset_ack(struct platform_device *pdev, u32 chan,
 				u32 rst_ack_mask, u32 maskval)

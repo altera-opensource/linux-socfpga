@@ -7,12 +7,12 @@
  *   Preetam Narayan
  *
  */
-#include <linux/slab.h>
-#include <linux/platform_device.h>
-#include <linux/debugfs.h>
-#include "altera_utils.h"
-#include "intel_fpga_hssiss.h"
-#include "intel_fpga_hssi_driver.h"
+ #include <linux/slab.h>
+ #include <linux/platform_device.h>
+ #include <linux/debugfs.h>
+ #include "altera_utils.h"
+ #include "intel_fpga_hssiss.h"
+ #include "intel_fpga_hssi_driver.h"
 
 struct hssiss_dbg_read_data {
 	u32 dr_grp; /* get_hss_profile */
@@ -291,7 +291,7 @@ free_buf:
 	return (ret < 0 ? ret : count);
 }
 
-#define BUF_SIZE	PAGE_SIZE
+ #define BUF_SIZE	PAGE_SIZE
 /*
  * hssiss_dbgfs_readme_read() - hssiss debugfs-node readme read callback
  */

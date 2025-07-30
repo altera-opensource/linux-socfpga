@@ -6,24 +6,24 @@
  *   Joyce Ooi
  */
 
-#include <linux/bitops.h>
-#include <linux/if_vlan.h>
-#include <linux/kernel.h>
-#include <linux/list.h>
-#include <linux/module.h>
-#include <linux/netdevice.h>
-#include <linux/of_net.h>
-#include <linux/of_platform.h>
-#include <linux/phy.h>
-#include <linux/platform_device.h>
-#include <linux/ptp_clock_kernel.h>
-#include <linux/phylink.h>
+ #include <linux/bitops.h>
+ #include <linux/if_vlan.h>
+ #include <linux/kernel.h>
+ #include <linux/list.h>
+ #include <linux/module.h>
+ #include <linux/netdevice.h>
+ #include <linux/of_net.h>
+ #include <linux/of_platform.h>
+ #include <linux/phy.h>
+ #include <linux/platform_device.h>
+ #include <linux/ptp_clock_kernel.h>
+ #include <linux/phylink.h>
 
-#include "altera_eth_dma.h"
-#include "intel_fpga_eth_etile.h"
-#include "intel_fpga_eth_hssi_itf.h"
+ #include "altera_eth_dma.h"
+ #include "intel_fpga_eth_etile.h"
+ #include "intel_fpga_eth_hssi_itf.h"
 
-#define MAX_COUNT_OFFSET		64000
+ #define MAX_COUNT_OFFSET		64000
 
 /* write protected read for the ui enable status */
 static inline bool wpr_get_uienable_status(intel_fpga_xtile_eth_private *priv)

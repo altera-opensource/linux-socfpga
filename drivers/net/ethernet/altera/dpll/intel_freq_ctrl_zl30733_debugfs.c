@@ -8,15 +8,15 @@
  *
  */
 
-#include <linux/delay.h>
-#include <linux/init.h>
-#include <linux/i2c-dev.h>
-#include <linux/i2c.h>
-#include <linux/kernel.h>
-#include <linux/debugfs.h>
-#include "../intel_freq_control.h"
-#include "intel_freq_ctrl_zl30733_i2c.h"
-#include "intel_freq_ctrl_zl30733_debugfs.h"
+ #include <linux/delay.h>
+ #include <linux/init.h>
+ #include <linux/i2c-dev.h>
+ #include <linux/i2c.h>
+ #include <linux/kernel.h>
+ #include <linux/debugfs.h>
+ #include "../intel_freq_control.h"
+ #include "intel_freq_ctrl_zl30733_i2c.h"
+ #include "intel_freq_ctrl_zl30733_debugfs.h"
 
 /* Register Map Page 0, General */
 u16 zl30733_reg_page_0[] = {
@@ -545,7 +545,7 @@ struct zarlink_pll_dbg {
 	u32  readaddr;
 };
 
-#define BUF_SIZE	8192U
+ #define BUF_SIZE	8192U
 
 static ssize_t zl30733_dpll_manual_freq_offset_show(struct file *filep, char __user *ubuf,
 						    size_t count, loff_t *offp)

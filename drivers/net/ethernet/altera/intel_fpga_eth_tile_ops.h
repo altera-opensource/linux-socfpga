@@ -7,8 +7,8 @@
  *
  */
 
-#ifndef __XTILE_SPEC_OPS__
-#define __XTILE_SPEC_OPS__
+ #ifndef __XTILE_SPEC_OPS__
+ #define __XTILE_SPEC_OPS__
 
 struct xtile_spec_ops {
 	const struct altera_dmaops *dma_ops;
@@ -34,4 +34,4 @@ struct xtile_spec_ops {
 	bool (*link_check)(intel_fpga_xtile_eth_private *priv);
 };
 
-#endif
+ #endif

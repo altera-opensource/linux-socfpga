@@ -7,16 +7,16 @@
  *   Preetam Narayan
  *
  */
-#define DEBUG
+ #define DEBUG
 
-#include <linux/kernel.h>
-#include <linux/delay.h>
-#include <linux/platform_device.h>
-#include "altera_utils.h"
-#include "intel_fpga_hssiss.h"
-#include "intel_fpga_hssi_driver.h"
+ #include <linux/kernel.h>
+ #include <linux/delay.h>
+ #include <linux/platform_device.h>
+ #include "altera_utils.h"
+ #include "intel_fpga_hssiss.h"
+ #include "intel_fpga_hssi_driver.h"
 
-#define ADDR_OFFSET_INCR 0x200000
+ #define ADDR_OFFSET_INCR 0x200000
 static u32 etile_addrmap[] = {
 	0x0200000, 0x0204000, 0x0240000, 0x0250000, 0x0260000, 0x0261000, 0x0262000};
 static u32 ftile_addrmap[] = {

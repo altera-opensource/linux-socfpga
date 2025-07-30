@@ -23,7 +23,7 @@
 #define CONF_LOW_POW	BIT(3)
 #define CONF_POLL_EN	BIT(4)
 #define CONF_A0PAGE_UPD BIT(5)
-#define CONF_PAGE_SEL	GENMASK(7,6)
+#define CONF_PAGE_SEL	GENMASK(7, 6)
 
 #define STAT_OFF	0x28
 #define MODPRSL             BIT(0)
@@ -136,7 +136,7 @@ static bool sfp_init(struct sfp *sfp)
 	sfp_init_i2c(sfp);
 
 	writel(I2C_ISR_CLEAR_FLAGS, sfp->base + I2C_ISR);
-	
+
 	writel(DELAY_VALUE, sfp->base + DELAY_REG);
 
 	return true;
@@ -195,10 +195,10 @@ static void sfp_check_hotplug(struct work_struct *work)
 	sfp = container_of(dwork, struct sfp, dwork);
 
 	mutex_lock(&sfp->lock);
-	
+
 	conf_off = readq(sfp->base + CONF_OFF);
-	stat_off = readq(sfp->base + STAT_OFF); 
-	
+	stat_off = readq(sfp->base + STAT_OFF);
+
 	is_sfp_pluggedin = check_sfp_plugin(sfp);
 
 	if ((!is_sfp_pluggedin) && (sfp->state != SFP_DETECT)) {
@@ -208,36 +208,35 @@ static void sfp_check_hotplug(struct work_struct *work)
 
 	/* in case of error observed then we need to take defensive action */
 	if (stat_off & A2_UPD_ERROR)
-                WRITE_ONCE(sfp->state, SFP_A2_UPDATE_ERROR);
+		WRITE_ONCE(sfp->state, SFP_A2_UPDATE_ERROR);
 
 	if (stat_off & A0_UPD_ERROR)
 		WRITE_ONCE(sfp->state, SFP_A0_UPDATE_ERROR);
-	
-	switch(sfp->state) {
 
+	switch (sfp->state) {
 	case SFP_DETECT:
 		if (is_sfp_pluggedin) {
 			dev_info_ratelimited(sfp->dev, "detected SFP plugin\n");
 			WRITE_ONCE(sfp->state, SFP_INIT_RESET);
 		}
 		break;
-	
+
 	case SFP_INIT_RESET:
-		if(sfp_init(sfp))
+		if (sfp_init(sfp))
 			WRITE_ONCE(sfp->state, SFP_INIT_DONE);
 		sfp->tolerance_count = IP_RESPONSE_TOLERANCE_LIMIT;
 		break;
 
 	case SFP_INIT_DONE:
 		if (!(stat_off & A0_UPD_RDY_TO_START))
-			dev_warn_ratelimited(sfp->dev, "SFP FSM should had been in A0 ready state \n");
+			dev_warn_ratelimited(sfp->dev, "SFP FSM should had been in A0 ready state\n");
 		else {
-			/* Driver is ready and so is the RTL now start the A0 update */	
+			/* Driver is ready and so is the RTL now start the A0 update */
 			writel(CONF_A0PAGE_UPD, sfp->base + CONF_OFF);
-	
+
 			poll_timeout = readq_poll_timeout(sfp->base + STAT_OFF, stat_off,
-							  ((stat_off & A0_UPD_COMPLETE) || 
-					    		  (stat_off & A0_UPD_IN_PROG)),
+							  ((stat_off & A0_UPD_COMPLETE) ||
+							  (stat_off & A0_UPD_IN_PROG)),
 							  10, I2C_MAX_TIMEOUT);
 			if (!poll_timeout) {
 				WRITE_ONCE(sfp->state, SFP_A0PAGE_UPDATE_INPROG);
@@ -245,8 +244,7 @@ static void sfp_check_hotplug(struct work_struct *work)
 				break;
 			} else {
 				dev_warn_ratelimited(sfp->dev,
-					 "SFP FSM state change to SFP_A0PAGE_UPDATE_INPROG"
-					 "unexpected delay\n");
+						     "SFP FSM state change to SFP_A0PAGE_UPDATE_INPROG unexpected delay\n");
 			}
 
 			if (--sfp->tolerance_count == IP_IRRESPONSIVE) {
@@ -262,11 +260,11 @@ static void sfp_check_hotplug(struct work_struct *work)
 		#define SFP_MODE_BIT BIT(7)
 
 		if (stat_off & A0_UPD_COMPLETE) {
-			page_sel = readl(sfp->base + A0_START_ADDR + MULTI_PAGE_SEL) & PAGE_SEL ? SFP_PAGE_BIT: 0;
-			sfp_sel = readl(sfp->base + A0_START_ADDR + ADDR_MODE) & MODE_SEL ? SFP_MODE_BIT: 0;
+			page_sel = readl(sfp->base + A0_START_ADDR + MULTI_PAGE_SEL) & PAGE_SEL ? SFP_PAGE_BIT : 0;
+			sfp_sel = readl(sfp->base + A0_START_ADDR + ADDR_MODE) & MODE_SEL ? SFP_MODE_BIT : 0;
 			sfp_sel |= page_sel;
 
-			/* write the bits to update the multi page info and the addr mode 
+			/* write the bits to update the multi page info and the addr mode
 			 * supported info to the design
 			 */
 			writeq(sfp_sel, sfp->base + CONF_OFF);
@@ -280,14 +278,14 @@ static void sfp_check_hotplug(struct work_struct *work)
 		writeq(CONF_POLL_EN, sfp->base + CONF_OFF);
 		WRITE_ONCE(sfp->state, SFP_A2PAGE_UPDATE_INPROG);
 		sfp->tolerance_count = IP_RESPONSE_TOLERANCE_LIMIT;
-	
+
 		break;
 
 	case SFP_A2PAGE_UPDATE_INPROG:
 		if (stat_off & A2_UPD_COMPLETE) {
 			WRITE_ONCE(sfp->state, SFP_A2PAGE_UPDATE_COMPLETE);
 		} else {
-		       	if (--sfp->tolerance_count == IP_IRRESPONSIVE)
+			if (--sfp->tolerance_count == IP_IRRESPONSIVE)
 				WRITE_ONCE(sfp->state, SFP_INIT_RESET);
 		}
 		break;
@@ -302,17 +300,15 @@ static void sfp_check_hotplug(struct work_struct *work)
 		WRITE_ONCE(sfp->state, SFP_A0PAGE_UPDATE_COMPLETE);
 		break;
 
-	case SFP_A2PAGE_UPDATE_COMPLETE:	
+	case SFP_A2PAGE_UPDATE_COMPLETE:
 	default:
 		break;
-
 	}
 
-        mutex_unlock(&sfp->lock);
+	mutex_unlock(&sfp->lock);
 
-        schedule_delayed_work(&sfp->dwork, msecs_to_jiffies(SFP_CHECK_TIME));
+	schedule_delayed_work(&sfp->dwork, msecs_to_jiffies(SFP_CHECK_TIME));
 }
-
 
 int sfp_register_regmap(struct sfp *sfp)
 {
@@ -337,78 +333,77 @@ static void sfp_page_copy(struct sfp *sfp)
 {
 	u32 *page;
 
-	page = (u32*)sfp->a0_page.a0_page;
-	for(u16 update_eeprom = 0, pg_byte = 0;
+	page = (u32 *)sfp->a0_page.a0_page;
+	for (u16 update_eeprom = 0, pg_byte = 0;
 	    update_eeprom < sizeof(sfp->a0_page); pg_byte += 1, update_eeprom += 4)
 		page[pg_byte] =
-			readl(sfp->base + A0_START_ADDR + update_eeprom); 
+			readl(sfp->base + A0_START_ADDR + update_eeprom);
 
-	page = (u32*)sfp->a2_page.a2_page;
-	for(u16 update_eeprom = 0, pg_byte = 0;
+	page = (u32 *)sfp->a2_page.a2_page;
+	for (u16 update_eeprom = 0, pg_byte = 0;
 	    update_eeprom < sizeof(sfp->a2_page); pg_byte += 1, update_eeprom += 4)
 		page[pg_byte] =
-			readl(sfp->base + A2_START_ADDR + update_eeprom); 
+			readl(sfp->base + A2_START_ADDR + update_eeprom);
 }
 
 static int sfp_module_info(struct sfp *sfp, struct ethtool_modinfo *modinfo)
 {
-	/* Atleast A0 page update is completed */
+	/* At least A0 page update is completed */
 	if (!(sfp->state >= SFP_A0PAGE_UPDATE_COMPLETE))
 		return -EIO;
 
 	sfp_page_copy(sfp);
 
 	if ((sfp->a0_page.a0.ext.sff8472_compliance) &&
-            (!((sfp->a0_page.a0.ext.diagmon) & SFP_DIAGMON_ADDRMODE))) {
-                modinfo->type = ETH_MODULE_SFF_8472;
-                //modinfo->eeprom_len = ETH_MODULE_SFF_8472_LEN;
+	    (!((sfp->a0_page.a0.ext.diagmon) & SFP_DIAGMON_ADDRMODE))) {
+		modinfo->type = ETH_MODULE_SFF_8472;
+		//modinfo->eeprom_len = ETH_MODULE_SFF_8472_LEN;
 		modinfo->eeprom_len = A0_EEPROM_SIZE + A2_EEPROM_SIZE;
-        } else {
-                modinfo->type = ETH_MODULE_SFF_8079;
-                modinfo->eeprom_len = ETH_MODULE_SFF_8079_LEN;
-        }
+	} else {
+		modinfo->type = ETH_MODULE_SFF_8079;
+		modinfo->eeprom_len = ETH_MODULE_SFF_8079_LEN;
+	}
 
-        return 0;
+	return 0;
 }
 
 static int sfp_module_eeprom_calc(struct sfp *sfp,
-			     	  u16 offset,
+				  u16 offset,
 				  u16 len_dump,
-			     	  u8 *data)
+				  u8 *data)
 {
 	u16 from_offset = offset;
 	u16 til_offset  = offset + len_dump;
 
-	if ( (len_dump == 0) || (til_offset > sizeof(sfp->a0_page) + sizeof(sfp->a2_page)) )
-		 return -EINVAL;
+	if ((len_dump == 0) || (til_offset > sizeof(sfp->a0_page) + sizeof(sfp->a2_page)))
+		return -EINVAL;
 
 	/* offset is within A0 page size */
 	if (til_offset <= ETH_MODULE_SFF_8079_LEN) {
 		/* copy from the offset the desired length */
-		memcpy(data, (u8*)sfp->a0_page.a0_page + from_offset, len_dump);
+		memcpy(data, (u8 *)sfp->a0_page.a0_page + from_offset, len_dump);
 	}
 
 	/* offset requested is on A2 page range */
 	else if ((from_offset >= ETH_MODULE_SFF_8079_LEN) && (til_offset <= A2_EEPROM_SIZE)) {
 		memcpy(data,
-		       (u8*)sfp->a2_page.a2_page + from_offset,
+		       (u8 *)sfp->a2_page.a2_page + from_offset,
 		       len_dump);
-	}
-	else {
+	} else {
 		/* requested dump covers both A0 and A2 */
 		u16 len;
-		
+
 		len = ETH_MODULE_SFF_8079_LEN - from_offset;
-		memcpy (data, 
-			(u8*)sfp->a0_page.a0_page + from_offset,
+		memcpy(data,
+		       (u8 *)sfp->a0_page.a0_page + from_offset,
 			len);
 
-		memcpy(data + len + 1, (u8*)sfp->a2_page.a2_page, len_dump - len);
+		memcpy(data + len + 1, (u8 *)sfp->a2_page.a2_page, len_dump - len);
 	}
 
-	return 0;	
+	return 0;
 }
-		
+
 static int sfp_module_eeprom(struct sfp *sfp,
 			     struct ethtool_eeprom *ee,
 			     u8 *data)
@@ -419,22 +414,22 @@ static int sfp_module_eeprom(struct sfp *sfp,
 }
 
 static int sfp_module_eeprom_by_page(struct sfp *sfp,
-                             	     const struct ethtool_module_eeprom *page_data,
-                             	     struct netlink_ext_ack *extack)
+				     const struct ethtool_module_eeprom *page_data,
+				     struct netlink_ext_ack *extack)
 {
 	int ret = 0;
 	u16 abs_offset;
-	
+
 	if ((page_data->page == 0) && (page_data->length == 1))
 		return 0;
-	
+
 	abs_offset = (page_data->page * ETH_MODULE_EEPROM_PAGE_LEN) + page_data->offset;
-	
+
 	if (abs_offset > ETH_MODULE_EEPROM_PAGE_LEN)
 		return -EINVAL;
 
 	ret = sfp_module_eeprom_calc(sfp, page_data->offset,
-				      page_data->length, page_data->data);
+				     page_data->length, page_data->data);
 
 	return ret;
 }
@@ -448,8 +443,8 @@ static const struct sfp_socket_ops sfp_module_ops = {
 	.start = unused_func,
 	.stop =  unused_func,
 	.attach =  unused_func,
-        .module_info = sfp_module_info,
-        .module_eeprom = sfp_module_eeprom,
+	.module_info = sfp_module_info,
+	.module_eeprom = sfp_module_eeprom,
 	.module_eeprom_by_page = sfp_module_eeprom_by_page,
 };
 

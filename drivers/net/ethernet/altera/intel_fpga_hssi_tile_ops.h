@@ -6,8 +6,8 @@
  *   Preetam Narayan
  *
  */
-#ifndef __HSSI_TILE_OPS_H__
-#define __HSSI_TILE_OPS_H__
+ #ifndef __HSSI_TILE_OPS_H__
+ #define __HSSI_TILE_OPS_H__
 
 struct hssi_gen_ops {
 	int (*probe_init)(struct platform_device *pdev);
@@ -29,6 +29,7 @@ struct hssi_gen_ops {
 	int (*get_mtu)(struct platform_device *pdev, enum hssiss_salcmd cmd,
 		       void *priv_data);
 	int (*set_mtu)(struct platform_device *pdev, enum hssiss_salcmd, void *data);
+
 	hssi_eth_port_sts(*get_ethport_status)(struct platform_device *pdev, int port);
 	int (*set_ethport_status)(struct platform_device *pdev, int port, u32 data);
 
@@ -64,4 +65,4 @@ struct hssi_spec_ops {
 	struct hssi_dev_ops *dev_ops;
 };
 
-#endif
+ #endif

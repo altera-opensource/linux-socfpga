@@ -36,7 +36,7 @@ static int sfp_platform_probe(struct platform_device *pdev)
 
 	/* SFP Mem address space */
 	sfpconfig = platform_get_resource_byname(pdev, IORESOURCE_MEM,
-						  INTEL_SFP_MEM_CONTROLLER_NAME);
+						 INTEL_SFP_MEM_CONTROLLER_NAME);
 	if (!sfpconfig) {
 		dev_err(dev, "resource %s not defined\n", INTEL_SFP_MEM_CONTROLLER_NAME);
 		return -ENODEV;

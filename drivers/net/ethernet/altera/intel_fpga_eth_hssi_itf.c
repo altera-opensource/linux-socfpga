@@ -7,7 +7,7 @@
  *
  */
 
-#include "intel_fpga_eth_hssi_itf.h"
+ #include "intel_fpga_eth_hssi_itf.h"
 
 static int hssi_csrrd32_errcheck(struct platform_device *pdev,
 				 enum hssiss_tile_regbank regbank,
@@ -345,14 +345,14 @@ int hssi_lock_mac_stats(struct platform_device *pdev, u32 port)
 	return hssiss_lock_stats(pdev, port);
 }
 
-int hssi_set_mtu(struct platform_device *pdev, u32 cmd, void* mtu_data)
+int hssi_set_mtu(struct platform_device *pdev, u32 cmd, void *mtu_data)
 {
 	return hssiss_set_mtu(pdev, cmd, mtu_data);
 }
 
 int hssi_unlock_mac_stats(struct platform_device *pdev, u32 port)
 {
-        return hssiss_unlock_stats(pdev, port);
+	return hssiss_unlock_stats(pdev, port);
 }
 
 int hssi_en_serial_loopback(struct platform_device *pdev,

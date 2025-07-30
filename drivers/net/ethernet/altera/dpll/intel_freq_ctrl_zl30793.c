@@ -6,16 +6,16 @@
  *	Lubana Badakar <lubana.badakar@intel.com>
  */
 
-#include <linux/delay.h>
-#include <linux/init.h>
-#include <linux/i2c-dev.h>
-#include <linux/i2c.h>
-#include <linux/kernel.h>
-#include <linux/math64.h>
-#include <linux/module.h>
-#include <linux/workqueue.h>
-#include <linux/spi/spi.h>
-#include "intel_freq_ctrl_zl30793.h"
+ #include <linux/delay.h>
+ #include <linux/init.h>
+ #include <linux/i2c-dev.h>
+ #include <linux/i2c.h>
+ #include <linux/kernel.h>
+ #include <linux/math64.h>
+ #include <linux/module.h>
+ #include <linux/workqueue.h>
+ #include <linux/spi/spi.h>
+ #include "intel_freq_ctrl_zl30793.h"
 
 /* Register Map Page 0, General */
 u16 zl30793_reg_page_0[] = {
@@ -478,7 +478,7 @@ static DEVICE_ATTR(zl30793_dpll_manual_freq_offset, 0644,
 		   zl30793_dpll_manual_freq_offset_show,
 		   zl30793_dpll_manual_freq_offset_store);
 
-static DEVICE_ATTR(zl30793_reg_dump, 0444, zl30793_reg_dump_show, NULL);
+static DEVICE_ATTR_RO(zl30793_reg_dump);
 
 static struct attribute *zl30793_sysfs_attrs[] = {
 	&dev_attr_zl30793_dpll_manual_freq_offset.attr,

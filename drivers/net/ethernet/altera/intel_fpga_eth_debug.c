@@ -7,18 +7,18 @@
  *
  */
 
-#include "altera_eth_dma.h"
-#include "altera_msgdma.h"
-#include "altera_msgdmahw.h"
-#include "altera_utils.h"
-#include "altera_msgdma_prefetcher.h"
-#include "altera_msgdmahw_prefetcher.h"
-#include "altera_sgdma.h"
-#include "intel_fpga_eth_main.h"
-#include "intel_fpga_eth_tile_ops.h"
-#include "intel_fpga_eth_hssi_itf.h"
-#include "intel_freq_control.h"
-#include <linux/string.h>
+ #include "altera_eth_dma.h"
+ #include "altera_msgdma.h"
+ #include "altera_msgdmahw.h"
+ #include "altera_utils.h"
+ #include "altera_msgdma_prefetcher.h"
+ #include "altera_msgdmahw_prefetcher.h"
+ #include "altera_sgdma.h"
+ #include "intel_fpga_eth_main.h"
+ #include "intel_fpga_eth_tile_ops.h"
+ #include "intel_fpga_eth_hssi_itf.h"
+ #include "intel_freq_control.h"
+ #include <linux/string.h>
 
 static void xtile_prefetcher_reg_dump_tx(struct altera_dma_private *priv)
 {

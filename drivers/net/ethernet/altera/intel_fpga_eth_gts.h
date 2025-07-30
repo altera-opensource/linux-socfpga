@@ -22,7 +22,6 @@
 #define FLOW_TX         2
 #define FLOW_ON         (FLOW_TX | FLOW_RX)
 
-
 /* 0x50108: IP Soft Reset Register eth_reset */
 #define ETH_EIO_SYS_RST                                         BIT(0)
 #define ETH_SOFT_TX_RST                                         BIT(1)
@@ -42,19 +41,19 @@
 #define ETH_DEASSERT_PMA_SER_LBK_DIS 0x02040
 #define ETH_SOFT_RST_ACK  BIT(0)
 #define ETH_SOFT_RX_RESET BIT(2)
-#define ETH_ASSERT_PMA_SER_LBK_ACK GENMASK(15,14)
+#define ETH_ASSERT_PMA_SER_LBK_ACK GENMASK(15, 14)
 #define ETH_DEASSERT_PMA_SER_LBK_ACK ETH_ASSERT_PMA_SER_LBK_ACK
 #define ETH_DEASSERT_PMA_SER_LBK_DONE 0
-#define ETH_ENABLE_FEC_LOOPBACK 	    BIT(1)
-#define ETH_ENABLE_XCVRIF_LOOPBACK 	    BIT(0)
-#define ETH_ENABLE_MAC_LOOPBACK             GENMASK(3,2)
+#define ETH_ENABLE_FEC_LOOPBACK	    BIT(1)
+#define ETH_ENABLE_XCVRIF_LOOPBACK	    BIT(0)
+#define ETH_ENABLE_MAC_LOOPBACK             GENMASK(3, 2)
 #define ETH_ENABLE_NEAREND_PAR_PMA_LOOPBACK BIT(22)
 #define ETH_ENABLE_NEAREND_PCS_LOOPBACK     GENMASK(18, 16)
 #define ETH_ENABLE_FAREND_PCS_LOOPBACK      GENMASK(15, 13)
 
-#define ETH_DISABLE_FEC_LOOPBACK    	    BIT(1)
-#define ETH_DISABLE_XCVRIF_LOOPBACK 	    BIT(0)
-#define ETH_DISABLE_MAC_LOOPBACK 	    GENMASK(3,2)
+#define ETH_DISABLE_FEC_LOOPBACK	    BIT(1)
+#define ETH_DISABLE_XCVRIF_LOOPBACK	    BIT(0)
+#define ETH_DISABLE_MAC_LOOPBACK	    GENMASK(3, 2)
 #define ETH_DISBLE_NEAREND_PAR_PMA_LOOPBACK BIT(22)
 #define ETH_DISABLE_NEAREND_PCS_LOOPBACK    GENMASK(18, 16)
 #define ETH_DISABLE_FAREND_PCS_LOOPBACK     GENMASK(15, 13)
@@ -95,6 +94,7 @@ struct intel_fpga_gts_eth_softip_csr {
 	u32 res2[4];
 	u32 status_signals; //0x150
 };
+
  #define eth_soft_csroffs(a) (offsetof(struct intel_fpga_gts_eth_softip_csr, a))
 
 struct intel_fpga_gts_eth_softip_ptp {
@@ -124,13 +124,14 @@ struct intel_fpga_gts_eth_softip_ptp {
 	u32 ptp_tx_lane0_calc_data_wiredelay; //0x910
 	u32 ptp_rx_lane0_calc_data_wiredelay; //0x914
 };
+
 #define eth_softip_ptp_csroffs(a) (offsetof(struct intel_fpga_gts_eth_softip_ptp, a))
 
 struct intel_fpga_gts_pcs_fec {
 	u32 res1[0x3BFF];                  // 0x51000 - 0x60000 (reserved)
-	u32 config_ctrl; 		   // 0x60000
+	u32 config_ctrl;		   // 0x60000
 	u32 res2[2];
-	u32 tx_pld_conf; 		   // 0x60010
+	u32 tx_pld_conf;		   // 0x60010
 	u32 res3[0xD];
 	u32 phy_ehip_pcs_modes;            // 0x60048
 	u32 res4[0x9];                     // 0x6004C - 0x6006F (reserved)
@@ -314,7 +315,7 @@ struct intel_fpga_gts_hardip_ptp {
 	u32 cfg_tx_ptp0_p2p126;     // 0x4021C
 	u32 cfg_tx_ptp0_p2p127;     // 0x40220
 	u32 cfg_tx_ptp0_asm0;       // 0x40224
-	u32 cfg_tx_ptp0_asm1; 	    //0x40228
+	u32 cfg_tx_ptp0_asm1;	    //0x40228
 	u32 cfg_tx_ptp0_asm2; //0x4022C
 	u32 cfg_tx_ptp0_asm3; //0x40230
 	u32 cfg_tx_ptp0_asm4; //0x40234
@@ -680,6 +681,7 @@ struct intel_fpga_gts_hardip_emac {
 	u32 rx_ts_ss_mid; //0x50670
 	u32 rx_ts_ss_hi; //0x50674
 };
+
 #define eth_hardip_emac_csroffs(a) (offsetof(struct intel_fpga_gts_hardip_emac, a))
 
 struct intel_fpga_gts_hardip_xcvr_pma {
@@ -693,6 +695,7 @@ struct intel_fpga_gts_hardip_xcvr_pma {
 	u32 xcvrif_stat_3; //0x8004C
 	u32 xcvrif_stat_hold_4; //0x80050
 };
+
  #define eth_hardip_xcvr_pma_csroffs(a) (offsetof(struct intel_fpga_gts_hardip_xcvr_pma, a))
 
 struct intel_fpga_gts_softip_pma_phy {
@@ -751,49 +754,51 @@ struct intel_fpga_gts_hardip_pma {
 	u32 SCMNG_PM_PHY_SIDE_CPI_REGS; //0xA4040
 	u32 res20[0x3EF];
 	u32 GTS_Physical_LANE_Number; //0xA5000
-	u32 res21[0x10]; 
+	u32 res21[0x10];
 	u32 pre_pma_lblk; //0xA5044
 };
+
 #define eth_hardip_pma_csroffs(a) (offsetof(struct intel_fpga_gts_hardip_pma, a))
 
 #define SYS_PLL_LOCKED    BIT(8)
 #define RX_CDR_LOCKED0    BIT(7)
 #define RX_CDR_LOCKED1    BIT(6)
+
 #define RX_CDR_LOCKED(port) \
-BUG(port > 1) \
-(port == 0) ?  RX_CDR_LOCKED0 : RX_CDR_LOCKED1
-#define TX_PLL_LOCKED1(x)  (x &  BIT(5))
-#define TX_PLL_LOCKED0(x)  (x &  BIT(4))
+	((BUG((port) > 1)), ((port) == 0 ? RX_CDR_LOCKED0 : RX_CDR_LOCKED1))
+
+#define TX_PLL_LOCKED1(x)   (((x) & BIT(5)))
+#define TX_PLL_LOCKED0(x)   (((x) & BIT(4)))
 #define TX_PLL_LOCKED(x, port) \
-BUG(port > 1) \
-(port == 0) ?  TX_PLL_LOCKED0(x): TX_PLL_LOCKED1(x)
-#define TX_LANE_STABLE1(x)   (x & BIT(3))
-#define TX_LANE_STABLE0(x)   (x & BIT(2))
+	((BUG((port) > 1)), ((port) == 0 ? TX_PLL_LOCKED0(x) : TX_PLL_LOCKED1(x)))
+
+#define TX_LANE_STABLE1(x)  (((x) & BIT(3)))
+#define TX_LANE_STABLE0(x)  (((x) & BIT(2)))
 #define TX_LANE_STABLE(x, port) \
-BUG(port > 1) \
-(port == 0) ?  TX_LANE_STABLE0(x): TX_LANE_STABLE1(x)
-#define RX_PCS_READY0(x)   (x &  BIT(0))
-#define RX_PCS_READY1(x)   (x &  BIT(1))
+	((BUG((port) > 1)), ((port) == 0 ? TX_LANE_STABLE0(x) : TX_LANE_STABLE1(x)))
+
+#define RX_PCS_READY0(x)    (((x) & BIT(0)))
+#define RX_PCS_READY1(x)    (((x) & BIT(1)))
 #define RX_PCS_READY(x, port) \
-BUG(port > 1) \
-(port == 0) ?  RX_PCS_READY0(x): RX_PCS_READY1(x)
-#define TX_FIFO_DEPTH0(x) (x & GENMASK(7,0))
-#define TX_FIFO_DEPTH1(x) (x & GENMASK(15,8)) >> 8
+	((BUG((port) > 1)), ((port) == 0 ? RX_PCS_READY0(x) : RX_PCS_READY1(x)))
+
+#define TX_FIFO_DEPTH0(x)   (((x) & GENMASK(7, 0)))
+#define TX_FIFO_DEPTH1(x)   ((((x) & GENMASK(15, 8)) >> 8))
 #define TX_FIFO_DEPTH(port, x) \
-BUG(port > 1) \
-(port == 0) ? TX_FIFO_DEPTH0(x) : TX_FIFO_DEPTH1(x)
-#define RX_FIFO_DEPTH0(x) (x & GENMASK(23,16)) >> 16
-#define RX_FIFO_DEPTH1(x) (x & GENMASK(31,24)) >> 24
+	((BUG((port) > 1)), ((port) == 0 ? TX_FIFO_DEPTH0(x) : TX_FIFO_DEPTH1(x)))
+
+#define RX_FIFO_DEPTH0(x) (((x) & GENMASK(23, 16)) >> 16)
+#define RX_FIFO_DEPTH1(x) (((x) & GENMASK(31, 24)) >> 24)
 #define RX_FIFO_DEPTH(port, x) \
-BUG(port > 1) \
-(port == 0) ? RX_FIFO_DEPTH0(x) : RX_FIFO_DEPTH1(x)
+	((BUG((port) > 1)), ((port) == 0 ? RX_FIFO_DEPTH0(x) : RX_FIFO_DEPTH1(x)))
 
 struct intel_fpga_userspace_reg {
-	u32 control_reg; 
+	u32 control_reg;
 	u32 error_reg;
 	u32 status_reg;
 	u32 fifo_status_reg;
 };
+
 #define eth_userspace_csroffs(a) (offsetof(struct intel_fpga_userspace_reg, a))
 
 #endif

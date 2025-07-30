@@ -11,20 +11,20 @@
  * Original driver contributed by GlobalLogic.
  */
 
-#include <linux/ethtool.h>
-#include <linux/kernel.h>
-#include <linux/net_tstamp.h>
-#include <linux/netdevice.h>
-#include <linux/phy.h>
-#include <linux/phylink.h>
-#include "altera_eth_dma.h"
-#include "intel_fpga_eth_main.h"
-#include "intel_fpga_eth_ftile.h"
-#include "intel_fpga_eth_hssi_itf.h"
-#include "intel_fpga_ftile_driver.h"
+ #include <linux/ethtool.h>
+ #include <linux/kernel.h>
+ #include <linux/net_tstamp.h>
+ #include <linux/netdevice.h>
+ #include <linux/phy.h>
+ #include <linux/phylink.h>
+ #include "altera_eth_dma.h"
+ #include "intel_fpga_eth_main.h"
+ #include "intel_fpga_eth_ftile.h"
+ #include "intel_fpga_eth_hssi_itf.h"
+ #include "intel_fpga_ftile_driver.h"
 
-#define FTILE_STATS_LEN	ARRAY_SIZE(stat_gstrings)
-#define FTILE_NUM_REGS	555
+ #define FTILE_STATS_LEN	ARRAY_SIZE(stat_gstrings)
+ #define FTILE_NUM_REGS	555
 
 static const char stat_gstrings[][ETH_GSTRING_LEN] = {
 	"tx_packets",

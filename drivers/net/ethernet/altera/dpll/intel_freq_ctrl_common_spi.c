@@ -7,8 +7,8 @@
  *
  */
 
-#include "../intel_freq_control.h"
-#include "intel_freq_ctrl_common_spi.h"
+ #include "../intel_freq_control.h"
+ #include "intel_freq_ctrl_common_spi.h"
 
 static int spi_dev_check(struct device *dev, void *data)
 {

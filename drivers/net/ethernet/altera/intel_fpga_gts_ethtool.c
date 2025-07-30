@@ -1,15 +1,15 @@
 // SPDX-License-Identifier: GPL-2.0
 /* Ethtool support for Altera FPGA GTS Ethernet MAC driver
- * Copyright (C) 2024, 2025 Altera Corporation. All rights reserved
- *
- * Contributors:
- *   Roman Bulgakov
- *   Yu Ying Choo
- *   Dalon Westergreen
- *   Joyce Ooi
- *
- * Original driver contributed by GlobalLogic.
- */
+* Copyright (C) 2024, 2025 Altera Corporation. All rights reserved
+*
+* Contributors:
+*   Roman Bulgakov
+*   Yu Ying Choo
+*   Dalon Westergreen
+*   Joyce Ooi
+*
+* Original driver contributed by GlobalLogic.
+*/
 
 #include <linux/ethtool.h>
 #include <linux/kernel.h>
@@ -88,8 +88,8 @@ static void gts_get_drvinfo(struct net_device *dev,
 }
 
 /* Fill in a buffer with the strings which correspond to the
- * stats
- */
+* stats
+*/
 static void gts_gstrings(struct net_device *dev, u32 stringset, u8 *buf)
 {
 	memcpy(buf, stat_gstrings, GTS_STATS_LEN * ETH_GSTRING_LEN);
@@ -100,8 +100,8 @@ static int gts_get_eeprom_len(struct net_device *dev)
 	return A0_EEPROM_SIZE;
 }
 
-static int gts_get_module_info (struct net_device *dev,
-				struct ethtool_modinfo *info)
+static int gts_get_module_info(struct net_device *dev,
+			       struct ethtool_modinfo *info)
 {
 	intel_fpga_xtile_eth_private *priv = netdev_priv(dev);
 
@@ -131,23 +131,23 @@ static int gts_get_module_eeprom(struct net_device *dev,
 }
 
 static int gts_get_module_eeprom_by_page(struct net_device *dev,
-                                         const struct ethtool_module_eeprom *page,
-                                         struct netlink_ext_ack *extack)
+					 const struct ethtool_module_eeprom *page,
+					struct netlink_ext_ack *extack)
 {
-        intel_fpga_xtile_eth_private *priv = netdev_priv(dev);
+	intel_fpga_xtile_eth_private *priv = netdev_priv(dev);
 
 	if (!priv)
-                return -ENODEV;
+		return -ENODEV;
 
-        if (!priv->phylink || !priv->dev || !priv->dev->sfp_bus) {
-                return -ENODEV;
-        }
-    	return sfp_get_module_eeprom_by_page(priv->dev->sfp_bus, page, extack);
+	if (!priv->phylink || !priv->dev || !priv->dev->sfp_bus) {
+		return -ENODEV;
+	}
+	return sfp_get_module_eeprom_by_page(priv->dev->sfp_bus, page, extack);
 }
 
 static void gts_fill_stats(struct net_device *dev,
 			   struct ethtool_stats *dummy,
-			   u64 *buf)
+			u64 *buf)
 {
 	intel_fpga_xtile_eth_private *priv = netdev_priv(dev);
 	struct platform_device *pdev  = priv->pdev_hssi;
@@ -159,8 +159,8 @@ static void gts_fill_stats(struct net_device *dev,
 	/* Tx packets */
 	buf[count++] = hssi_read_mac_stats64(pdev, hssi_port, MACSTAT_TX_PACKETS);
 
-        /* Tx SOP count*/
-        buf[count++] = hssi_read_mac_stats64(pdev, hssi_port, MACSTAT_TX_SOP_COUNT);
+	/* Tx SOP count*/
+	buf[count++] = hssi_read_mac_stats64(pdev, hssi_port, MACSTAT_TX_SOP_COUNT);
 
 	/* Tx total packets*/
 	buf[count++] = hssi_read_mac_stats64(pdev, hssi_port, MACSTAT_TX_TOTAL_PACKETS);
@@ -209,7 +209,7 @@ static void gts_fill_stats(struct net_device *dev,
 
 	/* Tx pause bytes */
 	buf[count++] = hssi_read_mac_stats64(pdev, hssi_port, MACSTAT_TX_PAUSE);
-	
+
 	/* Tx undersize*/
 	buf[count++] = hssi_read_mac_stats64(pdev, hssi_port, MACSTAT_TX_UNDERSIZE);
 
@@ -218,21 +218,21 @@ static void gts_fill_stats(struct net_device *dev,
 
 	/* Tx CRC error packets */
 	buf[count++] = hssi_read_mac_stats64(pdev, hssi_port, MACSTAT_TX_CRC_ERRORS);
-	
+
 	/* Tx Ethernet drops */
 	buf[count++] = hssi_read_mac_stats64(pdev, hssi_port, MACSTAT_TX_ETHER_DROPS);
 
 	/* Tx align error packets */
 	buf[count++] = hssi_read_mac_stats64(pdev, hssi_port, MACSTAT_TX_ALIGN_ERRORS);
-	
+
 	/* Tx error bytes */
 	buf[count++] = hssi_read_mac_stats64(pdev, hssi_port, MACSTAT_TX_ERRORS);
 
 	/* Rx packets */
 	buf[count++] = hssi_read_mac_stats64(pdev, hssi_port, MACSTAT_RX_PACKETS);
 
-        /* Rx SOP count*/
-        buf[count++] = hssi_read_mac_stats64(pdev, hssi_port, MACSTAT_RX_SOP_COUNT);
+	/* Rx SOP count*/
+	buf[count++] = hssi_read_mac_stats64(pdev, hssi_port, MACSTAT_RX_SOP_COUNT);
 
 	/* Rx total packets*/
 	buf[count++] = hssi_read_mac_stats64(pdev, hssi_port, MACSTAT_RX_TOTAL_PACKETS);
@@ -332,7 +332,7 @@ static int gts_reglen(struct net_device *dev)
 	return GTS_NUM_REGS * sizeof(u32);
 }
 
-#define FILLER_BYTES(in) buf[buf_index++] = 0;
+#define FILLER_BYTES(in) do { buf[buf_index++] = 0; } while (false);
 
 #define FILLER_HARDIP_EMAC(in) FILLER_BYTES(hardip_xcvr_pma->(in))
 
@@ -349,16 +349,16 @@ static void gts_get_regs(struct net_device *dev, struct ethtool_regs *regs,
 	hardip_xcvr_pma = NULL;
 
 	/* Set version to a known value, so ethtool knows
-	 * how to do any special formatting of this data.
-	 * This version number will need to change if and
-	 * when this register table is changed.
-	 *
-	 * version[31:0] = 1: Dump the 10GbE MAC IP Registers
-	 *      Upper bits are all 0 by default
-	 *
-	 * Upper 16-bits will indicate feature presence for
-	 * Ethtool register decoding in future version.
-	 */
+	* how to do any special formatting of this data.
+	* This version number will need to change if and
+	* when this register table is changed.
+	*
+	* version[31:0] = 1: Dump the 10GbE MAC IP Registers
+	*      Upper bits are all 0 by default
+	*
+	* Upper 16-bits will indicate feature presence for
+	* Ethtool register decoding in future version.
+	*/
 
 	regs->version = 1;
 
@@ -1620,22 +1620,22 @@ static int gts_set_pauseparam(struct net_device *dev,
 		new_pause |= FLOW_RX;
 		hssi_set_bit(pdev, HSSI_EMAC_HARDIP, hssi_port,
 			     eth_hardip_emac_csroffs(rxsfc_ehip_cfg),
-			     ETH_RX_EN_STD_FLOW_CTRL);
+	ETH_RX_EN_STD_FLOW_CTRL);
 	} else {
 		hssi_clear_bit(pdev, HSSI_EMAC_HARDIP, hssi_port,
 			       eth_hardip_emac_csroffs(rxsfc_ehip_cfg),
-			       ETH_RX_EN_STD_FLOW_CTRL);
+		ETH_RX_EN_STD_FLOW_CTRL);
 	}
 
 	if (pauseparam->tx_pause) {
 		new_pause |= FLOW_TX;
 		hssi_set_bit(pdev, HSSI_EMAC_HARDIP, hssi_port,
 			     eth_hardip_emac_csroffs(txsfc_ehip_cfg),
-				ETH_TX_EN_STD_FLOW_CTRL);
+	ETH_TX_EN_STD_FLOW_CTRL);
 	} else {
 		hssi_clear_bit(pdev, HSSI_EMAC_HARDIP, hssi_port,
 			       eth_hardip_emac_csroffs(txsfc_ehip_cfg),
-			       ETH_TX_EN_STD_FLOW_CTRL);
+		ETH_TX_EN_STD_FLOW_CTRL);
 	}
 
 	hssi_csrwr32(pdev, HSSI_EMAC_HARDIP, hssi_port,
@@ -1663,11 +1663,11 @@ static int gts_get_ts_info(struct net_device *dev,
 		info->phc_index = -1;
 
 	info->tx_types = (1 << HWTSTAMP_TX_OFF) |
-			 (1 << HWTSTAMP_TX_ON) |
-			 (1 << HWTSTAMP_TX_ONESTEP_SYNC);
+			(1 << HWTSTAMP_TX_ON) |
+			(1 << HWTSTAMP_TX_ONESTEP_SYNC);
 
 	info->rx_filters = (1 << HWTSTAMP_FILTER_NONE) |
-			   (1 << HWTSTAMP_FILTER_ALL);
+			(1 << HWTSTAMP_FILTER_ALL);
 	return 0;
 #endif
 }

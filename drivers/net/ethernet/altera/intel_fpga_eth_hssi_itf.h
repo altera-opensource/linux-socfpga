@@ -6,15 +6,15 @@
  *   Preetam Narayan
  */
 
-#ifndef __INTEL_FPGA_ETH_HSSI_ITF_H__
-#define __INTEL_FPGA_ETH_HSSI_ITF_H__
+ #ifndef __INTEL_FPGA_ETH_HSSI_ITF_H__
+ #define __INTEL_FPGA_ETH_HSSI_ITF_H__
 
-#include <linux/kernel.h>
-#include <linux/platform_device.h>
+ #include <linux/kernel.h>
+ #include <linux/platform_device.h>
 
-#include "intel_fpga_hssiss.h"
+ #include "intel_fpga_hssiss.h"
 
-#define INTEL_FPGA_RET_SUCCESS 0
+ #define INTEL_FPGA_RET_SUCCESS 0
 
 u32  hssi_csrrd32(struct platform_device *pdev,
 		  enum hssiss_tile_regbank regbank,
@@ -134,6 +134,6 @@ bool hssi_bit_is_clear(struct platform_device *pdev,
 int hssi_lock_mac_stats(struct platform_device *pdev, u32 port);
 int hssi_unlock_mac_stats(struct platform_device *pdev, u32 port);
 void hssi_reset_port(struct platform_device *pdev, u32 port);
-int hssi_set_mtu(struct platform_device *pdev, u32 cmd, void* mtu_data);
-int hssi_get_mtu(struct platform_device *pdev, u32 cmd, void* mtu_data);
-#endif
+int hssi_set_mtu(struct platform_device *pdev, u32 cmd, void *mtu_data);
+int hssi_get_mtu(struct platform_device *pdev, u32 cmd, void *mtu_data);
+ #endif

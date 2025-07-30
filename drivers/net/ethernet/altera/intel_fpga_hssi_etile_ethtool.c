@@ -6,21 +6,21 @@
  *   Preetam Narayan
  */
 
-#include <linux/ethtool.h>
-#include <linux/kernel.h>
-#include <linux/net_tstamp.h>
-#include <linux/netdevice.h>
-#include <linux/phy.h>
-#include <linux/phylink.h>
+ #include <linux/ethtool.h>
+ #include <linux/kernel.h>
+ #include <linux/net_tstamp.h>
+ #include <linux/netdevice.h>
+ #include <linux/phy.h>
+ #include <linux/phylink.h>
 
-#include "altera_eth_dma.h"
-#include "intel_fpga_eth_etile.h"
-#include "intel_fpga_eth_hssi_itf.h"
+ #include "altera_eth_dma.h"
+ #include "intel_fpga_eth_etile.h"
+ #include "intel_fpga_eth_hssi_itf.h"
 
-#define ETILE_STATS_LEN	ARRAY_SIZE(stat_gstrings)
-#define ETILE_NUM_REGS	294
+ #define ETILE_STATS_LEN	ARRAY_SIZE(stat_gstrings)
+ #define ETILE_NUM_REGS	294
 
-#define ARRAY_LEN(arr) ((int)((int)sizeof(arr) / (int)sizeof(arr[0])))
+ #define ARRAY_LEN(arr) ((int)((int)sizeof(arr) / (int)sizeof(arr[0])))
 
 static const char stat_gstrings[][ETH_GSTRING_LEN] = {
 	"tx_packets",

@@ -1,11 +1,11 @@
 // SPDX-License-Identifier: GPL-2.0
 /* Altera FPGA HSSI generic glue logic driver
- * Copyright (C) 2024, 2025 Altera Corporation. All rights reserved
- *
- * Contributors:
- *   Preetam Narayan
- *
- */
+* Copyright (C) 2024, 2025 Altera Corporation. All rights reserved
+*
+* Contributors:
+*   Preetam Narayan
+*
+*/
 #define DEBUG
 
 #include <linux/kernel.h>
@@ -24,41 +24,43 @@ int hssigldrv_probe_init(struct platform_device *pdev)
 	struct resource *usrcsr;
 	struct device_node *dev_tr;
 	struct platform_device *pdev_tr;
+
 	struct hssiss_private *priv = platform_get_drvdata(pdev);
-        
+
 	/* USR CSR address space */
-        ret = request_and_map(pdev, "usr_csr", &usrcsr,          
-                              (void __iomem **)&priv->usrcsr);
-        if (ret)
-                dev_warn(&pdev->dev, "No user space resource mapped");
+	ret = request_and_map(pdev, "usr_csr", &usrcsr,
+			      (void __iomem **)&priv->usrcsr);
+	if (ret)
+		dev_warn(&pdev->dev, "No user space resource mapped");
 
 	dev_info(&pdev->dev, "User CSR starts at 0x%08lx\n",
-				(unsigned long)usrcsr->start);
+		 (unsigned long)usrcsr->start);
 
 	dev_tr = of_parse_phandle(pdev->dev.of_node, "tr-type", 0);
 	if (!dev_tr)
 		return -ENOENT;
-	
+
 	pdev_tr = of_find_device_by_node(dev_tr);
-        if (!pdev_tr) {
-                of_node_put(dev_tr);
-                return -ENODEV;
-        }
+	if (!pdev_tr) {
+		of_node_put(dev_tr);
+		return -ENODEV;
+	}
 
 	priv->spec_ops->dev_ops = platform_get_drvdata(pdev_tr);
 	BUG_ON(!priv->spec_ops->dev_ops);
-	
+
 	priv->spec_ops->dev_ops->probe_init(pdev);
-	return ret; 
+	return ret;
 }
 
 static void hssigldrv_rdexecute(struct platform_device *pdev,
-			 	u32 offset, u8 acc_type, u32 *val)
+				u32 offset, u8 acc_type, u32 *val)
 {
 	struct hssiss_private *priv = platform_get_drvdata(pdev);
+
 	void __iomem *base = priv->sscsr;
 
-	switch(acc_type) {
+	switch (acc_type) {
 	case WORD_ACCESS:
 		*val = csrrd32(base, offset);
 		break;
@@ -71,12 +73,13 @@ static void hssigldrv_rdexecute(struct platform_device *pdev,
 }
 
 static void hssigldrv_wrexecute(struct platform_device *pdev,
-			 	u32 offset, u8 acc_type, u32 val)
+				u32 offset, u8 acc_type, u32 val)
 {
 	struct hssiss_private *priv = platform_get_drvdata(pdev);
+
 	void __iomem *base = priv->sscsr;
 
-	switch(acc_type) {
+	switch (acc_type) {
 	case WORD_ACCESS:
 		csrwr32(val, base, offset);
 		break;
@@ -90,17 +93,17 @@ static void hssigldrv_wrexecute(struct platform_device *pdev,
 
 int hssigldrv_get_set_csr(struct platform_device *pdev, u32 cmd,
 			  void *csr_data,
-			  bool rd)
+			bool rd)
 {
 	u32 addr_offset = 0;
 	struct hssiss_private *priv = platform_get_drvdata(pdev);
 	struct get_set_csr_data *data = (struct get_set_csr_data *)csr_data;
 
-	addr_offset = priv->spec_ops->dev_ops->get_addr_offset(pdev, 
-							       data->ch,
-							       data->reg_type,
-							       data->offs);
-	switch(cmd) {
+	addr_offset = priv->spec_ops->dev_ops->get_addr_offset(pdev,
+							data->ch,
+							data->reg_type,
+							data->offs);
+	switch (cmd) {
 	case SAL_GET_CSR:
 		hssigldrv_rdexecute(pdev, addr_offset, data->word,
 				    &data->data);
@@ -112,23 +115,23 @@ int hssigldrv_get_set_csr(struct platform_device *pdev, u32 cmd,
 	default:
 		dev_err(&pdev->dev, "Bad command type other than get/set csr\n");
 	}
-	
+
 	return 0;
 }
 
 hssi_eth_port_sts hssigldrv_get_ethport_status(struct platform_device *pdev,
 					       int port)
 {
-        hssi_eth_port_sts port_sts;
-        struct hssiss_private *priv = platform_get_drvdata(pdev);
-        
+	hssi_eth_port_sts port_sts;
+	struct hssiss_private *priv = platform_get_drvdata(pdev);
+
 	port_sts = priv->spec_ops->dev_ops->get_ethport_status(pdev, port);
 
 	return port_sts;
 }
 
 int hssigldrv_get_mtu(struct platform_device *pdev, enum hssiss_salcmd cmd,
-	    	      void *priv_data)
+		      void *priv_data)
 {
 	(void)cmd;
 	struct hssiss_private *priv = platform_get_drvdata(pdev);
@@ -139,30 +142,31 @@ int hssigldrv_get_mtu(struct platform_device *pdev, enum hssiss_salcmd cmd,
 }
 
 int hssigldrv_set_mtu(struct platform_device *pdev, enum hssiss_salcmd cmd,
-                      void *priv_data)
+		      void *priv_data)
 {
 	(void)cmd;
-        struct hssiss_private *priv = platform_get_drvdata(pdev);
+	struct hssiss_private *priv = platform_get_drvdata(pdev);
 
-        priv->spec_ops->dev_ops->set_mtu(pdev, priv_data);
+	priv->spec_ops->dev_ops->set_mtu(pdev, priv_data);
 
-        return 0;
+	return 0;
 }
 
 int hssigldrv_lock_mac_stats(struct platform_device *pdev,
 			     int port)
 {
 	struct hssiss_private *priv = platform_get_drvdata(pdev);
+
 	priv->spec_ops->dev_ops->freeze_mac_stats(pdev, port);
 
 	return 0;
 }
 
-
 int hssigldrv_unlock_mac_stats(struct platform_device *pdev,
 			       int port)
 {
 	struct hssiss_private *priv = platform_get_drvdata(pdev);
+
 	priv->spec_ops->dev_ops->defreeze_mac_stats(pdev, port);
 
 	return 0;
@@ -176,17 +180,18 @@ int hssigldrv_read_mac_stats(struct platform_device *pdev,
 	u64 val = 0;
 	struct hssiss_private *priv = platform_get_drvdata(pdev);
 
-	val = priv->spec_ops->dev_ops->read_mac_stat(pdev, (struct read_mac_stat_data*)data);
-	
-	return val;	
+	val = priv->spec_ops->dev_ops->read_mac_stat(pdev, (struct read_mac_stat_data *)data);
+
+	return val;
 }
 
 int hssigldrv_reset_mac_stat(struct platform_device *pdev, enum hssiss_salcmd cmd,
-                             void *data)
+			     void *data)
 {
 	struct hssiss_private *priv = platform_get_drvdata(pdev);
+
 	(void)cmd;
-	
+
 	priv->spec_ops->dev_ops->reset_mac_stat(pdev,
 						((struct reset_mac_stat_data *)data)->port);
 
@@ -201,7 +206,7 @@ int hssigldrv_enable_disable_loopback(struct platform_device *pdev, u32 cmdid,
 	int ret;
 
 	if (cmdid == SAL_ENABLE_LOOPBACK)
-		 ret = priv->spec_ops->dev_ops->enable_loopback(pdev, data->type, data->port);
+		ret = priv->spec_ops->dev_ops->enable_loopback(pdev, data->type, data->port);
 	else
 		ret = priv->spec_ops->dev_ops->disable_loopback(pdev, data->type, data->port);
 

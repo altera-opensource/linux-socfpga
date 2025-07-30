@@ -8,19 +8,19 @@
  *	Lubana Badakar <lubana.badakar@intel.com>
  */
 
-#ifndef HAVE_INTEL_FREQ_CONTROL_H
-#define HAVE_INTEL_FREQ_CONTROL_H
+ #ifndef HAVE_INTEL_FREQ_CONTROL_H
+ #define HAVE_INTEL_FREQ_CONTROL_H
 
-#include <linux/types.h>
-#include <linux/delay.h>
-#include <linux/math64.h>
-#include <linux/spi/spi.h>
-#include <linux/i2c-dev.h>
-#include <linux/i2c.h>
-#include <linux/workqueue.h>
+ #include <linux/types.h>
+ #include <linux/delay.h>
+ #include <linux/math64.h>
+ #include <linux/spi/spi.h>
+ #include <linux/i2c-dev.h>
+ #include <linux/i2c.h>
+ #include <linux/workqueue.h>
 
-#define FREQ_CTRL_ERROR_SUCCESS 0
-#define FREQ_CTRL_ERROR_FAIL    1
+ #define FREQ_CTRL_ERROR_SUCCESS 0
+ #define FREQ_CTRL_ERROR_FAIL    1
 
 struct clock_cleaner {
 	const char *clock_name;		/* Eg. si5518 or lmk05028 */
@@ -72,4 +72,4 @@ struct intel_freq_control_private {
 };
 
 void schedule_pll_lock_check(struct intel_freq_control_private *priv);
-#endif
+ #endif

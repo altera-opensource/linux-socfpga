@@ -101,7 +101,7 @@ static int qsfp_ctrl_version_read(struct qsfp *qsfp)
 	u32 ver;
 
 	ver = readl(qsfp->base + QSFP_CONTROLLER_VER);
-	dev_info(qsfp->dev, "QSFP I2C CONTROLLER VERSION: 0x%x \n", ver);
+	dev_info(qsfp->dev, "QSFP I2C CONTROLLER VERSION: 0x%x\n", ver);
 
 	return ver;
 }

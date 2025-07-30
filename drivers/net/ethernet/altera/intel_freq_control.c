@@ -8,18 +8,18 @@
  *	Lubana Badakar <lubana.badakar@intel.com>
  */
 
-#include <linux/init.h>
-#include <linux/kernel.h>
-#include <linux/module.h>
-#include <linux/workqueue.h>
-#include <linux/of_platform.h>
-#include <linux/platform_device.h>
-#include "intel_freq_control.h"
-#include "dpll/intel_freq_ctrl_common_spi.h"
-#include "dpll/intel_freq_ctrl_zl30793_spi.h"
-#include "dpll/intel_freq_ctrl_zl30733_i2c.h"
-#include "dpll/intel_freq_ctrl_common_i2c.h"
-#include "dpll/intel_freq_ctrl_zl30733_debugfs.h"
+ #include <linux/init.h>
+ #include <linux/kernel.h>
+ #include <linux/module.h>
+ #include <linux/workqueue.h>
+ #include <linux/of_platform.h>
+ #include <linux/platform_device.h>
+ #include "intel_freq_control.h"
+ #include "dpll/intel_freq_ctrl_common_spi.h"
+ #include "dpll/intel_freq_ctrl_zl30793_spi.h"
+ #include "dpll/intel_freq_ctrl_zl30733_i2c.h"
+ #include "dpll/intel_freq_ctrl_common_i2c.h"
+ #include "dpll/intel_freq_ctrl_zl30733_debugfs.h"
 
 struct platform_device;
 

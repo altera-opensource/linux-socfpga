@@ -66,14 +66,14 @@ static u32 hssigldrv_gts_make_usrcsr_addr_offs(struct platform_device *pdev,
 					       u8 port,
 					       u32 offs)
 {
-        struct hssiss_private *priv = platform_get_drvdata(pdev);
-        struct eth_sub_system *eth_ssr;
-        u32 offs_addr = offs;
+	struct hssiss_private *priv = platform_get_drvdata(pdev);
+	struct eth_sub_system *eth_ssr;
+	u32 offs_addr = offs;
 
-        eth_ssr = (struct eth_sub_system *)priv->dev_specific;
-	
+	eth_ssr = (struct eth_sub_system *)priv->dev_specific;
+
 	offs_addr += eth_ssr->user_csr_start;
-	BUG_ON(offs_addr >= eth_ssr->user_csr_start + 
+	BUG_ON(offs_addr >= eth_ssr->user_csr_start +
 				eth_ssr->user_csr_len);
 
 	return offs_addr;
@@ -237,14 +237,14 @@ static int hssigldrv_gts_en_loopback_mode(struct platform_device *pdev,
 			return -ETIME;
 
 		return 0;
-	
+
 	case NEAREND_PAR_PMA_LOOPBACK:
 		addr_offs = hssigldrv_gts_make_csr_addr_offs(pdev, port, HSSI_PMA_HARDIP,
 							     eth_hardip_pma_csroffs(pre_pma_lblk));
 
 		tse_set_bit(base, addr_offs, ETH_ENABLE_NEAREND_PAR_PMA_LOOPBACK);
 		break;
-	
+
 	case NEAREND_XCVRIF_LOOPBACK:
 		addr_offs = hssigldrv_gts_make_csr_addr_offs(pdev, port,
 							     HSSI_XCVR_PMA_HARDIP,
@@ -252,7 +252,7 @@ static int hssigldrv_gts_en_loopback_mode(struct platform_device *pdev,
 
 		tse_set_bit(base, addr_offs, ETH_ENABLE_XCVRIF_LOOPBACK);
 		break;
-	
+
 	case NEAREND_MAC_LOOPBACK:
 		addr_offs = hssigldrv_gts_make_csr_addr_offs(pdev, port,
 							     HSSI_EMAC_HARDIP,
@@ -260,7 +260,7 @@ static int hssigldrv_gts_en_loopback_mode(struct platform_device *pdev,
 
 		tse_set_bit(base, addr_offs, ETH_ENABLE_MAC_LOOPBACK);
 		break;
-	
+
 	case NEAREND_PAR_PCS_LOOPBACK:
 		addr_offs = hssigldrv_gts_make_csr_addr_offs(pdev, port,
 							     HSSI_PCS_FEC_HARDIP,
@@ -268,7 +268,7 @@ static int hssigldrv_gts_en_loopback_mode(struct platform_device *pdev,
 
 		tse_set_bit(base, addr_offs, ETH_ENABLE_NEAREND_PCS_LOOPBACK);
 		break;
-	
+
 	case FAREND_PAR_PCS_LOOPBACK:
 		addr_offs = hssigldrv_gts_make_csr_addr_offs(pdev, port,
 							     HSSI_PCS_FEC_HARDIP,
@@ -486,24 +486,24 @@ static int hssigldrv_gts_get_mtu(struct platform_device *pdev,
 }
 
 static int hssigldrv_gts_set_mtu(struct platform_device *pdev,
-                                 void *mtu_data)
+				 void *mtu_data)
 {
-        struct hssiss_private *priv = platform_get_drvdata(pdev);
-        void __iomem *base = priv->sscsr;
+	struct hssiss_private *priv = platform_get_drvdata(pdev);
+	void __iomem *base = priv->sscsr;
 	struct set_mtu_data *data = mtu_data;
-        u32 addr_offs;
+	u32 addr_offs;
 
-        addr_offs = hssigldrv_gts_make_csr_addr_offs(pdev, data->port,
-                                                     HSSI_EMAC_HARDIP,
-                                        eth_hardip_emac_csroffs(max_tx_size_config));
-        csrwr32(data->max_tx_frame_size, base, addr_offs);
+	addr_offs = hssigldrv_gts_make_csr_addr_offs(pdev, data->port,
+						     HSSI_EMAC_HARDIP,
+					eth_hardip_emac_csroffs(max_tx_size_config));
+	csrwr32(data->max_tx_frame_size, base, addr_offs);
 
-        addr_offs = hssigldrv_gts_make_csr_addr_offs(pdev, data->port,
-                                                     HSSI_EMAC_HARDIP,
-                                        eth_hardip_emac_csroffs(max_rx_size_config));
-        csrwr32(data->max_rx_frame_size, base, addr_offs);
+	addr_offs = hssigldrv_gts_make_csr_addr_offs(pdev, data->port,
+						     HSSI_EMAC_HARDIP,
+					eth_hardip_emac_csroffs(max_rx_size_config));
+	csrwr32(data->max_rx_frame_size, base, addr_offs);
 
-        return 0;
+	return 0;
 }
 
 static int hssigldrv_gts_read_mac_stats(struct platform_device *pdev,
@@ -660,25 +660,25 @@ static int hssigldrv_gts_read_mac_stats(struct platform_device *pdev,
 		rdata -= csrrd32(base, addr_offs);
 
 		break;
-        case MACSTAT_TX_CRC_ERRORS:
-                addr_offs = hssigldrv_gts_make_csr_addr_offs(pdev, data->port_data,
-                                                             HSSI_EMAC_HARDIP,
-                                                eth_hardip_emac_csroffs(cntr_tx_fcs_lo));
-                rdata = csrrd32(base, addr_offs);
+	case MACSTAT_TX_CRC_ERRORS:
+		addr_offs = hssigldrv_gts_make_csr_addr_offs(pdev, data->port_data,
+							     HSSI_EMAC_HARDIP,
+						eth_hardip_emac_csroffs(cntr_tx_fcs_lo));
+		rdata = csrrd32(base, addr_offs);
 
-                break;
-        case MACSTAT_TX_ALIGN_ERRORS:
-                addr_offs = hssigldrv_gts_make_csr_addr_offs(pdev, data->port_data,
-                                                             HSSI_EMAC_HARDIP,
-                                                eth_hardip_emac_csroffs(cntr_tx_fcs_lo));
-                rdata = csrrd32(base, addr_offs);
+		break;
+	case MACSTAT_TX_ALIGN_ERRORS:
+		addr_offs = hssigldrv_gts_make_csr_addr_offs(pdev, data->port_data,
+							     HSSI_EMAC_HARDIP,
+						eth_hardip_emac_csroffs(cntr_tx_fcs_lo));
+		rdata = csrrd32(base, addr_offs);
 
-                addr_offs = hssigldrv_gts_make_csr_addr_offs(pdev, data->port_data,
-                                                             HSSI_EMAC_HARDIP,
-                                                eth_hardip_emac_csroffs(cntr_tx_runt_lo));
-                rdata -= csrrd32(base, addr_offs);
+		addr_offs = hssigldrv_gts_make_csr_addr_offs(pdev, data->port_data,
+							     HSSI_EMAC_HARDIP,
+						eth_hardip_emac_csroffs(cntr_tx_runt_lo));
+		rdata -= csrrd32(base, addr_offs);
 
-                break;
+		break;
 	case MACSTAT_TX_BYTES:
 		addr_offs = hssigldrv_gts_make_csr_addr_offs(pdev, data->port_data,
 							     HSSI_EMAC_HARDIP,
@@ -893,13 +893,13 @@ static int hssigldrv_gts_read_mac_stats(struct platform_device *pdev,
 		rdata += U64_FROM_32(rdata_hi, rdata_lo);
 
 		break;
-        case MACSTAT_TX_ETHER_DROPS:
-                addr_offs = hssigldrv_gts_make_csr_addr_offs(pdev, data->port_data,
-                                                             HSSI_EMAC_HARDIP,
-                                                eth_hardip_emac_csroffs(cntr_tx_dropped_lo));
-                rdata = csrrd32(base, addr_offs);
+	case MACSTAT_TX_ETHER_DROPS:
+		addr_offs = hssigldrv_gts_make_csr_addr_offs(pdev, data->port_data,
+							     HSSI_EMAC_HARDIP,
+						eth_hardip_emac_csroffs(cntr_tx_dropped_lo));
+		rdata = csrrd32(base, addr_offs);
 
-                break;
+		break;
 	case MACSTAT_ETHER_DROPS:
 		addr_offs = hssigldrv_gts_make_csr_addr_offs(pdev, data->port_data,
 							     HSSI_EMAC_HARDIP,
@@ -907,19 +907,19 @@ static int hssigldrv_gts_read_mac_stats(struct platform_device *pdev,
 		rdata = csrrd32(base, addr_offs);
 
 		break;
-        case MACSTAT_TX_TOTAL_BYTES:
-                addr_offs = hssigldrv_gts_make_csr_addr_offs(pdev, data->port_data,
-                                                             HSSI_EMAC_HARDIP,
-                                                eth_hardip_emac_csroffs(cntr_tx_octetsok_lo));
-                rdata_lo = csrrd32(base, addr_offs);
+	case MACSTAT_TX_TOTAL_BYTES:
+		addr_offs = hssigldrv_gts_make_csr_addr_offs(pdev, data->port_data,
+							     HSSI_EMAC_HARDIP,
+						eth_hardip_emac_csroffs(cntr_tx_octetsok_lo));
+		rdata_lo = csrrd32(base, addr_offs);
 
-                addr_offs = hssigldrv_gts_make_csr_addr_offs(pdev, data->port_data,
-                                                             HSSI_EMAC_HARDIP,
-                                                eth_hardip_emac_csroffs(cntr_tx_octetsok_hi));
-                rdata_hi = csrrd32(base, addr_offs);
-                rdata += U64_FROM_32(rdata_hi, rdata_lo);
+		addr_offs = hssigldrv_gts_make_csr_addr_offs(pdev, data->port_data,
+							     HSSI_EMAC_HARDIP,
+						eth_hardip_emac_csroffs(cntr_tx_octetsok_hi));
+		rdata_hi = csrrd32(base, addr_offs);
+		rdata += U64_FROM_32(rdata_hi, rdata_lo);
 
-                break;
+		break;
 	case MACSTAT_RX_TOTAL_BYTES:
 		addr_offs = hssigldrv_gts_make_csr_addr_offs(pdev, data->port_data,
 							     HSSI_EMAC_HARDIP,
@@ -1119,43 +1119,43 @@ static int hssigldrv_gts_read_mac_stats(struct platform_device *pdev,
 		rdata += csrrd32(base, addr_offs);
 
 		break;
-        case MACSTAT_TX_UNDERSIZE:
-                addr_offs = hssigldrv_gts_make_csr_addr_offs(pdev, data->port_data,
-                                                             HSSI_EMAC_HARDIP,
-                                                eth_hardip_emac_csroffs(cntr_tx_runt_lo));
-                rdata = csrrd32(base, addr_offs);
-                break;
+	case MACSTAT_TX_UNDERSIZE:
+		addr_offs = hssigldrv_gts_make_csr_addr_offs(pdev, data->port_data,
+							     HSSI_EMAC_HARDIP,
+						eth_hardip_emac_csroffs(cntr_tx_runt_lo));
+		rdata = csrrd32(base, addr_offs);
+		break;
 	case MACSTAT_RX_UNDERSIZE:
 		addr_offs = hssigldrv_gts_make_csr_addr_offs(pdev, data->port_data,
 							     HSSI_EMAC_HARDIP,
 						eth_hardip_emac_csroffs(cntr_rx_runt_lo));
 		rdata = csrrd32(base, addr_offs);
 		break;
-        case MACSTAT_TX_OVERSIZE:
-                addr_offs = hssigldrv_gts_make_csr_addr_offs(pdev, data->port_data,
-                                                             HSSI_EMAC_HARDIP,
-                                                eth_hardip_emac_csroffs(cntr_tx_oversize_lo));
-                rdata = csrrd32(base, addr_offs);
-                break;
+	case MACSTAT_TX_OVERSIZE:
+		addr_offs = hssigldrv_gts_make_csr_addr_offs(pdev, data->port_data,
+							     HSSI_EMAC_HARDIP,
+						eth_hardip_emac_csroffs(cntr_tx_oversize_lo));
+		rdata = csrrd32(base, addr_offs);
+		break;
 	case MACSTAT_RX_OVERSIZE:
 		addr_offs = hssigldrv_gts_make_csr_addr_offs(pdev, data->port_data,
 							     HSSI_EMAC_HARDIP,
 						eth_hardip_emac_csroffs(cntr_rx_oversize_lo));
 		rdata = csrrd32(base, addr_offs);
 		break;
-        case MACSTAT_TX_64_BYTES:
-                addr_offs = hssigldrv_gts_make_csr_addr_offs(pdev, data->port_data,
-                                                             HSSI_EMAC_HARDIP,
-                                                eth_hardip_emac_csroffs(cntr_tx_64b_lo));
-                rdata_lo = csrrd32(base, addr_offs);
+	case MACSTAT_TX_64_BYTES:
+		addr_offs = hssigldrv_gts_make_csr_addr_offs(pdev, data->port_data,
+							     HSSI_EMAC_HARDIP,
+						eth_hardip_emac_csroffs(cntr_tx_64b_lo));
+		rdata_lo = csrrd32(base, addr_offs);
 
-                addr_offs = hssigldrv_gts_make_csr_addr_offs(pdev, data->port_data,
-                                                             HSSI_EMAC_HARDIP,
-                                                eth_hardip_emac_csroffs(cntr_tx_64b_hi));
-                rdata_hi = csrrd32(base, addr_offs);
-                rdata += U64_FROM_32(rdata_hi, rdata_lo);
+		addr_offs = hssigldrv_gts_make_csr_addr_offs(pdev, data->port_data,
+							     HSSI_EMAC_HARDIP,
+						eth_hardip_emac_csroffs(cntr_tx_64b_hi));
+		rdata_hi = csrrd32(base, addr_offs);
+		rdata += U64_FROM_32(rdata_hi, rdata_lo);
 
-                break;
+		break;
 	case MACSTAT_RX_64_BYTES:
 		addr_offs = hssigldrv_gts_make_csr_addr_offs(pdev, data->port_data,
 							     HSSI_EMAC_HARDIP,
@@ -1169,18 +1169,18 @@ static int hssigldrv_gts_read_mac_stats(struct platform_device *pdev,
 		rdata += U64_FROM_32(rdata_hi, rdata_lo);
 
 		break;
-        case MACSTAT_TX_65_127_BYTES:
-                addr_offs = hssigldrv_gts_make_csr_addr_offs(pdev, data->port_data,
-                                                             HSSI_EMAC_HARDIP,
-                                                eth_hardip_emac_csroffs(cntr_tx_65to127b_lo));
-                rdata_lo = csrrd32(base, addr_offs);
-                addr_offs = hssigldrv_gts_make_csr_addr_offs(pdev, data->port_data,
-                                                             HSSI_EMAC_HARDIP,
-                                                eth_hardip_emac_csroffs(cntr_tx_65to127b_hi));
-                rdata_hi = csrrd32(base, addr_offs);
-                rdata += U64_FROM_32(rdata_hi, rdata_lo);
+	case MACSTAT_TX_65_127_BYTES:
+		addr_offs = hssigldrv_gts_make_csr_addr_offs(pdev, data->port_data,
+							     HSSI_EMAC_HARDIP,
+						eth_hardip_emac_csroffs(cntr_tx_65to127b_lo));
+		rdata_lo = csrrd32(base, addr_offs);
+		addr_offs = hssigldrv_gts_make_csr_addr_offs(pdev, data->port_data,
+							     HSSI_EMAC_HARDIP,
+						eth_hardip_emac_csroffs(cntr_tx_65to127b_hi));
+		rdata_hi = csrrd32(base, addr_offs);
+		rdata += U64_FROM_32(rdata_hi, rdata_lo);
 
-                break;
+		break;
 	case MACSTAT_RX_65_127_BYTES:
 		addr_offs = hssigldrv_gts_make_csr_addr_offs(pdev, data->port_data,
 							     HSSI_EMAC_HARDIP,
@@ -1193,19 +1193,19 @@ static int hssigldrv_gts_read_mac_stats(struct platform_device *pdev,
 		rdata += U64_FROM_32(rdata_hi, rdata_lo);
 
 		break;
-        case MACSTAT_TX_128_255_BYTES:
-                addr_offs = hssigldrv_gts_make_csr_addr_offs(pdev, data->port_data,
-                                                             HSSI_EMAC_HARDIP,
-                                                eth_hardip_emac_csroffs(cntr_tx_128to255b_lo));
-                rdata_lo = csrrd32(base, addr_offs);
+	case MACSTAT_TX_128_255_BYTES:
+		addr_offs = hssigldrv_gts_make_csr_addr_offs(pdev, data->port_data,
+							     HSSI_EMAC_HARDIP,
+						eth_hardip_emac_csroffs(cntr_tx_128to255b_lo));
+		rdata_lo = csrrd32(base, addr_offs);
 
-                addr_offs = hssigldrv_gts_make_csr_addr_offs(pdev, data->port_data,
-                                                             HSSI_EMAC_HARDIP,
-                                                eth_hardip_emac_csroffs(cntr_tx_128to255b_hi));
-                rdata_hi = csrrd32(base, addr_offs);
-                rdata += U64_FROM_32(rdata_hi, rdata_lo);
+		addr_offs = hssigldrv_gts_make_csr_addr_offs(pdev, data->port_data,
+							     HSSI_EMAC_HARDIP,
+						eth_hardip_emac_csroffs(cntr_tx_128to255b_hi));
+		rdata_hi = csrrd32(base, addr_offs);
+		rdata += U64_FROM_32(rdata_hi, rdata_lo);
 
-                break;
+		break;
 	case MACSTAT_RX_128_255_BYTES:
 		addr_offs = hssigldrv_gts_make_csr_addr_offs(pdev, data->port_data,
 							     HSSI_EMAC_HARDIP,
@@ -1219,19 +1219,19 @@ static int hssigldrv_gts_read_mac_stats(struct platform_device *pdev,
 		rdata += U64_FROM_32(rdata_hi, rdata_lo);
 
 		break;
-        case MACSTAT_TX_256_511_BYTES:
-                addr_offs = hssigldrv_gts_make_csr_addr_offs(pdev, data->port_data,
-                                                             HSSI_EMAC_HARDIP,
-                                                eth_hardip_emac_csroffs(cntr_tx_256to511b_lo));
-                rdata_lo = csrrd32(base, addr_offs);
+	case MACSTAT_TX_256_511_BYTES:
+		addr_offs = hssigldrv_gts_make_csr_addr_offs(pdev, data->port_data,
+							     HSSI_EMAC_HARDIP,
+						eth_hardip_emac_csroffs(cntr_tx_256to511b_lo));
+		rdata_lo = csrrd32(base, addr_offs);
 
-                addr_offs = hssigldrv_gts_make_csr_addr_offs(pdev, data->port_data,
-                                                             HSSI_EMAC_HARDIP,
-                                                eth_hardip_emac_csroffs(cntr_tx_256to511b_hi));
-                rdata_hi = csrrd32(base, addr_offs);
-                rdata += U64_FROM_32(rdata_hi, rdata_lo);
+		addr_offs = hssigldrv_gts_make_csr_addr_offs(pdev, data->port_data,
+							     HSSI_EMAC_HARDIP,
+						eth_hardip_emac_csroffs(cntr_tx_256to511b_hi));
+		rdata_hi = csrrd32(base, addr_offs);
+		rdata += U64_FROM_32(rdata_hi, rdata_lo);
 
-                break;
+		break;
 	case MACSTAT_RX_256_511_BYTES:
 		addr_offs = hssigldrv_gts_make_csr_addr_offs(pdev, data->port_data,
 							     HSSI_EMAC_HARDIP,
@@ -1245,19 +1245,19 @@ static int hssigldrv_gts_read_mac_stats(struct platform_device *pdev,
 		rdata += U64_FROM_32(rdata_hi, rdata_lo);
 
 		break;
-        case MACSTAT_TX_512_1023_BYTES:
-                addr_offs = hssigldrv_gts_make_csr_addr_offs(pdev, data->port_data,
-                                                             HSSI_EMAC_HARDIP,
-                                                eth_hardip_emac_csroffs(cntr_tx_512to1023b_lo));
-                rdata_lo = csrrd32(base, addr_offs);
+	case MACSTAT_TX_512_1023_BYTES:
+		addr_offs = hssigldrv_gts_make_csr_addr_offs(pdev, data->port_data,
+							     HSSI_EMAC_HARDIP,
+						eth_hardip_emac_csroffs(cntr_tx_512to1023b_lo));
+		rdata_lo = csrrd32(base, addr_offs);
 
-                addr_offs = hssigldrv_gts_make_csr_addr_offs(pdev, data->port_data,
-                                                             HSSI_EMAC_HARDIP,
-                                                eth_hardip_emac_csroffs(cntr_tx_512to1023b_hi));
-                rdata_hi = csrrd32(base, addr_offs);
-                rdata += U64_FROM_32(rdata_hi, rdata_lo);
+		addr_offs = hssigldrv_gts_make_csr_addr_offs(pdev, data->port_data,
+							     HSSI_EMAC_HARDIP,
+						eth_hardip_emac_csroffs(cntr_tx_512to1023b_hi));
+		rdata_hi = csrrd32(base, addr_offs);
+		rdata += U64_FROM_32(rdata_hi, rdata_lo);
 
-                break;
+		break;
 	case MACSTAT_RX_512_1023_BYTES:
 		addr_offs = hssigldrv_gts_make_csr_addr_offs(pdev, data->port_data,
 							     HSSI_EMAC_HARDIP,
@@ -1271,19 +1271,19 @@ static int hssigldrv_gts_read_mac_stats(struct platform_device *pdev,
 		rdata += U64_FROM_32(rdata_hi, rdata_lo);
 
 		break;
-        case MACSTAT_TX_1024_1518_BYTES:
-                addr_offs = hssigldrv_gts_make_csr_addr_offs(pdev, data->port_data,
-                                                             HSSI_EMAC_HARDIP,
-                                                eth_hardip_emac_csroffs(cntr_tx_1024to1518b_lo));
-                rdata_lo = csrrd32(base, addr_offs);
+	case MACSTAT_TX_1024_1518_BYTES:
+		addr_offs = hssigldrv_gts_make_csr_addr_offs(pdev, data->port_data,
+							     HSSI_EMAC_HARDIP,
+						eth_hardip_emac_csroffs(cntr_tx_1024to1518b_lo));
+		rdata_lo = csrrd32(base, addr_offs);
 
-                addr_offs = hssigldrv_gts_make_csr_addr_offs(pdev, data->port_data,
-                                                             HSSI_EMAC_HARDIP,
-                                                eth_hardip_emac_csroffs(cntr_tx_1024to1518b_hi));
-                rdata_hi = csrrd32(base, addr_offs);
-                rdata += U64_FROM_32(rdata_hi, rdata_lo);
+		addr_offs = hssigldrv_gts_make_csr_addr_offs(pdev, data->port_data,
+							     HSSI_EMAC_HARDIP,
+						eth_hardip_emac_csroffs(cntr_tx_1024to1518b_hi));
+		rdata_hi = csrrd32(base, addr_offs);
+		rdata += U64_FROM_32(rdata_hi, rdata_lo);
 
-                break;
+		break;
 	case MACSTAT_RX_1024_1518_BYTES:
 		addr_offs = hssigldrv_gts_make_csr_addr_offs(pdev, data->port_data,
 							     HSSI_EMAC_HARDIP,
@@ -1297,19 +1297,19 @@ static int hssigldrv_gts_read_mac_stats(struct platform_device *pdev,
 		rdata += U64_FROM_32(rdata_hi, rdata_lo);
 
 		break;
-        case MACSTAT_TX_GTE_1519_BYTES:
-                addr_offs = hssigldrv_gts_make_csr_addr_offs(pdev, data->port_data,
-                                                             HSSI_EMAC_HARDIP,
-                                                eth_hardip_emac_csroffs(cntr_tx_1519tomaxb_lo));
-                rdata_lo = csrrd32(base, addr_offs);
+	case MACSTAT_TX_GTE_1519_BYTES:
+		addr_offs = hssigldrv_gts_make_csr_addr_offs(pdev, data->port_data,
+							     HSSI_EMAC_HARDIP,
+						eth_hardip_emac_csroffs(cntr_tx_1519tomaxb_lo));
+		rdata_lo = csrrd32(base, addr_offs);
 
-                addr_offs = hssigldrv_gts_make_csr_addr_offs(pdev, data->port_data,
-                                                             HSSI_EMAC_HARDIP,
-                                                eth_hardip_emac_csroffs(cntr_tx_1519tomaxb_hi));
-                rdata_hi = csrrd32(base, addr_offs);
-                rdata += U64_FROM_32(rdata_hi, rdata_lo);
+		addr_offs = hssigldrv_gts_make_csr_addr_offs(pdev, data->port_data,
+							     HSSI_EMAC_HARDIP,
+						eth_hardip_emac_csroffs(cntr_tx_1519tomaxb_hi));
+		rdata_hi = csrrd32(base, addr_offs);
+		rdata += U64_FROM_32(rdata_hi, rdata_lo);
 
-                break;
+		break;
 	case MACSTAT_RX_GTE_1519_BYTES:
 		addr_offs = hssigldrv_gts_make_csr_addr_offs(pdev, data->port_data,
 							     HSSI_EMAC_HARDIP,
@@ -1323,13 +1323,13 @@ static int hssigldrv_gts_read_mac_stats(struct platform_device *pdev,
 		rdata += U64_FROM_32(rdata_hi, rdata_lo);
 
 		break;
-        case MACSTAT_TX_JABBERS:
-                addr_offs = hssigldrv_gts_make_csr_addr_offs(pdev, data->port_data,
-                                                             HSSI_EMAC_HARDIP,
-                                                eth_hardip_emac_csroffs(cntr_tx_jabbers_lo));
-                rdata = csrrd32(base, addr_offs);
+	case MACSTAT_TX_JABBERS:
+		addr_offs = hssigldrv_gts_make_csr_addr_offs(pdev, data->port_data,
+							     HSSI_EMAC_HARDIP,
+						eth_hardip_emac_csroffs(cntr_tx_jabbers_lo));
+		rdata = csrrd32(base, addr_offs);
 
-                break;
+		break;
 	case MACSTAT_RX_JABBERS:
 		addr_offs = hssigldrv_gts_make_csr_addr_offs(pdev, data->port_data,
 							     HSSI_EMAC_HARDIP,
@@ -1337,13 +1337,13 @@ static int hssigldrv_gts_read_mac_stats(struct platform_device *pdev,
 		rdata = csrrd32(base, addr_offs);
 
 		break;
-        case MACSTAT_TX_RUNTS:
-                addr_offs = hssigldrv_gts_make_csr_addr_offs(pdev, data->port_data,
-                                                             HSSI_EMAC_HARDIP,
-                                                eth_hardip_emac_csroffs(cntr_tx_fragments_lo));
-                rdata = csrrd32(base, addr_offs);
+	case MACSTAT_TX_RUNTS:
+		addr_offs = hssigldrv_gts_make_csr_addr_offs(pdev, data->port_data,
+							     HSSI_EMAC_HARDIP,
+						eth_hardip_emac_csroffs(cntr_tx_fragments_lo));
+		rdata = csrrd32(base, addr_offs);
 
-                break;
+		break;
 	case MACSTAT_RX_RUNTS:
 		addr_offs = hssigldrv_gts_make_csr_addr_offs(pdev, data->port_data,
 							     HSSI_EMAC_HARDIP,
@@ -1351,34 +1351,34 @@ static int hssigldrv_gts_read_mac_stats(struct platform_device *pdev,
 		rdata = csrrd32(base, addr_offs);
 
 		break;
-        case MACSTAT_TX_SOP_COUNT:
-                addr_offs = hssigldrv_gts_make_csr_addr_offs(pdev, data->port_data,
-                                                             HSSI_EMAC_HARDIP,
-                                                eth_hardip_emac_csroffs(cntr_tx_st_lo));
-                rdata_lo = csrrd32(base, addr_offs);
+	case MACSTAT_TX_SOP_COUNT:
+		addr_offs = hssigldrv_gts_make_csr_addr_offs(pdev, data->port_data,
+							     HSSI_EMAC_HARDIP,
+						eth_hardip_emac_csroffs(cntr_tx_st_lo));
+		rdata_lo = csrrd32(base, addr_offs);
 
-                addr_offs = hssigldrv_gts_make_csr_addr_offs(pdev, data->port_data,
-                                                             HSSI_EMAC_HARDIP,
-                                                eth_hardip_emac_csroffs(cntr_tx_st_hi));
-                rdata_hi = csrrd32(base, addr_offs);
-                
+		addr_offs = hssigldrv_gts_make_csr_addr_offs(pdev, data->port_data,
+							     HSSI_EMAC_HARDIP,
+						eth_hardip_emac_csroffs(cntr_tx_st_hi));
+		rdata_hi = csrrd32(base, addr_offs);
+
 		rdata += U64_FROM_32(rdata_hi, rdata_lo);
 
-                break;
-        case MACSTAT_RX_SOP_COUNT:
-                addr_offs = hssigldrv_gts_make_csr_addr_offs(pdev, data->port_data,
-                                                             HSSI_EMAC_HARDIP,
-                                                eth_hardip_emac_csroffs(cntr_rx_st_lo));
-                rdata_lo = csrrd32(base, addr_offs);
+		break;
+	case MACSTAT_RX_SOP_COUNT:
+		addr_offs = hssigldrv_gts_make_csr_addr_offs(pdev, data->port_data,
+							     HSSI_EMAC_HARDIP,
+						eth_hardip_emac_csroffs(cntr_rx_st_lo));
+		rdata_lo = csrrd32(base, addr_offs);
 
-                addr_offs = hssigldrv_gts_make_csr_addr_offs(pdev, data->port_data,
-                                                             HSSI_EMAC_HARDIP,
-                                                eth_hardip_emac_csroffs(cntr_rx_st_hi));
-                rdata_hi = csrrd32(base, addr_offs);
+		addr_offs = hssigldrv_gts_make_csr_addr_offs(pdev, data->port_data,
+							     HSSI_EMAC_HARDIP,
+						eth_hardip_emac_csroffs(cntr_rx_st_hi));
+		rdata_hi = csrrd32(base, addr_offs);
 
-                rdata += U64_FROM_32(rdata_hi, rdata_lo);
+		rdata += U64_FROM_32(rdata_hi, rdata_lo);
 
-                break;
+		break;
 	default:
 		dev_err(&pdev->dev, "Unknown stat type\n");
 	}
@@ -1407,7 +1407,7 @@ static int hssigldrv_gts_freeze_stats(struct platform_device *pdev, int port)
 						     HSSI_EMAC_HARDIP,
 					eth_hardip_emac_csroffs(cntr_rx_config));
 	tse_set_bit(base, addr_offs, ETH_FREEZE_RX_MAC_STATS);
-	
+
 	return 0;
 }
 
@@ -1437,7 +1437,7 @@ static void hssigldrv_gts_reset_port(struct platform_device *pdev, int port)
 	u32 addr_offs;
 
 	addr_offs = hssigldrv_gts_make_usrcsr_addr_offs(pdev, port,
-					eth_userspace_csroffs(control_reg));
+							eth_userspace_csroffs(control_reg));
 
 	tse_clear_bit(base, addr_offs, (1 << port));
 }

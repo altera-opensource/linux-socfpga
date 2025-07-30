@@ -7,31 +7,31 @@
  *
  */
 
-#include <linux/etherdevice.h>
-#include <linux/if_ether.h>
-#include <linux/ip.h>
-#include <linux/tcp.h>
-#include <linux/udp.h>
-#include <linux/if_vlan.h>
-#include <linux/interrupt.h>
-#include <linux/kernel.h>
-#include <linux/module.h>
-#include <linux/net_tstamp.h>
-#include <linux/netdevice.h>
-#include <linux/of_device.h>
-#include <linux/of_net.h>
-#include <linux/of_platform.h>
-#include <linux/phy.h>
-#include <linux/platform_device.h>
-#include <linux/phylink.h>
-#include <linux/skbuff.h>
-#include "intel_fpga_eth_main.h"
-#include "intel_fpga_ftile_driver.h"
-#include "intel_fpga_etile_driver.h"
-#include "intel_fpga_gts_driver.h"
-#include "intel_fpga_eth_hssi_itf.h"
-#include "intel_fpga_eth_tile_ops.h"
-#include <linux/sched.h>
+ #include <linux/etherdevice.h>
+ #include <linux/if_ether.h>
+ #include <linux/ip.h>
+ #include <linux/tcp.h>
+ #include <linux/udp.h>
+ #include <linux/if_vlan.h>
+ #include <linux/interrupt.h>
+ #include <linux/kernel.h>
+ #include <linux/module.h>
+ #include <linux/net_tstamp.h>
+ #include <linux/netdevice.h>
+ #include <linux/of_device.h>
+ #include <linux/of_net.h>
+ #include <linux/of_platform.h>
+ #include <linux/phy.h>
+ #include <linux/platform_device.h>
+ #include <linux/phylink.h>
+ #include <linux/skbuff.h>
+ #include "intel_fpga_eth_main.h"
+ #include "intel_fpga_ftile_driver.h"
+ #include "intel_fpga_etile_driver.h"
+ #include "intel_fpga_gts_driver.h"
+ #include "intel_fpga_eth_hssi_itf.h"
+ #include "intel_fpga_eth_tile_ops.h"
+ #include <linux/sched.h>
 
 /* Module parameters */
 static int debug = -1;
@@ -59,12 +59,12 @@ MODULE_PARM_DESC(pause, "Flow Control Pause Time");
 
 extern const struct attribute_group *msgdma_attr_groups[];
 
-#define RX_DESCRIPTORS 512
+ #define RX_DESCRIPTORS 512
 static int dma_rx_num = RX_DESCRIPTORS;
 module_param(dma_rx_num, int, 0644);
 MODULE_PARM_DESC(dma_rx_num, "Number of descriptors in the RX list");
 
-#define TX_DESCRIPTORS 512
+ #define TX_DESCRIPTORS 512
 static int dma_tx_num = TX_DESCRIPTORS;
 module_param(dma_tx_num, int, 0644);
 MODULE_PARM_DESC(dma_tx_num, "Number of descriptors in the TX list");
@@ -74,16 +74,16 @@ MODULE_PARM_DESC(dma_tx_num, "Number of descriptors in the TX list");
  * 1518, a VLAN header would be additional 4 bytes and additional
  * headroom for alignment is 2 bytes, 2048 is just fine.
  */
-#define INTEL_FPGA_RXDMABUFFER_SIZE	2048
-#define INTEL_FPGA_COAL_TIMER(x)	(jiffies + usecs_to_jiffies(x))
+ #define INTEL_FPGA_RXDMABUFFER_SIZE	2048
+ #define INTEL_FPGA_COAL_TIMER(x)	(jiffies + usecs_to_jiffies(x))
 
 /* Allow network stack to resume queueing packets after we've
  * finished transmitting at least 1/4 of the packets in the queue.
  */
-#define ETH_TX_THRESH(x, i)	((x)->dma_info[(i)].dma_priv.tx_ring_size / 4)
-#define ETH_TX_THRESH_DMA(x)	((x)->dma_priv.tx_ring_size / 4)
+ #define ETH_TX_THRESH(x, i)	((x)->dma_info[(i)].dma_priv.tx_ring_size / 4)
+ #define ETH_TX_THRESH_DMA(x)	((x)->dma_priv.tx_ring_size / 4)
 
-#define TXQUEUESTOP_THRESHOLD	2
+ #define TXQUEUESTOP_THRESHOLD	2
 
 static const struct of_device_id intel_fpga_xtile_ll_ids[];
 
@@ -361,7 +361,7 @@ static void xtile_free_rx_buffer(struct intel_fpga_xtile_eth_private *priv,
 			dma_unmap_single(priv->device, dma_addr,
 					 rxbuffer->len,
 					 DMA_FROM_DEVICE);
-		
+
 		dev_consume_skb_any(skb);
 		rxbuffer->skb = NULL;
 		rxbuffer->dma_addr = 0;
@@ -1048,7 +1048,7 @@ static void eth_monitor_link_status(struct work_struct *work)
 		schedule_delayed_work(&priv->dwork, msecs_to_jiffies(priv->monitor_poll_interval));
 }
 
-#define PRELOAD_LINK_STABILITY_COUNT 10
+ #define PRELOAD_LINK_STABILITY_COUNT 10
 static void start_link_monitoring_thread(struct intel_fpga_xtile_eth_private *priv)
 {
 	rpw_set_monitor_link_status(true, priv);
@@ -1103,9 +1103,9 @@ static int xtile_open(struct net_device *dev)
 
 	/* clear the MAC layer statistics to start afresh */
 	xtile_clear_mac_statistics(pdev, hssi_port);
-   
-   	/* we need to clear the dev stats so that the ifconfig on interface shouldn't show old data */
-        memset(&dev->stats, 0, sizeof(dev->stats));
+
+	/* we need to clear the dev stats so that the ifconfig on interface shouldn't show old data */
+	memset(&dev->stats, 0, sizeof(dev->stats));
 
 	for (queue = 0; queue < priv->num_channels; queue++) {
 		priv->spec_ops->dma_ops->quiese_pref(&priv->dma_info[queue].dma_priv);
@@ -1991,10 +1991,10 @@ static int intel_fpga_xtile_probe(struct platform_device *pdev)
 		dev_warn(&pdev->dev, "Not able to get max-frame-size. Defaulting max_mtu to %d\n",
 			 priv->dev->max_mtu);
 	} else {
-                mtu.port = priv->hssi_port;
-                mtu.max_tx_frame_size = mtu.max_rx_frame_size = priv->dev->max_mtu;
-                hssiss_set_mtu(priv->pdev_hssi, SAL_SET_MTU, &mtu);
-        }
+		mtu.port = priv->hssi_port;
+		mtu.max_tx_frame_size = mtu.max_rx_frame_size = priv->dev->max_mtu;
+		hssiss_set_mtu(priv->pdev_hssi, SAL_SET_MTU, &mtu);
+	}
 
 	/* The DMA buffer size already accounts for an alignment bias
 	 * to avoid unaligned access exceptions for the NIOS processor,
@@ -2117,7 +2117,7 @@ static int intel_fpga_xtile_probe(struct platform_device *pdev)
 
        fixed_node = fwnode_get_named_child_node(pdev->dev.fwnode, "fixed-link");
        if (fixed_node) {
-                fwnode_property_read_u32(fixed_node, "speed", &priv->link_speed);
+		fwnode_property_read_u32(fixed_node, "speed", &priv->link_speed);
 		/* read the fixed link properties*/
 		priv->duplex = DUPLEX_FULL;
 		priv->autoneg = false;
@@ -2132,13 +2132,13 @@ static int intel_fpga_xtile_probe(struct platform_device *pdev)
 		goto err_free_netdev;
 	}
 
-        ret  = of_property_read_string(pdev->dev.of_node, "if_name",
-                                       &if_name);
+	ret  = of_property_read_string(pdev->dev.of_node, "if_name",
+				       &if_name);
 
-        if (if_name && (strlen(if_name) < ARRAY_SIZE(ndev->name)-1)) {
-                memset(&ndev->name, 0, ARRAY_SIZE(ndev->name));
-                memcpy(ndev->name, if_name, strlen(if_name));
-        }
+	if (if_name && (strlen(if_name) < ARRAY_SIZE(ndev->name) - 1)) {
+		memset(&ndev->name, 0, ARRAY_SIZE(ndev->name));
+		memcpy(ndev->name, if_name, strlen(if_name));
+	}
 
 	ret = register_netdev(ndev);
 	if (ret) {
@@ -2253,23 +2253,23 @@ static const struct xtile_spec_ops ftile_data = {
 };
 
 static const struct xtile_spec_ops gts_data = {
-        .dma_ops   = &altera_dtype_prefetcher,
-#ifdef CONFIG_INTEL_FPGA_GTS_TILE
-        .tile = {
-                .reset            = gts_ehip_reset,
-                .deassert_reset   = gts_ehip_deassert_reset,
-                .init             = gts_init,
-                .uninit           = gts_uninit,
-                .start            = gts_start,
-                .stop             = gts_stop,
-                .run_check        = gts_run_check,
-                .update_mac_addr  = gts_update_mac_addr,
-                .link_fault_status = gts_get_link_fault_status,
-                .reg_ethtool_ops  =
-                        intel_fpga_gts_set_ethtool_ops,
-                .check_dts_param = gts_check_dts_param,
-        },
-#endif
+	.dma_ops   = &altera_dtype_prefetcher,
+ #ifdef CONFIG_INTEL_FPGA_GTS_TILE
+	.tile = {
+		.reset            = gts_ehip_reset,
+		.deassert_reset   = gts_ehip_deassert_reset,
+		.init             = gts_init,
+		.uninit           = gts_uninit,
+		.start            = gts_start,
+		.stop             = gts_stop,
+		.run_check        = gts_run_check,
+		.update_mac_addr  = gts_update_mac_addr,
+		.link_fault_status = gts_get_link_fault_status,
+		.reg_ethtool_ops  =
+			intel_fpga_gts_set_ethtool_ops,
+		.check_dts_param = gts_check_dts_param,
+	},
+ #endif
 };
 
 static const struct of_device_id intel_fpga_xtile_ll_ids[] = {
@@ -2279,9 +2279,9 @@ static const struct of_device_id intel_fpga_xtile_ll_ids[] = {
 	{.compatible = "altr,hssi-ftile-1.0",
 	 .data = &ftile_data,
 	},
-        {.compatible = "altr,msgdma-gts-1.0",
-         .data = &gts_data,
-        },
+	{.compatible = "altr,msgdma-gts-1.0",
+	 .data = &gts_data,
+	},
 };
 
 MODULE_DEVICE_TABLE(of, intel_fpga_xtile_ll_ids);
@@ -2295,9 +2295,9 @@ static struct platform_driver intel_fpga_xtile_driver = {
 		.name	= INTEL_FPGA_XTILE_ETH_RESOURCE_NAME,
 		.owner	= THIS_MODULE,
 		.of_match_table = intel_fpga_xtile_ll_ids,
-#ifdef CONFIG_DEBUG_FS
+ #ifdef CONFIG_DEBUG_FS
 		.dev_groups = msgdma_attr_groups,
-#endif
+ #endif
 		},
 };
 

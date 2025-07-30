@@ -7,24 +7,24 @@
  *   Preetam Narayan
  *
  */
-#define DEBUG
+ #define DEBUG
 
-#include <linux/kernel.h>
-#include <linux/module.h>
-#include <linux/delay.h>
+ #include <linux/kernel.h>
+ #include <linux/module.h>
+ #include <linux/delay.h>
 
-#include <linux/mod_devicetable.h>
-#include <linux/of.h>
-#include <linux/of_device.h>
-#include <linux/platform_device.h>
+ #include <linux/mod_devicetable.h>
+ #include <linux/of.h>
+ #include <linux/of_device.h>
+ #include <linux/platform_device.h>
 
-#include "altera_utils.h"
-#include "intel_fpga_hssiss.h"
-#include "intel_fpga_hssi_driver.h"
-#include "intel_fpga_hssigl_driver.h"
-#include "intel_fpga_hssi_tile_ops.h"
+ #include "altera_utils.h"
+ #include "intel_fpga_hssiss.h"
+ #include "intel_fpga_hssi_driver.h"
+ #include "intel_fpga_hssigl_driver.h"
+ #include "intel_fpga_hssi_tile_ops.h"
 
-#define INTEL_FPGA_HSSISS_NAME "intel_fpga_hssiss"
+ #define INTEL_FPGA_HSSISS_NAME "intel_fpga_hssiss"
 
 static struct hssiss_salcmd_to_name salcmd_name[] = {
 	{SAL_NOP, 0x0, "SAL_NOP"},
@@ -75,11 +75,11 @@ static int hssiss_get_mtu(struct platform_device *pdev, u32 cmd,
 }
 
 int hssiss_set_mtu(struct platform_device *pdev, u32 cmd,
-                   void *priv_data)
+		   void *priv_data)
 {
-        struct hssiss_private *priv = platform_get_drvdata(pdev);
+	struct hssiss_private *priv = platform_get_drvdata(pdev);
 
-        return priv->spec_ops->ops->set_mtu(pdev, cmd, priv_data);
+	return priv->spec_ops->ops->set_mtu(pdev, cmd, priv_data);
 }
 
 static int hssiss_read_mac_stat(struct platform_device *pdev, u32 cmd,
@@ -158,24 +158,24 @@ int hssiss_enable_disable_loopback(struct platform_device *pdev, u32 cmdid,
 
 int hssiss_lock_stats(struct platform_device *pdev, int port)
 {
-        struct hssiss_private *priv = platform_get_drvdata(pdev);
+	struct hssiss_private *priv = platform_get_drvdata(pdev);
 
 	return priv->spec_ops->ops->lock_mac_stats(pdev, port);
 }
 
 int hssiss_unlock_stats(struct platform_device *pdev, int port)
 {
-        struct hssiss_private *priv = platform_get_drvdata(pdev);
+	struct hssiss_private *priv = platform_get_drvdata(pdev);
 
-        return priv->spec_ops->ops->unlock_mac_stats(pdev, port);
+	return priv->spec_ops->ops->unlock_mac_stats(pdev, port);
 }
 
 void hssiss_reset_port(struct platform_device *pdev, int port)
 {
-        struct hssiss_private *priv = platform_get_drvdata(pdev);
+	struct hssiss_private *priv = platform_get_drvdata(pdev);
 
 	if (priv->spec_ops->ops->reset_port)
-        	return priv->spec_ops->ops->reset_port(pdev, port);
+		return priv->spec_ops->ops->reset_port(pdev, port);
 }
 
 static int execute_sal_cmd(struct platform_device *pdev,
@@ -414,11 +414,11 @@ static int hssiss_probe(struct platform_device *pdev)
 
 	ret = priv->spec_ops->ops->probe_init(pdev);
 
-#ifdef CONFIG_DEBUG_FS
+ #ifdef CONFIG_DEBUG_FS
 	priv->dbgfs = hssiss_dbgfs_init(pdev);
 	if (!priv->dbgfs)
 		dev_warn(&pdev->dev, "Error creating dbgfs");
-#endif
+ #endif
 	dev_info(&pdev->dev, "Probe done\n");
 
 	return ret;

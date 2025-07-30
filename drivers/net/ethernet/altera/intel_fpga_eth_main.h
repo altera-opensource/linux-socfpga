@@ -6,53 +6,53 @@
  *   Preetam Narayan
  */
 
-#ifndef __INTEL_FPGA_ETH_MAIN_H__
-#define __INTEL_FPGA_ETH_MAIN_H__
+ #ifndef __INTEL_FPGA_ETH_MAIN_H__
+ #define __INTEL_FPGA_ETH_MAIN_H__
 
-#include <linux/bitops.h>
-#include <linux/if_vlan.h>
-#include <linux/list.h>
-#include <linux/netdevice.h>
-#include <linux/phy.h>
-#include <linux/ptp_clock_kernel.h>
-#include <linux/timer.h>
-#include <linux/phylink.h>
-#include "intel_fpga_tod.h"
-#include "altera_eth_dma.h"
-#include "altera_msgdma.h"
-#include "altera_msgdmahw.h"
-#include "altera_utils.h"
-#include "altera_msgdma_prefetcher.h"
-#include "altera_msgdmahw_prefetcher.h"
-#include "altera_sgdma.h"
-#include "intel_freq_control.h"
-#include "intel_fpga_hssiss.h"
-#define INTEL_FPGA_XTILE_ETH_RESOURCE_NAME "intel_fpga_eth"
+ #include <linux/bitops.h>
+ #include <linux/if_vlan.h>
+ #include <linux/list.h>
+ #include <linux/netdevice.h>
+ #include <linux/phy.h>
+ #include <linux/ptp_clock_kernel.h>
+ #include <linux/timer.h>
+ #include <linux/phylink.h>
+ #include "intel_fpga_tod.h"
+ #include "altera_eth_dma.h"
+ #include "altera_msgdma.h"
+ #include "altera_msgdmahw.h"
+ #include "altera_utils.h"
+ #include "altera_msgdma_prefetcher.h"
+ #include "altera_msgdmahw_prefetcher.h"
+ #include "altera_sgdma.h"
+ #include "intel_freq_control.h"
+ #include "intel_fpga_hssiss.h"
+ #define INTEL_FPGA_XTILE_ETH_RESOURCE_NAME "intel_fpga_eth"
 
-#define INTEL_FPGA_RET_SUCCESS                          0
+ #define INTEL_FPGA_RET_SUCCESS                          0
 /* Flow Control defines */
-#define FLOW_OFF        0
-#define FLOW_RX         1
-#define FLOW_TX         2
-#define FLOW_ON         (FLOW_TX | FLOW_RX)
+ #define FLOW_OFF        0
+ #define FLOW_RX         1
+ #define FLOW_TX         2
+ #define FLOW_ON         (FLOW_TX | FLOW_RX)
 
 /* TX Flow Control */
-#define MAC_PAUSEFRAME_QUANTA					0xFFFF
+ #define MAC_PAUSEFRAME_QUANTA					0xFFFF
 
-#define INTEL_FPGA_XTILE_CNTR_CHECK				10
-#define INTEL_FPGA_XTILE_SW_RESET_WATCHDOG_CNTR              	1000000
-#define INTEL_FPGA_XTILE_ETH_RESOURCE_NAME "intel_fpga_eth"
+ #define INTEL_FPGA_XTILE_CNTR_CHECK				10
+ #define INTEL_FPGA_XTILE_SW_RESET_WATCHDOG_CNTR		1000000
+ #define INTEL_FPGA_XTILE_ETH_RESOURCE_NAME "intel_fpga_eth"
 
-#define INTEL_FPGA_BYTE_ALIGN   8
-#define INTEL_FPGA_WORD_ALIGN   32
+ #define INTEL_FPGA_BYTE_ALIGN   8
+ #define INTEL_FPGA_WORD_ALIGN   32
 
-#define MOD_PARAM_PERM  0644
-#define MAX_DMA_CHANNELS 8
+ #define MOD_PARAM_PERM  0644
+ #define MAX_DMA_CHANNELS 8
 
 /* Link Stability check */
-#define PRELOAD_LINK_STABILITY_COUNT 10
+ #define PRELOAD_LINK_STABILITY_COUNT 10
 
-#define SKB_DMA_REALIGN         ((PAGE_SIZE - NET_SKB_PAD) % SMP_CACHE_BYTES)
+ #define SKB_DMA_REALIGN         ((PAGE_SIZE - NET_SKB_PAD) % SMP_CACHE_BYTES)
 
 enum {
 	ETH_LINK_STATE_RESET = 0,
@@ -153,8 +153,8 @@ struct intel_fpga_rx_fifo {
 	u32 drop_on_error;				//0x14
 };
 
-#define rx_fifo_csroffs(a)	(offsetof(struct intel_fpga_rx_fifo, a))
-#define tx_fifo_csroffs(a)	(offsetof(struct intel_fpga_rx_fifo, a))
+ #define rx_fifo_csroffs(a)	(offsetof(struct intel_fpga_rx_fifo, a))
+ #define tx_fifo_csroffs(a)	(offsetof(struct intel_fpga_rx_fifo, a))
 
 // Function Prototypes
 int etile_init_mac(intel_fpga_xtile_eth_private *priv);
@@ -172,4 +172,4 @@ int xtile_check_counter_complete(intel_fpga_xtile_eth_private *priv,
 				 u8 bit_mask,
 				 bool set_bit,
 				 int align);
-#endif
+ #endif

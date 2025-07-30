@@ -7,25 +7,25 @@
  *	Dalon Westergreen <dalon.westergreen@intel.com>
  */
 
-#ifndef __INTEL_FPGA_TOD_H__
-#define __INTEL_FPGA_TOD_H__
+ #ifndef __INTEL_FPGA_TOD_H__
+ #define __INTEL_FPGA_TOD_H__
 
-#include <linux/debugfs.h>
-#include <linux/netdevice.h>
-#include <linux/ptp_clock_kernel.h>
-#include <linux/platform_device.h>
-#include <linux/mutex.h>
-#include "intel_freq_control.h"
+ #include <linux/debugfs.h>
+ #include <linux/netdevice.h>
+ #include <linux/ptp_clock_kernel.h>
+ #include <linux/platform_device.h>
+ #include <linux/mutex.h>
+ #include "intel_freq_control.h"
 
-#define NOMINAL_PPB                     1000000000ULL
-#define TOD_PERIOD_MAX                  0xfffff
-#define TOD_PERIOD_MIN                  0
-#define TOD_DRIFT_ADJUST_FNS_MAX        0xffff
-#define TOD_DRIFT_ADJUST_RATE_MAX       0xffff
-#define TOD_ADJUST_COUNT_MAX            0xfffff
-#define TOD_ADJUST_MS_MAX               (((((TOD_PERIOD_MAX) >> 16) + 1) * \
-                                          ((TOD_ADJUST_COUNT_MAX) + 1)) /  \
-                                         1000000UL)
+ #define NOMINAL_PPB                     1000000000ULL
+ #define TOD_PERIOD_MAX                  0xfffff
+ #define TOD_PERIOD_MIN                  0
+ #define TOD_DRIFT_ADJUST_FNS_MAX        0xffff
+ #define TOD_DRIFT_ADJUST_RATE_MAX       0xffff
+ #define TOD_ADJUST_COUNT_MAX            0xfffff
+ #define TOD_ADJUST_MS_MAX               (((((TOD_PERIOD_MAX) >> 16) + 1) * \
+					  ((TOD_ADJUST_COUNT_MAX) + 1)) /  \
+					 1000000UL)
 
 /* Altera Time-of-Day (ToD) clock register space. */
 struct intel_fpga_tod {
@@ -39,7 +39,8 @@ struct intel_fpga_tod {
 	u32 drift_adjust;
 	u32 drift_adjust_rate;
 };
-#define tod_csroffs(a)	(offsetof(struct intel_fpga_tod, a))
+
+ #define tod_csroffs(a)	(offsetof(struct intel_fpga_tod, a))
 
 struct intel_fpga_pps {
 	u32 reserved_1[3];
@@ -50,8 +51,7 @@ struct intel_fpga_pps {
 	u32 nanosec;
 };
 
-#define pps_csroffs(a)	(offsetof(struct intel_fpga_pps, a))
-
+ #define pps_csroffs(a)	(offsetof(struct intel_fpga_pps, a))
 
 struct intel_fpga_tod_private {
 	struct device *dev;
@@ -79,4 +79,4 @@ struct intel_fpga_tod_private {
 int intel_fpga_tod_probe(struct platform_device *pdev);
 void intel_fpga_tod_unregister(struct platform_device *pdev);
 int intel_fpga_tod_register(struct intel_fpga_tod_private *priv, struct device *device);
-#endif /* __INTEL_FPGA_TOD_H__ */
+ #endif /* __INTEL_FPGA_TOD_H__ */

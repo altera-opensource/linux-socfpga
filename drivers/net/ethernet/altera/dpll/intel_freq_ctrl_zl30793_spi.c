@@ -6,10 +6,10 @@
  *
  */
 
-#include "../intel_freq_control.h"
-#include "intel_freq_ctrl_zl30793.h"
-#include "intel_freq_ctrl_zl30793_spi.h"
-#include "intel_freq_ctrl_common_spi.h"
+ #include "../intel_freq_control.h"
+ #include "intel_freq_ctrl_zl30793.h"
+ #include "intel_freq_ctrl_zl30793_spi.h"
+ #include "intel_freq_ctrl_common_spi.h"
 
 static u8 zl30793_page_write(struct spi_device *spi, u16 *dma_safe_buf,
 			     u16 addr)
