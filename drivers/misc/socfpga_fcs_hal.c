@@ -823,6 +823,10 @@ FCS_HAL_INT hal_hkdf_request(struct fcs_cmd_context *const k_ctx)
 		goto free_mem;
 	}
 
+	src_ptr += ctx.hkdf_req.output_key_obj_len;
+
+	k_ctx->hkdf_req.ikm_len = src_ptr - s_buf;
+
 	k_ctx->hkdf_req.ikm = s_buf;
 
 	ret = priv->plat_data->svc_send_request(priv,
