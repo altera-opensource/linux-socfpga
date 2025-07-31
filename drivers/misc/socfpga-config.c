@@ -1802,6 +1802,7 @@ static int __init fcs_config_init(void)
 
 static void __exit fcs_config_exit(void)
 {
+	hal_fcs_deinit();
 	/* Remove sysfs groups */
 	sysfs_remove_groups(sysfs_kobj, fcs_groups);
 
