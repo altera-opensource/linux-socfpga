@@ -1369,18 +1369,17 @@ int ftile_init(intel_fpga_xtile_eth_private *priv)
 	/* Set/Config source MAC address */
 	ftile_update_mac_addr(priv);
 
+	/* Enable F-tile MAC datapath */
+	ftile_enable_mac(priv);
+
+	/* Enable flow ctrl */
+	ftile_enable_mac_flow_ctrl(priv);
 	return 0;
 }
 
 int ftile_start(intel_fpga_xtile_eth_private *priv)
 {
 	int ret;
-
-	/* Enable F-tile MAC datapath */
-	ftile_enable_mac(priv);
-
-	/* Enable flow ctrl */
-	ftile_enable_mac_flow_ctrl(priv);
 
 	/* Enable PTP feature */
 	if (priv->ptp_enable) {
@@ -1395,19 +1394,11 @@ int ftile_start(intel_fpga_xtile_eth_private *priv)
 	return 0;
 
 ptp_error:
-	ftile_disable_mac(priv);
-	ftile_disable_mac_flow_ctrl(priv);
 	return ret;
 }
 
 int ftile_stop(intel_fpga_xtile_eth_private *priv)
 {
-	/* Disable Ftile MAC datapath */
-	ftile_disable_mac(priv);
-
-	/* Disable Ftile MAC flow ctrl */
-	ftile_disable_mac_flow_ctrl(priv);
-
 	/* Stop UI thread */
 	if (priv->ptp_enable)
 		ftile_ui_adjustments_cancel_worker(priv);
@@ -1417,6 +1408,12 @@ int ftile_stop(intel_fpga_xtile_eth_private *priv)
 
 int ftile_uninit(intel_fpga_xtile_eth_private *priv)
 {
+	/* Disable Ftile MAC datapath */
+	ftile_disable_mac(priv);
+
+	/* Disable Ftile MAC flow ctrl */
+	ftile_disable_mac_flow_ctrl(priv);
+
 	/* Just to make sure Ftile feature are disabled */
 	return ftile_stop(priv);
 }
