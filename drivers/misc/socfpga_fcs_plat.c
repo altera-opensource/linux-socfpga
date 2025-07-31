@@ -902,6 +902,12 @@ FCS_HAL_INT fcs_plat_init(FCS_HAL_DEV *dev, struct socfpga_fcs_priv *priv)
 	return 0;
 }
 
+FCS_HAL_VOID fcs_plat_deinit(struct socfpga_fcs_priv *priv)
+{
+	stratix10_svc_remove_async_client(priv->chan);
+	stratix10_svc_free_channel(priv->chan);
+}
+
 FCS_HAL_VOID fcs_plat_cleanup(struct socfpga_fcs_priv *priv)
 {
 	stratix10_svc_free_channel(priv->chan);
