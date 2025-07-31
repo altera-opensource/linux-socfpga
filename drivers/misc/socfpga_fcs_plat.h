@@ -78,6 +78,7 @@ FCS_HAL_VOID fcs_plat_uuid_generate(struct socfpga_fcs_priv *priv);
 FCS_HAL_VOID fcs_plat_free_svc_memory(struct socfpga_fcs_priv *priv, void *buf1,
 				      void *buf2, void *buf3);
 FCS_HAL_INT fcs_plat_init(struct device *dev, struct socfpga_fcs_priv *priv);
+FCS_HAL_VOID fcs_plat_deinit(struct socfpga_fcs_priv *priv);
 FCS_HAL_VOID fcs_plat_cleanup(struct socfpga_fcs_priv *priv);
 FCS_HAL_VOID fcs_plat_uuid_clear(struct socfpga_fcs_priv *priv);
 FCS_HAL_INT fcs_plat_copy_to_user(FCS_HAL_VOID *dst, FCS_HAL_VOID *src,
