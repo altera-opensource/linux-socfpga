@@ -277,6 +277,7 @@ static FCS_HAL_INT plat_sip_svc_send_request(struct socfpga_fcs_priv *priv,
 		msg->arg[3] = k_ctx->hkdf_req.key_id;
 		msg->arg[4] = k_ctx->hkdf_req.output_key_obj_len;
 		msg->payload = k_ctx->hkdf_req.ikm;
+		msg->payload_length = k_ctx->hkdf_req.ikm_len;
 		msg->command = COMMAND_FCS_CRYPTO_HKDF_REQUEST;
 		break;
 
