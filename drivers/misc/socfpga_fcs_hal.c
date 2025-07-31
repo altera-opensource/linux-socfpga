@@ -1547,7 +1547,7 @@ FCS_HAL_INT hal_aes_crypt(struct fcs_cmd_context *const k_ctx)
 
 	/* Copy the destination buffer to the user space */
 	ret = fcs_plat_copy_to_user(ctx.aes.op_len, &total_op_len,
-				    sizeof(ctx.aes.op_len));
+				    sizeof(*k_ctx->aes.op_len));
 	if (ret) {
 		LOG_ERR("Failed to copy AES data from kernel to user buffer ret: %d\n",
 			ret);
@@ -2362,7 +2362,6 @@ FCS_HAL_INT hal_sdos_crypt(struct fcs_cmd_context *const k_ctx)
 	    (priv->status != SDOS_DECRYPTION_NOT_LATEST_KEY_WARN)) {
 		LOG_ERR("Failed to perform SDOS operation ret: %d Mailbox Status = %d\n",
 			ret, priv->status);
-		ret = -EIO;
 		goto copy_mbox_status;
 	}
 
