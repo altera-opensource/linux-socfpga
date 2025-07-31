@@ -514,6 +514,13 @@ FCS_HAL_VOID hal_release_fcs_cmd_ctx(struct fcs_cmd_context *const k_ctx);
 FCS_HAL_INT hal_fcs_init(struct device *dev);
 
 /**
+ * @brief Deinitializes the FCS HAL.
+ *
+ * This function deinitializes the FCS HAL and performs any necessary cleanup.
+ */
+FCS_HAL_VOID hal_fcs_deinit(void);
+
+/**
  * @brief Cleans up the FCS HAL.
  *
  * This function cleans up the FCS HAL and performs any necessary cleanup.

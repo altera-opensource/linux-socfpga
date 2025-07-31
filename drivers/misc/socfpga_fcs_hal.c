@@ -4305,6 +4305,22 @@ FCS_HAL_INT hal_fcs_init(FCS_HAL_DEV *dev)
 	return ret;
 }
 
+FCS_HAL_VOID hal_fcs_deinit(void)
+{
+	if (priv && priv->session_id) {
+		FCS_HAL_INT ret = priv->plat_data->svc_send_request(
+			priv, FCS_DEV_CRYPTO_CLOSE_SESSION,
+			FCS_REQUEST_TIMEOUT);
+		if (ret) {
+			LOG_ERR("Failed to close FCS service session,ret=%d\n",
+				ret);
+		}
+	}
+
+	if (priv)
+		fcs_plat_deinit(priv);
+}
+
 FCS_HAL_VOID hal_fcs_cleanup(void)
 {
 	fcs_plat_cleanup(priv);
