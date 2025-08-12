@@ -23,7 +23,7 @@
 #include <uapi/linux/net_tstamp.h>
 
 #define ETHTOOL_MM_MAX_VERIFY_TIME_MS		128
-#define ETHTOOL_MM_MAX_VERIFY_RETRIES		3
+#define ETHTOOL_MM_MAX_VERIFY_RETRIES		20
 
 struct compat_ethtool_rx_flow_spec {
 	u32		flow_type;
