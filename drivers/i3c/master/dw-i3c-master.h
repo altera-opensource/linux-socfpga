@@ -52,6 +52,7 @@ struct dw_i3c_master {
 	u32 i2c_fmp_timing;
 	u32 quirks;
 	u32 dev_nack_retry_cnt;
+	bool runtime_pm;
 	/*
 	 * Per-device hardware data, used to manage the device address table
 	 * (DAT)
