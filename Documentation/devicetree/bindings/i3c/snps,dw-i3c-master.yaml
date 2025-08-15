@@ -41,6 +41,12 @@ properties:
   power-domains:
     maxItems: 1
 
+  snps,dw-i3c-disable-runtime-pm:
+    description: |
+      Boolean property to disable runtime PM enablement in the driver.
+      If present, the driver will not enable runtime PM for this device.
+    type: boolean
+
   snps,dev-nack-retry-cnt:
     description: |
       This field is used to set the Device NACK Retry count for the
