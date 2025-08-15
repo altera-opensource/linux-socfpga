@@ -270,6 +270,7 @@
 			interrupts = <GIC_SPI 164 IRQ_TYPE_LEVEL_HIGH>;
 			clocks = <&clkmgr AGILEX5_L4_MP_CLK>;
 			snps,dev-nack-retry-cnt = <1>;
+			snps,dw-i3c-disable-runtime-pm;
 			status = "disabled";
 		};
 
@@ -281,6 +282,7 @@
 			interrupts = <GIC_SPI 165 IRQ_TYPE_LEVEL_HIGH>;
 			clocks = <&clkmgr AGILEX5_L4_MP_CLK>;
 			snps,dev-nack-retry-cnt = <1>;
+			snps,dw-i3c-disable-runtime-pm;
 			status = "disabled";
 		};
 
