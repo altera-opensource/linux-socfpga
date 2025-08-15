@@ -269,6 +269,7 @@
 			#size-cells = <0>;
 			interrupts = <GIC_SPI 164 IRQ_TYPE_LEVEL_HIGH>;
 			clocks = <&clkmgr AGILEX5_L4_MP_CLK>;
+			snps,dw-i3c-disable-runtime-pm;
 			status = "disabled";
 		};
 
@@ -280,6 +281,7 @@
 			#size-cells = <0>;
 			interrupts = <GIC_SPI 165 IRQ_TYPE_LEVEL_HIGH>;
 			clocks = <&clkmgr AGILEX5_L4_MP_CLK>;
+			snps,dw-i3c-disable-runtime-pm;
 			status = "disabled";
 		};
 
