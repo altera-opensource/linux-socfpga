@@ -224,7 +224,7 @@ struct stratix10_async_chan {
  * @async_id_pool: Pointer to the ID pool used for asynchronous operations
  * @common_achan_refcount: Atomic reference count for the common asynchronous channel usage
  * @common_async_chan: Pointer to the common asynchronous channel structure
- * @trx_list_wr_lock: Spinlock for protecting the transaction list write operations
+ * @trx_list_lock: Spinlock for protecting the transaction list operations
  * @async_work: Work structure for scheduling asynchronous work
  * @trx_list: Hash table for managing asynchronous transactions
  */
@@ -237,8 +237,8 @@ struct stratix10_async_ctrl {
 	struct stratix10_sip_id_pool *async_id_pool;
 	atomic_t common_achan_refcount;
 	struct stratix10_async_chan *common_async_chan;
-	/* spinlock to protect the writes to trx_list hash table */
-	spinlock_t trx_list_wr_lock;
+	/* spinlock to protect trx_list hash table */
+	spinlock_t trx_list_lock;
 	struct work_struct async_work;
 	DECLARE_HASHTABLE(trx_list, ASYNC_TRX_HASH_BITS);
 };
@@ -2616,10 +2616,9 @@ int stratix10_svc_async_send(struct stratix10_svc_chan *chan, void *msg, void **
 	 * is rejected or busy then we will deallocate the handle for the client
 	 * to retry again.
 	 */
-	spin_lock(&actrl->trx_list_wr_lock);
-	hash_add_rcu(actrl->trx_list, &handle->next, handle->transaction_id);
-	spin_unlock(&actrl->trx_list_wr_lock);
-	synchronize_rcu();
+	spin_lock(&actrl->trx_list_lock);
+	hash_add(actrl->trx_list, &handle->next, handle->transaction_id);
+	spin_unlock(&actrl->trx_list_lock);
 
 	actrl->invoke_fn(actrl, &args, &res);
 
@@ -2645,10 +2644,9 @@ int stratix10_svc_async_send(struct stratix10_svc_chan *chan, void *msg, void **
 		ret = -EIO;
 	}
 
-	spin_lock(&actrl->trx_list_wr_lock);
-	hash_del_rcu(&handle->next);
-	spin_unlock(&actrl->trx_list_wr_lock);
-	synchronize_rcu();
+	spin_lock(&actrl->trx_list_lock);
+	hash_del(&handle->next);
+	spin_unlock(&actrl->trx_list_lock);
 
 dma_unmap_buffer:
 	stratix10_dma_unmap_buffer(ctrl, &handle->input_handle, p_msg->payload,
@@ -2797,10 +2795,13 @@ int stratix10_svc_async_poll(struct stratix10_svc_chan *chan, void *tx_handle,
 
 	struct stratix10_svc_async_handler *handle =
 		(struct stratix10_svc_async_handler *)tx_handle;
+	spin_lock(&actrl->trx_list_lock);
 	if (!hash_hashed(&handle->next)) {
 		dev_err(ctrl->dev, "Invalid transaction handler\n");
+		spin_unlock(&actrl->trx_list_lock);
 		return -EINVAL;
 	}
+	spin_unlock(&actrl->trx_list_lock);
 
 	/**
 	 * For certain operations like AES there are 2/3 stages of function
@@ -2845,7 +2846,7 @@ int stratix10_svc_async_poll(struct stratix10_svc_chan *chan, void *tx_handle,
 		return -EAGAIN;
 	}
 
-	dev_err(ctrl->dev,
+	dev_dbg(ctrl->dev,
 		"Failed to poll async message ,got status as %ld\n",
 		handle->res.a0);
 	return -EINVAL;
@@ -2872,6 +2873,7 @@ int stratix10_svc_async_done(struct stratix10_svc_chan *chan, void *tx_handle)
 		return -EINVAL;
 
 	struct stratix10_svc_controller *ctrl = chan->ctrl;
+	struct stratix10_async_ctrl *actrl = &ctrl->actrl;
 	struct stratix10_async_chan *achan = chan->async_chan;
 
 	if (!achan) {
@@ -2881,17 +2883,16 @@ int stratix10_svc_async_done(struct stratix10_svc_chan *chan, void *tx_handle)
 
 	struct stratix10_svc_async_handler *handle =
 		(struct stratix10_svc_async_handler *)tx_handle;
+	spin_lock(&actrl->trx_list_lock);
 	if (!hash_hashed(&handle->next)) {
 		dev_err(ctrl->dev, "Invalid transaction handle\n");
+		spin_unlock(&actrl->trx_list_lock);
 		return -EINVAL;
 	}
 
-	struct stratix10_async_ctrl *actrl = &ctrl->actrl;
+	hash_del(&handle->next);
+	spin_unlock(&actrl->trx_list_lock);
 
-	spin_lock(&actrl->trx_list_wr_lock);
-	hash_del_rcu(&handle->next);
-	spin_unlock(&actrl->trx_list_wr_lock);
-	synchronize_rcu();
 	stratix10_deallocate_id(achan->job_id_pool, STRATIX10_GET_JOBID(handle->transaction_id));
 	stratix10_dma_unmap_buffer(ctrl, &handle->input_handle, handle->msg->payload,
 				   DMA_TO_DEVICE);
@@ -2939,19 +2940,14 @@ static irqreturn_t stratix10_svc_async_irq_handler(int irq, void *dev_id)
 static void stratix10_async_workqueue_handler(struct work_struct *work)
 {
 	unsigned long tid = 0, transaction_id = 0;
-	ktime_t t0, t1;
 	struct stratix10_svc_async_handler *handler;
 	struct stratix10_async_ctrl *actrl =
 		container_of(work, struct stratix10_async_ctrl, async_work);
-	struct stratix10_svc_controller *ctrl =
-		container_of(actrl, struct stratix10_svc_controller, actrl);
 	DECLARE_BITMAP(pend_on_irq, TOTAL_TRANSACTION_IDS);
 	u64 bitmap_array[4];
 	struct arm_smccc_1_2_regs
 		args = { .a0 = INTEL_SIP_SMC_ASYNC_POLL_ON_IRQ },
 		res;
-	t0 = ktime_get();
-
 	actrl->invoke_fn(actrl, &args, &res);
 	if (res.a0 == INTEL_SIP_SMC_STATUS_OK) {
 		bitmap_array[0] = res.a1;
@@ -2960,17 +2956,17 @@ static void stratix10_async_workqueue_handler(struct work_struct *work)
 		bitmap_array[3] = res.a4;
 		bitmap_from_arr64(pend_on_irq, bitmap_array,
 				  TOTAL_TRANSACTION_IDS);
-		rcu_read_lock();
+		spin_lock(&actrl->trx_list_lock);
 		do {
 			transaction_id = find_next_bit(pend_on_irq,
 						       TOTAL_TRANSACTION_IDS,
 						       transaction_id);
 			if (transaction_id >= TOTAL_TRANSACTION_IDS)
 				break;
-			hash_for_each_possible_rcu_notrace(actrl->trx_list,
-							   handler, next,
-							   transaction_id) {
-				if (handler->transaction_id == transaction_id) {
+			hash_for_each_possible(actrl->trx_list,
+					       handler, next, transaction_id) {
+				if (handler->transaction_id == transaction_id &&
+				    handler->cb) {
 					handler->cb(handler->cb_arg);
 					tid++;
 					break;
@@ -2978,12 +2974,8 @@ static void stratix10_async_workqueue_handler(struct work_struct *work)
 			}
 			transaction_id++;
 		} while (transaction_id < TOTAL_TRANSACTION_IDS);
-		rcu_read_unlock();
+		spin_unlock(&actrl->trx_list_lock);
 	}
-	t1 = ktime_get();
-	dev_dbg(ctrl->dev,
-		"Async workqueue handled total time %lldns for %ld transactions on CPU%d\n",
-		ktime_to_ns(ktime_sub(t1, t0)), tid, smp_processor_id());
 	enable_irq(actrl->irq);
 }
 
@@ -3041,7 +3033,7 @@ static int stratix10_svc_async_init(struct stratix10_svc_controller *controller)
 		return -EADDRINUSE;
 	}
 
-	spin_lock_init(&actrl->trx_list_wr_lock);
+	spin_lock_init(&actrl->trx_list_lock);
 	hash_init(actrl->trx_list);
 	atomic_set(&actrl->common_achan_refcount, 0);
 
@@ -3102,14 +3094,14 @@ static int stratix10_svc_async_exit(struct stratix10_svc_controller *ctrl)
 		actrl->irq = 0;
 	}
 
-	spin_lock(&actrl->trx_list_wr_lock);
+	spin_lock(&actrl->trx_list_lock);
 	hash_for_each_safe(actrl->trx_list, i, tmp, handler, next) {
 		stratix10_deallocate_id(handler->achan->job_id_pool,
 					STRATIX10_GET_JOBID(handler->transaction_id));
-		hash_del_rcu(&handler->next);
+		hash_del(&handler->next);
 		kfree(handler);
 	}
-	spin_unlock(&actrl->trx_list_wr_lock);
+	spin_unlock(&actrl->trx_list_lock);
 
 	for (i = 0; i < SVC_NUM_CHANNEL; i++) {
 		if (ctrl->chans[i].async_chan) {
