@@ -2720,7 +2720,7 @@ int stratix10_svc_async_poll(struct stratix10_svc_chan *chan,
 		return -EAGAIN;
 	}
 
-	dev_err(ctrl->dev,
+	dev_dbg(ctrl->dev,
 		"Failed to poll async message ,got status as %ld\n",
 		handle->res.a0);
 	return -EINVAL;
@@ -2818,19 +2818,14 @@ static irqreturn_t stratix10_svc_async_irq_handler(int irq, void *dev_id)
 static void stratix10_async_workqueue_handler(struct work_struct *work)
 {
 	unsigned long tid = 0, transaction_id = 0;
-	ktime_t t0, t1;
 	struct stratix10_svc_async_handler *handler;
 	struct stratix10_async_ctrl *actrl =
 		container_of(work, struct stratix10_async_ctrl, async_work);
-	struct stratix10_svc_controller *ctrl =
-		container_of(actrl, struct stratix10_svc_controller, actrl);
 	DECLARE_BITMAP(pend_on_irq, TOTAL_TRANSACTION_IDS);
 	u64 bitmap_array[4];
 	struct arm_smccc_1_2_regs
 		args = { .a0 = INTEL_SIP_SMC_ASYNC_POLL_ON_IRQ },
 		res;
-	t0 = ktime_get();
-
 	actrl->invoke_fn(actrl, &args, &res);
 	if (res.a0 == INTEL_SIP_SMC_STATUS_OK) {
 		bitmap_array[0] = res.a1;
@@ -2839,17 +2834,17 @@ static void stratix10_async_workqueue_handler(struct work_struct *work)
 		bitmap_array[3] = res.a4;
 		bitmap_from_arr64(pend_on_irq, bitmap_array,
 				  TOTAL_TRANSACTION_IDS);
-		rcu_read_lock();
+		spin_lock(&actrl->trx_list_lock);
 		do {
 			transaction_id = find_next_bit(pend_on_irq,
 						       TOTAL_TRANSACTION_IDS,
 						       transaction_id);
 			if (transaction_id >= TOTAL_TRANSACTION_IDS)
 				break;
-			hash_for_each_possible_rcu_notrace(actrl->trx_list,
-							   handler, next,
-							   transaction_id) {
-				if (handler->transaction_id == transaction_id) {
+			hash_for_each_possible(actrl->trx_list,
+					       handler, next, transaction_id) {
+				if (handler->transaction_id == transaction_id &&
+				    handler->cb) {
 					handler->cb(handler->cb_arg);
 					tid++;
 					break;
@@ -2857,12 +2852,8 @@ static void stratix10_async_workqueue_handler(struct work_struct *work)
 			}
 			transaction_id++;
 		} while (transaction_id < TOTAL_TRANSACTION_IDS);
-		rcu_read_unlock();
+		spin_unlock(&actrl->trx_list_lock);
 	}
-	t1 = ktime_get();
-	dev_dbg(ctrl->dev,
-		"Async workqueue handled total time %lldns for %ld transactions on CPU%d\n",
-		ktime_to_ns(ktime_sub(t1, t0)), tid, smp_processor_id());
 	enable_irq(actrl->irq);
 }
 
