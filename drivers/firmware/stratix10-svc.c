@@ -331,7 +331,6 @@ struct stratix10_sip_id_pool {
 static LIST_HEAD(svc_ctrl);
 static LIST_HEAD(svc_data_mem);
 static DEFINE_MUTEX(svc_mem_lock);
-static DEFINE_MUTEX(svc_async_lock);
 
 /**
  * stratix10_id_pool_create - Create a new ID pool for Stratix10 async operation
@@ -2907,27 +2906,7 @@ static inline void stratix10_smc_1_2(struct stratix10_async_ctrl *actrl,
 				     const struct arm_smccc_1_2_regs *args,
 				     struct arm_smccc_1_2_regs *res)
 {
-	struct stratix10_svc_controller *ctrl =
-		container_of(actrl, struct stratix10_svc_controller, actrl);
-	ktime_t t1, t0;
-
-	mutex_lock(&svc_async_lock);
-	dev_dbg(ctrl->dev, "args->a0=0x%016lx", args->a0);
-	dev_dbg(ctrl->dev, "args->a1=0x%016lx, args->a2=0x%016lx,", args->a1, args->a2);
-	dev_dbg(ctrl->dev, "args->a3=0x%016lx, args->a4=0x%016lx,", args->a3, args->a4);
-	dev_dbg(ctrl->dev, "args->a5=0x%016lx, args->a6=0x%016lx,", args->a5, args->a6);
-	dev_dbg(ctrl->dev, "args->a7=0x%016lx, args->a8=0x%016lx,", args->a7, args->a8);
-	dev_dbg(ctrl->dev, "args->a9=0x%016lx, args->a10=0x%016lx,", args->a9, args->a10);
-	dev_dbg(ctrl->dev, "args->a11=0x%016lx, args->a12=0x%016lx,", args->a11, args->a12);
-	t0 = ktime_get();
 	arm_smccc_1_2_smc(args, res);
-	t1 = ktime_get();
-	dev_dbg(ctrl->dev, "Duration is %lld ns", ktime_to_ns(ktime_sub(t1, t0)));
-	dev_dbg(ctrl->dev, "res->a0=0x%016lx", res->a0);
-	dev_dbg(ctrl->dev, "res->a1=0x%016lx, res->a2=0x%016lx,", res->a1, res->a2);
-	dev_dbg(ctrl->dev, "res->a3=0x%016lx, res->a4=0x%016lx,", res->a3, res->a4);
-	dev_dbg(ctrl->dev, "res->a5=0x%016lx, res->a6=0x%016lx,", res->a5, res->a6);
-	mutex_unlock(&svc_async_lock);
 }
 
 static irqreturn_t stratix10_svc_async_irq_handler(int irq, void *dev_id)
