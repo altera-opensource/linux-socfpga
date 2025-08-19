@@ -497,6 +497,9 @@ static void msgdma_copy_one(struct msgdma_device *mdev,
 			    struct msgdma_sw_desc *desc)
 {
 	void __iomem *hw_desc = mdev->desc;
+	const u32 *src = (const u32 *)&desc->hw_desc;
+	size_t nwords = (sizeof(desc->hw_desc) - sizeof(u32)) / sizeof(u32);
+	int i;
 
 	/*
 	 * Check if the DESC FIFO it not full. If its full, we need to wait
@@ -507,16 +510,16 @@ static void msgdma_copy_one(struct msgdma_device *mdev,
 		mdelay(1);
 
 	/*
-	 * The descriptor needs to get copied into the descriptor FIFO
-	 * of the DMA controller. The descriptor will get flushed to the
-	 * FIFO, once the last word (control word) is written. Since we
-	 * are not 100% sure that memcpy() writes all word in the "correct"
-	 * order (address from low to high) on all architectures, we make
-	 * sure this control word is written last by single coding it and
-	 * adding some write-barriers here.
-	 */
-	memcpy((void __force *)hw_desc, &desc->hw_desc,
-	       sizeof(desc->hw_desc) - sizeof(u32));
+	* The descriptor must be written into the descriptor FIFO of the DMA
+	* controller. The FIFO is flushed and the descriptor becomes valid once
+	* the last word (the control word) is written. To guarantee the ordering
+	* of MMIO writes across all architectures, we write each 32-bit word
+	* individually using iowrite32(), and handle the control word separately
+	* at the end. This ensures the control word is always written last and
+	* prevents memcpy() or the compiler from reordering accesses.
+	*/
+	for (i = 0; i < nwords; i++)
+		iowrite32(src[i], hw_desc + i * sizeof(u32));
 
 	/* Write control word last to flush this descriptor into the FIFO */
 	mdev->idle = false;
