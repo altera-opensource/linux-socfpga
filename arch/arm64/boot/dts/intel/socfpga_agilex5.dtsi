@@ -325,15 +325,31 @@
 			};
 		};
 
+		sd_emmc_power: regulator-fixed-3p3v {
+			compatible = "regulator-fixed";
+			regulator-name = "card-power";
+			regulator-min-microvolt = <3300000>;
+			regulator-max-microvolt = <3300000>;
+			regulator-always-on;
+		};
+
+		emmc_io_1v8_reg: regulator-fixed-1p8v {
+			compatible = "regulator-fixed";
+			regulator-name = "emmc-io-power";
+			regulator-min-microvolt = <1800000>;
+			regulator-max-microvolt = <1800000>;
+			regulator-always-on;
+		};
+
 		mmc: mmc0@10808000 {
 			#address-cells = <1>;
 			#size-cells = <0>;
-			compatible = "intel,agilex5-sd4hc", "cdns,sd4hc";
+			compatible = "altr,agilex5-sd6hc", "cdns,sd6hc";
 			reg = <0x10808000 0x1000>;
 			interrupts = <GIC_SPI 96 IRQ_TYPE_LEVEL_HIGH>;
 			fifo-depth = <0x800>;
-			resets = <&rst SDMMC_RESET>;
-			reset-names = "reset";
+			resets = <&rst SDMMC_RESET>, <&rst COMBOPHY_RESET>, <&rst SDMMC_OCP_RESET>;
+			reset-names = "sdhc-reset", "combophy", "sdmmc-ocp";
 			clocks = <&clkmgr AGILEX5_L4_MP_CLK>, <&clkmgr AGILEX5_SDMCLK>;
 			clock-names = "biu", "ciu";
 			iommus = <&smmu 5>;
