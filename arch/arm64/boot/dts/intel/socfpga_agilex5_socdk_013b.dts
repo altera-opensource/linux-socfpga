@@ -76,6 +76,25 @@
 	status = "okay";
 };
 
+&sd_io_1v8_reg {
+	gpios = <&portb 3 GPIO_ACTIVE_HIGH>;
+};
+
+&mmc {
+	status = "okay";
+
+	no-mmc;
+	no-1-8-v;
+	disable-wp;
+	cap-sd-highspeed;
+	bus-width = <4>;
+	vmmc-supply = <&sd_emmc_power>;
+	vqmmc-supply = <&sd_io_1v8_reg>;
+	max-frequency = <200000000>;
+	sdhci-caps = <0x00000000 0x0000c800>;
+	sdhci-caps-mask = <0x00002007 0x0000ff00>;
+};
+
 &osc1 {
 	clock-frequency = <25000000>;
 };
