@@ -2,22 +2,16 @@
 /*
  * Copyright (C) 2016 Socionext Inc.
  *   Author: Masahiro Yamada <yamada.masahiro@socionext.com>
+ * Copyright (C) 2025 Altera Corporation
  */
 
 #include <linux/bitfield.h>
 #include <linux/bits.h>
-#include <linux/iopoll.h>
 #include <linux/module.h>
 #include <linux/mmc/host.h>
-#include <linux/mmc/mmc.h>
-#include <linux/of.h>
-#include <linux/platform_device.h>
-#include <linux/reset.h>
 
-#include "sdhci-pltfm.h"
+#include "sdhci-cadence.h"
 
-/* HRS - Host Register Set (specific to Cadence) */
-#define SDHCI_CDNS_HRS04		0x10		/* PHY access port */
 /* SD Host Controller V4 HRS04 Description */
 #define   SDHCI_CDNS_HRS04_ACK			BIT(26)
 #define   SDHCI_CDNS_HRS04_RD			BIT(25)
@@ -74,39 +68,12 @@
 #define SDHCI_CDNS_PHY_DLY_HSMMC	0x0c
 #define SDHCI_CDNS_PHY_DLY_STROBE	0x0d
 
-/*
- * The tuned val register is 6 bit-wide, but not the whole of the range is
- * available.  The range 0-42 seems to be available (then 43 wraps around to 0)
- * but I am not quite sure if it is official.  Use only 0 to 39 for safety.
- */
-#define SDHCI_CDNS_MAX_TUNING_LOOP	40
-
 #define MAIN_CLOCK_INDEX		0
-
-struct sdhci_cdns4_phy_param {
-	u8 addr;
-	u8 data;
-};
-
-struct sdhci_cdns_priv {
-	void __iomem *hrs_addr;
-	void __iomem *ctl_addr;	/* write control */
-	spinlock_t wrlock;	/* write lock */
-	bool enhanced_strobe;
-	void (*priv_writel)(struct sdhci_cdns_priv *priv, u32 val, void __iomem *reg);
-	struct reset_control *rst_hw;
-	unsigned int nr_phy_params;
-	struct sdhci_cdns4_phy_param phy_params[];
-};
+#define SD_MASTER_CLOCK_INDEX		1
 
 struct sdhci_cdns4_phy_cfg {
 	const char *property;
 	u8 addr;
-};
-
-struct sdhci_cdns_drv_data {
-	int (*init)(struct platform_device *pdev);
-	const struct sdhci_pltfm_data pltfm_data;
 };
 
 static const struct sdhci_cdns4_phy_cfg sdhci_cdns4_phy_cfgs[] = {
@@ -206,13 +173,6 @@ static int sdhci_cdns4_phy_init(struct sdhci_cdns_priv *priv)
 	return 0;
 }
 
-static void *sdhci_cdns_priv(struct sdhci_host *host)
-{
-	struct sdhci_pltfm_host *pltfm_host = sdhci_priv(host);
-
-	return sdhci_pltfm_priv(pltfm_host);
-}
-
 static unsigned int sdhci_cdns_get_timeout_clock(struct sdhci_host *host)
 {
 	/*
@@ -247,6 +207,9 @@ static int sdhci_cdns_set_tune_val(struct sdhci_host *host, unsigned int val)
 	void __iomem *reg = priv->hrs_addr + SDHCI_CDNS_HRS06;
 	u32 tmp;
 	int i, ret;
+
+	if (host->version >= SDHCI_SPEC_420)
+		return sdhci_cdns6_set_tune_val(host, val);
 
 	if (WARN_ON(!FIELD_FIT(SDHCI_CDNS_HRS06_TUNE, val)))
 		return -EINVAL;
@@ -328,8 +291,11 @@ static int sdhci_cdns_execute_tuning(struct sdhci_host *host, u32 opcode)
 	 * The delay is set by probe, based on the DT properties.
 	 */
 	if (host->timing != MMC_TIMING_MMC_HS200 &&
-	    host->timing != MMC_TIMING_UHS_SDR104)
+	    host->timing != MMC_TIMING_UHS_SDR104) {
+		dev_dbg(mmc_dev(host->mmc), "Tuning skipped (timing: %d)\n",
+			host->timing);
 		return 0;
+	}
 
 	for (i = 0; i < SDHCI_CDNS_MAX_TUNING_LOOP; i++) {
 		if (sdhci_cdns_set_tune_val(host, i) ||
@@ -388,6 +354,10 @@ static void sdhci_cdns_set_uhs_signaling(struct sdhci_host *host,
 	/* For SD, fall back to the default handler */
 	if (mode == SDHCI_CDNS_HRS06_MODE_SD)
 		sdhci_set_uhs_signaling(host, timing);
+
+	/* For host controller V6, set SDHCI and PHY registers for UHS signaling */
+	if (host->version >= SDHCI_SPEC_420)
+		sdhci_cdns6_phy_adj(host, timing);
 }
 
 /* Elba control register bits [6:3] are byte-lane enables */
@@ -484,6 +454,16 @@ static const struct sdhci_ops sdhci_cdns4_ops = {
 	.set_uhs_signaling = sdhci_cdns_set_uhs_signaling,
 };
 
+static const struct sdhci_ops sdhci_cdns6_ops = {
+	.set_clock = sdhci_set_clock,
+	.get_timeout_clock = sdhci_cdns_get_timeout_clock,
+	.set_bus_width = sdhci_set_bus_width,
+	.reset = sdhci_reset,
+	.platform_execute_tuning = sdhci_cdns_execute_tuning,
+	.set_uhs_signaling = sdhci_cdns_set_uhs_signaling,
+	.hw_reset = sdhci_cdns6_hw_reset,
+};
+
 static const struct sdhci_cdns_drv_data sdhci_cdns_uniphier_drv_data = {
 	.pltfm_data = {
 		.ops = &sdhci_cdns4_ops,
@@ -508,6 +488,20 @@ static const struct sdhci_cdns_drv_data sdhci_eyeq_drv_data = {
 static const struct sdhci_cdns_drv_data sdhci_cdns4_drv_data = {
 	.pltfm_data = {
 		.ops = &sdhci_cdns4_ops,
+	},
+};
+
+static const struct sdhci_cdns_drv_data sdhci_cdns6_agilex5_drv_data = {
+	.pltfm_data = {
+		.ops = &sdhci_cdns6_ops,
+		.quirks2 = SDHCI_QUIRK2_40_BIT_DMA_MASK |
+			   SDHCI_QUIRK2_PRESET_VALUE_BROKEN,
+	},
+};
+
+static const struct sdhci_cdns_drv_data sdhci_cdns6_drv_data = {
+	.pltfm_data = {
+		.ops = &sdhci_cdns6_ops,
 	},
 };
 
@@ -571,8 +565,28 @@ static struct clk **sdhci_cdns_enable_clocks(struct device *dev, bool is_sd4hc)
 			dev_err(dev, "Failed to get/enable clock\n");
 			return ERR_CAST(clks[MAIN_CLOCK_INDEX]);
 		}
-	}
+	} else {
+		clks = devm_kzalloc(dev, sizeof(struct clk *) * 2, GFP_KERNEL);
+		if (!clks)
+			return ERR_PTR(-ENOMEM);
 
+		/* Enable main clock ("biu") */
+		clks[MAIN_CLOCK_INDEX] = devm_clk_get_enabled(dev, "biu");
+		if (IS_ERR(clks[MAIN_CLOCK_INDEX])) {
+			dev_err(dev, "%s: request of Main clock failed (%ld)\n",
+				__func__, PTR_ERR(clks[MAIN_CLOCK_INDEX]));
+			return ERR_CAST(clks[MAIN_CLOCK_INDEX]);
+		}
+
+		/* Enable SD master clock ("ciu") */
+		clks[SD_MASTER_CLOCK_INDEX] = devm_clk_get_enabled(dev, "ciu");
+		if (IS_ERR(clks[SD_MASTER_CLOCK_INDEX])) {
+			dev_err(dev,
+				"%s: request of SD master clock failed (%ld)\n",
+				__func__, PTR_ERR(clks[SD_MASTER_CLOCK_INDEX]));
+			return ERR_CAST(clks[SD_MASTER_CLOCK_INDEX]);
+		}
+	}
 	return clks;
 }
 
@@ -634,9 +648,12 @@ static int sdhci_cdns_probe(struct platform_device *pdev)
 
 	if (is_sd4hc) {
 		ret = sdhci_cdns4_phy_probe(pdev, priv);
-		if (ret)
-			return ret;
+	} else {
+		priv->ciu_clk = clks[SD_MASTER_CLOCK_INDEX];
+		ret = sdhci_cdns6_phy_probe(host);
 	}
+	if (ret)
+		return ret;
 
 	if (host->mmc->caps & MMC_CAP_HW_RESET) {
 		priv->rst_hw = devm_reset_control_get_optional_exclusive(dev, NULL);
@@ -661,14 +678,24 @@ static int sdhci_cdns_resume(struct device *dev)
 	if (ret)
 		return ret;
 
-	ret = sdhci_cdns4_phy_init(priv);
-	if (ret)
-		goto disable_clk;
+	if (host->version >= SDHCI_SPEC_420) {
+		ret = clk_prepare_enable(priv->ciu_clk);
+		if (ret) {
+			dev_err(dev, "Failed to enable SD master clock: %d\n",
+				ret);
+			goto disable_clk;
+		}
+	} else {
+		ret = sdhci_cdns4_phy_init(priv);
+		if (ret)
+			goto disable_clk;
+	}
 
 	ret = sdhci_resume_host(host);
 	if (ret)
 		goto disable_clk;
 
+	dev_dbg(dev, "SDHCI host resumed successfully\n");
 	return 0;
 
 disable_clk:
@@ -677,7 +704,30 @@ disable_clk:
 	return ret;
 }
 
-static DEFINE_SIMPLE_DEV_PM_OPS(sdhci_cdns_pm_ops, sdhci_pltfm_suspend, sdhci_cdns_resume);
+static int sdhci_cdns_suspend(struct device *dev)
+{
+	struct sdhci_host *host = dev_get_drvdata(dev);
+	struct sdhci_pltfm_host *pltfm_host = sdhci_priv(host);
+	struct sdhci_cdns_priv *priv = sdhci_pltfm_priv(pltfm_host);
+	int ret;
+
+	if (host->tuning_mode != SDHCI_TUNING_MODE_3)
+		mmc_retune_needed(host->mmc);
+
+	ret = sdhci_suspend_host(host);
+	if (ret)
+		return ret;
+
+	clk_disable_unprepare(pltfm_host->clk);
+	if (host->version >= SDHCI_SPEC_420) {
+		clk_disable_unprepare(priv->ciu_clk);
+		dev_dbg(dev, "SD master clock disabled\n");
+	}
+
+	return 0;
+}
+
+static DEFINE_SIMPLE_DEV_PM_OPS(sdhci_cdns_pm_ops, sdhci_cdns_suspend, sdhci_cdns_resume);
 
 static const struct of_device_id sdhci_cdns_match[] = {
 	{
@@ -695,6 +745,14 @@ static const struct of_device_id sdhci_cdns_match[] = {
 	{
 		.compatible = "cdns,sd4hc",
 		.data = &sdhci_cdns4_drv_data,
+	},
+	{
+		.compatible = "altr,agilex5-sd6hc",
+		.data = &sdhci_cdns6_agilex5_drv_data,
+	},
+	{
+		.compatible = "cdns,sd6hc",
+		.data = &sdhci_cdns6_drv_data,
 	},
 	{ /* sentinel */ }
 };
