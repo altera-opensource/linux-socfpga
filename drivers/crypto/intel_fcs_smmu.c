@@ -23,7 +23,6 @@
 #define TRANSLATION_TABLE_UPPER_BIT_SHIFT	32
 #define TRANSLATION_CONTEXT_BANK_ENABLE		0x1
 #define TRANSLATION_CONTEXT_BANK_DISABLE	0x0
-#define SSD0_VAL	0xF
 #define SMR8_VAL	0xFC00000A
 #define S2CR8_VAL	0x0b000008
 #define CB8_SCTLR_VAL	0x00000001
@@ -3067,9 +3066,6 @@ void intel_fcs_smmu_init(struct intel_fcs_priv *priv)
 	ttbr_paddr_l1 = virt_to_phys(l1_table);
 	ttbr_paddr_l1_lower = ttbr_paddr_l1 & TRANSLATION_TABLE_LOWER_MASK;
 	ttbr_paddr_l1_upper = ttbr_paddr_l1 >> TRANSLATION_TABLE_UPPER_BIT_SHIFT;
-
-	//SSD0_REG
-	smmu_program_reg(priv, SSD0_REG_ADDR, SSD0_VAL);
 
 	//SMR8
 	smmu_program_reg(priv, SMR8_REG_ADDR, SMR8_VAL);
