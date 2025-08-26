@@ -15,3 +15,11 @@
 		};
 	};
 };
+
+&i3c0 {
+	status = "disabled";
+};
+
+&i3c1 {
+	status = "disabled";
+};
