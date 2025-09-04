@@ -81,6 +81,8 @@
  */
 #define SDHCI_CDNS_MAX_TUNING_LOOP	40
 
+#define MAIN_CLOCK_INDEX		0
+
 struct sdhci_cdns4_phy_param {
 	u8 addr;
 	u8 data;
@@ -545,25 +547,58 @@ static void sdhci_cdns_mmc_hw_reset(struct mmc_host *mmc)
 	usleep_range(300, 1000);
 }
 
+static int sdhci_cdns4_phy_probe(struct platform_device *pdev,
+				struct sdhci_cdns_priv *priv)
+{
+	struct device *dev = &pdev->dev;
+
+	sdhci_cdns4_phy_param_parse(dev->of_node, priv);
+
+	return sdhci_cdns4_phy_init(priv);
+}
+
+static struct clk **sdhci_cdns_enable_clocks(struct device *dev, bool is_sd4hc)
+{
+	struct clk **clks = NULL;
+
+	if (is_sd4hc) {
+		/* For SDHCI V4 controllers, enable only the default clock */
+		clks = devm_kzalloc(dev, sizeof(struct clk *), GFP_KERNEL);
+		if (!clks)
+			return NULL;
+		clks[MAIN_CLOCK_INDEX] = devm_clk_get_enabled(dev, NULL);
+		if (IS_ERR(clks[MAIN_CLOCK_INDEX])) {
+			dev_err(dev, "Failed to get/enable clock\n");
+			return ERR_CAST(clks[MAIN_CLOCK_INDEX]);
+		}
+	}
+
+	return clks;
+}
+
 static int sdhci_cdns_probe(struct platform_device *pdev)
 {
 	struct sdhci_host *host;
 	const struct sdhci_cdns_drv_data *data;
 	struct sdhci_pltfm_host *pltfm_host;
 	struct sdhci_cdns_priv *priv;
-	struct clk *clk;
+	struct clk **clks;
 	unsigned int nr_phy_params;
 	int ret;
 	struct device *dev = &pdev->dev;
-	static const u16 version = SDHCI_SPEC_400 << SDHCI_SPEC_VER_SHIFT;
+	bool is_sd4hc = of_device_is_compatible(dev->of_node, "cdns,sd4hc");
 
-	clk = devm_clk_get_enabled(dev, NULL);
-	if (IS_ERR(clk))
-		return PTR_ERR(clk);
+	clks = sdhci_cdns_enable_clocks(dev, is_sd4hc);
+	if (IS_ERR(clks)) {
+		dev_err(dev, "Failed to enable controller clocks: %ld\n", PTR_ERR(clks));
+		return PTR_ERR(clks);
+	}
 
 	data = of_device_get_match_data(dev);
-	if (!data)
-		data = &sdhci_cdns4_drv_data;
+	if (!data) {
+		dev_err(&pdev->dev, "Missing platform configuration data\n");
+		return -EINVAL;
+	}
 
 	nr_phy_params = sdhci_cdns4_phy_param_count(dev->of_node);
 	host = sdhci_pltfm_init(pdev, &data->pltfm_data,
@@ -572,7 +607,7 @@ static int sdhci_cdns_probe(struct platform_device *pdev)
 		return PTR_ERR(host);
 
 	pltfm_host = sdhci_priv(host);
-	pltfm_host->clk = clk;
+	pltfm_host->clk = clks[MAIN_CLOCK_INDEX];
 
 	priv = sdhci_pltfm_priv(pltfm_host);
 	priv->nr_phy_params = nr_phy_params;
@@ -588,19 +623,20 @@ static int sdhci_cdns_probe(struct platform_device *pdev)
 			return ret;
 	}
 	sdhci_enable_v4_mode(host);
-	__sdhci_read_caps(host, &version, NULL, NULL);
 
 	sdhci_get_of_property(pdev);
 
 	ret = mmc_of_parse(host->mmc);
-	if (ret)
+	if (ret) {
+		dev_err(dev, "mmc_of_parse failed: %d\n", ret);
 		return ret;
+	}
 
-	sdhci_cdns4_phy_param_parse(dev->of_node, priv);
-
-	ret = sdhci_cdns4_phy_init(priv);
-	if (ret)
-		return ret;
+	if (is_sd4hc) {
+		ret = sdhci_cdns4_phy_probe(pdev, priv);
+		if (ret)
+			return ret;
+	}
 
 	if (host->mmc->caps & MMC_CAP_HW_RESET) {
 		priv->rst_hw = devm_reset_control_get_optional_exclusive(dev, NULL);
@@ -656,7 +692,10 @@ static const struct of_device_id sdhci_cdns_match[] = {
 		.compatible = "mobileye,eyeq-sd4hc",
 		.data = &sdhci_eyeq_drv_data,
 	},
-	{ .compatible = "cdns,sd4hc" },
+	{
+		.compatible = "cdns,sd4hc",
+		.data = &sdhci_cdns4_drv_data,
+	},
 	{ /* sentinel */ }
 };
 MODULE_DEVICE_TABLE(of, sdhci_cdns_match);
