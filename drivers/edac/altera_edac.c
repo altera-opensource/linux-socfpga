@@ -1954,7 +1954,8 @@ static const struct of_device_id altr_edac_a10_device_of_match[] = {
 #endif
 #ifdef CONFIG_EDAC_ALTERA_USB
 	{ .compatible = "altr,socfpga-usb-ecc", .data = &a10_usbecc_data },
-	{ .compatible = "altr,socfpga-usb3-ecc", .data = &agilex5_usb3ecc_data },
+	{ .compatible = "altr,socfpga-agilex5-usb3-ecc",
+	  .data = &agilex5_usb3ecc_data },
 #endif
 #ifdef CONFIG_EDAC_ALTERA_QSPI
 	{ .compatible = "altr,socfpga-qspi-ecc", .data = &a10_qspiecc_data },
