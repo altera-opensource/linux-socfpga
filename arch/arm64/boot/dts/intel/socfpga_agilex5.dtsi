@@ -626,21 +626,21 @@
 			};
 
 			usb1-rx-ecc@108c4400 {
-				compatible = "altr,socfpga-usb3-ecc";
+				compatible = "altr,socfpga-usb-ecc";
 				reg = <0x108c4400 0x100>;
 				altr,ecc-parent = <&usb31>;
 				interrupts = <12 IRQ_TYPE_LEVEL_HIGH>, <44 IRQ_TYPE_LEVEL_HIGH>;
 			};
 
 			usb1-tx-ecc@108c4800 {
-				compatible = "altr,socfpga-usb3-ecc";
+				compatible = "altr,socfpga-usb-ecc";
 				reg = <0x108c4800 0x100>;
 				altr,ecc-parent = <&usb31>;
 				interrupts = <11 IRQ_TYPE_LEVEL_HIGH>, <43 IRQ_TYPE_LEVEL_HIGH>;
 			};
 
 			usb1-cache-ecc@108c4c00 {
-				compatible = "altr,socfpga-usb3-ecc";
+				compatible = "altr,socfpga-agilex5-usb3-ecc";
 				reg = <0x108c4c00 0x100>;
 				altr,ecc-parent = <&usb31>;
 				interrupts = <3 IRQ_TYPE_LEVEL_HIGH>, <35 IRQ_TYPE_LEVEL_HIGH>;
