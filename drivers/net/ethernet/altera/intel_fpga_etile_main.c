@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-2.0
-/* Intel FPGA E-tile Ethernet MAC driver
- * Copyright (C) 2020-2022 Intel Corporation. All rights reserved
+/* Altera FPGA E-tile Ethernet MAC driver
+ * Copyright (C) 2020-2022 Altera Corporation. All rights reserved
  *
  * Contributors:
  *   Roman Bulgakov
@@ -3277,6 +3277,6 @@ static struct platform_driver intel_fpga_etile_driver = {
 
 module_platform_driver(intel_fpga_etile_driver);
 
-MODULE_AUTHOR("Intel Corporation");
+MODULE_AUTHOR("Altera Corporation");
 MODULE_DESCRIPTION("Altera E-tile MAC driver");
 MODULE_LICENSE("GPL v2");

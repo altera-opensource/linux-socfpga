@@ -77,13 +77,43 @@ config SFP
 	depends on HWMON || HWMON=n
 	select MDIO_I2C
 
-config QSFP
-	tristate "QSFP cage support"
-	depends on I2C && PHYLINK
+config SFP_MEM_CORE
+        tristate "SFP Controller subsystem core code" if COMPILE_TEST
+        depends on HWMON || HWMON=n
+        help
+          The core code for the SFP Controller subsystem for Altera FPGAs used
+          by other interafce module drivers for access to the SFP controller
+          subsystem registers
+
+config SFP_MEM
+        tristate "AXI based Memory platform driver for SFP Controller subsystem in Altera FPGAs"
+        select SFP_MEM_CORE
+        help
+          Adds support for a SFP controller subsystem that shadows the SFP module's
+          memory pages in memory
+
+config QSFP_MEM_CORE
+	tristate "QSFP Controller subsystem core code" if COMPILE_TEST
 	depends on HWMON || HWMON=n
-	select MDIO_I2C
 	help
-	  Currently supports SFF-8636 Rev2.9 QSFP connectors or cables.
+	  The core code for the QSFP Controller subsystem for Altera FPGAs used
+	  by other interafce module drivers for access to the QSFP controller
+	  subsystem registers
+
+config QSFP_MEM
+	tristate "AXI based Memory platform driver for QSFP Controller subsystem in Altera FPGAs"
+	select QSFP_MEM_CORE
+	help
+	  Adds support for a QSFP controller subsystem that shadows the QSFP module's
+	  memory pages in memory
+
+config QSFP_MEM_DFL
+	tristate "DFL bus driver for QSFP Controller subsystem in Altera FPGAs"
+	depends on FPGA_DFL
+	select QSFP_MEM_CORE
+	help
+	  This is a Device Feature List (DFL) bus driver for the
+	  QSFP Controller subsystem in Altera FPGAs.
 
 comment "MII PHY device drivers"
 
@@ -233,9 +263,9 @@ config LXT_PHY
 config INTEL_XWAY_PHY
 	tristate "Intel XWAY PHYs"
 	help
-	  Supports the Intel XWAY (former Lantiq) 11G and 22E PHYs.
+	  Supports the Altera XWAY (former Lantiq) 11G and 22E PHYs.
 	  These PHYs are marked as standalone chips under the names
-	  PEF 7061, PEF 7071 and PEF 7072 or integrated into the Intel
+	  PEF 7061, PEF 7071 and PEF 7072 or integrated into the Altera
 	  SoCs xRX200, xRX300, xRX330, xRX350 and xRX550.
 
 config LSI_ET1011C_PHY

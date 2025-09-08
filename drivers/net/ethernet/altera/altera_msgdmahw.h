@@ -124,6 +124,7 @@ struct msgdma_csr {
 
 /* mSGDMA CSR fill level bits
  */
+#define MSGDMA_CSR_FILL_LEVEL_VALID             (0xffffffff)
 #define MSGDMA_CSR_WR_FILL_LEVEL_GET(v)		(((v) & 0xffff0000) >> 16)
 #define MSGDMA_CSR_RD_FILL_LEVEL_GET(v)		((v) & 0x0000ffff)
 #define MSGDMA_CSR_RESP_FILL_LEVEL_GET(v)	((v) & 0x0000ffff)

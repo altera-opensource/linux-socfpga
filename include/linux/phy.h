@@ -170,6 +170,8 @@ typedef enum {
 	PHY_INTERFACE_MODE_QUSGMII,
 	PHY_INTERFACE_MODE_1000BASEKX,
 	PHY_INTERFACE_MODE_10G_QXGMII,
+	/* 25GBASE-KR */
+	PHY_INTERFACE_MODE_25GKR,
 	PHY_INTERFACE_MODE_MAX,
 } phy_interface_t;
 
@@ -293,6 +295,8 @@ static inline const char *phy_modes(phy_interface_t interface)
 		return "qusgmii";
 	case PHY_INTERFACE_MODE_10G_QXGMII:
 		return "10g-qxgmii";
+	case PHY_INTERFACE_MODE_25GKR:
+		return "25gbase-kr";
 	default:
 		return "unknown";
 	}

@@ -1899,8 +1899,6 @@ copy_mbox_status:
 			ret);
 	}
 
-	priv->plat_data->svc_free_memory(priv, d_buf);
-
 free_mem:
 	priv->plat_data->svc_free_memory(priv, s_buf);
 
@@ -2932,7 +2930,6 @@ copy_mbox_status:
 			ret);
 	}
 
-	priv->plat_data->svc_free_memory(priv, d_buf);
 free_sbuf:
 	priv->plat_data->svc_free_memory(priv, s_buf);
 

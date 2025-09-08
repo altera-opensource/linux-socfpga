@@ -1,20 +1,31 @@
 /* SPDX-License-Identifier: GPL-2.0 */
 /* Altera PTP Hardware Clock (PHC) Linux driver
  * Copyright (C) 2015-2016 Altera Corporation. All rights reserved.
- * Copyright (C) 2017-2020 Intel Corporation. All rights reserved.
+ * Copyright (C) 2017-2020 Altera Corporation. All rights reserved.
  *
  * Author(s):
  *	Dalon Westergreen <dalon.westergreen@intel.com>
  */
 
-#ifndef __INTEL_FPGA_TOD_H__
-#define __INTEL_FPGA_TOD_H__
+ #ifndef __INTEL_FPGA_TOD_H__
+ #define __INTEL_FPGA_TOD_H__
 
-#include <linux/debugfs.h>
-#include <linux/netdevice.h>
-#include <linux/ptp_clock_kernel.h>
-#include <linux/platform_device.h>
-#include <linux/mutex.h>
+ #include <linux/debugfs.h>
+ #include <linux/netdevice.h>
+ #include <linux/ptp_clock_kernel.h>
+ #include <linux/platform_device.h>
+ #include <linux/mutex.h>
+ #include "intel_freq_control.h"
+
+ #define NOMINAL_PPB                     1000000000ULL
+ #define TOD_PERIOD_MAX                  0xfffff
+ #define TOD_PERIOD_MIN                  0
+ #define TOD_DRIFT_ADJUST_FNS_MAX        0xffff
+ #define TOD_DRIFT_ADJUST_RATE_MAX       0xffff
+ #define TOD_ADJUST_COUNT_MAX            0xfffff
+ #define TOD_ADJUST_MS_MAX               (((((TOD_PERIOD_MAX) >> 16) + 1) * \
+					  ((TOD_ADJUST_COUNT_MAX) + 1)) /  \
+					 1000000UL)
 
 /* Altera Time-of-Day (ToD) clock register space. */
 struct intel_fpga_tod {
@@ -29,28 +40,43 @@ struct intel_fpga_tod {
 	u32 drift_adjust_rate;
 };
 
-#define tod_csroffs(a)	(offsetof(struct intel_fpga_tod, a))
+ #define tod_csroffs(a)	(offsetof(struct intel_fpga_tod, a))
+
+struct intel_fpga_pps {
+	u32 reserved_1[3];
+	u32 pps_ctrl;
+	u32 reserved_2[15];
+	u32 seconds_msb;
+	u32 seconds_lsb;
+	u32 nanosec;
+};
+
+ #define pps_csroffs(a)	(offsetof(struct intel_fpga_pps, a))
 
 struct intel_fpga_tod_private {
-	struct net_device *dev;
+	struct device *dev;
 
 	struct ptp_clock_info ptp_clock_ops;
 	struct ptp_clock *ptp_clock;
 
 	/* Time-of-Day (ToD) Clock address space */
 	struct intel_fpga_tod __iomem *tod_ctrl;
+
+	/* PPS address space for TOD */
+	struct intel_fpga_pps __iomem *pps_ctrl;
 	struct clk *tod_clk;
 
 	/* ToD clock registers protection */
 	spinlock_t tod_lock;
+
+	bool ptp_clockcleaner_enable;
+
+	/* PTP Clock Cleaner structure */
+	struct intel_freq_control_private *ptp_freq_priv;
+
 };
 
-int intel_fpga_tod_init(struct intel_fpga_tod_private *priv);
-void intel_fpga_tod_uinit(struct intel_fpga_tod_private *priv);
-int intel_fpga_tod_register(struct intel_fpga_tod_private *priv,
-			    struct device *device);
-void intel_fpga_tod_unregister(struct intel_fpga_tod_private *priv);
-int intel_fpga_tod_probe(struct platform_device *pdev,
-			 struct intel_fpga_tod_private *priv);
-
-#endif /* __INTEL_FPGA_TOD_H__ */
+int intel_fpga_tod_probe(struct platform_device *pdev);
+void intel_fpga_tod_unregister(struct platform_device *pdev);
+int intel_fpga_tod_register(struct intel_fpga_tod_private *priv, struct device *device);
+ #endif /* __INTEL_FPGA_TOD_H__ */

@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-2.0
-/* Intel FPGA Quad-Speed Ethernet MAC driver
- * Copyright (C) 2019 Intel Corporation. All rights reserved
+/* Altera FPGA Quad-Speed Ethernet MAC driver
+ * Copyright (C) 2019 Altera Corporation. All rights reserved
  *
  * Contributors:
  *   Roman Bulgakov
@@ -1630,6 +1630,6 @@ static struct platform_driver intel_fpga_qse_ll_driver = {
 
 module_platform_driver(intel_fpga_qse_ll_driver);
 
-MODULE_AUTHOR("Intel Corporation");
+MODULE_AUTHOR("Altera Corporation");
 MODULE_DESCRIPTION("Altera Quad Speed Ethernet Low Latency MAC driver");
 MODULE_LICENSE("GPL v2");

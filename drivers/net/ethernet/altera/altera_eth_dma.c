@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-2.0
-/* DMA support for Intel FPGA Quad-Speed Ethernet MAC driver
- * Copyright (C) 2019 Intel Corporation. All rights reserved
+/* DMA support for Altera FPGA Quad-Speed Ethernet MAC driver
+ * Copyright (C) 2019 Altera Corporation. All rights reserved
  *
  * Contributors:
  *   Dalon Westergreen
@@ -22,6 +22,7 @@
 
 #include "altera_eth_dma.h"
 #include "altera_utils.h"
+#include "linux/of_address.h"
 
 /* Probe DMA
  */
@@ -191,4 +192,64 @@ err:
 	return ret;
 };
 EXPORT_SYMBOL_GPL(altera_eth_dma_probe);
+int altera_eth_dma_node_probe(struct platform_device *pdev,
+			      struct device_node *dmanp,
+			      struct intel_xtile_msgdma_info *dmainfo,
+			      enum altera_dma_type type)
+{
+	int ret = -ENODEV;
+
+	/* xSGDMA Rx Dispatcher address space */
+	ret = request_and_map_node(pdev, dmanp, "rx_csr", &dmainfo->dma_priv.rx_dma_csr);
+	if (ret)
+		goto err;
+
+	/* mSGDMA Tx Dispatcher address space */
+	ret = request_and_map_node(pdev, dmanp, "tx_csr", &dmainfo->dma_priv.tx_dma_csr);
+	if (ret)
+		goto err;
+
+	switch (type) {
+	case ALTERA_DTYPE_SGDMA:
+	case ALTERA_DTYPE_MSGDMA:
+	case ALTERA_DTYPE_MSGDMA_PTP:
+		if (netif_msg_probe(&dmainfo->dma_priv))
+			dev_info(&pdev->dev, "\tDMA type %d not supported\n", type);
+		ret = -ENODEV;
+		break;
+	case ALTERA_DTYPE_MSGDMA_PREF:
+		/* mSGDMA Rx Prefetcher address space */
+		ret = request_and_map_node(pdev, dmanp, "rx_pref", &dmainfo->dma_priv.rx_pref_csr);
+		if (ret)
+			break;
+
+		/* mSGDMA Tx Prefetcher address space */
+		ret = request_and_map_node(pdev, dmanp, "tx_pref", &dmainfo->dma_priv.tx_pref_csr);
+		if (ret)
+			break;
+
+		/* get prefetcher rx poll frequency from device tree */
+		if (of_property_read_u32(dmanp,
+					 "rx-poll-freq",
+					 &dmainfo->dma_priv.rx_poll_freq)) {
+			dev_info(&pdev->dev, "Defaulting RX Poll Frequency to 128\n");
+			dmainfo->dma_priv.rx_poll_freq = 128;
+		}
+
+		/* get prefetcher tx poll frequency from device tree */
+		if (of_property_read_u32(dmanp,
+					 "tx-poll-freq",
+					 &dmainfo->dma_priv.tx_poll_freq)) {
+			dev_info(&pdev->dev, "Defaulting TX Poll Frequency to 128\n");
+			dmainfo->dma_priv.tx_poll_freq = 128;
+		}
+		break;
+	default:
+		ret = -ENODEV;
+		break;
+	}
+err:
+	return ret;
+}
+EXPORT_SYMBOL_GPL(altera_eth_dma_node_probe);
 MODULE_LICENSE("GPL");
