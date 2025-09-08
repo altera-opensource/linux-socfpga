@@ -150,8 +150,8 @@ struct altera_dmaops {
 	void (*disable_rxirq)(struct altera_dma_private *priv);
 	void (*clear_txirq)(struct altera_dma_private *priv);
 	void (*clear_rxirq)(struct altera_dma_private *priv);
-	int (*tx_buffer)(struct altera_dma_private *priv,
-			 struct altera_dma_buffer *buffer);
+	netdev_tx_t (*tx_buffer)(struct altera_dma_private *priv,
+				 struct altera_dma_buffer *buffer);
 	u32 (*tx_completions)(struct altera_dma_private *priv);
 	void (*add_rx_desc)(struct altera_dma_private *priv,
 			    struct altera_dma_buffer *buffer);

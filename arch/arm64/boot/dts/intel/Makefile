@@ -24,6 +24,7 @@ dtb-$(CONFIG_ARCH_INTEL_SOCFPGA) += socfpga_n6000_10G_ptp.dtb \
 				socfpga_agilex5_socdk_emmc.dtb \
 				socfpga_agilex5_socdk_nand.dtb \
 				socfpga_agilex5_socdk_nand_b0.dtb \
+				socfpga_agilex5_socdk_nand_b0_atfboot.dtb \
 				socfpga_agilex5_socdk_swvp_b0.dtb \
 				socfpga_agilex5_socdk_tsn_cfg2.dtb \
 				socfpga_agilex5_socdk_tsn_cfg2_b0.dtb \

@@ -234,17 +234,9 @@
 				compatible = "intel,soc64-hwmon";
 			};
 
-			fcs_hal: fcs-hal {
-				compatible = "intel,agilex5-soc-fcs-hal";
+			fcs_config: fcs-config {
+				compatible = "intel,agilex5-soc-fcs-config";
 			};
-		};
-
-		fcs_crypto: fcs-crypto {
-			compatible = "intel,agilex5-soc-fcs-crypto";
-		};
-
-		fcs_config: fcs-config {
-			compatible = "intel,agilex5-soc-fcs-config";
 		};
 	};
 

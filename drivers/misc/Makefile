@@ -76,6 +76,4 @@ obj-$(CONFIG_NSM)		+= nsm.o
 obj-$(CONFIG_MARVELL_CN10K_DPI)	+= mrvl_cn10k_dpi.o
 obj-y				+= keba/
 obj-$(CONFIG_ALTERA_SOCFPGA_CONFIG) += altera-fcs-config.o
-altera-fcs-config-y := socfpga-config.o
-obj-$(CONFIG_ALTERA_SOCFPGA_FCS_HAL) += altera-fcs-hal.o
-altera-fcs-hal-y := fcs_hal_mod.o socfpga_fcs_plat.o socfpga_fcs_hal.o
+altera-fcs-config-y := socfpga-config.o socfpga_fcs_plat.o socfpga_fcs_hal.o

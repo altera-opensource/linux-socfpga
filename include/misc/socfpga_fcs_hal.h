@@ -38,8 +38,6 @@ extern "C" {
 #define SDOS_ENCRYPTED_MIN_SZ	(SDOS_PLAINDATA_MIN_SZ + SDOS_HEADER_SZ + SDOS_HMAC_SZ)
 #define SDOS_ENCRYPTED_MAX_SZ	(SDOS_PLAINDATA_MAX_SZ + SDOS_HEADER_SZ + SDOS_HMAC_SZ)
 
-extern struct socfpga_fcs_priv *priv;
-
 #pragma pack(push, 1)
 struct fcs_cmd_context {
 	/* Error status variable address */
@@ -657,16 +655,6 @@ FCS_HAL_INT hal_counter_set(struct fcs_cmd_context *const ctx);
 FCS_HAL_INT hal_counter_set_preauth(struct fcs_cmd_context *const ctx);
 
 /**
- * @brief Computes the digest for the given command context.
- *
- * This function calculates the digest based on the provided command context.
- *
- * @param k_ctx Pointer to the command context structure.
- * @return FCS_HAL_INT Result of the digest computation.
- */
-FCS_HAL_INT hal_digest(struct fcs_cmd_context *const k_ctx);
-
-/**
  * hal_digest_free_resource - Frees resources associated with the digest operation.
  * @k_ctx: Pointer to the FCS command context structure.
  *
@@ -891,6 +879,179 @@ FCS_HAL_BOOL hal_fcs_is_ready(void);
  */
 FCS_HAL_INT hal_generic_mbox(struct fcs_cmd_context *k_ctx);
 #endif
+
+/**
+ * @brief API sends the init command for the AES encryption/decryption request
+ *
+ * @param ctx A pointer to the command context structure.
+ * @return An integer indicating the success or failure of AES
+ * encryption/decryption init stage.
+ */
+FCS_HAL_INT hal_aes_streaming_init(struct fcs_cmd_context *const k_ctx);
+
+/**
+ * @brief API sends data update for AES encryption/decryption request
+ *
+ * @param ctx A pointer to the command context structure.
+ * @return An integer indicating the success or failure of the AES
+ * encryption/decryption update stage.
+ */
+FCS_HAL_INT hal_aes_streaming_update(struct fcs_cmd_context *const k_ctx);
+
+/**
+ * @brief API sends AES encryption/decryption final request
+ *
+ * @param ctx A pointer to the command context structure.
+ * @return An integer indicating the success or failure of the AES
+ * encryption/decryption final stage
+ */
+FCS_HAL_INT hal_aes_streaming_final(struct fcs_cmd_context *const k_ctx);
+
+/**
+ * @brief API sends the init command for the ECDSA sha2 data signing request
+ *
+ * @param ctx A pointer to the command context structure.
+ * @return An integer indicating the success or failure of the ECDSA
+ * data signing operation.
+ */
+FCS_HAL_INT
+hal_ecdsa_data_sign_streaming_init(struct fcs_cmd_context *const k_ctx);
+
+/**
+ * @brief API sends data update for ECDSA sha2 data signing request
+ *
+ * @param ctx A pointer to the command context structure.
+ * @return An integer indicating the success or failure of the ECDSA
+ * data signing operation.
+ */
+FCS_HAL_INT
+hal_ecdsa_data_sign_streaming_update(struct fcs_cmd_context *const k_ctx);
+
+/**
+ * @brief API sends ECDSA sha2 data signing final request
+ *
+ * @param ctx A pointer to the command context structure.
+ * @return An integer indicating the success or failure of the ECDSA
+ * data signing operation.
+ */
+FCS_HAL_INT
+hal_ecdsa_data_sign_streaming_final(struct fcs_cmd_context *const k_ctx);
+
+/**
+ * @brief API sends the init command for the ECDSA sha2 data verification request
+ *
+ * @param ctx A pointer to the command context structure.
+ * @return An integer indicating the success or failure of ECDSA
+ * data verification operation: init stage.
+ */
+FCS_HAL_INT
+hal_ecdsa_data_verify_streaming_init(struct fcs_cmd_context *const k_ctx);
+
+/**
+ * @brief API sends data update for ECDSA sha2 data verification request
+ *
+ * @param ctx A pointer to the command context structure.
+ * @return An integer indicating the success or failure of the ECDSA
+ * data verification operation: init stage.
+ */
+FCS_HAL_INT
+hal_ecdsa_data_verify_streaming_init(struct fcs_cmd_context *const k_ctx);
+
+/**
+ * @brief API sends data update for ECDSA sha2 data verification request
+ *
+ * @param ctx A pointer to the command context structure.
+ * @return An integer indicating the success or failure of the ECDSA
+ * data verification operation: update stage.
+ */
+FCS_HAL_INT
+hal_ecdsa_data_verify_streaming_update(struct fcs_cmd_context *const k_ctx);
+
+/**
+ * @brief API sends ECDSA sha2 data verification final request
+ *
+ * @param ctx A pointer to the command context structure.
+ * @return An integer indicating the success or failure of the ECDSA
+ * data verification operation: final stage.
+ */
+FCS_HAL_INT
+hal_ecdsa_data_verify_streaming_final(struct fcs_cmd_context *const k_ctx);
+
+/**
+ * @brief Initializes the digest generation operation: Init stage.
+ *
+ * This function initializes the digest operation for the given command context.
+ *
+ * @param k_ctx Pointer to the command context structure.
+ * @return FCS_HAL_INT Result of the initialization.
+ */
+FCS_HAL_INT hal_digest_streaming_init(struct fcs_cmd_context *const k_ctx);
+
+/**
+ * @brief Updates the digest operation with new data.
+ *
+ * This function updates the digest operation with the provided data for the
+ * given command context.
+ *
+ * @param k_ctx Pointer to the command context structure.
+ * @return FCS_HAL_INT Result of the update.
+ */
+FCS_HAL_INT hal_digest_streaming_update(struct fcs_cmd_context *const k_ctx);
+
+/**
+ * @brief Finalizes the digest operation.
+ *
+ * This function finalizes the digest operation and retrieves the final digest
+ * for the given command context.
+ *
+ * @param k_ctx Pointer to the command context structure.
+ * @return FCS_HAL_INT Result of the finalization.
+ */
+FCS_HAL_INT hal_digest_streaming_final(struct fcs_cmd_context *const k_ctx);
+
+/**
+ * @brief Computes the digest for the given command context.
+ *
+ * This function calculates the digest based on the provided command context.
+ *
+ * @param k_ctx Pointer to the command context structure.
+ * @return FCS_HAL_INT Result of the digest computation.
+ */
+FCS_HAL_INT hal_get_digest(struct fcs_cmd_context *const k_ctx);
+
+/**
+ * @brief Initializes the MAC verification operation: Init stage.
+ *
+ * This function initializes the MAC verification operation for the given
+ * command context.
+ *
+ * @param k_ctx Pointer to the command context structure.
+ * @return FCS_HAL_INT Result of the initialization.
+ */
+FCS_HAL_INT hal_mac_verify_streaming_init(struct fcs_cmd_context *const k_ctx);
+
+/**
+ * @brief Updates the MAC verification operation: Update stage.
+ *
+ * This function updates the MAC verification operation with the provided data
+ * for the given command context.
+ *
+ * @param k_ctx Pointer to the command context structure.
+ * @return FCS_HAL_INT Result of the update.
+ */
+FCS_HAL_INT
+hal_mac_verify_streaming_update(struct fcs_cmd_context *const k_ctx);
+
+/**
+ * @brief Finalizes the MAC verification operation: Final stage.
+ *
+ * This function finalizes the MAC verification operation and retrieves the
+ * final result for the given command context.
+ *
+ * @param k_ctx Pointer to the command context structure.
+ * @return FCS_HAL_INT Result of the finalization.
+ */
+FCS_HAL_INT hal_mac_verify_streaming_final(struct fcs_cmd_context *const k_ctx);
 
 #ifdef __cplusplus
 }

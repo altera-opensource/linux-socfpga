@@ -1,0 +1,46 @@
+// SPDX-License-Identifier:     GPL-2.0
+/*
+ * Copyright (c) 2025, Altera Corporation. All rights reserved.
+ */
+
+#include "socfpga_agilex5_socdk_nand_b0.dts"
+
+/ {
+	model = "SoCFPGA Agilex5 SoCDK";
+	compatible = "intel,socfpga-agilex5-socdk", "intel,socfpga-agilex5";
+
+	chosen {
+		stdout-path = "serial0:115200n8";
+		bootargs = "console=uart8250,mmio32,0x10c02000,115200n8 \
+			earlycon=uart8250,mmio32,0x10c02000,115200n8 \
+			panic=-1 \
+			root=ubi0:rootfs rw rootwait rootfstype=ubifs ubi.mtd=2";
+	};
+};
+
+&nand {
+	status = "okay";
+	/delete-node/ flash@0;
+
+	flash@0 {
+		#address-cells = <1>;
+		#size-cells = <1>;
+		reg = <0>;
+		nand-bus-width = <8>;
+
+		partition@0 {
+			label = "u-boot";
+			reg = <0 0x200000>;
+		};
+
+		partition@200000 {
+			label = "fip";
+			reg = <0x200000 0x03200000>;
+		};
+
+		partition@3400000 {
+			label = "root";
+			reg = <0x03400000 0xfcc00000>;
+		};
+	};
+};

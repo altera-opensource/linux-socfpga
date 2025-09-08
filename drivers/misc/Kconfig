@@ -609,16 +609,9 @@ config ALTERA_ILC
 
 config ALTERA_SOCFPGA_CONFIG
 	tristate "Altera FPGA FCS configuration support"
-	depends on ALTERA_SOCFPGA_FCS_HAL
-	help
-	  Altera socfpga FCS security features driver.
-
-config ALTERA_SOCFPGA_FCS_HAL
-	tristate "Altera FPGA FCS hal driver support"
 	depends on INTEL_STRATIX10_SERVICE
 	help
-	  Altera socfpga FCS HAL driver.
-	  This is a subdriver of the Altera SOCFPGA FCS features.
+	  Altera socfpga FCS security features driver.
 
 config ALTERA_SOCFPGA_FCS_DEBUG
 	bool "Altera FPGA FCS debug driver support"

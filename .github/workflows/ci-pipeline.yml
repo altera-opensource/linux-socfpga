@@ -25,7 +25,7 @@ jobs:
   ci-checkpatch:
     runs-on: [self-hosted,pg-embedded-runner]
     container:
-      image: amr-registry-pre.caas.intel.com/pse-pswe-software-ba/embedded_coverity:ubuntu20.04.0_6
+      image: amr-registry.sc.altera.com/pse-pswe-software-ba/embedded_coverity:ubuntu20.04.0_6-new-proxy-inbuilt
       options: -v /mnt/nfs_share/site/proj/psg:/p/psg
     # Check patch only can run at pull request as it is hard to determine the commit during the push event.
     env:
@@ -48,7 +48,7 @@ jobs:
   ci-coverity:
     runs-on: [self-hosted,pg-embedded-runner]
     container:
-        image: amr-registry-pre.caas.intel.com/pse-pswe-software-ba/embedded_coverity:ubuntu20.04.0_6
+        image: amr-registry.sc.altera.com/pse-pswe-software-ba/embedded_coverity:ubuntu20.04.0_6-new-proxy-inbuilt
     env:
       # Disable the warnings of Security violation. We need to check why this is trigger later, plaintext password.
       EC_DISABLE_VAL: project,system
@@ -92,7 +92,7 @@ jobs:
     needs: ci-coverity
     runs-on: [self-hosted,pg-embedded-runner]
     container:
-        image: amr-registry-pre.caas.intel.com/pse-pswe-software-ba/embedded_coverity:ubuntu20.04.0_6
+        image: amr-registry.sc.altera.com/pse-pswe-software-ba/embedded_coverity:ubuntu20.04.0_6-new-proxy-inbuilt
 
     steps:
       - name: Download prechange coverity result
@@ -128,7 +128,7 @@ jobs:
           cd application.devops.github.pr.workflow
           mv /tmp/coverity-result-json/* .
           rm -rf /tmp/coverity-result-json
-          bash workflow_Coverity_Parser.sh ${{ github.workspace }} ${{ github.event.repository.name }}
+          bash workflow_Coverity_Parser.sh ${{ github.workspace }} ${{ github.event.repository.name }} ${{ secrets.GITHUB_TOKEN }} ${{ github.event.pull_request.number }}
 
       - name: linux-coverity-report
         if: always()
@@ -144,7 +144,7 @@ jobs:
     # The type of runner that the job will run on
     runs-on: [self-hosted,pg-embedded-runner]
     container:
-        image: amr-registry-pre.caas.intel.com/pse-pswe-software-ba/embedded_coverity:ubuntu20.04.0_6
+        image: amr-registry.sc.altera.com/pse-pswe-software-ba/embedded_coverity:ubuntu20.04.0_6-new-proxy-inbuilt
     env:
       # Disable the warnings of Security violation. We need to check why this is trigger later, plaintext password.
       EC_DISABLE_VAL: project,system
@@ -169,7 +169,7 @@ jobs:
 
 #This action runs the simic regression test
   ci-verification:
-     runs-on: [self-hosted,emb-arc-runner]
+     runs-on: [self-hosted,linux-arc-runner]
      needs: ci-build
      env:
       # Disable the warnings of Security violation. We need to check why this is trigger later, plaintext password.
@@ -199,7 +199,7 @@ jobs:
 
 #This action runs the on-board regression test
   ci-on-board-verification:
-    runs-on: [self-hosted,emb-arc-runner]
+    runs-on: [self-hosted,linux-arc-runner]
     needs: ci-build
     env:
       # Disable the warnings of Security violation. We need to check why this is trigger later, plaintext password.
@@ -227,29 +227,11 @@ jobs:
         git checkout master
         bash workflow_On_Board_Regtest.sh ${{ github.workspace }} ${{ github.event.repository.name }} ${{ github.event.pull_request.number }}
 
-#This action checks if there is any unaddressed comments or change request
-  ci-check-reviews:
-    runs-on: [self-hosted,pg-embedded-runner]
-    steps:
-     - name: Check for unaddressed change requests
-       env:
-          https_proxy: proxy-dmz.intel.com:912 # If the self-hosted runner has issues with the proxy
-       run: |
-          tmp_dir=$(mktemp -d -t get-prerequisite-binary-XXXX)
-          cd $tmp_dir
-          rm -rf application.devops.github.pr.workflow
-          git config --global credential.helper store
-          git clone https://${{ secrets.GIT_USER }}:${{ secrets.GIT_TOKEN }}@github.com/intel-sandbox/application.devops.github.pr.workflow
-          cd application.devops.github.pr.workflow
-          git checkout master
-          bash workflow_Check_Unaddressed_Change_Request.sh ${{ github.workspace }} ${{ github.repository }} ${{ secrets.GITHUB_TOKEN }} ${{ github.event.pull_request.number }}
-          rm -fr $tmp_dir
-
 #This action checks if the branch has been released and if so block PR until approved by repo Admin
   ci-check-tag:
     runs-on: [self-hosted,pg-embedded-runner]
     container:
-      image: amr-registry-pre.caas.intel.com/pse-pswe-software-ba/embedded_coverity:ubuntu20.04.0_6
+      image: amr-registry.sc.altera.com/pse-pswe-software-ba/embedded_coverity:ubuntu20.04.0_6-new-proxy-inbuilt
       options: -v /mnt/nfs_share/site/proj/psg:/p/psg
     env:
       GITHUB_EVENT_NAME: ${{ github.event_name }}
@@ -270,24 +252,13 @@ jobs:
 #This is the commit gate that ensures all required checks are passing before the PR is allowed to be merged.
   ci-check-pr-status:
     runs-on: [self-hosted,pg-embedded-runner]
-    needs: [ci-coverity-parse-result, ci-verification, ci-checkpatch, ci-check-reviews, ci-check-tag, ci-on-board-verification]
+    container:
+      image: amr-registry.sc.altera.com/pse-pswe-software-ba/embedded_coverity:ubuntu20.04.0_6-new-proxy-inbuilt
+      options: -v /mnt/nfs_share/site/proj/psg:/p/psg
+    needs: [ci-coverity-parse-result, ci-verification, ci-checkpatch, ci-check-tag, ci-on-board-verification]
     steps:
-     - name: Check for unaddressed change requests
-       env:
-          https_proxy: proxy-dmz.intel.com:912 # If the self-hosted runner has issues with the proxy
-       run: |
-          tmp_dir=$(mktemp -d -t get-prerequisite-binary-XXXX)
-          cd $tmp_dir
-          rm -rf application.devops.github.pr.workflow
-          git config --global credential.helper store
-          git clone https://${{ secrets.GIT_USER }}:${{ secrets.GIT_TOKEN }}@github.com/intel-sandbox/application.devops.github.pr.workflow
-          cd application.devops.github.pr.workflow
-          git checkout master
-          bash workflow_Check_Unaddressed_Change_Request.sh ${{ github.workspace }} ${{ github.repository }} ${{ secrets.GITHUB_TOKEN }} ${{ github.event.pull_request.number }}
-          rm -rf $tmp_dir
-
      - name: On failure
-       if: ${{ needs.ci-coverity-parse-result.result != 'success' || needs.ci-verification.result != 'success' || needs.ci-checkpatch.result != 'success' || needs.ci-check-reviews.result != 'success' || needs.ci-check-tag.result != 'success' || needs.ci-on-board-verification.result != 'success'}}
+       if: ${{ needs.ci-coverity-parse-result.result != 'success' || needs.ci-verification.result != 'success' || needs.ci-checkpatch.result != 'success' || needs.ci-check-tag.result != 'success' || needs.ci-on-board-verification.result != 'success'}}
        run: |
           echo "Status check has failed."
           exit 1

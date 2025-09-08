@@ -26,6 +26,10 @@
 #include <linux/iommu.h>
 #include <linux/iova.h>
 #include <linux/workqueue.h>
+#include <linux/psci.h>
+#include <linux/of.h>
+#include <linux/cpuhplock.h>
+#include <linux/reboot.h>
 
 /**
  * SVC_NUM_DATA_IN_FIFO - number of struct stratix10_svc_data in the FIFO
@@ -3466,6 +3470,38 @@ void stratix10_svc_free_memory(struct stratix10_svc_chan *chan, void *kaddr)
 }
 EXPORT_SYMBOL_GPL(stratix10_svc_free_memory);
 
+static int smp_psci_offline_cpus(void)
+{
+	int cpu, ret;
+    /* Iterate over all online CPUs except the CPU currently running the code*/
+	for_each_online_cpu(cpu) {
+		if (cpu == smp_processor_id())
+			continue; // don't offline self
+
+		ret = remove_cpu(cpu); // equivalent to cpu_down(cpu)
+		if (ret)
+			pr_warn("Failed to offline CPU%d: %d\n", cpu, ret);
+	}
+	return 0;
+}
+
+static int psci_cpu_off_reboot_notifier(struct notifier_block *nb,
+				unsigned long action, void *data)
+{
+	switch (action) {
+	case SYS_POWER_OFF:
+	case SYS_RESTART:
+		smp_psci_offline_cpus(); // Powers down secondary CPUs
+		break;
+	}
+	return NOTIFY_OK;
+}
+
+static struct notifier_block psci_reboot_nb = {
+	.notifier_call = psci_cpu_off_reboot_notifier,
+	.priority = INT_MAX, // Make this one of the last notifiers called
+};
+
 static const struct of_device_id stratix10_svc_drv_match[] = {
 	{.compatible = "intel,stratix10-svc"},
 	{.compatible = "intel,agilex-svc"},
@@ -3532,6 +3568,12 @@ static int stratix10_svc_drv_probe(struct platform_device *pdev)
 	controller->is_smmu_enabled = false;
 	controller->sdm_dma_addr_offset = 0x0;
 	init_completion(&controller->complete_status);
+
+	if (of_device_is_compatible(node, "intel,agilex-svc")
+		|| of_device_is_compatible(node, "intel,stratix10-svc")) {
+		ret = register_reboot_notifier(&psci_reboot_nb);
+		WARN_ON(ret);
+	}
 
 	if (of_device_is_compatible(node, "intel,agilex5-svc")) {
 		if (iommu_present(&platform_bus_type) &&

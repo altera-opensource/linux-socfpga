@@ -116,7 +116,6 @@
 	cap-mmc-highspeed;
 	disable-wp;
 	sd-uhs-sdr50;
-	no-sdio;
 	cdns,phy-use-ext-lpbk-dqs = <1>;
 	cdns,phy-use-lpbk-dqs = <1>;
 	cdns,phy-use-phony-dqs = <1>;
