@@ -11,14 +11,19 @@ maintainers:
 
 properties:
   compatible:
-    items:
-      - enum:
-          - amd,pensando-elba-sd4hc
-          - microchip,mpfs-sd4hc
-          - microchip,pic64gx-sd4hc
-          - mobileye,eyeq-sd4hc
-          - socionext,uniphier-sd4hc
-      - const: cdns,sd4hc
+    oneOf:
+      - items:
+          - enum:
+              - amd,pensando-elba-sd4hc
+              - microchip,mpfs-sd4hc
+              - microchip,pic64gx-sd4hc
+              - mobileye,eyeq-sd4hc
+              - socionext,uniphier-sd4hc
+          - const: cdns,sd4hc
+      - items:
+          - enum:
+              - altr,agilex5-sd6hc
+          - const: cdns,sd6hc
 
   reg:
     minItems: 1
