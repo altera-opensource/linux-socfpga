@@ -242,6 +242,8 @@
 #define AMD_I3C_OD_PP_TIMING		BIT(1)
 #define DW_I3C_DISABLE_RUNTIME_PM_QUIRK	BIT(2)
 
+#define GET_MRL_MIN_LEN 2
+
 struct dw_i3c_cmd {
 	u32 cmd_lo;
 	u32 cmd_hi;
@@ -768,7 +770,8 @@ static int dw_i3c_ccc_set(struct dw_i3c_master *master,
 			xfer->cmds[0].error == RESPONSE_ERROR_ADDRESS_NACK)
 		ccc->err = I3C_ERROR_M2;
 
-	if (xfer->cmds[0].error == RESPONSE_ERROR_FRAME)
+	if (xfer->cmds[0].error == RESPONSE_ERROR_FRAME ||
+			(cmd->rx_len < ccc->dests[0].payload.len))
 		ccc->err = I3C_ERROR_M0;
 
 	dw_i3c_master_free_xfer(xfer);
@@ -781,6 +784,7 @@ static int dw_i3c_ccc_get(struct dw_i3c_master *master, struct i3c_ccc_cmd *ccc)
 	struct dw_i3c_xfer *xfer;
 	struct dw_i3c_cmd *cmd;
 	int ret, pos;
+	bool rx_len_mismatch;
 
 	pos = dw_i3c_master_get_addr_pos(master, ccc->dests[0].addr);
 	if (pos < 0)
@@ -814,8 +818,15 @@ static int dw_i3c_ccc_get(struct dw_i3c_master *master, struct i3c_ccc_cmd *ccc)
 			xfer->cmds[0].error == RESPONSE_ERROR_ADDRESS_NACK)
 		ccc->err = I3C_ERROR_M2;
 
-	if (xfer->cmds[0].error == RESPONSE_ERROR_FRAME)
+	if (ccc->id == I3C_CCC_GETMRL)
+		rx_len_mismatch = (cmd->rx_len < GET_MRL_MIN_LEN);
+	else
+		rx_len_mismatch = (cmd->rx_len < ccc->dests[0].payload.len);
+
+	if (xfer->cmds[0].error == RESPONSE_ERROR_FRAME || rx_len_mismatch) {
 		ccc->err = I3C_ERROR_M0;
+		ret = -EIO;
+	}
 
 	dw_i3c_master_free_xfer(xfer);
 
