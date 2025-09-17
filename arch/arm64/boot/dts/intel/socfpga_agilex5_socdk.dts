@@ -17,6 +17,10 @@
 
 	chosen {
 		stdout-path = "serial0:115200n8";
+		bootargs = "console=uart8250,mmio32,0x10c02000,115200n8 \
+			root=/dev/ram0 rw initrd=0x10000000 init=/sbin/init \
+			ramdisk_size=10000000 earlycon=uart8250,mmio32,0x10c02000,115200n8 \
+			panic=-1 rootfstype=ext3";
 	};
 
 	leds {
