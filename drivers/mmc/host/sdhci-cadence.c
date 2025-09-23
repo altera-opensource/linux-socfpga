@@ -494,8 +494,10 @@ static const struct sdhci_cdns_drv_data sdhci_cdns4_drv_data = {
 static const struct sdhci_cdns_drv_data sdhci_cdns6_agilex5_drv_data = {
 	.pltfm_data = {
 		.ops = &sdhci_cdns6_ops,
+		.quirks = SDHCI_QUIRK_MULTIBLOCK_READ_ACMD12,
 		.quirks2 = SDHCI_QUIRK2_40_BIT_DMA_MASK |
-			   SDHCI_QUIRK2_PRESET_VALUE_BROKEN,
+			   SDHCI_QUIRK2_PRESET_VALUE_BROKEN |
+			   SDHCI_QUIRK2_ACMD23_BROKEN,
 	},
 };
 
