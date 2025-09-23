@@ -89,6 +89,7 @@ FCS_HAL_VOID fcs_plat_memcpy(FCS_HAL_VOID *dst, FCS_HAL_VOID *src,
 			     FCS_HAL_SIZE size);
 FCS_HAL_VOID fcs_plat_memset(FCS_HAL_VOID *dst, FCS_HAL_U8 val,
 			     FCS_HAL_SIZE size);
+FCS_HAL_INT fcs_platform_get(FCS_HAL_DEV *dev, struct socfpga_fcs_priv *priv);
 
 #ifdef __cplusplus
 }
