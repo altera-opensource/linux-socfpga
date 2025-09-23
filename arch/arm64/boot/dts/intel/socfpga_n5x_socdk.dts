@@ -181,5 +181,6 @@
 };
 
 &fcs_config {
+	compatible = "intel,n5x-soc-fcs-config";
 	status = "disabled";
 };
