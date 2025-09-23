@@ -38,6 +38,11 @@ extern "C" {
 #define SDOS_ENCRYPTED_MIN_SZ	(SDOS_PLAINDATA_MIN_SZ + SDOS_HEADER_SZ + SDOS_HMAC_SZ)
 #define SDOS_ENCRYPTED_MAX_SZ	(SDOS_PLAINDATA_MAX_SZ + SDOS_HEADER_SZ + SDOS_HMAC_SZ)
 
+/* Platform definitions */
+#define AGILEX_PLAT		1
+#define AGILEX5_PLAT		2
+#define N5X_PLAT		3
+
 #pragma pack(push, 1)
 struct fcs_cmd_context {
 	/* Error status variable address */
@@ -356,6 +361,8 @@ struct fcs_cmd_context {
 struct socfpga_fcs_priv {
 	/** Communication channel */
 	FCS_HAL_CHAN *chan;
+	/** platform */
+	FCS_HAL_U32 platform;
 	/** plat data */
 	struct socfpga_fcs_service_ops *plat_data;
 	/* command context */
@@ -503,6 +510,15 @@ FCS_HAL_VOID hal_destroy_fcs_cmd_ctx(struct fcs_cmd_context *const k_ctx);
  * @param k_ctx A pointer to the command context structure.
  */
 FCS_HAL_VOID hal_release_fcs_cmd_ctx(struct fcs_cmd_context *const k_ctx);
+
+/**
+ * @brief Gets the platform type.
+ *
+ * This function retrieves the platform type.
+ *
+ * @return Returns an integer representing the platform type.
+ */
+FCS_HAL_INT hal_get_platform(void);
 
 /**
  * @brief Initializes the FCS HAL.
