@@ -11,6 +11,8 @@
 
 #include <linux/firmware/intel/stratix10-svc-client.h>
 #include <linux/delay.h>
+#include <linux/of.h>
+#include <linux/of_platform.h>
 
 #define INVALID_STATUS		0xFFFFFFFF
 #define INVALID_ID		0xFFFFFFFF
@@ -863,6 +865,26 @@ out:
 	return ret;
 }
 
+FCS_HAL_INT fcs_platform_get(FCS_HAL_DEV *dev, struct socfpga_fcs_priv *priv)
+{
+	FCS_HAL_INT ret = 0;
+
+	if (of_device_is_compatible(dev->of_node, "intel,agilex5-soc-fcs-config"))
+		priv->platform = AGILEX5_PLAT;
+	else if (of_device_is_compatible(dev->of_node, "intel,agilex-soc-fcs-config"))
+		priv->platform = AGILEX_PLAT;
+	else if (of_device_is_compatible(dev->of_node, "intel,n5x-soc-fcs-config"))
+		priv->platform = N5X_PLAT;
+	else
+		priv->platform = 0;
+
+	if (!priv->platform) {
+		pr_err("Unsupported platform\n");
+		ret = -ENODEV;
+	}
+	return ret;
+}
+
 FCS_HAL_INT fcs_plat_init(FCS_HAL_DEV *dev, struct socfpga_fcs_priv *priv)
 {
 	mutex_init(&priv->lock);
@@ -899,6 +921,12 @@ FCS_HAL_INT fcs_plat_init(FCS_HAL_DEV *dev, struct socfpga_fcs_priv *priv)
 	priv->plat_data->svc_alloc_memory = plat_sip_svc_allocate_memory;
 	priv->plat_data->svc_free_memory = plat_sip_svc_free_memory;
 	priv->plat_data->svc_task_done = plat_sip_svc_task_done;
+
+	ret = fcs_platform_get(priv->dev, priv);
+	if (ret) {
+		pr_err("Failed to get platform data\n");
+		return ret;
+	}
 
 	return 0;
 }

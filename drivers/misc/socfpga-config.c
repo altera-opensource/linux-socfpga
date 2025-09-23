@@ -1033,6 +1033,12 @@ static ssize_t atf_version_show(struct device *dev,
 	return sprintf(buf, "%u.%u.%u\n", version[0], version[1], version[2]);
 }
 
+static ssize_t platform_show(struct device *dev, struct device_attribute *attr,
+			     char *buf)
+{
+	return sprintf(buf, "%d\n", hal_get_platform());
+}
+
 static ssize_t sdos_store(struct device *dev, struct device_attribute *attr,
 			  const char *buf, size_t buf_size)
 {
@@ -1652,6 +1658,7 @@ static DEVICE_ATTR_WO(mac_verify_init);
 static DEVICE_ATTR_WO(mac_verify_update);
 static DEVICE_ATTR_WO(mac_verify_final);
 static DEVICE_ATTR_WO(get_rng);
+static DEVICE_ATTR_RO(platform);
 
 static struct attribute *fcs_config_attrs[] = {
 	&dev_attr_open_session.attr,
@@ -1709,6 +1716,7 @@ static struct attribute *fcs_config_attrs[] = {
 	&dev_attr_mac_verify_update.attr,
 	&dev_attr_mac_verify_final.attr,
 	&dev_attr_get_rng.attr,
+	&dev_attr_platform.attr,
 	NULL
 };
 
@@ -1757,6 +1765,7 @@ static int fcs_driver_probe(struct platform_device *pdev)
 static const struct of_device_id fcs_of_match[] = {
 	{ .compatible = "intel,agilex5-soc-fcs-config" },
 	{ .compatible = "intel,agilex-soc-fcs-config" },
+	{ .compatible = "intel,n5x-soc-fcs-config" },
 	{},
 };
 
