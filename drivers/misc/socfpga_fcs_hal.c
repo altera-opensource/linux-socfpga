@@ -2305,12 +2305,15 @@ FCS_HAL_INT hal_sdos_crypt(struct fcs_cmd_context *const k_ctx)
 
 	/* Compare the session UUIDs to check for a match. Here suuid is set
 	 * through hal_store_context
+	 * N5X platform doesn't support session IDs
 	 */
-	ret = fcs_plat_uuid_compare(&priv->uuid_id, &k_ctx->rng.suuid);
-	if (!ret) {
-		LOG_ERR("Session UUID Mismatch ret: %d\n", ret);
-		ret = -EINVAL;
-		return ret;
+	if (priv->platform != N5X_PLAT) {
+		ret = fcs_plat_uuid_compare(&priv->uuid_id, &k_ctx->rng.suuid);
+		if (!ret) {
+			LOG_ERR("Session UUID Mismatch ret: %d\n", ret);
+			ret = -EINVAL;
+			return ret;
+		}
 	}
 
 	s_buf = priv->plat_data->svc_alloc_memory(priv, k_ctx->sdos.src_size);
@@ -4322,6 +4325,11 @@ FCS_HAL_VOID hal_fcs_deinit(void)
 
 	if (priv)
 		fcs_plat_deinit(priv);
+}
+
+FCS_HAL_INT hal_get_platform(FCS_HAL_VOID)
+{
+	return priv->platform;
 }
 
 FCS_HAL_VOID hal_fcs_cleanup(void)
