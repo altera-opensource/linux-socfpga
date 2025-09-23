@@ -1514,16 +1514,23 @@ static int mmc_select_hs200(struct mmc_card *card)
 		 * switch failed. If there really is a problem, we would expect
 		 * tuning will fail and the result ends up the same.
 		 */
-		err = mmc_switch_status(card, false);
+		/*
+		 * TODO: Cadence IP does not respond to CMD13 after switching to HS200,
+		 * resulting in a timeout instead of the expected -EBADMSG failure.
+		 * As a temporary workaround, mmc_switch_status() is skipped and tuning
+		 * proceeds directly. Proper handling for CMD13 timeout or Cadence IP support
+		 * should be implemented here.
+		 */
+		/* err = mmc_switch_status(card, false); */
 
 		/*
 		 * mmc_select_timing() assumes timing has not changed if
 		 * it is a switch error.
 		 */
-		if (err == -EBADMSG) {
-			mmc_set_clock(host, old_clock);
-			mmc_set_timing(host, old_timing);
-		}
+		// if (err == -EBADMSG) {
+		//	mmc_set_clock(host, old_clock);
+		//	mmc_set_timing(host, old_timing);
+		// }
 	}
 err:
 	if (err) {
