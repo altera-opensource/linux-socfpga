@@ -17,6 +17,7 @@ properties:
     enum:
       - intel,agilex5-soc-fcs-config
       - intel,agilex-soc-fcs-config
+      - intel,n5x-soc-fcs-config
 
 additionalProperties: false
 
