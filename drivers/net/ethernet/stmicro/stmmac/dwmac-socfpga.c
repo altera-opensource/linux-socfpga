@@ -584,6 +584,8 @@ static int socfpga_dwmac_probe(struct platform_device *pdev)
 	struct device		*dev = &pdev->dev;
 	int			ret;
 	struct socfpga_dwmac	*dwmac;
+	struct net_device	*ndev;
+	struct stmmac_priv	*stpriv;
 	const struct socfpga_dwmac_ops *ops;
 
 	ops = device_get_match_data(&pdev->dev);
@@ -645,6 +647,17 @@ static int socfpga_dwmac_probe(struct platform_device *pdev)
 	}
 
 	return devm_stmmac_pltfr_probe(pdev, plat_dat, &stmmac_res);
+
+	ndev = platform_get_drvdata(pdev);
+	stpriv = netdev_priv(ndev);
+
+	if (plat_dat->has_xgmac) {
+		/* For Agilex5 which has XGMAC, re-enable the Rx Watchdog Timer */
+		plat_dat->riwt_off = 0;
+		stpriv->use_riwt = 1;
+		dev_info(stpriv->device,
+			 "Enable RX Mitigation via HW Watchdog Timer\n");
+	}
 
 }
 
