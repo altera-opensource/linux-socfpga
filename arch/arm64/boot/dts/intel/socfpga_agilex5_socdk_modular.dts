@@ -23,3 +23,18 @@
 &i3c1 {
 	status = "disabled";
 };
+
+&i2c3 {
+	status = "okay";
+
+	expander1: gpio@27 {
+		compatible = "nxp,pca9535";
+		reg = <0x27>;			/* SoM expander address */
+		gpio-controller;
+		#gpio-cells = <2>;
+	};
+};
+
+&sd_io_1v8_reg {
+	gpios = <&expander1 1 GPIO_ACTIVE_HIGH>;
+};
