@@ -219,6 +219,7 @@ struct stratix10_async_chan {
 /**
  * struct stratix10_async_ctrl - Control structure for Stratix 10 asynchronous operations
  * @irq: Interrupt request number associated with the asynchronous control
+ * @supported: Flag indicating whether the system supports async operations
  * @initialized: Flag indicating whether the control structure has been initialized
  * @invoke_fn: Function pointer for invoking Stratix 10 service calls to EL3 secure firmware
  * @async_id_pool: Pointer to the ID pool used for asynchronous operations
@@ -231,6 +232,7 @@ struct stratix10_async_chan {
 
 struct stratix10_async_ctrl {
 	int irq;
+	bool supported;
 	bool initialized;
 	void (*invoke_fn)(struct stratix10_async_ctrl *actrl,
 			  const struct arm_smccc_1_2_regs *args, struct arm_smccc_1_2_regs *res);
@@ -1902,6 +1904,7 @@ EXPORT_SYMBOL_GPL(stratix10_svc_request_channel_byname);
  *
  * Return: 0 on success, or a negative error code on failure:
  *         -EINVAL if the channel is NULL or the async controller is not initialized.
+ *         -EOPNOTSUPP if async operations are not supported.
  *         -EALREADY if the async channel is already allocated.
  *         -ENOMEM if memory allocation fails.
  *         Other negative values if ID allocation fails.
@@ -1917,6 +1920,10 @@ int stratix10_svc_add_async_client(struct stratix10_svc_chan *chan,
 
 	struct stratix10_svc_controller *ctrl = chan->ctrl;
 	struct stratix10_async_ctrl *actrl = &ctrl->actrl;
+
+	if (!actrl->supported) {
+		return -EOPNOTSUPP;
+	}
 
 	if (!actrl->initialized) {
 		dev_err(ctrl->dev, "Async controller not initialized\n");
@@ -2989,6 +2996,7 @@ static void stratix10_async_workqueue_handler(struct work_struct *work)
  * registering the IRQ handler for asynchronous transactions.
  *
  * Return: 0 on success, -EINVAL if the controller is NULL or already initialized,
+ *         -EOPNOTSUPP if system doesn't supporting async operations,
  *         -ENOMEM if memory allocation fails, -EADDRINUSE if the client ID is already
  *         reserved, or other negative error codes on failure.
  */
@@ -3015,8 +3023,10 @@ static int stratix10_svc_async_init(struct stratix10_svc_controller *controller)
 	       res.a2 >= ASYNC_ATF_MINIMUM_MINOR_VERSION))) {
 		dev_err(dev,
 			"Intel Service Layer Driver: ATF version is not compatible for async operation\n");
-		return -EINVAL;
+		actrl->supported = false;
+		return -EOPNOTSUPP;
 	}
+	actrl->supported = true;
 
 	actrl->invoke_fn = stratix10_smc_1_2;
 
