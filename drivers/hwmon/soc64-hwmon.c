@@ -37,6 +37,9 @@
 struct soc64_hwmon_priv {
 	struct stratix10_svc_chan *chan;
 	struct stratix10_svc_client client;
+	struct completion completion;
+	struct mutex lock;	/* protect SVC calls */
+	bool async;
 	int temperature;
 	int voltage;
 	int temperature_channels;
@@ -71,6 +74,34 @@ static umode_t soc64_is_visible(const void *dev,
 	}
 }
 
+static void soc64_readtemp_smc_callback(struct stratix10_svc_client *client,
+					struct stratix10_svc_cb_data *data)
+{
+	struct soc64_hwmon_priv *priv = client->priv;
+	struct arm_smccc_res *res = (struct arm_smccc_res *)data->kaddr1;
+
+	if (data->status == BIT(SVC_STATUS_OK))
+		priv->temperature = res->a0;
+	else
+		dev_err(client->dev, "%s returned 0x%lX\n", __func__, res->a0);
+
+	complete(&priv->completion);
+}
+
+static void soc64_readvolt_smc_callback(struct stratix10_svc_client *client,
+					struct stratix10_svc_cb_data *data)
+{
+	struct soc64_hwmon_priv *priv = client->priv;
+	struct arm_smccc_res *res = (struct arm_smccc_res *)data->kaddr1;
+
+	if (data->status == BIT(SVC_STATUS_OK))
+		priv->voltage = res->a0;
+	else
+		dev_err(client->dev, "%s returned 0x%lX\n", __func__, res->a0);
+
+	complete(&priv->completion);
+}
+
 static void soc64_async_callback(void *ptr)
 {
 	if (ptr)
@@ -78,7 +109,7 @@ static void soc64_async_callback(void *ptr)
 }
 
 static int soc64_async_read(struct device *dev, enum hwmon_sensor_types type,
-			    u32 attr, int chan, long *val)
+			    struct stratix10_svc_client_msg *msg)
 {
 	unsigned long ret;
 	int status, index;
@@ -86,74 +117,126 @@ static int soc64_async_read(struct device *dev, enum hwmon_sensor_types type,
 	void *handle = NULL;
 	struct completion completion;
 	struct stratix10_svc_cb_data data;
-	struct stratix10_svc_client_msg msg = {0};
 
 	init_completion(&completion);
 
-	switch (type) {
-	case hwmon_temp:
-		if (chan > 15)
-			return -EOPNOTSUPP;
+	for (index = 0; index < HWMON_ASYNC_MSG_RETRY; index++) {
+		status = stratix10_svc_async_send(priv->chan, msg,
+						  &handle, soc64_async_callback,
+						  &completion);
+		if (status == 0)
+			break;
+		dev_warn(dev, "Failed to send async message\n");
+		msleep(HWMON_RETRY_SLEEP_MS);
+	}
 
+	if (status && !handle)
+		return -ETIMEDOUT;
+
+	ret = wait_for_completion_io_timeout(&completion, (HWMON_TIMEOUT));
+	if (ret > 0)
+		dev_dbg(dev, "Received async interrupt\n");
+	else if (ret == 0)
+		dev_dbg(dev, "Timeout occurred.trying to poll the response\n");
+
+	for (index = 0; index < HWMON_ASYNC_MSG_RETRY; index++) {
+		status = stratix10_svc_async_poll(priv->chan, handle, &data);
+		if (status == -EAGAIN) {
+			dev_dbg(dev, "Async message is still in progress\n");
+		} else if (status < 0) {
+			dev_alert(dev, "Failed to poll async message\n");
+			ret = -ETIMEDOUT;
+		} else if (status == 0) {
+			ret = 0;
+			break;
+		}
+		msleep(HWMON_RETRY_SLEEP_MS);
+	}
+
+	stratix10_svc_async_done(priv->chan, handle);
+
+	if (ret) {
+		dev_err(dev, "Failed to get async response\n");
+		return ret;
+	}
+
+	if (data.status == 0) {
+		if (type == hwmon_temp)
+			priv->temperature = *((unsigned long *)data.kaddr1);
+		if (type == hwmon_in)
+			priv->voltage = *((unsigned long *)data.kaddr1);
+	} else {
+		dev_err(dev, "%s returned 0x%p\n", __func__, data.kaddr1);
+	}
+
+	return ret;
+}
+
+static int soc64_sync_read(struct device *dev, enum hwmon_sensor_types type,
+			   struct stratix10_svc_client_msg *msg)
+{
+	struct soc64_hwmon_priv *priv = dev_get_drvdata(dev);
+	int ret;
+
+	reinit_completion(&priv->completion);
+
+	if (type == hwmon_temp)
+		priv->client.receive_cb = soc64_readtemp_smc_callback;
+	else
+		priv->client.receive_cb = soc64_readvolt_smc_callback;
+
+	ret = stratix10_svc_send(priv->chan, msg);
+	if (ret < 0)
+		goto status_done;
+
+	ret = wait_for_completion_interruptible_timeout(&priv->completion,
+							HWMON_TIMEOUT);
+	if (!ret) {
+		dev_err(priv->client.dev, "timeout waiting for SMC call\n");
+		ret = -ETIMEDOUT;
+	} else if (ret < 0) {
+		dev_err(priv->client.dev, "error %d waiting for SMC call\n", ret);
+	} else {
+		ret = 0;
+	}
+
+status_done:
+	stratix10_svc_done(priv->chan);
+	return ret;
+}
+
+static int soc64_read(struct device *dev, enum hwmon_sensor_types type,
+		      u32 attr, int chan, long *val)
+{
+	struct soc64_hwmon_priv *priv = dev_get_drvdata(dev);
+	struct stratix10_svc_client_msg msg = {0};
+	int ret;
+
+	if (chan > 15)
+		return -EOPNOTSUPP; // Channel outside of range
+
+	if (type == hwmon_temp) {
+		msg.command = COMMAND_HWMON_READTEMP;
 		/* To support Page at upper word and channel at lower word */
 		msg.arg[0] =
 			(((u64)1 << (priv->soc64_temp_chan[chan] & 0xFFFF)) +
 			 (priv->soc64_temp_chan[chan] & 0xFFF0000));
-		msg.command = COMMAND_HWMON_READTEMP;
+	} else if (type == hwmon_in) {
+		msg.command = COMMAND_HWMON_READVOLT;
+		msg.arg[0] = ((u64)1 << priv->soc64_volt_chan[chan]);
+	} else {
+		return -EOPNOTSUPP;
+	}
 
-		for (index = 0; index < HWMON_ASYNC_MSG_RETRY; index++) {
-			status = stratix10_svc_async_send(priv->chan, &msg,
-							  &handle, soc64_async_callback,
-							  &completion);
-			if (status == 0)
-				break;
-			dev_warn(dev, "Failed to send async message\n");
-			msleep(HWMON_RETRY_SLEEP_MS);
-		}
+	guard(mutex)(&priv->lock);
+	if (priv->async)
+		ret = soc64_async_read(dev, type, &msg);
+	else
+		ret = soc64_sync_read(dev, type, &msg);
+	if (ret)
+		return ret;
 
-		if (status && !handle)
-			return -ETIMEDOUT;
-
-		ret = wait_for_completion_io_timeout(&completion,
-						     (HWMON_TIMEOUT));
-		if (ret > 0)
-			dev_dbg(dev, "Received async interrupt\n");
-		else if (ret == 0)
-			dev_dbg(dev,
-				"Timeout occurred.trying to poll the response\n");
-
-		for (index = 0; index < HWMON_ASYNC_MSG_RETRY; index++) {
-			status = stratix10_svc_async_poll(priv->chan, handle,
-							  &data);
-			if (status == -EAGAIN) {
-				dev_dbg(dev,
-					"Async message is still in progress\n");
-			} else if (status < 0) {
-				dev_alert(dev,
-					  "Failed to poll async message\n");
-				ret = -ETIMEDOUT;
-			} else if (status == 0) {
-				ret = 0;
-				break;
-			}
-			msleep(HWMON_RETRY_SLEEP_MS);
-		}
-
-		if (ret) {
-			dev_err(dev, "Failed to get async response\n");
-			goto status_done;
-		}
-
-		if (data.status == 0) {
-			priv->temperature = *((unsigned long *)data.kaddr1);
-		} else {
-			dev_err(dev, "%s returned 0x%p\n", __func__,
-				data.kaddr1);
-			goto status_done;
-		}
-
-		*val = ((long)(priv->temperature)) * 1000 / 256;
-
+	if (type == hwmon_temp) {
 		switch (priv->temperature) {
 		case ETEMP_INACTIVE:
 		case ETEMP_NOT_PRESENT:
@@ -168,81 +251,13 @@ static int soc64_async_read(struct device *dev, enum hwmon_sensor_types type,
 			ret = -EAGAIN;
 			break;
 		default:
-			ret = 0;
+			*val = ((long)(priv->temperature)) * 1000 / 256;
 			break;
 		}
-
-		break;
-
-	case hwmon_in: // Read voltage
-		if (chan > 15)
-			return -EOPNOTSUPP; // Channel outside of range
-
-		msg.arg[0] = ((u64)1 << priv->soc64_volt_chan[chan]);
-		msg.command = COMMAND_HWMON_READVOLT;
-
-		for (index = 0; index < HWMON_ASYNC_MSG_RETRY; index++) {
-			status = stratix10_svc_async_send(priv->chan, &msg,
-							  &handle, soc64_async_callback,
-							  &completion);
-			if (status == 0)
-				break;
-			msleep(HWMON_RETRY_SLEEP_MS);
-		}
-
-		if (status && !handle)
-			return -ETIMEDOUT;
-
-		ret = wait_for_completion_io_timeout(&completion, HWMON_TIMEOUT);
-		if (ret > 0)
-			dev_dbg(dev, "received async interrupt\n");
-		else if (ret == 0)
-			dev_err(dev,
-				"timeout occurred ,waiting for async message, trying for polling\n");
-
-		for (index = 0; index < HWMON_ASYNC_MSG_RETRY; index++) {
-			status = stratix10_svc_async_poll(priv->chan, handle,
-							  &data);
-			if (status == -EAGAIN) {
-				dev_dbg(dev,
-					"async message is still in progress\n");
-				ret = -EAGAIN;
-			} else if (status < 0) {
-				dev_alert(dev,
-					  "Failed to poll async message\n");
-				ret = -ETIMEDOUT;
-			} else if (status == 0) {
-				dev_dbg(dev, "async response received\n");
-				ret = 0;
-				break;
-			}
-			msleep(HWMON_RETRY_SLEEP_MS);
-		}
-
-		if (ret) {
-			dev_err(dev, "Failed to get async response\n");
-			goto status_done;
-		}
-
-		if (data.status == 0) {
-			priv->voltage = *((unsigned long *)data.kaddr1);
-		} else {
-			dev_err(dev, "%s returned 0x%p\n", __func__,
-				data.kaddr1);
-			ret = -EFAULT;
-			goto status_done;
-		}
-
+	} else {
 		*val = ((long)(priv->voltage)) * 1000 / 65536;
-		ret = 0;
-		break;
-
-	default:
-		return -EOPNOTSUPP;
 	}
 
-status_done:
-	stratix10_svc_async_done(priv->chan, handle);
 	return ret;
 }
 
@@ -267,7 +282,7 @@ static int soc64_read_string(struct device *dev,
 
 static const struct hwmon_ops soc64_ops = {
 	.is_visible = soc64_is_visible,
-	.read = soc64_async_read,
+	.read = soc64_read,
 	.read_string = soc64_read_string,
 };
 
@@ -412,6 +427,8 @@ static int soc64_hwmon_probe(struct platform_device *pdev)
 		return ret;
 	}
 
+	mutex_init(&priv->lock);
+
 	priv->chan = stratix10_svc_request_channel_byname(&priv->client,
 					SVC_CLIENT_HWMON);
 	if (IS_ERR(priv->chan)) {
@@ -429,13 +446,14 @@ static int soc64_hwmon_probe(struct platform_device *pdev)
 							 NULL);
 
 	ret = stratix10_svc_add_async_client(priv->chan, false);
-	if (ret) {
-		dev_err(dev, "failed to enable async client hwmon client\n");
-		stratix10_svc_free_channel(priv->chan);
-		hwmon_device_unregister(hwmon_dev);
-		return PTR_ERR(priv->chan);
+	if (ret < 0) {
+		dev_dbg(dev, "Async operations not supported, fallback to non-async mode\n");
+		priv->async = false;
+	} else {
+		priv->async = true;
 	}
 
+	init_completion(&priv->completion);
 	platform_set_drvdata(pdev, priv);
 
 	return PTR_ERR_OR_ZERO(hwmon_dev);
@@ -445,7 +463,8 @@ static void soc64_hwmon_remove(struct platform_device *pdev)
 {
 	struct soc64_hwmon_priv *priv = platform_get_drvdata(pdev);
 
-	stratix10_svc_remove_async_client(priv->chan);
+	if (priv->async)
+		stratix10_svc_remove_async_client(priv->chan);
 	stratix10_svc_free_channel(priv->chan);
 }
 
