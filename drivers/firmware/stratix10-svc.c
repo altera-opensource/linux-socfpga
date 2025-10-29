@@ -256,12 +256,14 @@ struct stratix10_async_chan {
  * @trx_list_lock: Spinlock for protecting the transaction list
  *                     operations
  * @irq: Interrupt request number associated with the asynchronous control
+ * @supported: Flag indicating whether the system supports async operations
  * @async_work: Work structure for scheduling asynchronous work
  * @trx_list: Hash table for managing asynchronous transactions
  */
 
 struct stratix10_async_ctrl {
 	int irq;
+	bool supported;
 	bool initialized;
 	void (*invoke_fn)(struct stratix10_async_ctrl *actrl,
 			  const struct arm_smccc_1_2_regs *args,
@@ -1745,6 +1747,7 @@ EXPORT_SYMBOL_GPL(stratix10_svc_request_channel_byname);
  * Return: 0 on success, or a negative error code on failure:
  *         -EINVAL if the channel is NULL or the async controller is
  *         not initialized.
+ *         -EOPNOTSUPP if async operations are not supported.
  *         -EALREADY if the async channel is already allocated.
  *         -ENOMEM if memory allocation fails.
  *         Other negative values if ID allocation fails.
@@ -1762,6 +1765,10 @@ int stratix10_svc_add_async_client(struct stratix10_svc_chan *chan,
 
 	ctrl = chan->ctrl;
 	actrl = &ctrl->actrl;
+
+	if (!actrl->supported) {
+		return -EOPNOTSUPP;
+	}
 
 	if (!actrl->initialized) {
 		dev_err(ctrl->dev, "Async controller not initialized\n");
@@ -2854,6 +2861,7 @@ static void stratix10_async_workqueue_handler(struct work_struct *work)
  *         initialized, -ENOMEM if memory allocation fails,
  *         -EADDRINUSE if the client ID is already reserved, or other
  *         negative error codes on failure.
+ *         -EOPNOTSUPP if system doesn't supporting async operations,
  */
 static int stratix10_svc_async_init(struct stratix10_svc_controller *controller)
 {
@@ -2881,8 +2889,10 @@ static int stratix10_svc_async_init(struct stratix10_svc_controller *controller)
 	       res.a2 >= ASYNC_ATF_MINIMUM_MINOR_VERSION))) {
 		dev_err(dev,
 			"Intel Service Layer Driver: ATF version is not compatible for async operation\n");
-		return -EINVAL;
+		actrl->supported = false;
+		return -EOPNOTSUPP;
 	}
+	actrl->supported = true;
 
 	actrl->invoke_fn = stratix10_smc_1_2;
 
