@@ -255,6 +255,7 @@ struct stratix10_async_chan {
  * @trx_list_lock: Spinlock for protecting the transaction list
  *                     operations
  * @irq: Interrupt request number associated with the asynchronous control
+ * @supported: Flag indicating whether the system supports async operations
  * @async_work: Work structure for scheduling asynchronous work
  * @trx_list: Hash table for managing asynchronous transactions
  */
