@@ -3009,7 +3009,7 @@ static int stratix10_svc_async_init(struct stratix10_svc_controller *controller)
 	struct device_node *node = dev->of_node;
 
 	controller->invoke_fn(INTEL_SIP_SMC_SVC_VERSION, 0, 0, 0, 0, 0, 0, 0, &res);
-	if (res.a0 != INTEL_SIP_SMC_STATUS_OK &&
+	if (res.a0 != INTEL_SIP_SMC_STATUS_OK ||
 	    !(res.a1 > ASYNC_ATF_MINIMUM_MAJOR_VERSION ||
 	      (res.a1 == ASYNC_ATF_MINIMUM_MAJOR_VERSION &&
 	       res.a2 >= ASYNC_ATF_MINIMUM_MINOR_VERSION))) {
