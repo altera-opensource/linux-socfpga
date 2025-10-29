@@ -16,6 +16,10 @@
 #include <linux/sysfs.h>
 #include <linux/delay.h>
 
+#define RSU_STATE_MASK			GENMASK_ULL(31, 0)
+#define RSU_VERSION_MASK		GENMASK_ULL(63, 32)
+#define RSU_ERROR_LOCATION_MASK		GENMASK_ULL(31, 0)
+#define RSU_ERROR_DETAIL_MASK		GENMASK_ULL(63, 32)
 #define RSU_ERASE_SIZE_MASK		GENMASK_ULL(63, 32)
 #define RSU_DCMF0_MASK			GENMASK_ULL(31, 0)
 #define RSU_DCMF1_MASK			GENMASK_ULL(63, 32)
@@ -34,6 +38,9 @@
 #define INVALID_SPT_ADDRESS		0x0
 #define INVALID_DEVICE_INFO		0x0
 
+#define RSU_GET_SPT_CMD			0x5A
+#define RSU_GET_SPT_RESP_LEN		(4 * sizeof(unsigned int))
+
 #define RSU_RETRY_SLEEP_MS		(1U)
 #define RSU_ASYNC_MSG_RETRY		(3U)
 
@@ -50,6 +57,7 @@ typedef void (*rsu_callback)(struct stratix10_svc_client *client,
  * @client: active service client
  * @completion: state for callback completion
  * @lock: a mutex to protect callback completion state
+ * @async: supports async operations
  * @status.current_image: address of image currently running in flash
  * @status.fail_image: address of failed image in flash
  * @status.version: the interface version number of RSU firmware
@@ -77,6 +85,7 @@ struct stratix10_rsu_priv {
 	struct stratix10_svc_client client;
 	struct completion completion;
 	struct mutex lock;
+	bool async;
 	struct {
 		unsigned long current_image;
 		unsigned long fail_image;
@@ -107,10 +116,51 @@ struct stratix10_rsu_priv {
 
 	unsigned long spt0_address;
 	unsigned long spt1_address;
+
+	unsigned int *get_spt_response_buf;
 };
 
 typedef void (*rsu_async_callback)(struct device *dev,
 	struct stratix10_rsu_priv *priv, struct stratix10_svc_cb_data *data);
+
+/**
+ * rsu_status_callback() - Status callback from Intel Service Layer
+ * @client: pointer to service client
+ * @data: pointer to callback data structure
+ *
+ * Callback from Intel service layer for RSU status request. Status is
+ * only updated after a system reboot, so a get updated status call is
+ * made during driver probe.
+ */
+static void rsu_status_callback(struct stratix10_svc_client *client,
+				struct stratix10_svc_cb_data *data)
+{
+	struct stratix10_rsu_priv *priv = client->priv;
+	struct arm_smccc_res *res = (struct arm_smccc_res *)data->kaddr1;
+
+	if (data->status == BIT(SVC_STATUS_OK)) {
+		priv->status.version = FIELD_GET(RSU_VERSION_MASK,
+						 res->a2);
+		priv->status.state = FIELD_GET(RSU_STATE_MASK, res->a2);
+		priv->status.fail_image = res->a1;
+		priv->status.current_image = res->a0;
+		priv->status.error_location =
+			FIELD_GET(RSU_ERROR_LOCATION_MASK, res->a3);
+		priv->status.error_details =
+			FIELD_GET(RSU_ERROR_DETAIL_MASK, res->a3);
+	} else {
+		dev_err(client->dev, "COMMAND_RSU_STATUS returned 0x%lX\n",
+			res->a0);
+		priv->status.version = 0;
+		priv->status.state = 0;
+		priv->status.fail_image = 0;
+		priv->status.current_image = 0;
+		priv->status.error_location = 0;
+		priv->status.error_details = 0;
+	}
+
+	complete(&priv->completion);
+}
 
 /**
  * rsu_async_status_callback() - Status callback from Intel Service Layer
@@ -151,6 +201,33 @@ static void rsu_command_callback(struct stratix10_svc_client *client,
 		dev_warn(client->dev, "Secure FW doesn't support notify\n");
 	else if (data->status == BIT(SVC_STATUS_ERROR))
 		dev_err(client->dev, "Failure, returned status is %lu\n",
+			BIT(data->status));
+
+	complete(&priv->completion);
+}
+
+/**
+ * rsu_retry_callback() - Callback from Intel service layer for getting
+ * the current image's retry counter from the firmware
+ * @client: pointer to client
+ * @data: pointer to callback data structure
+ *
+ * Callback from Intel service layer for retry counter, which is used by
+ * user to know how many times the images is still allowed to reload
+ * itself before giving up and starting RSU fail-over flow.
+ */
+static void rsu_retry_callback(struct stratix10_svc_client *client,
+			       struct stratix10_svc_cb_data *data)
+{
+	struct stratix10_rsu_priv *priv = client->priv;
+	unsigned int *counter = (unsigned int *)data->kaddr1;
+
+	if (data->status == BIT(SVC_STATUS_OK))
+		priv->retry_counter = *counter;
+	else if (data->status == BIT(SVC_STATUS_NO_SUPPORT))
+		dev_warn(client->dev, "Secure FW doesn't support retry\n");
+	else
+		dev_err(client->dev, "Failed to get retry counter %lu\n",
 			BIT(data->status));
 
 	complete(&priv->completion);
@@ -265,8 +342,12 @@ static void rsu_get_device_info_callback(struct stratix10_svc_client *client,
 			FIELD_GET(RSU_ERASE_SIZE_MASK, res->a4);
 
 	} else {
-		dev_err(client->dev, "COMMAND_RSU_GET_DEVICE_INFO returned 0x%lX\n",
-			res->a0);
+		if (data->status == BIT(SVC_STATUS_NO_SUPPORT))
+			dev_warn(client->dev, "Secure FW doesn't support get device info\n");
+		else
+			dev_err(client->dev, "COMMAND_RSU_GET_DEVICE_INFO returned 0x%lX\n",
+				res->a0);
+
 		priv->device_info[0].size = INVALID_DEVICE_INFO;
 		priv->device_info[1].size = INVALID_DEVICE_INFO;
 		priv->device_info[2].size = INVALID_DEVICE_INFO;
@@ -293,6 +374,36 @@ static void rsu_async_get_spt_table_callback(struct device *dev,
 {
 	priv->spt0_address = *((unsigned long *)data->kaddr1);
 	priv->spt1_address = *((unsigned long *)data->kaddr2);
+}
+
+static void rsu_get_spt_callback(struct stratix10_svc_client *client,
+				 struct stratix10_svc_cb_data *data)
+{
+	struct stratix10_rsu_priv *priv = client->priv;
+	unsigned long *mbox_err = (unsigned long *)data->kaddr1;
+	unsigned long *resp_len = (unsigned long *)data->kaddr2;
+
+	if (data->status != BIT(SVC_STATUS_OK) || (*mbox_err) ||
+	    (*resp_len != RSU_GET_SPT_RESP_LEN))
+		goto error;
+
+	priv->spt0_address = priv->get_spt_response_buf[0];
+	priv->spt0_address <<= 32;
+	priv->spt0_address |= priv->get_spt_response_buf[1];
+
+	priv->spt1_address = priv->get_spt_response_buf[2];
+	priv->spt1_address <<= 32;
+	priv->spt1_address |= priv->get_spt_response_buf[3];
+
+	goto complete;
+
+error:
+	dev_err(client->dev, "failed to get SPTs\n");
+
+complete:
+	stratix10_svc_free_memory(priv->chan, priv->get_spt_response_buf);
+	priv->get_spt_response_buf = NULL;
+	complete(&priv->completion);
 }
 
 /**
@@ -325,6 +436,14 @@ static int rsu_send_msg(struct stratix10_rsu_priv *priv,
 	msg.command = command;
 	if (arg)
 		msg.arg[0] = arg;
+
+	if (command == COMMAND_MBOX_SEND_CMD) {
+		msg.arg[1] = 0;
+		msg.payload = NULL;
+		msg.payload_length = 0;
+		msg.payload_output = priv->get_spt_response_buf;
+		msg.payload_length_output = RSU_GET_SPT_RESP_LEN;
+	}
 
 	ret = stratix10_svc_send(priv->chan, &msg);
 	if (ret < 0)
@@ -680,15 +799,30 @@ static ssize_t notify_store(struct device *dev,
 	if (ret)
 		return ret;
 
-	ret = rsu_send_async_msg(dev, priv, COMMAND_RSU_NOTIFY, status, NULL);
+	if (priv->async)
+		ret = rsu_send_async_msg(dev, priv, COMMAND_RSU_NOTIFY, status, NULL);
+	else
+		ret = rsu_send_msg(priv, COMMAND_RSU_NOTIFY, status, rsu_command_callback);
 	if (ret) {
 		dev_err(dev, "Error, RSU notify returned %i\n", ret);
 		return ret;
 	}
 
 	/* to get the updated state */
-	ret = rsu_send_async_msg(dev, priv, COMMAND_RSU_STATUS, 0,
-				 rsu_async_status_callback);
+	if (priv->async) {
+		ret = rsu_send_async_msg(dev, priv, COMMAND_RSU_STATUS, 0,
+					 rsu_async_status_callback);
+	} else {
+		ret = rsu_send_msg(priv, COMMAND_RSU_STATUS, 0,
+				   rsu_status_callback);
+		/**In asynchronous operation COMMAND_RSU_RETRY is integrated to
+		 * be part of COMMAND_RSU_STATUS.so we need to invoke it only
+		 * in synchronous mode.
+		 */
+		if (!ret)
+			ret = rsu_send_msg(priv, COMMAND_RSU_RETRY, 0,
+					   rsu_retry_callback);
+	}
 	if (ret) {
 		dev_err(dev, "Error, getting RSU status %i\n", ret);
 		return ret;
@@ -943,6 +1077,8 @@ static int stratix10_rsu_probe(struct platform_device *pdev)
 	priv->device_info[1].erase_size = INVALID_DEVICE_INFO;
 	priv->device_info[2].erase_size = INVALID_DEVICE_INFO;
 	priv->device_info[3].erase_size = INVALID_DEVICE_INFO;
+	priv->get_spt_response_buf = NULL;
+	priv->async = false;
 
 	mutex_init(&priv->lock);
 	priv->chan = stratix10_svc_request_channel_byname(&priv->client,
@@ -954,21 +1090,42 @@ static int stratix10_rsu_probe(struct platform_device *pdev)
 	}
 
 	ret = stratix10_svc_add_async_client(priv->chan, false);
-	if (ret) {
-		dev_err(dev, "failed to add async client\n");
-		stratix10_svc_free_channel(priv->chan);
-		return ret;
+	if (ret < 0) {
+		dev_dbg(dev, "Async operations not supported, fallback to non-async mode\n");
+		priv->async = false;
+	} else {
+		priv->async = true;
 	}
 
 	init_completion(&priv->completion);
 	platform_set_drvdata(pdev, priv);
 
 	/* get the initial state from firmware */
-	ret = rsu_send_async_msg(dev, priv, COMMAND_RSU_STATUS, 0,
-				 rsu_async_status_callback);
+	if (priv->async)
+		ret = rsu_send_async_msg(dev, priv, COMMAND_RSU_STATUS, 0,
+					 rsu_async_status_callback);
+	else
+		ret = rsu_send_msg(priv, COMMAND_RSU_STATUS, 0,
+				   rsu_status_callback);
 	if (ret) {
 		dev_err(dev, "Error, getting RSU status %i\n", ret);
+		if (priv->async)
+			stratix10_svc_remove_async_client(priv->chan);
 		stratix10_svc_free_channel(priv->chan);
+		return ret;
+	}
+
+	/**In asynchronous operation COMMAND_RSU_RETRY is integrated to
+	 * be part of COMMAND_RSU_STATUS.so we need to invoke it only
+	 * in synchronous mode.
+	 */
+	if (!priv->async) {
+		ret = rsu_send_msg(priv, COMMAND_RSU_RETRY, 0, rsu_retry_callback);
+		if (ret) {
+			dev_err(dev, "Error, getting RSU retry %i\n", ret);
+			stratix10_svc_free_channel(priv->chan);
+		}
+		return ret;
 	}
 
 	/* get DCMF version from firmware */
@@ -976,21 +1133,30 @@ static int stratix10_rsu_probe(struct platform_device *pdev)
 			   0, rsu_dcmf_version_callback);
 	if (ret) {
 		dev_err(dev, "Error, getting DCMF version %i\n", ret);
+		if (priv->async)
+			stratix10_svc_remove_async_client(priv->chan);
 		stratix10_svc_free_channel(priv->chan);
+		return ret;
 	}
 
 	ret = rsu_send_msg(priv, COMMAND_RSU_DCMF_STATUS,
 			   0, rsu_dcmf_status_callback);
 	if (ret) {
 		dev_err(dev, "Error, getting DCMF status %i\n", ret);
+		if (priv->async)
+			stratix10_svc_remove_async_client(priv->chan);
 		stratix10_svc_free_channel(priv->chan);
+		return ret;
 	}
 
 	ret = rsu_send_msg(priv, COMMAND_RSU_MAX_RETRY, 0,
 			   rsu_max_retry_callback);
 	if (ret) {
 		dev_err(dev, "Error, getting RSU max retry %i\n", ret);
+		if (priv->async)
+			stratix10_svc_remove_async_client(priv->chan);
 		stratix10_svc_free_channel(priv->chan);
+		return ret;
 	}
 
 	/* get QSPI device info from firmware */
@@ -998,13 +1164,35 @@ static int stratix10_rsu_probe(struct platform_device *pdev)
 			   0, rsu_get_device_info_callback);
 	if (ret) {
 		dev_err(dev, "Error, getting QSPI Device Info %i\n", ret);
+		if (priv->async)
+			stratix10_svc_remove_async_client(priv->chan);
 		stratix10_svc_free_channel(priv->chan);
+		return ret;
 	}
 
-	ret = rsu_send_async_msg(dev, priv, COMMAND_RSU_GET_SPT_TABLE, 0,
-				 rsu_async_get_spt_table_callback);
+	if (priv->async) {
+		ret = rsu_send_async_msg(dev, priv, COMMAND_RSU_GET_SPT_TABLE,
+					 0, rsu_async_get_spt_table_callback);
+	} else {
+		priv->get_spt_response_buf =
+			stratix10_svc_allocate_memory(priv->chan, RSU_GET_SPT_RESP_LEN);
+		if (IS_ERR(priv->get_spt_response_buf)) {
+			dev_err(dev, "failed to allocate get spt buffer\n");
+			ret = -ENOMEM;
+		} else {
+			ret = rsu_send_msg(priv, COMMAND_MBOX_SEND_CMD,
+					   RSU_GET_SPT_CMD, rsu_get_spt_callback);
+		}
+	}
 	if (ret) {
 		dev_err(dev, "Error, getting SPT table %i\n", ret);
+		if (priv->async) {
+			stratix10_svc_remove_async_client(priv->chan);
+		} else if (priv->get_spt_response_buf) {
+			stratix10_svc_free_memory(priv->chan,
+						  priv->get_spt_response_buf);
+			priv->get_spt_response_buf = NULL;
+		}
 		stratix10_svc_free_channel(priv->chan);
 	}
 
@@ -1014,6 +1202,9 @@ static int stratix10_rsu_probe(struct platform_device *pdev)
 static void stratix10_rsu_remove(struct platform_device *pdev)
 {
 	struct stratix10_rsu_priv *priv = platform_get_drvdata(pdev);
+
+	if (priv->async)
+		stratix10_svc_remove_async_client(priv->chan);
 
 	stratix10_svc_free_channel(priv->chan);
 }
