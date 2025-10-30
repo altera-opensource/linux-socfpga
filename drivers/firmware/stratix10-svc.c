@@ -121,6 +121,15 @@
 #define STRATIX10_GET_SDM_STATUS_CODE(status) \
 	(FIELD_GET(STRATIX10_SDM_STATUS_MASK, status))
 
+static struct workqueue_struct *psci_cpu_off_wq;
+static DECLARE_COMPLETION(psci_offline_done);
+static atomic_t psci_pending_cpus;
+
+struct psci_cpu_off_work {
+	struct work_struct work;
+	int cpu;
+};
+
 typedef void (svc_invoke_fn)(unsigned long, unsigned long, unsigned long,
 			     unsigned long, unsigned long, unsigned long,
 			     unsigned long, unsigned long,
@@ -3299,28 +3308,58 @@ void stratix10_svc_free_memory(struct stratix10_svc_chan *chan, void *kaddr)
 }
 EXPORT_SYMBOL_GPL(stratix10_svc_free_memory);
 
-static int smp_psci_offline_cpus(void)
+static void psci_cpu_off_worker(struct work_struct *work)
 {
-	int cpu, ret;
-    /* Iterate over all online CPUs except the CPU currently running the code*/
-	for_each_online_cpu(cpu) {
-		if (cpu == smp_processor_id())
-			continue; // don't offline self
+	struct psci_cpu_off_work *cw =
+		container_of(work, struct psci_cpu_off_work, work);
 
-		ret = remove_cpu(cpu); // equivalent to cpu_down(cpu)
-		if (ret)
-			pr_warn("Failed to offline CPU%d: %d\n", cpu, ret);
+	remove_cpu(cw->cpu);
+	if (atomic_dec_and_test(&psci_pending_cpus))
+		complete(&psci_offline_done);
+
+	kfree(cw);
+}
+
+static void psci_offline_secondary_cpus(void)
+{
+	int cpu;
+	struct psci_cpu_off_work *cw;
+	int me;
+
+	/* safely get current CPU id (disables preemption briefly) */
+	me = get_cpu();
+	put_cpu();
+
+	atomic_set(&psci_pending_cpus, 0);
+	reinit_completion(&psci_offline_done);
+
+	for_each_online_cpu(cpu) {
+		if (cpu == me)
+			continue;
+
+		cw = kzalloc(sizeof(*cw), GFP_ATOMIC);
+		if (!cw)
+			continue;
+
+		INIT_WORK(&cw->work, psci_cpu_off_worker);
+		cw->cpu = cpu;
+		atomic_inc(&psci_pending_cpus);
+		queue_work(psci_cpu_off_wq, &cw->work);
 	}
-	return 0;
+
+	/* Wait for all CPUs to be offlined */
+	if (atomic_read(&psci_pending_cpus))
+		wait_for_completion_timeout(&psci_offline_done,
+					    msecs_to_jiffies(1000));
 }
 
 static int psci_cpu_off_reboot_notifier(struct notifier_block *nb,
-				unsigned long action, void *data)
+					unsigned long action, void *data)
 {
 	switch (action) {
-	case SYS_POWER_OFF:
 	case SYS_RESTART:
-		smp_psci_offline_cpus(); // Powers down secondary CPUs
+	case SYS_POWER_OFF:
+		psci_offline_secondary_cpus();
 		break;
 	}
 	return NOTIFY_OK;
@@ -3328,7 +3367,7 @@ static int psci_cpu_off_reboot_notifier(struct notifier_block *nb,
 
 static struct notifier_block psci_reboot_nb = {
 	.notifier_call = psci_cpu_off_reboot_notifier,
-	.priority = INT_MAX, // Make this one of the last notifiers called
+	.priority = INT_MAX, /* keep as late notifier if you want */
 };
 
 static const struct of_device_id stratix10_svc_drv_match[] = {
@@ -3407,6 +3446,11 @@ static int stratix10_svc_drv_probe(struct platform_device *pdev)
 
 	if (of_device_is_compatible(node, "intel,agilex-svc")
 		|| of_device_is_compatible(node, "intel,stratix10-svc")) {
+		/* simpler, safer for calling remove_cpu() */
+		psci_cpu_off_wq = alloc_workqueue("psci_cpu_off_wq", WQ_UNBOUND, 0);
+		if (!psci_cpu_off_wq)
+			return -ENOMEM;
+
 		ret = register_reboot_notifier(&psci_reboot_nb);
 		WARN_ON(ret);
 	}
@@ -3553,6 +3597,17 @@ err_destroy_pool:
 	return ret;
 }
 
+/* And a cleanup to unregister the notifier and destroy workqueue if needed */
+static void psci_cpu_off_teardown(void)
+{
+	unregister_reboot_notifier(&psci_reboot_nb);
+	if (psci_cpu_off_wq) {
+		flush_workqueue(psci_cpu_off_wq);
+		destroy_workqueue(psci_cpu_off_wq);
+		psci_cpu_off_wq = NULL;
+	}
+}
+
 static void stratix10_svc_drv_remove(struct platform_device *pdev)
 {
 	int i;
@@ -3584,6 +3639,8 @@ static void stratix10_svc_drv_remove(struct platform_device *pdev)
 	if (ctrl->genpool)
 		gen_pool_destroy(ctrl->genpool);
 	list_del(&ctrl->node);
+
+	psci_cpu_off_teardown();
 }
 
 static struct platform_driver stratix10_svc_driver = {
