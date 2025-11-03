@@ -762,8 +762,7 @@ static int dw_i3c_ccc_set(struct dw_i3c_master *master,
 			xfer->cmds[0].error == RESPONSE_ERROR_ADDRESS_NACK)
 		ccc->err = I3C_ERROR_M2;
 
-	if (xfer->cmds[0].error == RESPONSE_ERROR_FRAME ||
-			(cmd->rx_len < ccc->dests[0].payload.len))
+	if (xfer->cmds[0].error == RESPONSE_ERROR_FRAME)
 		ccc->err = I3C_ERROR_M0;
 
 	return ret;
