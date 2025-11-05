@@ -41,13 +41,9 @@
 	};
 };
 
-&cpu2 {
-	status = "disabled";
-};
+/delete-node/ &cpu2;
 
-&cpu3 {
-	status = "disabled";
-};
+/delete-node/ &cpu3;
 
 &gpio0 {
 	status = "okay";
