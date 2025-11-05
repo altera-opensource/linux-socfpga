@@ -1,0 +1,64 @@
+// SPDX-License-Identifier:     GPL-2.0
+/*
+ * Copyright (C) 2025, Altera Corporation
+ */
+#include "socfpga_agilex_socdk.dts"
+
+/ {
+	model = "SoCFPGA Agilex SoCDK";
+	compatible = "intel,socfpga-agilex-socdk", "intel,socfpga-agilex";
+
+	chosen {
+		stdout-path = "serial0:115200n8";
+		bootargs = "console=ttys0,115200 earlycon panic=-1 root=/dev/mtdblock1 \
+			    rw rootfstype=jffs2 rootwait";
+
+	};
+
+	memory {
+		device_type = "memory";
+		reg = <0 0x00000000 0 0x80000000>;
+	};
+};
+
+&gmac0 {
+	status = "disabled";
+};
+
+&qspi {
+	status = "okay";
+	/delete-node/ flash@0;
+
+	flash@0 {
+		compatible = "micron,mt25qu02g", "jedec,spi-nor";
+		reg = <0>;
+		spi-max-frequency = <50000000>;
+
+		m25p,fast-read;
+		cdns,read-delay = <2>;
+		cdns,tshsl-ns = <50>;
+		cdns,tsd2d-ns = <50>;
+		cdns,tchsh-ns = <4>;
+		cdns,tslch-ns = <4>;
+		spi-tx-bus-width = <4>;
+		spi-rx-bus-width = <4>;
+
+		partitions {
+			compatible = "fixed-partitions";
+			#address-cells = <1>;
+			#size-cells = <1>;
+			rsu-handle = <&qspi_boot>;
+
+			qspi_boot: partition@0 {
+				label = "Boot and fpga data";
+				reg = <0x0 0x07000000>;
+			};
+
+			root: partition@7000000 {
+				label = "Root Filesystem - UBIFS";
+				reg = <0x07000000 0x09000000>;
+			};
+		};
+	};
+};
+
