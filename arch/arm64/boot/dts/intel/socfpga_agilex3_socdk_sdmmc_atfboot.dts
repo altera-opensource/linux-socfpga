@@ -1,0 +1,20 @@
+// SPDX-License-Identifier: GPL-2.0-only
+/*
+ * Copyright (C) 2025, Altera Corporation
+ */
+#include "socfpga_agilex3_socdk.dts"
+
+/ {
+	model = "SoCFPGA Agilex3 SoCDK";
+	compatible = "intel,socfpga-agilex3-socdk", "intel,socfpga-agilex3";
+
+	chosen {
+		stdout-path = "serial0:115200n8";
+		bootargs = "console=ttys0,115200 earlycon panic=-1 root=/dev/mmcblk0p2 rw rootwait";
+	};
+
+	memory {
+		device_type = "memory";
+		reg = <0 0x80000000 0 0x70000000>;
+	};
+};
