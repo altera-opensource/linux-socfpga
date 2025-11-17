@@ -869,6 +869,13 @@ static FCS_HAL_INT hal_digest_init(struct fcs_cmd_context *const k_ctx)
 
 	fcs_plat_memcpy(&ctx, k_ctx, sizeof(struct fcs_cmd_context));
 
+	ret = fcs_plat_uuid_compare(&priv->uuid_id, &k_ctx->dgst.suuid);
+	if (!ret) {
+		ret = -EINVAL;
+		LOG_ERR("Session UUID Mismatch ret: %d\n", ret);
+		return ret;
+	}
+
 	ret = priv->plat_data->svc_send_request(
 		priv, FCS_DEV_CRYPTO_GET_DIGEST_INIT, FCS_REQUEST_TIMEOUT);
 	if (ret) {
@@ -903,6 +910,12 @@ static FCS_HAL_INT hal_digest_update(struct fcs_cmd_context *const k_ctx)
 
 	k_ctx->dgst.digest_len = &ldigest_len;
 
+	ret = fcs_plat_uuid_compare(&priv->uuid_id, &k_ctx->dgst.suuid);
+	if (!ret) {
+		ret = -EINVAL;
+		LOG_ERR("Session UUID Mismatch ret: %d\n", ret);
+		return ret;
+	}
 
 	d_buf = priv->plat_data->svc_alloc_memory(priv, DIGEST_CMD_MAX_SZ);
 	if (IS_ERR(d_buf)) {
@@ -947,12 +960,18 @@ static FCS_HAL_INT hal_digest_final(struct fcs_cmd_context *const k_ctx)
 
 	fcs_plat_memcpy(&ctx, k_ctx, sizeof(struct fcs_cmd_context));
 
+	ret = fcs_plat_uuid_compare(&priv->uuid_id, &k_ctx->dgst.suuid);
+	if (!ret) {
+		ret = -EINVAL;
+		LOG_ERR("Session UUID Mismatch ret: %d\n", ret);
+		return ret;
+	}
+
 	d_buf = priv->plat_data->svc_alloc_memory(priv, DIGEST_CMD_MAX_SZ);
 	if (IS_ERR(d_buf)) {
-		ret = -ENOMEM;
 		LOG_ERR("Failed to allocate memory for digest output kernel buffer ret: %d\n",
 			ret);
-		goto free_src;
+		return -ENOMEM;
 	}
 
 	k_ctx->dgst.digest = d_buf;
@@ -1003,8 +1022,6 @@ copy_mbox_status:
 
 free_dst:
 	priv->plat_data->svc_free_memory(priv, d_buf);
-free_src:
-	priv->plat_data->svc_free_memory(priv, k_ctx->dgst.src);
 
 	return ret;
 }
@@ -4027,6 +4044,7 @@ FCS_HAL_INT hal_get_digest(struct fcs_cmd_context *const k_ctx)
 	FCS_HAL_INT ret = 0;
 	struct fcs_cmd_context ctx;
 	FCS_HAL_U32 remaining_bytes = 0, bytes_transfered = 0;
+	FCS_HAL_VOID *s_buf = NULL;
 
 	fcs_plat_memcpy(&ctx, k_ctx, sizeof(struct fcs_cmd_context));
 	ret = hal_digest_init(k_ctx);
@@ -4035,26 +4053,51 @@ FCS_HAL_INT hal_get_digest(struct fcs_cmd_context *const k_ctx)
 		return ret;
 	}
 
+	s_buf = priv->plat_data->svc_alloc_memory(priv, DIGEST_CMD_MAX_SZ);
+	if (IS_ERR(s_buf)) {
+		ret = -ENOMEM;
+		LOG_ERR("Failed to allocate memory for digest input data kernel buffer ret: %d\n",
+			ret);
+		return ret;
+	}
+	k_ctx->dgst.src = s_buf;
+
 	remaining_bytes = k_ctx->dgst.src_len;
 	while (remaining_bytes > 0) {
 		if (remaining_bytes > CRYPTO_DIGEST_MAX_SZ) {
 			k_ctx->dgst.src_len = CRYPTO_DIGEST_MAX_SZ;
+			if (copy_from_user(k_ctx->dgst.src,
+					   ctx.dgst.src + bytes_transfered,
+					   CRYPTO_DIGEST_MAX_SZ) != 0) {
+				LOG_ERR("Failed to copy data from user ret: %d\n", ret);
+				ret = -EFAULT;
+				goto free_mem;
+			}
 			ret = hal_digest_update(k_ctx);
 		} else {
 			k_ctx->dgst.src_len = remaining_bytes;
+			if (copy_from_user(k_ctx->dgst.src,
+					   ctx.dgst.src + bytes_transfered,
+					   remaining_bytes) != 0) {
+				LOG_ERR("Failed to copy data from user ret: %d\n", ret);
+				ret = -EFAULT;
+				goto free_mem;
+			}
 			ret = hal_digest_final(k_ctx);
 		}
 		if (ret) {
 			LOG_ERR("Failed to perform digest ret: %d\n", ret);
-			return ret;
+			goto free_mem;
 		}
 
 		remaining_bytes -= k_ctx->dgst.src_len;
 		bytes_transfered += k_ctx->dgst.src_len;
-		k_ctx->dgst.src = ctx.dgst.src + bytes_transfered;
 		k_ctx->dgst.digest = ctx.dgst.digest;
 		k_ctx->dgst.digest_len = ctx.dgst.digest_len;
 	}
+
+free_mem:
+	priv->plat_data->svc_free_memory(priv, s_buf);
 
 	return ret;
 }
