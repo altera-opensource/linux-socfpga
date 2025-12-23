@@ -4,7 +4,7 @@
 $id: http://devicetree.org/schemas/mmc/cdns,sdhci.yaml#
 $schema: http://devicetree.org/meta-schemas/core.yaml#
 
-title: Cadence SD/SDIO/eMMC Host Controller (SD4HC)
+title: Cadence SD/SDIO/eMMC Host Controller (SD4HC/SD6HC)
 
 maintainers:
   - Masahiro Yamada <yamada.masahiro@socionext.com>
@@ -12,7 +12,8 @@ maintainers:
 properties:
   compatible:
     oneOf:
-      - items:
+      - description: Cadence SD4HC controller
+        items:
           - enum:
               - amd,pensando-elba-sd4hc
               - microchip,mpfs-sd4hc
@@ -20,9 +21,8 @@ properties:
               - mobileye,eyeq-sd4hc
               - socionext,uniphier-sd4hc
           - const: cdns,sd4hc
-      - items:
-          - enum:
-              - altr,agilex5-sd6hc
+      - description: Cadence SD6HC controller
+        items:
           - const: cdns,sd6hc
 
   reg:
@@ -120,6 +120,25 @@ properties:
     minimum: 0
     maximum: 0x7f
 
+  # SD6HC PHY timing properties:
+  cdns,iocell-input-delay:
+    description: Input delay across IO cells in picoseconds
+    $ref: /schemas/types.yaml#/definitions/uint32
+    minimum: 0
+    maximum: 20000   # 20 ns
+
+  cdns,iocell-output-delay:
+    description: Output delay across IO cells in picoseconds
+    $ref: /schemas/types.yaml#/definitions/uint32
+    minimum: 0
+    maximum: 20000   # 20 ns
+
+  cdns,delay-element:
+    description: Delay element size in picoseconds
+    $ref: /schemas/types.yaml#/definitions/uint32
+    minimum: 1
+    maximum: 1000
+
 required:
   - compatible
   - reg
@@ -145,6 +164,38 @@ allOf:
       properties:
         reg:
           maxItems: 1
+
+  - if:
+      properties:
+        compatible:
+          contains:
+            const: cdns,sd6hc
+    then:
+      description: SD6HC variant - use IO-cell and delay element properties
+      properties:
+        cdns,phy-input-delay-sd-highspeed: false
+        cdns,phy-input-delay-legacy: false
+        cdns,phy-input-delay-sd-uhs-sdr12: false
+        cdns,phy-input-delay-sd-uhs-sdr25: false
+        cdns,phy-input-delay-sd-uhs-sdr50: false
+        cdns,phy-input-delay-sd-uhs-ddr50: false
+        cdns,phy-input-delay-mmc-highspeed: false
+        cdns,phy-input-delay-mmc-ddr: false
+        cdns,phy-dll-delay-sdclk: false
+        cdns,phy-dll-delay-sdclk-hsmmc: false
+        cdns,phy-dll-delay-strobe: false
+
+  - if:
+      properties:
+        compatible:
+          contains:
+            const: cdns,sd4hc
+    then:
+      description: SD4HC variant - use legacy DLL delay properties
+      properties:
+        cdns,iocell-input-delay: false
+        cdns,iocell-output-delay: false
+        cdns,delay-element: false
 
 unevaluatedProperties: false
 
