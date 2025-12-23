@@ -2,6 +2,11 @@
 /*
  * Copyright (C) 2025 Altera Corporation
  *   Author: Tanmay Kathpalia <tanmay.kathpalia@altera.com>
+ *
+ * Cadence SD/SDIO/eMMC Host Controller driver - common header
+ * Shared definitions and structures for the Cadence SDHCI driver.
+ * Contains private data and declarations for SD6HC-specific functions
+ * called by the main driver in sdhci-cadence4.c.
  */
 
 #ifndef _MMC_HOST_SDHCI_CADENCE_H
@@ -12,12 +17,13 @@
 #include <linux/reset.h>
 #include <linux/clk.h>
 #include <linux/iopoll.h>
-#include <linux/mmc/mmc.h>
+#include <linux/mmc/host.h>
+
 #include "sdhci-pltfm.h"
 
 /* HRS - Host Register Set (specific to Cadence) */
-#define SDHCI_CDNS_HRS04		0x10		/* PHY access port */
-#define SDHCI_CDNS_HRS05		0x14		/* PHY access port data */
+#define SDHCI_CDNS_HRS04		0x10		/* PHY access: address port */
+#define SDHCI_CDNS_HRS05		0x14		/* PHY access: data port */
 
 /*
  * The tuned val register is 6 bit-wide, but not the whole of the range is
@@ -39,18 +45,6 @@ struct sdhci_cdns_drv_data {
 	const struct sdhci_pltfm_data pltfm_data;
 };
 
-/**
- * struct sdhci_cdns4_phy_param - PHY parameter/address pair
- * @addr: PHY register address.
- * @data: Value to write to the PHY register.
- *
- * Used for passing a list of PHY configuration parameters to the
- * Cadence SDHCI V4 controller.
- */
-struct sdhci_cdns4_phy_param {
-	u8 addr;
-	u8 data;
-};
 
 /**
  * struct sdhci_cdns_priv - Cadence SDHCI private controller data
@@ -65,8 +59,9 @@ struct sdhci_cdns4_phy_param {
  * @rst_hw: Hardware reset control for the controller.
  * @ciu_clk: Card Interface Unit (CIU) clock handle.
  *           Used only for V6 (SDHCI spec >= 4.20) controllers.
- * @nr_phy_params: Number of PHY parameter entries parsed from DT (V4 only).
- * @phy_params: Array of PHY parameter/address pairs for PHY initialization (V4 only).
+ * @phy: Opaque pointer to variant-specific PHY data.
+ *       For SD4HC: points to struct sdhci_cdns4_phy.
+ *       For SD6HC: points to struct sdhci_cdns6_phy.
  */
 struct sdhci_cdns_priv {
 	void __iomem *hrs_addr;
@@ -77,17 +72,16 @@ struct sdhci_cdns_priv {
 			    void __iomem *reg);
 	struct reset_control *rst_hw;
 	struct clk *ciu_clk; /* Card Interface Unit clock */
-	unsigned int nr_phy_params;
-	struct sdhci_cdns4_phy_param phy_params[];
+	void *phy;
 };
 
 /*
- * sdhci_cdns_priv - Helper to retrieve Cadence private data from sdhci_host
+ * sdhci_cdns_get_priv - Helper to retrieve Cadence private data from sdhci_host
  * @host: Pointer to struct sdhci_host.
  *
- * Returns: Pointer to struct sdhci_cdns_priv.
+ * Return: Pointer to struct sdhci_cdns_priv.
  */
-static inline void *sdhci_cdns_priv(struct sdhci_host *host)
+static inline void *sdhci_cdns_get_priv(struct sdhci_host *host)
 {
 	struct sdhci_pltfm_host *pltfm_host = sdhci_priv(host);
 
@@ -95,34 +89,42 @@ static inline void *sdhci_cdns_priv(struct sdhci_host *host)
 }
 
 /**
- * sdhci_cdns6_phy_adj - Program PHY registers for a specific timing mode.
+ * sdhci_cdns6_set_uhs_signaling - Program PHY registers for a specific timing mode.
  * @host: Pointer to struct sdhci_host.
  * @timing: MMC timing mode (MMC_TIMING_*).
- *
- * Returns 0 on success or a negative error code.
  */
-int sdhci_cdns6_phy_adj(struct sdhci_host *host, unsigned char timing);
+void sdhci_cdns6_set_uhs_signaling(struct sdhci_host *host, unsigned int timing);
 
 /**
  * sdhci_cdns6_set_tune_val - Set the PHY tuning value.
  * @host: Pointer to struct sdhci_host.
  * @val: Tuning value to program.
  *
- * Returns 0 on success or a negative error code.
+ * Return: 0 on success, -ETIMEDOUT if PHY initialization times out.
  */
 int sdhci_cdns6_set_tune_val(struct sdhci_host *host, unsigned int val);
 
 /**
- * sdhci_cdns6_phy_probe - Initialize the Cadence PHY using device tree.
- * @host: Pointer to struct sdhci_host.
+ * sdhci_cdns6_phy_probe - Probe and initialize Cadence SD6HC PHY parameters
+ * @pdev: Platform device pointer
+ * @priv: Pointer to Cadence private data structure
  *
- * Returns 0 on success or a negative error code.
+ * Return: 0 on success or a negative error code.
  */
-int sdhci_cdns6_phy_probe(struct sdhci_host *host);
+int sdhci_cdns6_phy_probe(struct platform_device *pdev,
+				    struct sdhci_cdns_priv *priv);
 /**
  * sdhci_cdns6_hw_reset - Perform hardware reset of the Cadence SDHCI controller.
  * @host: Pointer to struct sdhci_host.
  */
 void sdhci_cdns6_hw_reset(struct sdhci_host *host);
+
+/**
+ * sdhci_cdns6_phy_init - Initialize the SD6HC PHY with current settings.
+ * @priv: Pointer to Cadence private data structure.
+ *
+ * Return: 0 on success, -ETIMEDOUT if PHY initialization times out.
+ */
+int sdhci_cdns6_phy_init(struct sdhci_cdns_priv *priv);
 
 #endif /* _MMC_HOST_SDHCI_CADENCE_H */
