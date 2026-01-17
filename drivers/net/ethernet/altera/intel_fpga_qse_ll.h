@@ -623,6 +623,7 @@ struct intel_fpga_qse_private {
 	/* ethtool msglvl option */
 	u32 msg_enable;
 	struct altera_dmaops *dmaops;
+	struct phylink_pcs pcs;
 };
 
 /* XCVR 10GBASE-R registers bit definitions

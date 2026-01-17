@@ -1229,11 +1229,11 @@ static const struct net_device_ops intel_fpga_qse_netdev_ops = {
 	.ndo_get_stats64	= qse_get_stats64
 };
 
-static void intel_fpga_qse_mac_pcs_get_state(struct phylink_config *config,
+static void intel_fpga_qse_pcs_get_state(struct phylink_pcs *pcs,
 					     struct phylink_link_state *state)
 {
 	struct intel_fpga_qse_private *priv =
-			netdev_priv(to_net_dev(config->dev));
+				container_of(pcs, struct intel_fpga_qse_private, pcs);
 	u32 speed_reconfig;
 
 	speed_reconfig = csrrd32(priv->phy_reconfig_csr,
@@ -1249,10 +1249,25 @@ static void intel_fpga_qse_mac_pcs_get_state(struct phylink_config *config,
 	state->link = 1;
 }
 
-static void intel_fpga_qse_mac_an_restart(struct phylink_config *config)
+static void intel_fpga_qse_pcs_an_restart(struct phylink_pcs *pcs)
 {
-	/* Not Supported */
+	/* Not supported */
 }
+
+static int intel_fpga_qse_pcs_config(struct phylink_pcs *pcs,
+			   unsigned int neg_mode,
+			   phy_interface_t interface,
+			   const unsigned long *advertising,
+			   bool permit_pause_to_mac)
+{
+	return 0;
+}
+
+static const struct phylink_pcs_ops intel_fpga_qse_pcs_ops = {
+	.pcs_get_state = intel_fpga_qse_pcs_get_state,
+	.pcs_an_restart = intel_fpga_qse_pcs_an_restart,
+	.pcs_config = intel_fpga_qse_pcs_config,
+};
 
 static void intel_fpga_qse_mac_config(struct phylink_config *config,
 				      unsigned int mode,
@@ -1315,10 +1330,18 @@ static void intel_fpga_qse_mac_link_up(struct phylink_config *config,
 	phylink_mac_change(priv->phylink, true);
 }
 
+static struct phylink_pcs *intel_fpga_qse_mac_select_pcs(struct phylink_config *config,
+					       phy_interface_t interface)
+{
+	struct intel_fpga_qse_private *priv =
+			netdev_priv(to_net_dev(config->dev));
+
+	return &priv->pcs;
+}
+
 static const struct phylink_mac_ops intel_fpga_qse_phylink_ops = {
 	.validate = phylink_generic_validate,
-	.mac_pcs_get_state = intel_fpga_qse_mac_pcs_get_state,
-	.mac_an_restart = intel_fpga_qse_mac_an_restart,
+	.mac_select_pcs = intel_fpga_qse_mac_select_pcs,
 	.mac_config = intel_fpga_qse_mac_config,
 	.mac_link_down = intel_fpga_qse_mac_link_down,
 	.mac_link_up = intel_fpga_qse_mac_link_up,
@@ -1570,7 +1593,6 @@ static int intel_fpga_qse_ll_probe(struct platform_device *pdev)
 		  priv->phylink_config.supported_interfaces);
 
 	priv->phylink_config.mac_capabilities = MAC_1000FD | MAC_10000FD;
-	priv->phylink_config.legacy_pre_march2020 = true;
 
 	/* create phylink */
 	priv->phylink = phylink_create(&priv->phylink_config, pdev->dev.fwnode,
@@ -1581,6 +1603,8 @@ static int intel_fpga_qse_ll_probe(struct platform_device *pdev)
 		ret = PTR_ERR(priv->phylink);
 		goto err_free_netdev;
 	}
+
+	priv->pcs.ops = &intel_fpga_qse_pcs_ops;
 
 	ret = register_netdev(ndev);
 	if (ret) {
