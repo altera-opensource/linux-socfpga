@@ -14,10 +14,11 @@
 
 	no-sd;
 	no-sdio;
-	no-1-8-v;
 	disable-wp;
 	non-removable;
 	cap-mmc-highspeed;
+	mmc-hs400-1_8v;
+	mmc-hs200-1_8v;
 	bus-width = <8>;
 	vmmc-supply = <&sd_emmc_power>;
 	vqmmc-supply = <&emmc_io_1v8_reg>;
