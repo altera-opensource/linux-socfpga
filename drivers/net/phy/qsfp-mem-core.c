@@ -15,6 +15,7 @@
 #include <linux/regmap.h>
 #include <linux/uaccess.h>
 #include <linux/phy/qsfp-mem.h>
+#include <linux/qsfp.h>
 
 #define CONF_OFF	0x20
 #define CONF_RST_MOD	BIT(0)
@@ -64,6 +65,7 @@
 #define QSFP_I2C_INIT_DONE  0x90
 
 #define QSFP_SHADOW_CSRS_BASE_OFF	0x100
+#define QSFP_SHADOW_CSRS_NXT_PAGE_OFF	0x200
 #define QSFP_SHADOW_CSRS_BASE_END	0x3f8
 
 #define DELAY_US 1000
@@ -250,6 +252,18 @@ const struct attribute_group *qsfp_mem_groups[] = {
 };
 EXPORT_SYMBOL_GPL(qsfp_mem_groups);
 
+static void qsfp_module_get_base_page(struct qsfp *qsfp)
+{
+	int i;
+	for (i=0; i< QSFP_EEPROM_BASE_SIZE; i++) {
+		qsfp->mem.data[i]= readl(qsfp->base + QSFP_SHADOW_CSRS_BASE_OFF + (i*sizeof(u32)));
+		//printk("%s:%d Base page: %d 0x%x - 0x%x\n", __FUNCTION__,__LINE__, i, (unsigned int)(qsfp->base + QSFP_SHADOW_CSRS_BASE_OFF + (i*sizeof(u32))),
+		//		qsfp->mem.data[i]);
+		//if (qsfp->mem.data[0] == 0x0) return;
+	}
+	return;
+}
+
 static void qsfp_check_hotplug(struct work_struct *work)
 {
 	struct delayed_work *dwork;
@@ -278,11 +292,125 @@ static void qsfp_check_hotplug(struct work_struct *work)
 	schedule_delayed_work(&qsfp->dwork, msecs_to_jiffies(QSFP_CHECK_TIME));
 }
 
+static int qsfp_module_info(struct qsfp *qsfp, struct ethtool_modinfo *modinfo)
+{
+
+	mutex_lock(&qsfp->lock);
+	if (check_qsfp_plugin(qsfp) && qsfp->mem.data[0] == 0x0) {
+		//Fill up the QSFP eeprom data here
+		qsfp_module_get_base_page(qsfp);
+	}
+
+	if (qsfp->mem.base.etile_qsfp_spec_compliance_1[0] &&
+			!(qsfp->mem.base.etile_qsfp_diag_monitor & QSFP_DIAGMON_ADDRMODE)) {
+		modinfo->type = ETH_MODULE_SFF_8472;
+		modinfo->eeprom_len = ETH_MODULE_SFF_8472_LEN;
+	} else {
+		modinfo->type = ETH_MODULE_SFF_8079;
+		modinfo->eeprom_len = ETH_MODULE_SFF_8079_LEN;
+	}
+	//printk("%s:%d Module Type: %d Len: %d\n", __FUNCTION__,__LINE__, modinfo->type, modinfo->eeprom_len);
+	mutex_unlock(&qsfp->lock);
+	return 0;
+}
+
+static int qsfp_module_eeprom(struct qsfp *qsfp, struct ethtool_eeprom *ee,
+		u8 *data)
+{
+	unsigned int first, last, len, temp , i;
+	int ret;
+
+	if (ee->len == 0)
+		return -EINVAL;
+
+	first = ee->offset;
+	last = ee->offset + ee->len;
+	//printk("%s:%d First: %d Last: %d %d %d\n", __FUNCTION__,__LINE__, first, last, ETH_MODULE_SFF_8079_LEN, ETH_MODULE_SFF_8472_LEN);
+	if (first < ETH_MODULE_SFF_8079_LEN) {
+		len = min_t(unsigned int, last, ETH_MODULE_SFF_8079_LEN);
+		len -= first;
+		//printk("%s:%d Copying base page start - 0x%x %d\n", __FUNCTION__,__LINE__,((u32)(&qsfp->mem.data)+first), len);
+		memcpy(data,((u8*)(&qsfp->mem.data)+first), len);
+
+		first += len;
+		data += len;
+	}
+	//printk("%s:%d First: %d Last: %d %d %d\n", __FUNCTION__,__LINE__, first, last, ETH_MODULE_SFF_8079_LEN, ETH_MODULE_SFF_8472_LEN);
+	if (first < ETH_MODULE_SFF_8472_LEN && last > ETH_MODULE_SFF_8079_LEN) {
+		len = min_t(unsigned int, last, ETH_MODULE_SFF_8472_LEN);
+		len -= first;
+		first -= ETH_MODULE_SFF_8079_LEN;
+		//printk("%s:%d First: %d Last: %d\n", __FUNCTION__,__LINE__, first, last);
+		for (i=0; i< (len/sizeof(u32)); i++) {
+			temp = readl(qsfp->base + QSFP_SHADOW_CSRS_NXT_PAGE_OFF + (i*sizeof(u32)));
+			//printk("%s:%d Read 0x%x %d - 0x%x\n", __FUNCTION__,__LINE__, (u32)(qsfp->base + QSFP_SHADOW_CSRS_NXT_PAGE_OFF + (i*sizeof(u32))), i, temp);
+			*data = (u8)(temp & 0xFF); data++;
+			*data = (u8)((temp & 0xFF00)>>8); data++;
+			*data = (u8)((temp & 0xFF0000)>>16); data++;
+			*data = (u8)((temp & 0xFF000000)>>24); data++;
+		}
+		if (len % sizeof(u32) != 0) {
+			temp = readl(qsfp->base + QSFP_SHADOW_CSRS_NXT_PAGE_OFF + (i*sizeof(u32)));
+			//printk("%s:%d Read 0x%x %d - 0x%x\n", __FUNCTION__,__LINE__, (u32)(qsfp->base + QSFP_SHADOW_CSRS_NXT_PAGE_OFF + (i*sizeof(u32))), i, temp);
+			for (i=0; i< (len % sizeof(u32)); i++) {
+				*data = (u8)(temp & 0xFF); data++;
+				temp = temp >> 8;
+			}
+		}
+
+		if (ret < 0)
+			return ret;
+	}
+	return 0;
+}
+
+static void qsfp_attach(struct qsfp *qsfp)
+{
+	return;
+}
+
+static void qsfp_detach(struct qsfp *qsfp)
+{
+	return;
+}
+static void qsfp_start(struct qsfp *qsfp)
+{
+	if (check_qsfp_plugin(qsfp) && qsfp->mem.data[0] == 0x0) {
+		//Fill up the QSFP eeprom data here
+		qsfp_module_get_base_page(qsfp);
+	}
+	if (qsfp->mem.data[0] == 0x0) {
+		printk("%s:%d Base 0 - 0x%x\n", __FUNCTION__,__LINE__, qsfp->mem.data[0]);
+	}
+	return;
+}
+static void qsfp_stop(struct qsfp *qsfp)
+{
+	return;
+}
+
+static const struct qsfp_socket_ops qsfp_module_ops = {
+	.attach = qsfp_attach,
+	.detach = qsfp_detach,
+	.start = qsfp_start,
+	.stop = qsfp_stop,
+	.module_info = qsfp_module_info,
+	.module_eeprom = qsfp_module_eeprom,
+};
+
 int qsfp_init_work(struct qsfp *qsfp)
 {
+	//struct device *dev = qsfp->dev;
 	qsfp->init = QSFP_INIT_RESET;
 	INIT_DELAYED_WORK(&qsfp->dwork, qsfp_check_hotplug);
 	qsfp_check_hotplug(&qsfp->dwork.work);
+
+	qsfp->qsfp_bus =
+                 qsfp_register_socket(qsfp->dev, qsfp, &qsfp_module_ops);
+         if (!qsfp->qsfp_bus)
+                 return -ENOMEM;
+
+	//dev_info(dev,"Registering with the QSFP bus - 0x%p\n", qsfp->qsfp_bus);
 	return 0;
 }
 EXPORT_SYMBOL_GPL(qsfp_init_work);

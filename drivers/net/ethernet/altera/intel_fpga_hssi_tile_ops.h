@@ -9,6 +9,8 @@
  #ifndef __HSSI_TILE_OPS_H__
  #define __HSSI_TILE_OPS_H__
 
+#include <linux/types.h>
+
 struct hssi_gen_ops {
 	int (*probe_init)(struct platform_device *pdev);
 	int (*read_mac_stat)(struct platform_device *pdev, u32 cmd,
@@ -40,6 +42,10 @@ struct hssi_gen_ops {
 	int (*lock_mac_stats)(struct platform_device *pdev, int port);
 	int (*unlock_mac_stats)(struct platform_device *pdev, int port);
 	void (*reset_port)(struct platform_device *pdev, int port);
+	u32 (*anlt_get_status)(struct platform_device *pdev, int port);
+	u32 (*anlt_get_cfg)(struct platform_device *pdev, int port);
+	u32 (*anlt_get_ext_status)(struct platform_device *pdev, int port, int *an_status);
+	int (*anlt_update)(struct platform_device *pdev, int port, bool enable_anlt);
 };
 
 struct hssi_dev_ops {

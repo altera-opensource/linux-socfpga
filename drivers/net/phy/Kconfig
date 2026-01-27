@@ -117,6 +117,12 @@ config QSFP_MEM_DFL
 
 comment "MII PHY device drivers"
 
+config QSFP
+	tristate "QSFP cage support"
+	depends on I2C && PHYLINK
+	depends on HWMON || HWMON=n
+	select MDIO_I2C
+
 config AIR_EN8811H_PHY
 	tristate "Airoha EN8811H 2.5 Gigabit PHY"
 	help

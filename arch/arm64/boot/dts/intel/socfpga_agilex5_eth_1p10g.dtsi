@@ -54,10 +54,17 @@
                          reg = <0x50001000 0x10000>;
                          reg-names = "pkt_cli";
                 };
-                ptp_bridge_0: ptp_bridge@81000000 {
+                packetswitch_0: packetswitch@81000000 {
                          compatible = "generic-uio";
                          reg = <0x50010000 0x10000>;
-                         reg-names = "ptp_bridge";
+                         reg-names = "packetswitch";
+                };
+
+                sfp_eth0: sfp-eth0 {
+                        compatible = "altera,sfp-mem";
+                        reg-names = "sfp-mem-ctrl";
+                        reg = <0x44040000 0x00001000>;
+                        status = "okay";
                 };
 
                 sfp_eth0: sfp-eth0 {

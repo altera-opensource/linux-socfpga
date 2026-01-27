@@ -15,6 +15,12 @@
  #include "intel_fpga_hssiss.h"
 
  #define INTEL_FPGA_RET_SUCCESS 0
+enum lane_speed {
+	LANE_10G,
+	LANE_25G,
+	LANE_50G,
+	LANE_100G
+};
 
 u32  hssi_csrrd32(struct platform_device *pdev,
 		  enum hssiss_tile_regbank regbank,
@@ -136,4 +142,13 @@ int hssi_unlock_mac_stats(struct platform_device *pdev, u32 port);
 void hssi_reset_port(struct platform_device *pdev, u32 port);
 int hssi_set_mtu(struct platform_device *pdev, u32 cmd, void *mtu_data);
 int hssi_get_mtu(struct platform_device *pdev, u32 cmd, void *mtu_data);
+
+int hssi_anlt_enable(struct platform_device *pdev, u32 port);
+
+int hssi_anlt_disable(struct platform_device *pdev, u32 port);
+
+u32 hssi_anlt_get_status(struct platform_device *pdev, u32 port);
+
+int hssi_get_pma_lane_count(struct platform_device *pdev, u32 port);
+int hssi_get_profile_lane_speed(struct platform_device *pdev, u32 port);
  #endif

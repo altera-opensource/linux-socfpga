@@ -53,9 +53,16 @@
  #define PRELOAD_LINK_STABILITY_COUNT 10
 
  #define SKB_DMA_REALIGN         ((PAGE_SIZE - NET_SKB_PAD) % SMP_CACHE_BYTES)
+static inline unsigned long long altera_rm_trail0(unsigned long long v, int num)
+{
+	if (num)
+		return (v >> num);
+	return v ? v >> __builtin_ctzl(v) : 0;
+}
 
 enum {
 	ETH_LINK_STATE_RESET = 0,
+	ETH_LINK_STATE_ANLT,
 	ETH_LINK_STATE_START,
 	ETH_LINK_STATE_STOP,
 	ETH_LINK_STATE_RUN
@@ -111,6 +118,8 @@ typedef struct intel_fpga_xtile_eth_private {
 	u8 duplex;
 	u8 qsfp_lane;
 	bool autoneg;
+	bool anlt;
+	int prev_anlt_err;
 	bool ptp_enable;
 	u32 link_state;
 	bool cable_unplugged;
@@ -172,4 +181,6 @@ int xtile_check_counter_complete(intel_fpga_xtile_eth_private *priv,
 				 u8 bit_mask,
 				 bool set_bit,
 				 int align);
+int altera_fpga_anlt_get_capabilities(intel_fpga_xtile_eth_private *priv);
+char *get_anlt_error(u32 err_code);
  #endif

@@ -447,3 +447,81 @@ void hssi_reset_port(struct platform_device *pdev, u32 port)
 {
 	hssiss_reset_port(pdev, port);
 }
+
+int hssi_get_profile_lane_speed(struct platform_device *pdev, u32 port)
+{
+	hssi_eth_port_attr port_attr;
+	int lane_speed = 0;
+
+	port_attr = hssiss_get_ethport_attr(pdev, port);
+
+	switch (port_attr.part.profile) {
+	case HSSI_PORT_PROFILE_10GBE:
+		lane_speed = LANE_10G;
+		break;
+	case HSSI_PORT_PROFILE_200GAUI_8:
+	case HSSI_PORT_PROFILE_100GCAUI_4:
+	case HSSI_PORT_PROFILE_25GBE:
+	case HSSI_PORT_PROFILE_50GAUI_2:
+		lane_speed = LANE_25G;
+		break;
+	case HSSI_PORT_PROFILE_400GAUI_8:
+	case HSSI_PORT_PROFILE_200GAUI_4:
+	case HSSI_PORT_PROFILE_100GAUI_2:
+	case HSSI_PORT_PROFILE_50GAUI_1:
+		lane_speed = LANE_50G;
+		break;
+	case HSSI_PORT_PROFILE_100GAUI_1:
+	case HSSI_PORT_PROFILE_200GAUI_2:
+	case HSSI_PORT_PROFILE_400GAUI_4:
+		lane_speed = LANE_100G;
+		break;
+	default:
+		break;
+	}
+
+	return lane_speed;
+}
+
+int hssi_get_pma_lane_count(struct platform_device *pdev, u32 port)
+{
+	hssi_eth_port_attr port_attr;
+	int lane_count = 1; //default value
+
+	port_attr = hssiss_get_ethport_attr(pdev, port);
+
+	switch (port_attr.part.profile) {
+	case HSSI_PORT_PROFILE_200GAUI_8:
+	case HSSI_PORT_PROFILE_400GAUI_8:
+		lane_count = 8;
+		break;
+	case HSSI_PORT_PROFILE_400GAUI_4:
+	case HSSI_PORT_PROFILE_200GAUI_4:
+	case HSSI_PORT_PROFILE_100GCAUI_4:
+		lane_count = 4;
+		break;
+	case HSSI_PORT_PROFILE_100GAUI_2:
+	case HSSI_PORT_PROFILE_200GAUI_2:
+	case HSSI_PORT_PROFILE_50GAUI_2:
+		lane_count = 2;
+		break;
+	default:
+		break;
+	}
+	return lane_count;
+}
+
+int hssi_anlt_enable(struct platform_device *pdev, u32 port)
+{
+	return hssiss_anlt_update(pdev, port, true);
+}
+
+int hssi_anlt_disable(struct platform_device *pdev, u32 port)
+{
+	return hssiss_anlt_update(pdev, port, false);
+}
+
+u32 hssi_anlt_get_status(struct platform_device *pdev, u32 port)
+{
+	return hssiss_anlt_get_status(pdev, port);
+}

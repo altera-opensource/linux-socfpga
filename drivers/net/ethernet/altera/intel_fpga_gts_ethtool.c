@@ -1,15 +1,15 @@
 // SPDX-License-Identifier: GPL-2.0
 /* Ethtool support for Altera FPGA GTS Ethernet MAC driver
-* Copyright (C) 2024, 2025 Altera Corporation. All rights reserved
-*
-* Contributors:
-*   Roman Bulgakov
-*   Yu Ying Choo
-*   Dalon Westergreen
-*   Joyce Ooi
-*
-* Original driver contributed by GlobalLogic.
-*/
+ * Copyright (C) 2024, 2025 Altera Corporation. All rights reserved
+ *
+ * Contributors:
+ *   Roman Bulgakov
+ *   Yu Ying Choo
+ *   Dalon Westergreen
+ *   Joyce Ooi
+ *
+ * Original driver contributed by GlobalLogic.
+ */
 
 #include <linux/ethtool.h>
 #include <linux/kernel.h>
@@ -88,8 +88,8 @@ static void gts_get_drvinfo(struct net_device *dev,
 }
 
 /* Fill in a buffer with the strings which correspond to the
-* stats
-*/
+ * stats
+ */
 static void gts_gstrings(struct net_device *dev, u32 stringset, u8 *buf)
 {
 	memcpy(buf, stat_gstrings, GTS_STATS_LEN * ETH_GSTRING_LEN);
@@ -108,9 +108,8 @@ static int gts_get_module_info(struct net_device *dev,
 	if (!priv)
 		return -ENODEV;
 
-	if (!priv->phylink || !priv->dev || !priv->dev->sfp_bus) {
+	if (!priv->phylink || !priv->dev || !priv->dev->sfp_bus)
 		return -ENODEV;
-	}
 
 	return sfp_get_module_info(priv->dev->sfp_bus, info);
 }
@@ -123,9 +122,8 @@ static int gts_get_module_eeprom(struct net_device *dev,
 	if (!priv)
 		return -ENODEV;
 
-	if (!priv->phylink || !priv->dev || !priv->dev->sfp_bus) {
+	if (!priv->phylink || !priv->dev || !priv->dev->sfp_bus)
 		return -ENODEV;
-	}
 
 	return sfp_get_module_eeprom(priv->dev->sfp_bus, eeprom, data);
 }
@@ -139,9 +137,9 @@ static int gts_get_module_eeprom_by_page(struct net_device *dev,
 	if (!priv)
 		return -ENODEV;
 
-	if (!priv->phylink || !priv->dev || !priv->dev->sfp_bus) {
+	if (!priv->phylink || !priv->dev || !priv->dev->sfp_bus)
 		return -ENODEV;
-	}
+
 	return sfp_get_module_eeprom_by_page(priv->dev->sfp_bus, page, extack);
 }
 
@@ -332,7 +330,7 @@ static int gts_reglen(struct net_device *dev)
 	return GTS_NUM_REGS * sizeof(u32);
 }
 
-#define FILLER_BYTES(in) do { buf[buf_index++] = 0; } while (false);
+#define FILLER_BYTES(in) do { buf[buf_index++] = 0; } while (false)
 
 #define FILLER_HARDIP_EMAC(in) FILLER_BYTES(hardip_xcvr_pma->(in))
 
@@ -349,16 +347,16 @@ static void gts_get_regs(struct net_device *dev, struct ethtool_regs *regs,
 	hardip_xcvr_pma = NULL;
 
 	/* Set version to a known value, so ethtool knows
-	* how to do any special formatting of this data.
-	* This version number will need to change if and
-	* when this register table is changed.
-	*
-	* version[31:0] = 1: Dump the 10GbE MAC IP Registers
-	*      Upper bits are all 0 by default
-	*
-	* Upper 16-bits will indicate feature presence for
-	* Ethtool register decoding in future version.
-	*/
+	 * how to do any special formatting of this data.
+	 * This version number will need to change if and
+	 * when this register table is changed.
+	 *
+	 * version[31:0] = 1: Dump the 10GbE MAC IP Registers
+	 *      Upper bits are all 0 by default
+	 *
+	 * Upper 16-bits will indicate feature presence for
+	 * Ethtool register decoding in future version.
+	 */
 
 	regs->version = 1;
 

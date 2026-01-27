@@ -361,6 +361,7 @@ static ssize_t ui_interval_store(struct device *dev,
 	return len;
 }
 
+#ifdef CONFIG_INTEL_FPGA_FREQ_CTRL
 static ssize_t en_dis_sec_ip_store(struct device *dev,
 				   struct device_attribute *attr,
 				   const char *buf, size_t len)
@@ -384,6 +385,7 @@ static ssize_t en_dis_sec_ip_store(struct device *dev,
 
 	return len;
 }
+#endif
 
 static ssize_t eth_poll_monitoring_interval_show(struct device *dev,
 						 struct device_attribute *attr,
@@ -420,7 +422,9 @@ static DEVICE_ATTR(msgdma_tx_desc_dump, 0644, msgdma_tx_desc_dump_show, NULL);
 static DEVICE_ATTR_RW(msgdma_tx_irq);
 static DEVICE_ATTR(link_state, 0644, link_state_show, NULL);
 static DEVICE_ATTR_RW(ui_interval);
+#ifdef CONFIG_INTEL_FPGA_FREQ_CTRL
 static DEVICE_ATTR(en_dis_sec_ip, 0644, NULL, en_dis_sec_ip_store);
+#endif
 static DEVICE_ATTR(eth_poll_monitoring_interval, 0644,
 		   eth_poll_monitoring_interval_show,
 		   eth_poll_monitoring_interval_store);
@@ -431,7 +435,9 @@ static struct attribute *msgdma_sysfs_attrs[] = {
 	&dev_attr_msgdma_tx_irq.attr,
 	&dev_attr_link_state.attr,
 	&dev_attr_ui_interval.attr,
+#ifdef CONFIG_INTEL_FPGA_FREQ_CTRL
 	&dev_attr_en_dis_sec_ip.attr,
+#endif
 	&dev_attr_eth_poll_monitoring_interval.attr,
 	NULL
 };

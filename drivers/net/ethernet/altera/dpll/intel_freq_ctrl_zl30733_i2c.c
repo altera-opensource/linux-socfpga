@@ -262,8 +262,8 @@ int i2c_dev_check_zl30733_clock(struct intel_freq_control_private *priv)
 
 	ret = i2c_zl30733_read_byte_data(i2c_cli, ZL30733_REG_ID_0, rdbuf, sizeof(rdbuf));
 	if (ret == 0) {
-		pr_info("%s: i2c_zl30733_read_byte_data read ID:0x%02x%02x\n", __func__,
-			rdbuf[0], rdbuf[1]);
+		//pr_info("%s: i2c_zl30733_read_byte_data read ID:0x%02x%02x\n", __func__,
+		//	rdbuf[0], rdbuf[1]);
 
 		if (((rdbuf[0] << 8) | rdbuf[1]) == ZL30733_ID_VALUE) {
  #ifdef CONFIG_DEBUG_FS

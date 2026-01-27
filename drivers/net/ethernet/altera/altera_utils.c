@@ -11,6 +11,7 @@
 void tse_set_bit(void __iomem *ioaddr, size_t offs, u32 bit_mask)
 {
 	u32 value = csrrd32(ioaddr, offs);
+
 	value |= bit_mask;
 	csrwr32(value, ioaddr, offs);
 }
@@ -18,6 +19,7 @@ void tse_set_bit(void __iomem *ioaddr, size_t offs, u32 bit_mask)
 void tse_clear_bit(void __iomem *ioaddr, size_t offs, u32 bit_mask)
 {
 	u32 value = csrrd32(ioaddr, offs);
+
 	value &= ~bit_mask;
 	csrwr32(value, ioaddr, offs);
 }
@@ -25,12 +27,14 @@ void tse_clear_bit(void __iomem *ioaddr, size_t offs, u32 bit_mask)
 int tse_bit_is_set(void __iomem *ioaddr, size_t offs, u32 bit_mask)
 {
 	u32 value = csrrd32(ioaddr, offs);
+
 	return (value & bit_mask) ? 1 : 0;
 }
 
 int tse_bit_is_clear(void __iomem *ioaddr, size_t offs, u32 bit_mask)
 {
 	u32 value = csrrd32(ioaddr, offs);
+
 	return (value & bit_mask) ? 0 : 1;
 }
 
@@ -69,7 +73,7 @@ int request_and_map_node(struct platform_device *pdev, struct device_node *dmanp
 	int ret = 0;
 	struct resource *region;
 	struct device *device = &pdev->dev;
-	struct resource res={0};
+	struct resource res = {0};
 
 	// Find the property by name
 	int index = of_property_match_string(dmanp, "reg-names", name);
