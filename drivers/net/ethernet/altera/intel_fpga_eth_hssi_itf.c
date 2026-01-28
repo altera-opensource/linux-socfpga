@@ -525,3 +525,18 @@ u32 hssi_anlt_get_status(struct platform_device *pdev, u32 port)
 {
 	return hssiss_anlt_get_status(pdev, port);
 }
+
+void hssi_errpkt_cnt_reset(struct platform_device *pdev, int port)
+{
+	hssiss_usrspace_pkterr_cnt_rst(pdev, port);
+}
+
+u32 hssi_errpkt_cnt_read(struct platform_device *pdev, u32 addr_offs)
+{
+	return hssiss_usrspace_pkterr_cnt(pdev, addr_offs);
+}
+
+void hssi_errpkt_logic_en(struct platform_device *pdev, int port, bool enable)
+{
+	hssiss_usrspace_pkterr_logic_en(pdev, port, enable);
+}

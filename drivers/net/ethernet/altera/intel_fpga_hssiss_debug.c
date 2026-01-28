@@ -890,7 +890,7 @@ static ssize_t anlt_dbgfs_dump_by_port_write(struct file *filep, const char __us
 	//ret = sscanf(buf, "%d", &port);
 	ret = kstrtouint(buf, 10, &port);
 	kfree(buf);
-	if (ret < 1)
+	if (ret != 0)
 		return -EINVAL;
 	anlt_base = HSSISS_CSR_ANLT_BASE + (port * HSSISS_CSR_ANLT_RANGE);
 	d->anlt_data.port = port;

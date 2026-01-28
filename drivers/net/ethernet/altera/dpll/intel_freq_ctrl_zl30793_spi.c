@@ -3,7 +3,7 @@
  * Copyright (C) 2023 Altera Corporation. All rights reserved
  *
  * Contributors:
- *
+ *	Lubana Badakar <lubana.badakar@altera.com>
  */
 
  #include "../intel_freq_control.h"
@@ -20,7 +20,7 @@ static u8 zl30793_page_write(struct spi_device *spi, u16 *dma_safe_buf,
 	/* dev_info(&spi->dev,"%s: pll: page send : 0x%x\n",
 	 * __func__, dma_safe_buf[0]);
 	 */
-	ret = spi_msg_transfer(spi, &dma_safe_buf[0], NULL);
+	ret = spi_msg_transfer(spi, &dma_safe_buf[0], NULL, 2);
 
 	/* dev_info(&spi->dev,"%s: pll: page reply : 0x%x\n",
 	 * __func__, dma_safe_buf[1]);
@@ -46,7 +46,7 @@ u8 zl30793_spi_write(struct spi_device *spi, u16 *dma_safe_buf,
 	/* dev_info(&spi->dev, "%s: pll: send : 0x%x\n",
 	 * __func__, dma_safe_buf[0]);
 	 */
-	ret = spi_msg_transfer(spi, &dma_safe_buf[0], NULL);
+	ret = spi_msg_transfer(spi, &dma_safe_buf[0], NULL, 2);
 
 	return ret;
 }
@@ -69,7 +69,7 @@ u8 zl30793_spi_read(struct spi_device *spi,  u16 *dma_safe_buf,
 	 *__func__,dma_safe_buf[0]);
 	 */
 
-	ret = spi_msg_transfer(spi, &dma_safe_buf[0], &dma_safe_buf[2]);
+	ret = spi_msg_transfer(spi, &dma_safe_buf[0], &dma_safe_buf[2], 2);
 
 	*val = (dma_safe_buf[2] & 0xff);
 	/*dev_info(&spi->dev,"%s: pll: reply val: 0x%x\n",

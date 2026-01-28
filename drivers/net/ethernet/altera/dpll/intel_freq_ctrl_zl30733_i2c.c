@@ -266,9 +266,6 @@ int i2c_dev_check_zl30733_clock(struct intel_freq_control_private *priv)
 		//	rdbuf[0], rdbuf[1]);
 
 		if (((rdbuf[0] << 8) | rdbuf[1]) == ZL30733_ID_VALUE) {
- #ifdef CONFIG_DEBUG_FS
-			zl30733_dbgfs_init(i2c_cli);
- #endif
 			priv->pll_lock_check_ctr = 0;
 			INIT_DELAYED_WORK(&priv->pll_lock_dwork, pll_lock_handler);
 			schedule_delayed_work(&priv->pll_lock_dwork,
@@ -277,4 +274,19 @@ int i2c_dev_check_zl30733_clock(struct intel_freq_control_private *priv)
 	}
 
 	return ret;
+}
+
+void i2c_dev_zl30733_init(struct intel_freq_control_private *priv)
+{
+#ifdef CONFIG_DEBUG_FS
+	priv->pll_debug = zl30733_dbgfs_init(priv->fc_acc_type.i2c_cli);
+#endif
+}
+
+void i2c_dev_zl30733_remove(struct intel_freq_control_private *priv)
+{
+#ifdef CONFIG_DEBUG_FS
+	if(priv->pll_debug)
+		zl30733_dbgfs_remove(priv->pll_debug);
+#endif
 }

@@ -2230,7 +2230,6 @@ static int intel_fpga_xtile_probe(struct platform_device *pdev)
 
 			dev_info(&pdev->dev, "\tfixed link speed:%d full duplex:%d\n",
 				 priv->link_speed, priv->duplex);
-
 			fwnode_handle_put(fixed_node);
 		} else {
 			dev_err(&pdev->dev, "fixed link property undefined\n");
@@ -2376,6 +2375,8 @@ static const struct xtile_spec_ops gts_data = {
 		.reg_ethtool_ops  =
 			intel_fpga_gts_set_ethtool_ops,
 		.check_dts_param = gts_check_dts_param,
+                .check_counter_complete =
+                        gts_check_counter_complete,
 	},
  #endif
 };
