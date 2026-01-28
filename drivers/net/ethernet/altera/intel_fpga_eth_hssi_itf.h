@@ -6,15 +6,15 @@
  *   Preetam Narayan
  */
 
- #ifndef __INTEL_FPGA_ETH_HSSI_ITF_H__
- #define __INTEL_FPGA_ETH_HSSI_ITF_H__
+#ifndef __INTEL_FPGA_ETH_HSSI_ITF_H__
+#define __INTEL_FPGA_ETH_HSSI_ITF_H__
 
- #include <linux/kernel.h>
- #include <linux/platform_device.h>
+#include <linux/kernel.h>
+#include <linux/platform_device.h>
 
- #include "intel_fpga_hssiss.h"
+#include "intel_fpga_hssiss.h"
 
- #define INTEL_FPGA_RET_SUCCESS 0
+#define INTEL_FPGA_RET_SUCCESS 0
 enum lane_speed {
 	LANE_10G,
 	LANE_25G,
@@ -144,11 +144,13 @@ int hssi_set_mtu(struct platform_device *pdev, u32 cmd, void *mtu_data);
 int hssi_get_mtu(struct platform_device *pdev, u32 cmd, void *mtu_data);
 
 int hssi_anlt_enable(struct platform_device *pdev, u32 port);
-
 int hssi_anlt_disable(struct platform_device *pdev, u32 port);
-
 u32 hssi_anlt_get_status(struct platform_device *pdev, u32 port);
 
 int hssi_get_pma_lane_count(struct platform_device *pdev, u32 port);
 int hssi_get_profile_lane_speed(struct platform_device *pdev, u32 port);
- #endif
+void hssi_errpkt_cnt_reset(struct platform_device *pdev, int port);
+u32 hssi_errpkt_cnt_read(struct platform_device *pdev, u32 addr_offs);
+void hssi_errpkt_logic_en(struct platform_device *pdev, int port, bool enable);
+
+#endif

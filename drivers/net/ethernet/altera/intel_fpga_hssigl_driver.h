@@ -5,9 +5,23 @@
  * Contributors:
  *   Preetam Narayan
  *
- */
- #ifndef __INTEL_FPGA_HSSIGL_DRIVER_H__
- #define __INTEL_FPGA_HSSIGL_DRIVER_H__
+*/
+
+#ifndef __INTEL_FPGA_HSSIGL_DRIVER_H__
+#define __INTEL_FPGA_HSSIGL_DRIVER_H__
+
+#define ERR_CNT_RST 6
+
+struct intel_fpga_userspace_reg {
+        u32 control_reg;
+        u32 error_reg;
+        u32 status_reg;
+        u32 fifo_status_reg;
+        u32 p0_packet_err_count;
+        u32 p1_packet_err_count;
+        u32 error_ctrl_reg;
+};
+#define eth_userspace_csroffs(a) (offsetof(struct intel_fpga_userspace_reg, a))
 
 int hssigldrv_probe_init(struct platform_device *pdev);
 int hssigldrv_get_set_csr(struct platform_device *pdev, u32 cmd,
@@ -36,4 +50,8 @@ int hssigldrv_unlock_mac_stats(struct platform_device *pdev,
 			       int port);
 void hssigldrv_reset_port(struct platform_device *pdev,
 			  int port);
+void hssigldrv_err_cnt_reset(struct platform_device *pdev, int port);
+u32 hssigldrv_err_cnt_read(struct platform_device *pdev, u32 addr_offs);
+void hssigldrv_err_cnt_enable(struct platform_device *pdev, int port, bool enable);
+
  #endif

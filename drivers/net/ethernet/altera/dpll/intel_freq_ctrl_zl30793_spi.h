@@ -2,6 +2,7 @@
 /* Copyright (C) 2023 Altera Corporation. All rights reserved.
  *
  * Author(s):
+ *	Lubana Badakar <lubana.badakar@altera.com>
  */
 
  #ifndef HAVE_INTEL_FREQ_CONTROL_ZL30793_SPI_H

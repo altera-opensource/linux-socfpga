@@ -539,18 +539,12 @@ const u16 zl30733_pll_refin_status_reg[] = { 0x102, 0x103, 0x104, 0x105, 0x106,
 
 const u16 zl30733_pll_mode_refsel_reg[] = { 0x284, 0x288, 0x290, 0x294, 0x298, 0x2a0};
 
-struct zarlink_pll_dbg {
-	struct device *dev;
-	struct dentry *dbgfs;
-	u32  readaddr;
-};
-
- #define BUF_SIZE	8192U
+#define BUF_SIZE	8192U
 
 static ssize_t zl30733_dpll_manual_freq_offset_show(struct file *filep, char __user *ubuf,
 						    size_t count, loff_t *offp)
 {
-	struct zarlink_pll_dbg *d = filep->private_data;
+	struct pll_dbg *d = filep->private_data;
 	struct device *dev  = d->dev;
 	int ret = 0, len = 0, i = 0;
 	u8 dpll_df_data[6] = {0};
@@ -587,7 +581,7 @@ zl_dpll_err:
 static ssize_t zl30733_dpll_manual_freq_offset_store(struct file *filep, const char __user *ubuf,
 						     size_t count, loff_t *offp)
 {
-	struct zarlink_pll_dbg *d = filep->private_data;
+	struct pll_dbg *d = filep->private_data;
 	struct device *dev  = d->dev;
 	int ret = 0, i = 0;
 	u8 dpll_df_data[6] = {0};
@@ -635,7 +629,7 @@ zl_dpll_err:
 static ssize_t zl30733_dpll_refinput_status_rd(struct file *filep, char __user *ubuf,
 					       size_t count, loff_t *offp)
 {
-	struct zarlink_pll_dbg *d = filep->private_data;
+	struct pll_dbg *d = filep->private_data;
 	struct device *dev  = d->dev;
 	int ret = 0, len = 0;
 	u8 dpll_refin_status = 0;
@@ -667,7 +661,7 @@ zl_dpll_err:
 static ssize_t zl30733_dpll_refinput_status_wr(struct file *filep, const char __user *ubuf,
 					       size_t count, loff_t *offp)
 {
-	struct zarlink_pll_dbg *d = filep->private_data;
+	struct pll_dbg *d = filep->private_data;
 	int ret = 0;
 	u32 dpll_df_addr = 0;
 	char *buf;
@@ -698,7 +692,7 @@ static ssize_t zl30733_dpll_refinput_status_wr(struct file *filep, const char __
 static ssize_t zl30733_dpll_state_read(struct file *filep, char __user *ubuf,
 				       size_t count, loff_t *offp)
 {
-	struct zarlink_pll_dbg *d = filep->private_data;
+	struct pll_dbg *d = filep->private_data;
 	struct device *dev  = d->dev;
 	int ret = 0, len = 0;
 	u8 dpll_state_status = 0;
@@ -731,7 +725,7 @@ zl_dpll_err:
 static ssize_t zl30733_dpll_state_write(struct file *filep, const char __user *ubuf,
 					size_t count, loff_t *offp)
 {
-	struct zarlink_pll_dbg *d = filep->private_data;
+	struct pll_dbg *d = filep->private_data;
 	int ret = 0;
 	u32 dpll_df_addr = 0;
 	char *buf;
@@ -762,7 +756,7 @@ static ssize_t
 zl30733_reg_dump_show(struct file *filep, char __user *ubuf,
 		      size_t count, loff_t *offp)
 {
-	struct zarlink_pll_dbg *d = filep->private_data;
+	struct pll_dbg *d = filep->private_data;
 	struct device *dev  = d->dev;
 	int ret = 0, i;
 	int wc = 0;
@@ -850,7 +844,7 @@ static ssize_t
 zl30733_synth_freq_wr(struct file *filep, const char __user *ubuf,
 		      size_t count, loff_t *offp)
 {
-	struct zarlink_pll_dbg *d = filep->private_data;
+	struct pll_dbg *d = filep->private_data;
 	struct device *dev  = d->dev;
 	int ret = 0;
 	u8  val;
@@ -896,7 +890,7 @@ static ssize_t
 zl30733_synth_freq_read(struct file *filep, char __user *ubuf,
 			size_t count, loff_t *offp)
 {
-	struct zarlink_pll_dbg *d = filep->private_data;
+	struct pll_dbg *d = filep->private_data;
 	struct device *dev  = d->dev;
 	int ret = 0;
 	int wc = 0;
@@ -973,7 +967,7 @@ static ssize_t
 zl30733_ref_freq_wr(struct file *filep, const char __user *ubuf,
 		    size_t count, loff_t *offp)
 {
-	struct zarlink_pll_dbg *d = filep->private_data;
+	struct pll_dbg *d = filep->private_data;
 	struct device *dev  = d->dev;
 	int ret = 0;
 	u8  val = 0;
@@ -1047,7 +1041,7 @@ const u16 ref_freq_addr[] = {0x144, 0x148, 0x14c, 0x150, 0x154, 0x158, 0x15c, 0x
 static ssize_t zl30733_ref_freq_read(struct file *filep, char __user *ubuf,
 				     size_t count, loff_t *offp)
 {
-	struct zarlink_pll_dbg *d = filep->private_data;
+	struct pll_dbg *d = filep->private_data;
 	struct device *dev  = d->dev;
 	int ret = 0;
 	int wc = 0;
@@ -1085,7 +1079,7 @@ static ssize_t
 zl30733_out_freq_wr(struct file *filep, const char __user *ubuf,
 		    size_t count, loff_t *offp)
 {
-	struct zarlink_pll_dbg *d = filep->private_data;
+	struct pll_dbg *d = filep->private_data;
 	struct device *dev  = d->dev;
 	int ret = 0;
 	struct i2c_client *i2c = to_i2c_client(dev);
@@ -1129,7 +1123,7 @@ zl_dpll_err:
 static ssize_t zl30733_out_freq_read(struct file *filep, char __user *ubuf,
 				     size_t count, loff_t *offp)
 {
-	struct zarlink_pll_dbg *d = filep->private_data;
+	struct pll_dbg *d = filep->private_data;
 	struct device *dev  = d->dev;
 	int ret = 0;
 	int wc = 0;
@@ -1221,11 +1215,9 @@ static const struct file_operations dpll_satus_dbgfs_ops = {
 	.read = zl30733_dpll_state_read
 };
 
-struct zarlink_pll_dbg *zl30733_dbgfs_init(struct i2c_client *i2c_cli)
+struct pll_dbg *zl30733_dbgfs_init(struct i2c_client *i2c_cli)
 {
-	struct zarlink_pll_dbg *d;
-
-	d = devm_kzalloc(&i2c_cli->dev, sizeof(*d), GFP_KERNEL);
+	struct pll_dbg *d = devm_kzalloc(&i2c_cli->dev, sizeof(*d), GFP_KERNEL);
 	if (!d)
 		return NULL;
 
@@ -1244,7 +1236,7 @@ struct zarlink_pll_dbg *zl30733_dbgfs_init(struct i2c_client *i2c_cli)
 	return d;
 }
 
-void zl30733_dbgfs_remove(struct zarlink_pll_dbg *d)
+void zl30733_dbgfs_remove(struct pll_dbg *d)
 {
 	debugfs_remove_recursive(d->dbgfs);
 }

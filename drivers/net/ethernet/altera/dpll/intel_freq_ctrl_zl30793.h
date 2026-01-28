@@ -3,7 +3,7 @@
  * Copyright (C) 2023 Altera Corporation. All rights reserved.
  *
  * Author(s):
- *	Lubana Badakar <lubana.badakar@intel.com>
+ *	Lubana Badakar <lubana.badakar@altera.com>
  */
 
  #ifndef HAVE_INTEL_FREQUENCY_CONTROL_ZL30793_H

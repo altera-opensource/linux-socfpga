@@ -7,10 +7,10 @@
  *   Preetam Narayan
  */
 
- #ifndef __INTEL_FPGA_HSSISS_H__
- #define __INTEL_FPGA_HSSISS_H__
+#ifndef __INTEL_FPGA_HSSISS_H__
+#define __INTEL_FPGA_HSSISS_H__
 
- #include <linux/io.h>
+#include <linux/io.h>
 
 enum hssiss_salcmd {
 	SAL_NOP,
@@ -46,11 +46,13 @@ enum hssiss_mac_stat_counter_type {
 	MACSTAT_TX_DISCARDS,
 	MACSTAT_TX_UNICAST,
 	MACSTAT_TX_MULTICAST,
+	MACSTAT_TX_PTP_CTRL,
 	MACSTAT_TX_BROADCAST,
 	MACSTAT_ETHER_DROPS,
 	MACSTAT_RX_TOTAL_BYTES,
 	MACSTAT_RX_TOTAL_PACKETS,
 	MACSTAT_RX_UNDERSIZE,
+	MACSTAT_RX_PTP_CTRL,
 	MACSTAT_RX_OVERSIZE,
 	MACSTAT_RX_64_BYTES,
 	MACSTAT_RX_65_127_BYTES,
@@ -314,7 +316,7 @@ struct hssiss_csr_v5_only {
 	u32 feature_csr_size_msb;		//0x24
 };
 
- #define feature_offs(x) (offsetof(struct hssiss_csr_v5_only, x))
+#define feature_offs(x) (offsetof(struct hssiss_csr_v5_only, x))
 
 enum access_type {
 	BYTE_ACCESS,
@@ -334,7 +336,7 @@ struct hssiss_sysfs_data {
 struct hssiss_dbg;
 struct hssiss_private {
 	struct device *dev;
-
+	u32 scratch;
 	/* HSSI SS CSR address space */
 	void __iomem *sscsr;
 	/* Transceiver specific address space if any */
@@ -354,9 +356,9 @@ struct hssiss_private {
 	struct hssiss_sysfs_data sysfs;
 	struct cold_reset_register cold_rst_reg;
 	int hssi_err_wa;
- #ifdef CONFIG_DEBUG_FS
+#ifdef CONFIG_DEBUG_FS
 	struct hssiss_dbg *dbgfs;
- #endif
+#endif
 	void *dev_specific;
 };
 
@@ -385,10 +387,14 @@ u32 hssiss_anlt_get_status(struct platform_device *pdev, int port);
 u32 hssiss_anlt_get_cfg(struct platform_device *pdev, int port);
 u32 hssiss_anlt_get_ext_status(struct platform_device *pdev, int port, int *an_status);
 
- #ifdef CONFIG_DEBUG_FS
+u32 hssiss_usrspace_pkterr_cnt(struct platform_device *pdev, u32 addr_offs);
+void hssiss_usrspace_pkterr_cnt_rst(struct platform_device *pdev, int port);
+void hssiss_usrspace_pkterr_logic_en(struct platform_device *pdev, u32 addr_offs, bool enable);
+
+#ifdef CONFIG_DEBUG_FS
 struct hssiss_dbg *hssiss_dbgfs_init(struct platform_device *pdev);
 void hssiss_dbgfs_remove(struct hssiss_dbg *d);
- #endif /* CONFIG_DEBUG_FS */
+#endif /* CONFIG_DEBUG_FS */
 
- #endif /* __INTEL_FPGA_HSSISS_H__ */
+#endif /* __INTEL_FPGA_HSSISS_H__ */
 

@@ -93,7 +93,7 @@ static void hssigldrv_wrexecute(struct platform_device *pdev,
 
 int hssigldrv_get_set_csr(struct platform_device *pdev, u32 cmd,
 			  void *csr_data,
-			bool rd)
+			  bool rd)
 {
 	u32 addr_offset = 0;
 	struct hssiss_private *priv = platform_get_drvdata(pdev);
@@ -216,6 +216,45 @@ int hssigldrv_enable_disable_loopback(struct platform_device *pdev, u32 cmdid,
 void hssigldrv_reset_port(struct platform_device *pdev, int port)
 {
 	struct hssiss_private *priv = platform_get_drvdata(pdev);
+	void __iomem *base = priv->usrcsr;
+	u32 addr_offs;
 
-	priv->spec_ops->dev_ops->reset_port(pdev, port);
+	addr_offs = eth_userspace_csroffs(control_reg);
+
+	tse_clear_bit(base, addr_offs, (1 << port));
+}
+
+void hssigldrv_err_cnt_reset(struct platform_device *pdev, int port)
+{
+	struct hssiss_private *priv = platform_get_drvdata(pdev);
+	void __iomem *base = priv->usrcsr;
+	u32 addr_offs;
+
+	addr_offs = eth_userspace_csroffs(control_reg);
+
+	tse_clear_bit(base, addr_offs, (1 << (ERR_CNT_RST + port)));
+
+	tse_set_bit(base, addr_offs, (1 << (ERR_CNT_RST + port)));
+}
+
+void hssigldrv_err_cnt_enable(struct platform_device *pdev, int port, bool enable)
+{
+	struct hssiss_private *priv = platform_get_drvdata(pdev);
+	void __iomem *base = priv->usrcsr;
+	u32 addr_offs;
+
+	addr_offs = eth_userspace_csroffs(error_ctrl_reg);
+
+	if (enable)
+		tse_set_bit(base, addr_offs, (u8)(1 << port));
+	else
+		tse_clear_bit(base, addr_offs, (u8)(1 << port));
+}
+
+u32 hssigldrv_err_cnt_read(struct platform_device *pdev, u32 addr_offs)
+{
+	struct hssiss_private *priv = platform_get_drvdata(pdev);
+	void __iomem *base = priv->usrcsr;
+
+	return csrrd32(base, addr_offs);
 }

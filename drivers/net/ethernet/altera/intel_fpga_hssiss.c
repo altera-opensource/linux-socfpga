@@ -221,6 +221,32 @@ u32 hssiss_anlt_get_ext_status(struct platform_device *pdev, int port, int *an_s
 	return 0;
 }
 
+u32 hssiss_usrspace_pkterr_cnt(struct platform_device *pdev, u32 addr_offs)
+{
+	struct hssiss_private *priv = platform_get_drvdata(pdev);
+
+	if (priv->spec_ops->ops->usrspace_pkterr_cnt)
+		return priv->spec_ops->ops->usrspace_pkterr_cnt(pdev, addr_offs);
+
+	return ~0;
+}
+
+void hssiss_usrspace_pkterr_logic_en(struct platform_device *pdev, u32 addr_offs, bool enable)
+{
+	struct hssiss_private *priv = platform_get_drvdata(pdev);
+
+	if (priv->spec_ops->ops->usrspace_pkterr_logic_en)
+		priv->spec_ops->ops->usrspace_pkterr_logic_en(pdev, addr_offs, enable);
+}
+
+void hssiss_usrspace_pkterr_cnt_rst(struct platform_device *pdev, int port)
+{
+	struct hssiss_private *priv = platform_get_drvdata(pdev);
+
+	if (priv->spec_ops->ops->usrspace_pkterr_cnt_rst)
+		priv->spec_ops->ops->usrspace_pkterr_cnt_rst(pdev, port);
+}
+
 static int execute_sal_cmd(struct platform_device *pdev,
 			   enum hssiss_salcmd cmd, void *data)
 {
@@ -392,6 +418,9 @@ static struct hssi_gen_ops nonhssi_gen_ops = {
 	.unlock_mac_stats = hssigldrv_unlock_mac_stats,
 	.enable_disable_loopback = hssigldrv_enable_disable_loopback,
 	.reset_port = hssigldrv_reset_port,
+	.usrspace_pkterr_cnt = hssigldrv_err_cnt_read,
+	.usrspace_pkterr_cnt_rst = hssigldrv_err_cnt_reset,
+	.usrspace_pkterr_logic_en = hssigldrv_err_cnt_enable,
 };
 
 struct hssi_spec_ops nonhssi_xtile_data = {

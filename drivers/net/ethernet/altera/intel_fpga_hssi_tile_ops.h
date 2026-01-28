@@ -46,6 +46,9 @@ struct hssi_gen_ops {
 	u32 (*anlt_get_cfg)(struct platform_device *pdev, int port);
 	u32 (*anlt_get_ext_status)(struct platform_device *pdev, int port, int *an_status);
 	int (*anlt_update)(struct platform_device *pdev, int port, bool enable_anlt);
+	u32 (*usrspace_pkterr_cnt)(struct platform_device *pdev, u32 addr_offs);
+	void (*usrspace_pkterr_cnt_rst)(struct platform_device *pdev, int port);
+	void (*usrspace_pkterr_logic_en)(struct platform_device *pdev, int port, bool enable);
 };
 
 struct hssi_dev_ops {

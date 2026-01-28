@@ -66,6 +66,8 @@
  #define ZL30733_LOCK_CHECK_INTERVAL_IN_MS (500)
  #define ZL30733_DPLL_IS_LOCKED(data)      ((data) & 0x01)
  #define ZL30733_MAX_PLL_LOCK_CHECK_COUNTER      (200)
+void i2c_dev_zl30733_init(struct intel_freq_control_private *priv);
+void i2c_dev_zl30733_remove(struct intel_freq_control_private *priv);
 int i2c_dev_check_zl30733_clock(struct intel_freq_control_private *priv);
 
 void intel_freq_control_zl30733(struct work_struct *work);

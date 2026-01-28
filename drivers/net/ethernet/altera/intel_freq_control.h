@@ -4,8 +4,8 @@
  * Copyright (C) 2017-2023 Altera Corporation. All rights reserved.
  *
  * Author(s):
- *	Markos Papadonikolakis <markos.papadonikolakis@intel.com>
- *	Lubana Badakar <lubana.badakar@intel.com>
+ *	Markos Papadonikolakis <markos.papadonikolakis@altera.com>
+ *	Lubana Badakar <lubana.badakar@altera.com>
  */
 
  #ifndef HAVE_INTEL_FREQ_CONTROL_H
@@ -50,17 +50,26 @@ struct intf_type {
 	struct spi_device *spi_dev;
 };
 
-struct zarlink_pll_dbg;
+struct pll_dbg {
+	struct device *dev;
+	struct dentry *dbgfs;
+	u32  readaddr;
+};
+
 struct xtile_intf_ops {
+	void (*init_handler)(struct intel_freq_control_private *priv);
 	int (*client_validator)(struct clock_cleaner *cc);
 	void (*clock_cleaner)(struct work_struct *ws);
 	int (*clock_check)(struct intel_freq_control_private *fq);
+	bool (*clock_pre_modify_check)(struct intel_freq_control_private *fq,
+				       long scaled_ppm);
 	int (*reset_pll_state)(struct intel_freq_control_private *priv);
-	void (*shutdown_handler)(struct zarlink_pll_dbg *d);
+	void (*shutdown_handler)(struct intel_freq_control_private *priv);
 };
 
 struct intel_freq_control_private {
 	u32 step_size;
+	long scaled_ppm_programmed;
 	struct freq_work queued_work;
 	struct intf_type fc_acc_type;
 	struct xtile_intf_ops  *intf_ops;
@@ -68,7 +77,7 @@ struct intel_freq_control_private {
 	struct ptp_freq_ctrl_info freqctrl_ops;
 	struct delayed_work pll_lock_dwork;
 	int pll_lock_check_ctr;
-	struct zarlink_pll_dbg *pll_dbg;
+	struct pll_dbg *pll_debug;
 };
 
 void schedule_pll_lock_check(struct intel_freq_control_private *priv);

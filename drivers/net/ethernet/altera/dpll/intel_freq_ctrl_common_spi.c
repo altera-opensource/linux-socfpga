@@ -12,10 +12,10 @@
 
 static int spi_dev_check(struct device *dev, void *data)
 {
+	int idx;
 	int ret = INTEL_FPGA_SPI_SUCCESS;
 	struct spi_device *spi = to_spi_device(dev);
-	struct clock_cleaner *clockcleaner_info =
-				(struct clock_cleaner *)data;
+	struct clock_cleaner *clockcleaner_info = (struct clock_cleaner *)data;
 
 	struct intel_freq_control_private *priv =
 		container_of(clockcleaner_info,
@@ -23,14 +23,31 @@ static int spi_dev_check(struct device *dev, void *data)
 			     clockcleaner_info);
 
 	if (!clockcleaner_info || !spi) {
-		dev_err(&spi->dev, "NULL check (%s) failed\n",
-			dev_name(dev));
+		dev_err(&spi->dev, "NULL check (%s) failed\n", dev_name(dev));
 		ret = INTEL_FPGA_SPI_ERROR;
 		goto spi_client_ret;
 	}
 
-	if ((clockcleaner_info->bus_num != spi->controller->bus_num) ||
-	    (clockcleaner_info->chip_select != spi_get_chipselect(spi, 0))) {
+	if (clockcleaner_info->bus_num != spi->controller->bus_num) {
+		ret = INTEL_FPGA_SPI_ERROR;
+		goto spi_client_ret;
+	}
+
+	for (idx = 0; idx < SPI_CS_CNT_MAX; idx++) {
+		if (spi->cs_index_mask & BIT(idx)) {
+			if (clockcleaner_info->chip_select ==
+			    spi_get_chipselect(spi, idx)) {
+				dev_info(&spi->dev,
+					 "found valid chip select %d",
+					 clockcleaner_info->chip_select);
+				break;
+			}
+		}
+	}
+
+	if (idx == SPI_CS_CNT_MAX) {
+		dev_err(&spi->dev, "valid chip select %d not found",
+			clockcleaner_info->chip_select);
 		ret = INTEL_FPGA_SPI_ERROR;
 		goto spi_client_ret;
 	}
@@ -70,10 +87,10 @@ int determine_spi_client(struct clock_cleaner *clockcleaner_info)
 			       spi_dev_check);
 
 	/* case can happen that the spi bus is not registered yet */
-	if (ret > 0) {
+	if (ret > 0)
 		ret = FREQ_CTRL_ERROR_SUCCESS;
-		goto err;
-	}
+	else
+		ret = FREQ_CTRL_ERROR_FAIL;
 
 err:
 	return ret;
@@ -86,7 +103,7 @@ err:
  * @param parameter3 is the rx buffer pointeri
  * @return success state of the transfer to spi device
  */
-u8 spi_msg_transfer(struct spi_device *spi, void *tx_buf, void *rx_buf)
+u8 spi_msg_transfer(struct spi_device *spi, void *tx_buf, void *rx_buf, u8 len)
 {
 	u8 ret;
 	struct spi_transfer x;
@@ -95,7 +112,7 @@ u8 spi_msg_transfer(struct spi_device *spi, void *tx_buf, void *rx_buf)
 	spi_message_init(&spi_message);
 
 	memset(&x, 0, sizeof(x));
-	x.len = 2;
+	x.len = len;
 	x.tx_buf = tx_buf;
 	x.rx_buf = rx_buf;
 

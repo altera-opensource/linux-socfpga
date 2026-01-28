@@ -4,8 +4,7 @@
  *
  * Contributors:
  *   Preetam Narayan
-*/
-
+ */
 #ifndef __INTEL_FPGA_SM_ETH_H__
 #define __INTEL_FPGA_SM_ETH_H__
 
@@ -36,27 +35,21 @@
 #define ETH_RX_CNTR_CFG_RST_PARITY_ERR                          BIT(1)
 
 #define ETH_ASSERT_PMA_SER_LBK_EN    0x6A340
-#define ETH_ASSERT_PMA_SER_LBK_DIS   0x0A040
+#define ETH_ASSERT_PMA_SER_LBK_DIS   0x0A340
 #define ETH_DEASSERT_PMA_SER_LBK_EN  0x62340
-#define ETH_DEASSERT_PMA_SER_LBK_DIS 0x02040
-#define ETH_SOFT_RST_ACK  BIT(0)
+#define ETH_DEASSERT_PMA_SER_LBK_DIS 0x02340
+#define ETH_SOFT_RX_RST_ACK  BIT(2)
 #define ETH_SOFT_RX_RESET BIT(2)
-#define ETH_ASSERT_PMA_SER_LBK_ACK GENMASK(15, 14)
-#define ETH_DEASSERT_PMA_SER_LBK_ACK ETH_ASSERT_PMA_SER_LBK_ACK
-#define ETH_DEASSERT_PMA_SER_LBK_DONE 0
+#define ETH_ASSERT_PMA_SER_LBK_ACK	    GENMASK(15, 14)
+#define ETH_DEASSERT_PMA_SER_LBK_ACK	    GENMASK(15, 14)
+#define ETH_SERV_REQ_NO_RESET		    BIT(15)
+#define ETH_NO_SERV_NO_RESET		    0
 #define ETH_ENABLE_FEC_LOOPBACK	    BIT(1)
 #define ETH_ENABLE_XCVRIF_LOOPBACK	    BIT(0)
-#define ETH_ENABLE_MAC_LOOPBACK             GENMASK(3, 2)
-#define ETH_ENABLE_NEAREND_PAR_PMA_LOOPBACK BIT(22)
+#define ETH_ENABLE_MAC_LOOPBACK             BIT(2)
+#define ETH_ENABLE_NEAREND_PAR_PMA_LOOPBACK BIT(8)
 #define ETH_ENABLE_NEAREND_PCS_LOOPBACK     GENMASK(18, 16)
 #define ETH_ENABLE_FAREND_PCS_LOOPBACK      GENMASK(15, 13)
-
-#define ETH_DISABLE_FEC_LOOPBACK	    BIT(1)
-#define ETH_DISABLE_XCVRIF_LOOPBACK	    BIT(0)
-#define ETH_DISABLE_MAC_LOOPBACK	    GENMASK(3, 2)
-#define ETH_DISBLE_NEAREND_PAR_PMA_LOOPBACK BIT(22)
-#define ETH_DISABLE_NEAREND_PCS_LOOPBACK    GENMASK(18, 16)
-#define ETH_DISABLE_FAREND_PCS_LOOPBACK     GENMASK(15, 13)
 
 #define ETH_FREEZE_RX_MAC_STATS	BIT(2)
 #define ETH_FREEZE_TX_MAC_STATS	BIT(2)
@@ -73,7 +66,56 @@
 /* Flow Control Feature Configuration */
 #define ETH_TX_EN_STD_FLOW_CTRL                                 BIT(0)
 #define ETH_RX_EN_STD_FLOW_CTRL                                 BIT(0)
+#define ETH_TX_EN_PRIORITY_FLOW_CTRL                            BIT(1)
 
+/* 0x081C: Time Value Control*/
+#define ETH_TX_TAM_SNAPSHOT                                     BIT(0)
+#define ETH_RX_TAM_SNAPSHOT                                     BIT(1)
+
+/* 0x0820: TX TAM Lower */
+#define ETH_TX_TAM_LO_FRAC_NS                                   0xFFFF
+#define ETH_TX_TAM_LO_NS                                        (0xFFFF << 16)
+
+/* 0x0824: TX TAM Upper */
+#define ETH_TX_TAM_HI_NS                                        0xFFFF
+
+/* 0x0824: TX TAM Count / valid */
+#define ETH_TX_TAM_CNT_SHIFT                                    16
+#define ETH_TX_TAM_CNT_MASK                                     (0x7FFF << 16)
+#define ETH_TX_TAM_VALID                                        BIT(31)
+/* 0x0828: RX TAM Lower */
+#define ETH_RX_TAM_LO_FRAC_NS                                   0xFFFF
+#define ETH_RX_TAM_LO_NS                                        (0xFFFF << 16)
+
+/* 0x082C: RX TAM Upper */
+#define ETH_RX_TAM_HI_NS                                        0xFFFF
+
+/* 0x082C: RX TAM Count / valid */
+#define ETH_RX_TAM_CNT_SHIFT                                    16
+#define ETH_RX_TAM_CNT_MASK                                     (0x7FFF << 16)
+#define ETH_RX_TAM_VALID                                        BIT(31)
+
+#define INTEL_FPGA_GTS_UI_VALUE_10G                   0x018D3019 // 10G-1
+#define INTEL_FPGA_GTS_UI_VALUE_25G                   0x009EE00A // 25G-1
+#define INTEL_FPGA_TX_PMA_DELAY_10G			79
+#define INTEL_FPGA_TX_PMA_DELAY_25G			INTEL_FPGA_TX_PMA_DELAY_10G
+#define INTEL_FPGA_RX_PMA_DELAY_10G                     88
+#define INTEL_FPGA_RX_PMA_DELAY_25G                     INTEL_FPGA_RX_PMA_DELAY_10G
+
+
+#define INTEL_FPGA_GTS_ETH_RATE_10G_25G   		0 // 10G / 25G
+#define ETH_TX_PTP_OFFSET_DATA_VALID                    BIT(0)
+#define ETH_RX_PTP_OFFSET_DATA_VALID                    BIT(1)
+
+#define ETH_PTP_TX_USER_CFG_DONE                         BIT(0)
+#define ETH_PTP_RX_USER_CFG_DONE                         BIT(0)
+#define ETH_TX_PTP_READY                                 BIT(2)
+#define ETH_RX_PTP_READY                                 BIT(3)
+#define ETH_PHY_RX_PCS_ALIGNED                           BIT(0)
+#define ETH_PHY_RX_PCS_BITSLIP_CNT                       0x0000007F
+#define ETH_PHY_RX_PCS_DLPULSE_ALIGNED                   BIT(7)
+
+/* offset at 0x100 + port * 0x200000 */
 struct intel_fpga_gts_eth_softip_csr {
 	u32 gui_option; //0x100
 	u32 qhip_scratch; //0x104
@@ -97,11 +139,12 @@ struct intel_fpga_gts_eth_softip_csr {
 
  #define eth_soft_csroffs(a) (offsetof(struct intel_fpga_gts_eth_softip_csr, a))
 
+/* offset at 0x800  + port * 0x200000 */
 struct intel_fpga_gts_eth_softip_ptp {
 	u32 ptp_tx_tam_adjust; //0x800
 	u32 ptp_rx_tam_adjust; //0x804
-	u32 res1[2];
-	u32 ptp_ref_lane; //0x80C
+	u32 res1;              //0x808
+	u32 ptp_ref_lane;      //0x80C
 	u32 ptp_dr_cfg; //0x810
 	u32 ptp_tx_user_cfg_status; //0x814
 	u32 ptp_rx_user_cfg_status; //0x818
@@ -111,12 +154,12 @@ struct intel_fpga_gts_eth_softip_ptp {
 	u32 ptp_rx_uim_tam_info0; //0x828
 	u32 ptp_rx_uim_tam_info1; //0x82C
 	u32 ptp_status; //0x830
-	u32 res2[3];
+	u32 res2[3];    //0x834, 0x838, 0x83C
 	u32 ptp_status2; //0x840
-	u32 res3[43];
+	u32 res3[43];   //0x844 ... 0x8EC
 	u32 ptp_tx_lane_calc_data_constdelay; //0x8F0
 	u32 ptp_rx_lane_calc_data_constdelay; //0x8F4
-	u32 res4[3];
+	u32 res4[2];    //0x8F8, 0x8FC
 	u32 ptp_tx_lane0_calc_data_offset; //0x900
 	u32 ptp_rx_lane0_calc_data_offset; //0x904
 	u32 ptp_tx_lane0_calc_data_time; //0x908
@@ -124,67 +167,69 @@ struct intel_fpga_gts_eth_softip_ptp {
 	u32 ptp_tx_lane0_calc_data_wiredelay; //0x910
 	u32 ptp_rx_lane0_calc_data_wiredelay; //0x914
 };
-
 #define eth_softip_ptp_csroffs(a) (offsetof(struct intel_fpga_gts_eth_softip_ptp, a))
 
+/* offset at 0x51000 + port * 0x200000 */
 struct intel_fpga_gts_pcs_fec {
-	u32 res1[0x3BFF];                  // 0x51000 - 0x60000 (reserved)
-	u32 config_ctrl;		   // 0x60000
-	u32 res2[2];
-	u32 tx_pld_conf;		   // 0x60010
-	u32 res3[0xD];
-	u32 phy_ehip_pcs_modes;            // 0x60048
-	u32 res4[0x9];                     // 0x6004C - 0x6006F (reserved)
-	u32 xus_timer_window;              // 0x60070
-	u32 ber_invalid_count;             // 0x60074
-	u32 err_inj;                       // 0x60078
-	u32 res5;                          // 0x6007C (reserved)
-	u32 phy_frame_error;               // 0x60080
-	u32 phy_rxpcs_status;              // 0x60084
-	u32 am_lock;                       // 0x60088
-	u32 res6;                          // 0x6008C (reserved)
-	u32 ber_count;                     // 0x60090
-	u32 res7[0x18];                    // 0x60094 - 0x600F3 (reserved)
-	u32 err_block_cnt;                 // 0x600F4
-	u32 res8[0x3FC2];                  // 0x600F8 - 0x6FFFF (reserved)
-	u32 rsfec_tx_top;                  // 0x70000
-	u32 res9[2];                       // 0x70004 - 0x7000B (reserved)
-	u32 rsfec_lane_cfg0;               // 0x7000C
+	// 0x51000 - 0x60000 (reserved)
+	u32 res1[0x3C00];                   // (0x60000 - 0x51000)/4 = 0xF000/4 = 0x3C00
+
+	u32 config_ctrl;                    // 0x60000
+	u32 res2[2];                        // 0x60004 - 0x6000B (reserved)
+	u32 tx_pld_conf;                    // 0x6000C
+	u32 res3[13];                       // 0x60010 - 0x60043 (reserved)
+	u32 phy_ehip_pcs_modes;             // 0x60044
+	u32 res4[10];                       // 0x60048 - 0x6006C (reserved)
+	u32 xus_timer_window;               // 0x60070
+	u32 ber_invalid_count;              // 0x60074
+	u32 err_inj;                        // 0x60078
+	u32 res5;                           // 0x6007C (reserved)
+	u32 phy_frame_error;                // 0x60080
+	u32 phy_rxpcs_status;               // 0x60084
+	u32 am_lock;                        // 0x60088
+	u32 res6;                           // 0x6008C (reserved)
+	u32 ber_count;                      // 0x60090
+	u32 res7[24];                       // 0x60094 - 0x600F3 (reserved)
+	u32 err_block_cnt;                  // 0x600F4
+	u32 res8[0x3FC2];                   // 0x600F8 - 0x6FFFF (reserved)
+	u32 rsfec_tx_top;                   // 0x70000
+	u32 res9[2];                        // 0x70004 - 0x7000B (reserved)
+	u32 rsfec_lane_cfg0;                // 0x7000C
 	u32 res10[6];                       // 0x70010 - 0x70027 (reserved)
-	u32 rsfec_err_inj_tx;              // 0x70028
-	u32 res11[76];                      // 0x7002C - 0x70203 (reserved)
-	u32 rsfec_lane_tx_stat;            // 0x70204
-	u32 rsfec_lane_tx_hold;            // 0x70208
-	u32 res12;                         // 0x7020C (reserved)
-	u32 rsfec_lane_rx_stat;            // 0x70210
-	u32 rsfec_lane_rx_hold;            // 0x70214
-	u32 res13[6];                      // 0x70218 - 0x7022F (reserved)
-	u32 rsfec_cw_pos_rx;               // 0x70230
-	u32 res14;                         // 0x70234 (reserved)
-	u32 rsfec_err_val_tx;              // 0x70238
-	u32 rsfec_corr_cw_cnt_lo;          // 0x7023C
-	u32 rsfec_corr_cw_cnt_hi;          // 0x70240
-	u32 rsfec_uncorr_cw_cnt_lo;        // 0x70244
-	u32 rsfec_uncorr_cw_cnt_hi;        // 0x70248
-	u32 rsfec_corr_syms_cnt_lo;        // 0x7024C
-	u32 rsfec_corr_syms_cnt_hi;        // 0x70250
-	u32 rsfec_corr_0s_cnt_lo;          // 0x70254
-	u32 rsfec_corr_0s_cnt_hi;          // 0x70258
-	u32 rsfec_corr_1s_cnt_lo;          // 0x7025C
-	u32 rsfec_corr_1s_cnt_hi;          // 0x70260
-	u32 rsfec_corr_cwbin_cnt_0_1;      // 0x70264
-	u32 rsfec_corr_cwbin_cnt_2_3;      // 0x70268
-	u32 rsfec_corr_cwbin_cnt_4_5;      // 0x7026C
-	u32 rsfec_corr_cwbin_cnt_6_7;      // 0x70270
-	u32 rsfec_corr_cwbin_cnt_8_9;      // 0x70274
-	u32 rsfec_corr_cwbin_cnt_10_11;    // 0x70278
-	u32 rsfec_debug_cfg;               // 0x7027C
+	u32 rsfec_err_inj_tx;               // 0x70028
+	u32 res11[11];                      // 0x7002C - 0x70203 (reserved)
+	u32 rsfec_lane_tx_stat;             // 0x70204
+	u32 rsfec_lane_tx_hold;             // 0x70208
+	u32 res12;                          // 0x7020C (reserved)
+	u32 rsfec_lane_rx_stat;             // 0x70210
+	u32 rsfec_lane_rx_hold;             // 0x70214
+	u32 res13[6];                       // 0x70218 - 0x7022B (reserved)
+	u32 rsfec_cw_pos_rx;                // 0x70230
+	u32 res14;                          // 0x70234 (reserved)
+	u32 rsfec_err_val_tx;               // 0x70238
+	u32 rsfec_corr_cw_cnt_lo;           // 0x7023C
+	u32 rsfec_corr_cw_cnt_hi;           // 0x70240
+	u32 rsfec_uncorr_cw_cnt_lo;         // 0x70244
+	u32 rsfec_uncorr_cw_cnt_hi;         // 0x70248
+	u32 rsfec_corr_syms_cnt_lo;         // 0x7024C
+	u32 rsfec_corr_syms_cnt_hi;         // 0x70250
+	u32 rsfec_corr_0s_cnt_lo;           // 0x70254
+	u32 rsfec_corr_0s_cnt_hi;           // 0x70258
+	u32 rsfec_corr_1s_cnt_lo;           // 0x7025C
+	u32 rsfec_corr_1s_cnt_hi;           // 0x70260
+	u32 rsfec_corr_cwbin_cnt_0_1;       // 0x70264
+	u32 rsfec_corr_cwbin_cnt_2_3;       // 0x70268
+	u32 rsfec_corr_cwbin_cnt_4_5;       // 0x7026C
+	u32 rsfec_corr_cwbin_cnt_6_7;       // 0x70270
+	u32 rsfec_corr_cwbin_cnt_8_9;       // 0x70274
+	u32 rsfec_corr_cwbin_cnt_10_11;     // 0x70278
+	u32 rsfec_debug_cfg;                // 0x7027C
 };
+ #define eth_hardip_pcsfec_csroffs(a) (offsetof(struct intel_fpga_gts_pcs_fec, a))
 
-#define eth_hardip_pcsfec_csroffs(a) (offsetof(struct intel_fpga_gts_pcs_fec, a))
-
+/* offset start at 0x40000 + port * 0x200000 */
 struct intel_fpga_gts_hardip_ptp {
-	u32 res1[0x40020 / 4 - 1]; // Reserved fields up to offset 0x40020
+	u32 res1[(0x40020 - 0x40000) / 4];      // Reserved fields up to offset 0x40020
 	u32 ptp_clk_mux;            // 0x40020
 	u32 cfg_tx_ptp0_p2p0;       // 0x40024
 	u32 cfg_tx_ptp0_p2p1;       // 0x40028
@@ -442,12 +487,13 @@ struct intel_fpga_gts_hardip_ptp {
 	u32 cfg_tx_ptp0_asm125; //0x40418
 	u32 cfg_tx_ptp0_asm126; //0x4041C
 	u32 cfg_tx_ptp0_asm127; //0x40420
-	u32 res2[(0x407F8 - 0x40424) / 4 - 1]; // Reserved fields up to offset 0x407F8
+	u32 res2[(0x407F8 - 0x40424) / 4]; // Reserved fields up to offset 0x407F8
 	u32 ptp_rx_mux;              // 0x407F8
 };
 
  #define eth_hardip_ptp_csroffs(a) (offsetof(struct intel_fpga_gts_hardip_ptp, a))
 
+/* offset start at 0x50000 + port * 0x200000 */
 struct intel_fpga_gts_hardip_emac {
 	u32 link_fault_config; //0x50000
 	u32 ipg_col_rem; //0x50004
@@ -519,7 +565,7 @@ struct intel_fpga_gts_hardip_emac {
 	u32 cntr_tx_fcs_lo; //0x50210
 	u32 res10[1];
 	u32 cntr_tx_fcs_err_okpkt_lo; //0x50218
-	u32 rev11[1];
+	u32 res11[1];
 	u32 cntr_tx_mcast_data_err_lo; //0x50220
 	u32 res12[1];
 	u32 cntr_tx_bcast_data_err_lo; //0x50228
@@ -680,82 +726,93 @@ struct intel_fpga_gts_hardip_emac {
 	u32 rx_ts_ss_lo; //0x5066C
 	u32 rx_ts_ss_mid; //0x50670
 	u32 rx_ts_ss_hi; //0x50674
+	u32 res46[0x3EA7]; // 0x50678 - 0x6010F (reserved)
+	u32 phy_rx_bitslip_cnt;  // 0x60110
+
 };
 
-#define eth_hardip_emac_csroffs(a) (offsetof(struct intel_fpga_gts_hardip_emac, a))
+ #define eth_hardip_emac_csroffs(a) (offsetof(struct intel_fpga_gts_hardip_emac, a))
 
+/* offset start at 0x80000 + port * 0x200000 */
 struct intel_fpga_gts_hardip_xcvr_pma {
-	u32 res0[7];
-	u32 sm_xcvrif_debug1; //0x80020
-	u32 sm_xcvrif_reg_9; //0x80024
-	u32 res1[4];
-	u32 xcvrif_stat_0; //0x8003C
-	u32 xcvrif_stat_hold_1; //0x80040
-	u32 res2[2];
-	u32 xcvrif_stat_3; //0x8004C
-	u32 xcvrif_stat_hold_4; //0x80050
+	u32 res0[(0x80020 - 0x80000) / 4];
+	u32 sm_xcvrif_debug1;      // 0x80020
+	u32 sm_xcvrif_reg_9;       // 0x80024
+	u32 res1[(0x8003C - 0x80028) / 4];
+	u32 xcvrif_stat_0;         // 0x8003C
+	u32 xcvrif_stat_hold_1;    // 0x80040
+	u32 res2[(0x8004C - 0x80044) / 4];
+	u32 xcvrif_stat_3;         // 0x8004C
+	u32 xcvrif_stat_hold_4;    // 0x80050
 };
 
  #define eth_hardip_xcvr_pma_csroffs(a) (offsetof(struct intel_fpga_gts_hardip_xcvr_pma, a))
 
-struct intel_fpga_gts_softip_pma_phy {
+/* offset start at 0x800 + port * 0x200000 */
+struct intel_fpga_gts_softip_phy {
 	u32 gui_option; //0x800
-	u32 phy_tx_pll_locked; //0x810
-	u32 phy_rx_cdr_locked; //0x814
+	u32 phy_scratch; //0x804
 	u32 phy_reset; //0x808
 	u32 phy_reset_status; //0x80C
+	u32 phy_tx_pll_locked; //0x810
+	u32 phy_rx_cdr_locked; //0x814
 	u32 src_ctrl; //0x818
+	u32 res1[0x3E01]; // 0x81C - 0x10017 (reserved)
 	u32 src_user_reg0; //0x10018
-	u32 phy_scratch; //0x804
 };
 
+ #define eth_softip_phy_csroffs(a) (offsetof(struct intel_fpga_gts_softip_phy, a))
+
+/* offset at 0x90000 + port * 0x200000 */
 struct intel_fpga_gts_hardip_pma {
-	u32 res1[0x1D0];
-	u32 SRDS_IP_SYNTH_MED_reg_16; //0x90740
-	u32 SRDS_IP_SYNTH_MED_reg_17; //0x90744
-	u32 res2[0x3E];
-	u32 SRDS_IP_SYNTH_SLOW_reg_16; //0x90840
-	u32 SRDS_IP_SYNTH_SLOW_reg_17; //0x90844
-	u32 res3[0x53];
-	u32 SRDS_IP_SYNTH_FAST_reg_37; //0x90994
-	u32 SRDS_IP_SYNTH_FAST_reg_38; //0x90998
-	u32 res4[0x29F];
-	u32 SRDS_IP_LANE_reg_7; //0x91418
-	u32 res5;
-	u32 SRDS_IP_LANE_reg_9; //0x91420
-	u32 res6;
-	u32 SRDS_IP_LANE_reg_11; //0x91428
-	u32 res7[0x62];
-	u32 SRDS_IP_LANE_reg_110; //0x915B4
-	u32 res8[0x66];
-	u32 SRDS_IP_LANE_reg_213; //0x91750
-	u32 res9[0x70];
-	u32 SRDS_IP_LANE_RXEQ_reg_5; //0x91914
-	u32 res10[0xA8];
-	u32 SRDS_IP_LANE_RXEQ_reg_174; //0x91BB8
-	u32 res11[0x911];
-	u32 SRDS_IP_PLLLCSLOW_DIV0; //0x94000
-	u32 res12[0x2];
-	u32 SRDS_IP_PLLLCSLOW_FRAC_LOCK0; //0x9400C
-	u32 res13[0x3C];
-	u32 SRDS_IP_PLLLCMED_DIV0; //0x94100
-	u32 res14[0x2];
-	u32 SRDS_IP_PLLLCMED_FRAC_LOCK0; //0x9410C
-	u32 res15[0x3C];
-	u32 SRDS_IP_PLLLCFAST_DIV0; //0x94200
-	u32 res16[0x2];
-	u32 SRDS_IP_PLLLCFAST_FRAC_LOCK0; //0x9420C
-	u32 res17[0xD83];
-	u32 SRDS_IP_IF_debug; //0x9781C
-	u32 res18[4];
-	u32 SRDS_IP_IF_TX1; //0x97830
-	u32 res19[0x3202];
-	u32 SCMNG_PM_LINK_MNG_SIDE_CPI_REGS; //0xA403C
-	u32 SCMNG_PM_PHY_SIDE_CPI_REGS; //0xA4040
-	u32 res20[0x3EF];
-	u32 GTS_Physical_LANE_Number; //0xA5000
-	u32 res21[0x10];
-	u32 pre_pma_lblk; //0xA5044
+	u32 res1[(0x90740 - 0x90000) / 4];
+	u32 SRDS_IP_SYNTH_MED_reg_16;         // 0x90740
+	u32 SRDS_IP_SYNTH_MED_reg_17;         // 0x90744
+	u32 res2[(0x90840 - 0x90748) / 4];
+	u32 SRDS_IP_SYNTH_SLOW_reg_16;        // 0x90840
+	u32 SRDS_IP_SYNTH_SLOW_reg_17;        // 0x90844
+	u32 res3[(0x90994 - 0x90848) / 4];
+	u32 SRDS_IP_SYNTH_FAST_reg_37;        // 0x90994
+	u32 SRDS_IP_SYNTH_FAST_reg_38;        // 0x90998
+	u32 res4[(0x91418 - 0x9099C) / 4];
+	u32 SRDS_IP_LANE_reg_7;               // 0x91418
+	u32 res5;                             // 0x9141C (reserved)
+	u32 SRDS_IP_LANE_reg_9;               // 0x91420
+	u32 res6;                             // 0x91424 (reserved)
+	u32 SRDS_IP_LANE_reg_11;              // 0x91428
+	u32 res7[(0x915B4 - 0x9142C) / 4];
+	u32 SRDS_IP_LANE_reg_110;             // 0x915B4
+	u32 res8[(0x916A4 - 0x915B8) / 4];
+	u32 SRDS_IP_LANE_reg_170;             // 0x916A4 (cfg_tx2rxlb_en)
+	u32 res8b[(0x91750 - 0x916A8) / 4];
+	u32 SRDS_IP_LANE_reg_213;             // 0x91750
+	u32 res9[(0x91914 - 0x91754) / 4];
+	u32 SRDS_IP_LANE_RXEQ_reg_5;          // 0x91914
+	u32 res10[(0x91BB8 - 0x91918) / 4];
+	u32 SRDS_IP_LANE_RXEQ_reg_174;        // 0x91BB8
+	u32 res11[(0x94000 - 0x91BBC) / 4];
+	u32 SRDS_IP_PLLLCSLOW_DIV0;           // 0x94000
+	u32 res12[2];                         // 0x94004, 0x94008 (reserved)
+	u32 SRDS_IP_PLLLCSLOW_FRAC_LOCK0;     // 0x9400C
+	u32 res13[(0x94100 - 0x94010) / 4];
+	u32 SRDS_IP_PLLLCMED_DIV0;            // 0x94100
+	u32 res14[2];                         // 0x94104, 0x94108 (reserved)
+	u32 SRDS_IP_PLLLCMED_FRAC_LOCK0;      // 0x9410C
+	u32 res15[(0x94200 - 0x94110) / 4];
+	u32 SRDS_IP_PLLLCFAST_DIV0;           // 0x94200
+	u32 res16[2];                         // 0x94204, 0x94208 (reserved)
+	u32 SRDS_IP_PLLLCFAST_FRAC_LOCK0;     // 0x9420C
+	u32 res17[(0x9781C - 0x94210) / 4];
+	u32 SRDS_IP_IF_debug;                 // 0x9781C
+	u32 res18[4];                         // 0x97820, 0x97824, 0x97828, 0x9782C (reserved)
+	u32 SRDS_IP_IF_TX1;                   // 0x97830
+	u32 res19[(0xA403C - 0x97834) / 4];	  // 0x97834..0xA403C
+	u32 SCMNG_PM_LINK_MNG_SIDE_CPI_REGS;  // 0xA403C
+	u32 SCMNG_PM_PHY_SIDE_CPI_REGS;       // 0xA4040
+	u32 res20[(0xA5000 - 0xA4044) / 4];
+	u32 GTS_Physical_LANE_Number;         // 0xA5000
+	u32 res21[(0xA5044 - 0xA5004) / 4];
+	u32 pre_pma_lblk;                     // 0xA5044
 };
 
 #define eth_hardip_pma_csroffs(a) (offsetof(struct intel_fpga_gts_hardip_pma, a))
@@ -763,42 +820,41 @@ struct intel_fpga_gts_hardip_pma {
 #define SYS_PLL_LOCKED    BIT(8)
 #define RX_CDR_LOCKED0    BIT(7)
 #define RX_CDR_LOCKED1    BIT(6)
-
 #define RX_CDR_LOCKED(port) \
-	((BUG((port) > 1)), ((port) == 0 ? RX_CDR_LOCKED0 : RX_CDR_LOCKED1))
-
-#define TX_PLL_LOCKED1(x)   (((x) & BIT(5)))
-#define TX_PLL_LOCKED0(x)   (((x) & BIT(4)))
+	({ \
+	BUG(port > 1); \
+	((port == 0) ?  RX_CDR_LOCKED0 : RX_CDR_LOCKED1); \
+	})
+#define TX_PLL_LOCKED1(x)  (x &  BIT(5))
+#define TX_PLL_LOCKED0(x)  (x &  BIT(4))
 #define TX_PLL_LOCKED(x, port) \
-	((BUG((port) > 1)), ((port) == 0 ? TX_PLL_LOCKED0(x) : TX_PLL_LOCKED1(x)))
-
-#define TX_LANE_STABLE1(x)  (((x) & BIT(3)))
-#define TX_LANE_STABLE0(x)  (((x) & BIT(2)))
+	({ \
+	BUG(port > 1); \
+	((port == 0) ?  TX_PLL_LOCKED0(x) : TX_PLL_LOCKED1(x)); \
+	})
+#define TX_LANE_STABLE1(x)   (x & BIT(3))
+#define TX_LANE_STABLE0(x)   (x & BIT(2))
 #define TX_LANE_STABLE(x, port) \
-	((BUG((port) > 1)), ((port) == 0 ? TX_LANE_STABLE0(x) : TX_LANE_STABLE1(x)))
-
-#define RX_PCS_READY0(x)    (((x) & BIT(0)))
-#define RX_PCS_READY1(x)    (((x) & BIT(1)))
+	({ \
+	BUG_ON((port) > 1); \
+	((port) == 0 ? TX_LANE_STABLE0(x) : TX_LANE_STABLE1(x)); \
+	})
+#define RX_PCS_READY0(x)   (x &  BIT(0))
+#define RX_PCS_READY1(x)   (x &  BIT(1))
 #define RX_PCS_READY(x, port) \
-	((BUG((port) > 1)), ((port) == 0 ? RX_PCS_READY0(x) : RX_PCS_READY1(x)))
-
-#define TX_FIFO_DEPTH0(x)   (((x) & GENMASK(7, 0)))
-#define TX_FIFO_DEPTH1(x)   ((((x) & GENMASK(15, 8)) >> 8))
+	({ \
+	    BUG_ON((port) > 1); \
+	    ((port) == 0 ? RX_PCS_READY0(x) : RX_PCS_READY1(x)); \
+	})
+#define TX_FIFO_DEPTH0(x) ((x) & GENMASK(7, 0))
+#define TX_FIFO_DEPTH1(x) (((x) & GENMASK(15, 8)) >> 8)
 #define TX_FIFO_DEPTH(port, x) \
-	((BUG((port) > 1)), ((port) == 0 ? TX_FIFO_DEPTH0(x) : TX_FIFO_DEPTH1(x)))
-
+	({ \
+	BUG((port) > 1); \
+	((port) == 0 ? TX_FIFO_DEPTH0(x) : TX_FIFO_DEPTH1(x)); \
+	})
 #define RX_FIFO_DEPTH0(x) (((x) & GENMASK(23, 16)) >> 16)
 #define RX_FIFO_DEPTH1(x) (((x) & GENMASK(31, 24)) >> 24)
-#define RX_FIFO_DEPTH(port, x) \
-	((BUG((port) > 1)), ((port) == 0 ? RX_FIFO_DEPTH0(x) : RX_FIFO_DEPTH1(x)))
-
-struct intel_fpga_userspace_reg {
-	u32 control_reg;
-	u32 error_reg;
-	u32 status_reg;
-	u32 fifo_status_reg;
-};
-
-#define eth_userspace_csroffs(a) (offsetof(struct intel_fpga_userspace_reg, a))
+#define RX_FIFO_DEPTH(port, x) ((port) == 0 ? RX_FIFO_DEPTH0(x) : RX_FIFO_DEPTH1(x))
 
 #endif

@@ -62,23 +62,6 @@ static void hssigldrv_gts_probe_init(struct platform_device *pdev)
 	eth_ssr->user_csr_len = USER_CSR_LEN;
 }
 
-static u32 hssigldrv_gts_make_usrcsr_addr_offs(struct platform_device *pdev,
-					       u8 port,
-					       u32 offs)
-{
-	struct hssiss_private *priv = platform_get_drvdata(pdev);
-	struct eth_sub_system *eth_ssr;
-	u32 offs_addr = offs;
-
-	eth_ssr = (struct eth_sub_system *)priv->dev_specific;
-
-	offs_addr += eth_ssr->user_csr_start;
-	BUG_ON(offs_addr >= eth_ssr->user_csr_start +
-				eth_ssr->user_csr_len);
-
-	return offs_addr;
-}
-
 static u32 hssigldrv_gts_make_csr_addr_offs(struct platform_device *pdev,
 					    u8 port,
 					    enum hssiss_tile_regbank regbank,
@@ -105,7 +88,7 @@ static u32 hssigldrv_gts_make_csr_addr_offs(struct platform_device *pdev,
 	case HSSI_PTP_SOFTIP:
 		offs_addr += eth_ssr->softip_ptp_start;
 		BUG_ON(offs_addr >=
-		       eth_ssr->hardip_pcs_fec_start + eth_ssr->softip_ptp_len);
+		       eth_ssr->softip_ptp_start + eth_ssr->softip_ptp_len);
 		break;
 	case HSSI_PCS_FEC_HARDIP:
 		offs_addr += eth_ssr->hardip_pcs_fec_start;
@@ -144,6 +127,88 @@ static u32 hssigldrv_gts_make_csr_addr_offs(struct platform_device *pdev,
 	return offs_addr + (port * CHANNEL_OFFSET);
 }
 
+static int hssigldrv_gts_rx_assert(struct platform_device *pdev, int port)
+{
+	struct hssiss_private *priv = platform_get_drvdata(pdev);
+	void __iomem *base = priv->sscsr;
+	u32 addr_offs;
+	u32 delay_wait = DELAY_READY_WAIT;
+	u32 val;
+
+	addr_offs = hssigldrv_gts_make_csr_addr_offs(pdev, port,
+						     HSSI_BASE_SOFTIP,
+					eth_soft_csroffs(eth_reset));
+
+	tse_set_bit(base, addr_offs, ETH_SOFT_RX_RESET);
+
+	addr_offs = hssigldrv_gts_make_csr_addr_offs(pdev, port,
+						     HSSI_BASE_SOFTIP,
+					eth_soft_csroffs(eth_reset_status));
+
+	do {
+		val = csrrd32(base, addr_offs);
+		udelay(5);
+	} while ((delay_wait-- > 0) && (val & ETH_SOFT_RX_RST_ACK));
+
+	if ((csrrd32(base, addr_offs) & ETH_SOFT_RX_RST_ACK))
+		return -ETIME;
+
+	return 0;
+}
+
+static int hssigldrv_gts_rx_deassert(struct platform_device *pdev, int port)
+{
+	struct hssiss_private *priv = platform_get_drvdata(pdev);
+	void __iomem *base = priv->sscsr;
+	u32 addr_offs;
+	u32 val;
+	u32 delay_wait = DELAY_READY_WAIT;
+
+	addr_offs = hssigldrv_gts_make_csr_addr_offs(pdev, port,
+						     HSSI_BASE_SOFTIP,
+					eth_soft_csroffs(eth_reset));
+
+	tse_clear_bit(base, addr_offs, ETH_SOFT_RX_RESET);
+
+	addr_offs = hssigldrv_gts_make_csr_addr_offs(pdev, port,
+						     HSSI_BASE_SOFTIP,
+					eth_soft_csroffs(eth_reset_status));
+
+	do {
+		val = csrrd32(base, addr_offs);
+		udelay(5);
+	} while ((delay_wait-- > 0) && !(val & ETH_SOFT_RX_RST_ACK));
+
+	if (!(csrrd32(base, addr_offs) & ETH_SOFT_RX_RST_ACK))
+		return -ETIME;
+
+	return 0;
+}
+
+static void hssigldrv_gts_softrst_src_override(struct platform_device *pdev,
+					       enum hssiss_loopback_type lb_type,
+					       int port, bool en)
+{
+	struct hssiss_private *priv = platform_get_drvdata(pdev);
+	void __iomem *base = priv->sscsr;
+	u32 addr_offs = SRC_OVERRIDE;
+
+	switch (lb_type) {
+	case NEAREND_FEC_LOOPBACK:
+	case NEAREND_XCVRIF_LOOPBACK:
+	case NEAREND_PAR_PMA_LOOPBACK:
+	case NEAREND_MAC_LOOPBACK:
+	case NEAREND_PAR_PCS_LOOPBACK:
+		if (en)
+			tse_set_bit(base, addr_offs, RX_BITSTREAM_NOT_PRESENT);
+		else
+			tse_clear_bit(base, addr_offs, RX_BITSTREAM_NOT_PRESENT);
+		break;
+	default:
+		break;
+	}
+}
+
 static int hssigldrv_gts_en_loopback_mode(struct platform_device *pdev,
 					  enum hssiss_loopback_type lb_type,
 					  int port)
@@ -152,7 +217,14 @@ static int hssigldrv_gts_en_loopback_mode(struct platform_device *pdev,
 	void __iomem *base = priv->sscsr;
 	u32 addr_offs;
 	u32 val;
+	s32 ret;
 	u32 delay_wait = DELAY_READY_WAIT;
+
+	ret = hssigldrv_gts_rx_assert(pdev, port);
+	if (ret)
+		goto err;
+
+	hssigldrv_gts_softrst_src_override(pdev, lb_type, port, true);
 
 	switch (lb_type) {
 	case NEAREND_FEC_LOOPBACK:
@@ -161,26 +233,11 @@ static int hssigldrv_gts_en_loopback_mode(struct platform_device *pdev,
 							     eth_hardip_pcsfec_csroffs(rsfec_tx_top));
 		tse_set_bit(base, addr_offs, ETH_ENABLE_FEC_LOOPBACK);
 		break;
+
 	case FAREND_PAR_PMA_LOOPBACK:
 		break;
+
 	case NEAREND_SER_PMA_LOOPBACK:
-		addr_offs = hssigldrv_gts_make_csr_addr_offs(pdev, port,
-							     HSSI_BASE_SOFTIP,
-							     eth_soft_csroffs(eth_reset));
-		tse_set_bit(base, addr_offs, ETH_SOFT_RX_RESET);
-
-		addr_offs = hssigldrv_gts_make_csr_addr_offs(pdev, port,
-							     HSSI_BASE_SOFTIP,
-				       eth_soft_csroffs(eth_reset_status));
-
-		delay_wait = DELAY_READY_WAIT;
-		do {
-			udelay(5);
-		} while ((delay_wait-- > 0) &&
-			 (csrrd32(base, addr_offs) & ETH_SOFT_RST_ACK));
-
-		if (!(csrrd32(base, addr_offs) & ETH_SOFT_RST_ACK))
-			return -ETIME;
 
 		addr_offs = hssigldrv_gts_make_csr_addr_offs(pdev, port,
 							     HSSI_PMA_HARDIP,
@@ -197,11 +254,12 @@ static int hssigldrv_gts_en_loopback_mode(struct platform_device *pdev,
 			udelay(5);
 
 		} while ((delay_wait-- > 0) &&
-			 (val & ETH_ASSERT_PMA_SER_LBK_ACK) != ETH_DEASSERT_PMA_SER_LBK_DONE);
+			 (val & ETH_ASSERT_PMA_SER_LBK_ACK) != ETH_SERV_REQ_NO_RESET);
 
 		addr_offs = hssigldrv_gts_make_csr_addr_offs(pdev, port,
 							     HSSI_PMA_HARDIP,
 				eth_hardip_pma_csroffs(SCMNG_PM_LINK_MNG_SIDE_CPI_REGS));
+
 		csrwr32(ETH_DEASSERT_PMA_SER_LBK_EN, base, addr_offs);
 
 		addr_offs = hssigldrv_gts_make_csr_addr_offs(pdev, port,
@@ -215,32 +273,12 @@ static int hssigldrv_gts_en_loopback_mode(struct platform_device *pdev,
 
 		} while ((delay_wait-- > 0) &&
 			 (val & ETH_ASSERT_PMA_SER_LBK_ACK) !=
-					ETH_DEASSERT_PMA_SER_LBK_DONE);
-
-		addr_offs = hssigldrv_gts_make_csr_addr_offs(pdev,
-							     port, HSSI_BASE_SOFTIP,
-					eth_soft_csroffs(eth_reset));
-		tse_clear_bit(base, addr_offs, ETH_SOFT_RX_RESET);
-
-		addr_offs = hssigldrv_gts_make_csr_addr_offs(pdev, port,
-							     HSSI_BASE_SOFTIP,
-				      eth_soft_csroffs(eth_reset_status));
-
-		delay_wait = DELAY_READY_WAIT;
-		do {
-			val = csrrd32(base, addr_offs);
-			udelay(5);
-
-		} while ((delay_wait-- > 0) && (val & ETH_SOFT_RST_ACK));
-
-		if ((csrrd32(base, addr_offs) & ETH_SOFT_RST_ACK))
-			return -ETIME;
-
-		return 0;
+					ETH_NO_SERV_NO_RESET);
+		break;
 
 	case NEAREND_PAR_PMA_LOOPBACK:
 		addr_offs = hssigldrv_gts_make_csr_addr_offs(pdev, port, HSSI_PMA_HARDIP,
-							     eth_hardip_pma_csroffs(pre_pma_lblk));
+							     eth_hardip_pma_csroffs(SRDS_IP_LANE_reg_170));
 
 		tse_set_bit(base, addr_offs, ETH_ENABLE_NEAREND_PAR_PMA_LOOPBACK);
 		break;
@@ -266,6 +304,7 @@ static int hssigldrv_gts_en_loopback_mode(struct platform_device *pdev,
 							     HSSI_PCS_FEC_HARDIP,
 					eth_hardip_pcsfec_csroffs(phy_ehip_pcs_modes));
 
+		priv->scratch = csrrd32(base, addr_offs);
 		tse_set_bit(base, addr_offs, ETH_ENABLE_NEAREND_PCS_LOOPBACK);
 		break;
 
@@ -278,7 +317,13 @@ static int hssigldrv_gts_en_loopback_mode(struct platform_device *pdev,
 		break;
 	}
 
+	ret = hssigldrv_gts_rx_deassert(pdev, port);
+	if (ret)
+		goto err;
+
 	return 0;
+err:
+	return ret;
 }
 
 static int hssigldrv_gts_dis_loopback_mode(struct platform_device *pdev,
@@ -290,36 +335,22 @@ static int hssigldrv_gts_dis_loopback_mode(struct platform_device *pdev,
 	u32 addr_offs;
 	u32 delay_wait = DELAY_READY_WAIT;
 	u32 val;
+	s32 ret = 0;
+
+	ret = hssigldrv_gts_rx_assert(pdev, port);
+	if (ret)
+		goto err;
 
 	switch (lb_type) {
 	case NEAREND_FEC_LOOPBACK:
 		addr_offs = hssigldrv_gts_make_csr_addr_offs(pdev, port,
 							     HSSI_PCS_FEC_HARDIP,
-					eth_hardip_xcvr_pma_csroffs(sm_xcvrif_reg_9));
-
-		tse_clear_bit(base, addr_offs, ETH_DISABLE_FEC_LOOPBACK);
+					eth_hardip_pcsfec_csroffs(rsfec_tx_top));
+		tse_clear_bit(base, addr_offs, ETH_ENABLE_FEC_LOOPBACK);
 		break;
 	case FAREND_PAR_PMA_LOOPBACK:
 		break;
 	case NEAREND_SER_PMA_LOOPBACK:
-		addr_offs = hssigldrv_gts_make_csr_addr_offs(pdev, port,
-							     HSSI_BASE_SOFTIP,
-						eth_soft_csroffs(eth_reset));
-
-		tse_set_bit(base, addr_offs, ETH_SOFT_RX_RESET);
-
-		addr_offs = hssigldrv_gts_make_csr_addr_offs(pdev, port,
-							     HSSI_BASE_SOFTIP,
-						eth_soft_csroffs(eth_reset_status));
-
-		delay_wait = DELAY_READY_WAIT;
-		do {
-			val = csrrd32(base, addr_offs);
-			udelay(5);
-		} while ((delay_wait-- > 0) && (val & ETH_SOFT_RST_ACK));
-
-		if (!(csrrd32(base, addr_offs) & ETH_SOFT_RST_ACK))
-			return -ETIME;
 
 		addr_offs = hssigldrv_gts_make_csr_addr_offs(pdev, port,
 							     HSSI_PMA_HARDIP,
@@ -336,7 +367,7 @@ static int hssigldrv_gts_dis_loopback_mode(struct platform_device *pdev,
 			udelay(5);
 
 		} while ((delay_wait-- > 0) && (val & ETH_ASSERT_PMA_SER_LBK_ACK)
-							!= ETH_DEASSERT_PMA_SER_LBK_DONE);
+							!= ETH_SERV_REQ_NO_RESET);
 
 		addr_offs = hssigldrv_gts_make_csr_addr_offs(pdev, port,
 							     HSSI_PMA_HARDIP,
@@ -353,66 +384,60 @@ static int hssigldrv_gts_dis_loopback_mode(struct platform_device *pdev,
 			udelay(5);
 
 		} while ((delay_wait-- > 0) && (val & ETH_DEASSERT_PMA_SER_LBK_ACK) !=
-							ETH_DEASSERT_PMA_SER_LBK_DONE);
+						ETH_NO_SERV_NO_RESET);
 
-		addr_offs = hssigldrv_gts_make_csr_addr_offs(pdev, port,
-							     HSSI_BASE_SOFTIP,
-					eth_soft_csroffs(eth_reset));
-		tse_clear_bit(base, addr_offs, ETH_SOFT_RX_RESET);
-
-		addr_offs = hssigldrv_gts_make_csr_addr_offs(pdev, port,
-							     HSSI_BASE_SOFTIP,
-					eth_soft_csroffs(eth_reset_status));
-
-		delay_wait = DELAY_READY_WAIT;
-		do {
-			val = csrrd32(base, addr_offs);
-			udelay(5);
-		} while ((delay_wait-- > 0) && (val & ETH_SOFT_RST_ACK));
-
-		if ((csrrd32(base, addr_offs) & ETH_SOFT_RST_ACK))
-			return -ETIME;
-
-		return 0;
+		break;
 
 	case NEAREND_PAR_PMA_LOOPBACK:
 		addr_offs = hssigldrv_gts_make_csr_addr_offs(pdev, port,
 							     HSSI_PMA_HARDIP,
-					eth_hardip_pma_csroffs(pre_pma_lblk));
+					eth_hardip_pma_csroffs(SRDS_IP_LANE_reg_170));
 
 		tse_clear_bit(base, addr_offs, ETH_ENABLE_NEAREND_PAR_PMA_LOOPBACK);
 		break;
+
 	case NEAREND_XCVRIF_LOOPBACK:
 		addr_offs = hssigldrv_gts_make_csr_addr_offs(pdev, port,
 							     HSSI_XCVR_PMA_HARDIP,
 					eth_hardip_xcvr_pma_csroffs(sm_xcvrif_reg_9));
 
-		tse_clear_bit(base, addr_offs, ETH_DISABLE_XCVRIF_LOOPBACK);
+		tse_clear_bit(base, addr_offs, ETH_ENABLE_XCVRIF_LOOPBACK);
 		break;
+
 	case NEAREND_MAC_LOOPBACK:
 		addr_offs = hssigldrv_gts_make_csr_addr_offs(pdev, port,
 							     HSSI_EMAC_HARDIP,
 					eth_hardip_emac_csroffs(rxmac_ehip_cfg));
 
-		tse_clear_bit(base, addr_offs, ETH_DISABLE_MAC_LOOPBACK);
+		tse_clear_bit(base, addr_offs, ETH_ENABLE_MAC_LOOPBACK);
 		break;
+
 	case NEAREND_PAR_PCS_LOOPBACK:
 		addr_offs = hssigldrv_gts_make_csr_addr_offs(pdev, port,
 							     HSSI_PCS_FEC_HARDIP,
 					eth_hardip_pcsfec_csroffs(phy_ehip_pcs_modes));
-
-		tse_clear_bit(base, addr_offs, ETH_DISABLE_NEAREND_PCS_LOOPBACK);
+		tse_clear_bit(base, addr_offs, ETH_ENABLE_NEAREND_PCS_LOOPBACK);
+		csrwr32(priv->scratch, base, addr_offs);
 		break;
+
 	case FAREND_PAR_PCS_LOOPBACK:
 		addr_offs = hssigldrv_gts_make_csr_addr_offs(pdev, port,
 							     HSSI_PCS_FEC_HARDIP,
 					eth_hardip_pcsfec_csroffs(phy_ehip_pcs_modes));
 
-		tse_clear_bit(base, addr_offs, ETH_DISABLE_FAREND_PCS_LOOPBACK);
+		tse_clear_bit(base, addr_offs, ETH_ENABLE_FAREND_PCS_LOOPBACK);
 		break;
 	}
 
+	hssigldrv_gts_softrst_src_override(pdev, lb_type, port, false);
+
+	ret = hssigldrv_gts_rx_deassert(pdev, port);
+	if (ret)
+		goto err;
+
 	return 0;
+err:
+	return ret;
 }
 
 static hssi_eth_port_sts hssigldrv_gts_get_ethport_status(struct platform_device *pdev,
@@ -1119,22 +1144,34 @@ static int hssigldrv_gts_read_mac_stats(struct platform_device *pdev,
 		rdata += csrrd32(base, addr_offs);
 
 		break;
+	case MACSTAT_TX_PTP_CTRL:
+		addr_offs = hssigldrv_gts_make_csr_addr_offs(pdev, data->port_data,
+							     HSSI_EMAC_HARDIP,
+						eth_hardip_emac_csroffs(cntr_tx_total_ptp_pkts));
+		rdata = csrrd32(base, addr_offs);
+		break;
 	case MACSTAT_TX_UNDERSIZE:
 		addr_offs = hssigldrv_gts_make_csr_addr_offs(pdev, data->port_data,
 							     HSSI_EMAC_HARDIP,
 						eth_hardip_emac_csroffs(cntr_tx_runt_lo));
 		rdata = csrrd32(base, addr_offs);
 		break;
-	case MACSTAT_RX_UNDERSIZE:
-		addr_offs = hssigldrv_gts_make_csr_addr_offs(pdev, data->port_data,
-							     HSSI_EMAC_HARDIP,
-						eth_hardip_emac_csroffs(cntr_rx_runt_lo));
-		rdata = csrrd32(base, addr_offs);
-		break;
 	case MACSTAT_TX_OVERSIZE:
 		addr_offs = hssigldrv_gts_make_csr_addr_offs(pdev, data->port_data,
 							     HSSI_EMAC_HARDIP,
 						eth_hardip_emac_csroffs(cntr_tx_oversize_lo));
+		rdata = csrrd32(base, addr_offs);
+		break;
+	case MACSTAT_RX_PTP_CTRL:
+		addr_offs = hssigldrv_gts_make_csr_addr_offs(pdev, data->port_data,
+							     HSSI_EMAC_HARDIP,
+						eth_hardip_emac_csroffs(cntr_rx_total_ptp_ts));
+		rdata = csrrd32(base, addr_offs);
+		break;
+	case MACSTAT_RX_UNDERSIZE:
+		addr_offs = hssigldrv_gts_make_csr_addr_offs(pdev, data->port_data,
+							     HSSI_EMAC_HARDIP,
+						eth_hardip_emac_csroffs(cntr_rx_runt_lo));
 		rdata = csrrd32(base, addr_offs);
 		break;
 	case MACSTAT_RX_OVERSIZE:
@@ -1430,18 +1467,6 @@ static int hssigldrv_gts_defreeze_stats(struct platform_device *pdev, int port)
 	return 0;
 }
 
-static void hssigldrv_gts_reset_port(struct platform_device *pdev, int port)
-{
-	struct hssiss_private *priv = platform_get_drvdata(pdev);
-	void __iomem *base = priv->usrcsr;
-	u32 addr_offs;
-
-	addr_offs = hssigldrv_gts_make_usrcsr_addr_offs(pdev, port,
-							eth_userspace_csroffs(control_reg));
-
-	tse_clear_bit(base, addr_offs, (1 << port));
-}
-
 struct hssi_dev_ops device_ops_gdr = {
 	.probe_init = hssigldrv_gts_probe_init,
 	.get_addr_offset = hssigldrv_gts_make_csr_addr_offs,
@@ -1454,7 +1479,6 @@ struct hssi_dev_ops device_ops_gdr = {
 	.disable_loopback = hssigldrv_gts_dis_loopback_mode,
 	.freeze_mac_stats = hssigldrv_gts_freeze_stats,
 	.defreeze_mac_stats = hssigldrv_gts_defreeze_stats,
-	.reset_port = hssigldrv_gts_reset_port,
 };
 
 static void intel_fpga_gts_unregister(struct platform_device *pdev)

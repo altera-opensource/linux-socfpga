@@ -41,7 +41,7 @@ int determine_i2c_client(struct clock_cleaner *clockcleaner_info)
 
 	i2c_adap = i2c_get_adapter(adapter);
 	if (!i2c_adap) {
-		pr_err("[ %s ] i2c_get_adapter is NULL", __func__);
+		pr_err("Not able to get i2c adapter. Defer probe.");
 		ret = FREQ_CTRL_ERROR_FAIL;
 		goto i2c_client_ret;
 	}
@@ -56,7 +56,6 @@ int determine_i2c_client(struct clock_cleaner *clockcleaner_info)
 		ret = FREQ_CTRL_ERROR_FAIL;
 		goto i2c_client_ret;
 	} else {
-		pr_info("created i2c device %p\n", (uint32_t *)i2c_cli);
 		priv->fc_acc_type.i2c_cli = i2c_cli;
 		ret = FREQ_CTRL_ERROR_SUCCESS;
 		goto i2c_client_ret;

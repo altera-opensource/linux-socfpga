@@ -31,6 +31,7 @@ ifeq ($(CONFIG_INTEL_FPGA_FREQ_CTRL), y)
 	intel_frequency_ctrl_driver-objs += intel_freq_ctrl_zl30793_spi.o \
 				intel_freq_ctrl_zl30793.o \
 				intel_freq_ctrl_zl30733_i2c.o \
+				intel_freq_ctrl_si5518_i2c.o  \
 				intel_freq_ctrl_common_spi.o \
 				intel_freq_ctrl_common_i2c.o \
 
@@ -108,5 +109,6 @@ ifeq ($(CONFIG_INTEL_FPGA_GTS_TILE), y)
 				    intel_fpga_ftile_driver.o       \
 				    intel_fpga_hssi_ftile_fec.o	    \
 				    intel_fpga_hssi_ftile_ethtool.o \
-				    altera_fpga_anlt.o
+				    altera_fpga_anlt.o              \
+				    intel_fpga_hssigl_gts_fec.o
 endif

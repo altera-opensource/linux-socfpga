@@ -12,6 +12,6 @@
 
 struct clock_cleaner;
 int determine_spi_client(struct clock_cleaner *cc);
-u8 spi_msg_transfer(struct spi_device *spi, void *tx_buf, void *rx_buf);
+u8 spi_msg_transfer(struct spi_device *spi, void *tx_buf, void *rx_buf, u8 len);
 
  #endif
