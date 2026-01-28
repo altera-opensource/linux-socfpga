@@ -497,7 +497,7 @@ int intel_fpga_tod_probe(struct platform_device *pdev)
 
 	pps_irq = platform_get_irq_byname(pdev, "pps_irq");
 
-	if ((pps_irq > 0) && priv->pps_ctrl) {
+	if (pps_irq > 0 && priv->pps_ctrl) {
 		/* pps interrupt is level triggered */
 		ret = devm_request_irq(&pdev->dev, pps_irq, intel_fpga_pps_isr,
 				       IRQF_TRIGGER_HIGH, "pps_ip", priv);

@@ -18,6 +18,37 @@
  #define FTILE_EHIP_RESET_TO		10000 /* in us */
  #define FTILE_EHIP_RESET_POLL_INTERVAL	5 /* in us */
 
+static void ftile_convert_eth_speed_to_eth_rate(intel_fpga_xtile_eth_private *priv)
+{
+	u32 eth_speed = priv->link_speed;
+
+	switch (eth_speed) {
+	case SPEED_10000:
+	case SPEED_25000:
+		priv->eth_rate = INTEL_FPGA_FTILE_ETH_RATE_10G_25G;
+		break;
+	case SPEED_50000:
+		priv->eth_rate = INTEL_FPGA_FTILE_ETH_RATE_50G;
+		break;
+	case SPEED_40000:
+	case SPEED_100000:
+		priv->eth_rate = INTEL_FPGA_FTILE_ETH_RATE_40G_100G;
+		break;
+	case SPEED_200000:
+		priv->eth_rate = INTEL_FPGA_FTILE_ETH_RATE_200G;
+		break;
+	case SPEED_400000:
+		priv->eth_rate = INTEL_FPGA_FTILE_ETH_RATE_400G;
+		break;
+	default:
+		if (priv->autoneg)
+			pr_info("Autoneg in progress. Please check LP AN ability\n");
+		else
+			pr_err("invalid eth speed %d, Failed to convert to eth_rate\n", eth_speed);
+		break;
+	}
+}
+
 static int ftile_wait_reset_ack(struct platform_device *pdev, u32 chan,
 				u32 rst_ack_mask, u32 maskval)
 {
@@ -116,11 +147,11 @@ static void ftile_enable_mac(intel_fpga_xtile_eth_private *priv)
 
 	/* Enable Tx MAC datapath */
 	hssi_clear_bit_ba(pdev, HSSI_ETH_RECONFIG, chan,
-			  eth_mac_ptp_csroffs(0, tx_mac_conf),
+			  eth_mac_ptp_csroffs(priv->eth_rate, tx_mac_conf),
 			  ETH_TX_MAC_DISABLE_TXMAC);
 
 	hssi_clear_bit_ba(pdev, HSSI_ETH_RECONFIG, chan,
-			  eth_mac_ptp_csroffs(0, rx_mac_frwd_rx_crc),
+			  eth_mac_ptp_csroffs(priv->eth_rate, rx_mac_frwd_rx_crc),
 			  ETH_RX_MAC_CRC_FORWARD);
 }
 
@@ -131,11 +162,11 @@ static void ftile_disable_mac(intel_fpga_xtile_eth_private *priv)
 
 	/* Disable Tx MAC datapath */
 	hssi_set_bit_ba(pdev, HSSI_ETH_RECONFIG, chan,
-			eth_mac_ptp_csroffs(0, tx_mac_conf),
+			eth_mac_ptp_csroffs(priv->eth_rate, tx_mac_conf),
 			ETH_TX_MAC_DISABLE_TXMAC);
 
 	hssi_clear_bit_ba(pdev, HSSI_ETH_RECONFIG, chan,
-			  eth_mac_ptp_csroffs(0, tx_mac_conf),
+			  eth_mac_ptp_csroffs(priv->eth_rate, tx_mac_conf),
 			  ETH_TX_MAC_ENABLE_S_ADDR_EN);
 
 	netif_warn(priv, drv, priv->dev, "Tx and Rx datapath stop done\n");
@@ -154,13 +185,14 @@ void ftile_update_mac_addr(intel_fpga_xtile_eth_private *priv)
 
 	/* Set MAC address */
 	hssi_csrwr32_ba(pdev, HSSI_ETH_RECONFIG, chan,
-			eth_mac_ptp_csroffs(0, tx_mac_source_addr_lower_bytes), lsb);
+			eth_mac_ptp_csroffs(priv->eth_rate, tx_mac_source_addr_lower_bytes), lsb);
 	hssi_csrwr32_ba(pdev, HSSI_ETH_RECONFIG, chan,
-			eth_mac_ptp_csroffs(0, tx_mac_source_addr_higher_bytes), msb);
+			eth_mac_ptp_csroffs(priv->eth_rate, tx_mac_source_addr_higher_bytes), msb);
 
-	/* Enable Source address insertion */
-	hssi_set_bit_ba(pdev, HSSI_ETH_RECONFIG, chan,
-			eth_mac_ptp_csroffs(0, tx_mac_conf), ETH_TX_MAC_ENABLE_S_ADDR_EN);
+	/* Disable Source address insertion */
+	hssi_clear_bit_ba(pdev, HSSI_ETH_RECONFIG, chan,
+			  eth_mac_ptp_csroffs(priv->eth_rate, tx_mac_conf),
+			  ETH_TX_MAC_ENABLE_S_ADDR_EN);
 
 	netdev_info(priv->dev, "Device MAC address %pM\n", priv->dev->dev_addr);
 }
@@ -174,39 +206,41 @@ static void ftile_enable_mac_flow_ctrl(intel_fpga_xtile_eth_private *priv)
 	/* Rx MAC flow control */
 	if ((priv->flow_ctrl & FLOW_RX)) {
 		hssi_set_bit_ba(pdev, HSSI_ETH_RECONFIG, chan,
-				eth_mac_ptp_csroffs(0, rx_flow_control_feature_cfg),
+				eth_mac_ptp_csroffs(priv->eth_rate, rx_flow_control_feature_cfg),
 				ETH_RX_EN_STD_FLOW_CTRL);
 
 		reg = hssi_csrrd32_ba(pdev, HSSI_ETH_RECONFIG, chan,
-				      eth_mac_ptp_csroffs(0, rx_flow_control_feature_cfg));
+				      eth_mac_ptp_csroffs(priv->eth_rate,
+							  rx_flow_control_feature_cfg));
 
-		if (netif_msg_ifup(priv))
-			netdev_info(priv->dev, "F-tile rx_flow_ctrl: 0x%08x\n", reg);
+		//if (netif_msg_ifup(priv))
+			//netdev_info(priv->dev, "F-tile rx_flow_ctrl: 0x%08x\n", reg);
 	}
 
 	/* Tx MAC flow control */
 	if ((priv->flow_ctrl & FLOW_TX)) {
 		hssi_set_bit_ba(pdev, HSSI_ETH_RECONFIG, chan,
-				eth_mac_ptp_csroffs(0, tx_flow_control_feature_cfg),
+				eth_mac_ptp_csroffs(priv->eth_rate, tx_flow_control_feature_cfg),
 				ETH_TX_EN_PRIORITY_FLOW_CTRL);
 
 		reg = hssi_csrrd32_ba(pdev, HSSI_ETH_RECONFIG, chan,
-				      eth_mac_ptp_csroffs(0, tx_flow_control_feature_cfg));
+				      eth_mac_ptp_csroffs(priv->eth_rate,
+							  tx_flow_control_feature_cfg));
 
-		if (netif_msg_ifup(priv))
-			netdev_info(priv->dev, "F-tile tx_flow_ctrl: 0x%08x\n", reg);
+		//if (netif_msg_ifup(priv))
+			//netdev_info(priv->dev, "F-tile tx_flow_ctrl: 0x%08x\n", reg);
 	}
 
 	/* Set pfc pause quanta */
 	if (priv->flow_ctrl & FLOW_TX) {
 		hssi_csrwr32_ba(pdev, HSSI_ETH_RECONFIG, chan,
-				eth_mac_ptp_csroffs(0, pause_quanta_0), priv->pause);
+				eth_mac_ptp_csroffs(priv->eth_rate, pause_quanta_0), priv->pause);
 
 		reg = hssi_csrrd32_ba(pdev, HSSI_ETH_RECONFIG, chan,
-				      eth_mac_ptp_csroffs(0, pause_quanta_0));
+				      eth_mac_ptp_csroffs(priv->eth_rate, pause_quanta_0));
 
-		if (netif_msg_ifup(priv))
-			netdev_info(priv->dev, "F-tile: pause_quanta0: 0x%08x\n", reg);
+		//if (netif_msg_ifup(priv))
+			//netdev_info(priv->dev, "F-tile: pause_quanta0: 0x%08x\n", reg);
 	}
 }
 
@@ -218,14 +252,14 @@ static void ftile_disable_mac_flow_ctrl(intel_fpga_xtile_eth_private *priv)
 	/* Disable Rx MAC flow control */
 	if ((priv->flow_ctrl & FLOW_RX)) {
 		hssi_clear_bit_ba(pdev, HSSI_ETH_RECONFIG, chan,
-				  eth_mac_ptp_csroffs(0, rx_flow_control_feature_cfg),
+				  eth_mac_ptp_csroffs(priv->eth_rate, rx_flow_control_feature_cfg),
 				  ETH_RX_EN_STD_FLOW_CTRL);
 	}
 
 	/* Disable Tx MAC flow control */
 	if ((priv->flow_ctrl & FLOW_TX)) {
 		hssi_clear_bit_ba(pdev, HSSI_ETH_RECONFIG, chan,
-				  eth_mac_ptp_csroffs(0, tx_flow_control_feature_cfg),
+				  eth_mac_ptp_csroffs(priv->eth_rate, tx_flow_control_feature_cfg),
 				  ETH_TX_EN_PRIORITY_FLOW_CTRL);
 	}
 }
@@ -413,7 +447,7 @@ static int eth_ftile_tx_rx_user_flow(intel_fpga_xtile_eth_private *priv)
 	u32 ui_value;
 	u32 tx_routing_adj, rx_routing_adj;
 	u8 tx_routing_adj_sign, rx_routing_adj_sign;
-
+	int lane_speed = 0;
 	struct platform_device *pdev = priv->pdev_hssi;
 	u32 chan = priv->tile_chan;
 	u16 pma_type = priv->pma_type;
@@ -421,10 +455,10 @@ static int eth_ftile_tx_rx_user_flow(intel_fpga_xtile_eth_private *priv)
 
 	speed = priv->link_speed;
 
+	lane_speed = hssi_get_profile_lane_speed(pdev, chan);
 	// TBD add other PHY modes
-	switch (priv->phy_iface) {
-	case PHY_INTERFACE_MODE_10GKR:
-	case PHY_INTERFACE_MODE_10GBASER:
+	switch (lane_speed) {
+	case LANE_10G:
 		ui_value = INTEL_FPGA_FTILE_UI_VALUE_10G;
 		if ((pma_type) == XCVR_PMA_TYPE_FGT) {
 			tx_pma_delay_ui = INTEL_FPGA_TX_PMA_DELAY_25G_UX;
@@ -434,8 +468,7 @@ static int eth_ftile_tx_rx_user_flow(intel_fpga_xtile_eth_private *priv)
 			rx_pma_delay_ui = INTEL_FPGA_RX_PMA_DELAY_25G_BK;
 		}
 		break;
-	case PHY_INTERFACE_MODE_25GKR:
-	case PHY_INTERFACE_MODE_25GBASER:
+	case LANE_25G:
 		ui_value = INTEL_FPGA_FTILE_UI_VALUE_25G;
 		if ((pma_type) == XCVR_PMA_TYPE_FGT) {
 			tx_pma_delay_ui = INTEL_FPGA_TX_PMA_DELAY_25G_UX;
@@ -444,6 +477,21 @@ static int eth_ftile_tx_rx_user_flow(intel_fpga_xtile_eth_private *priv)
 			tx_pma_delay_ui = INTEL_FPGA_TX_PMA_DELAY_25G_BK;
 			rx_pma_delay_ui = INTEL_FPGA_RX_PMA_DELAY_25G_BK;
 		}
+		break;
+	case LANE_50G:
+		ui_value = INTEL_FPGA_FTILE_UI_VALUE_50G;
+		if ((pma_type) == XCVR_PMA_TYPE_FGT) {
+			tx_pma_delay_ui = INTEL_FPGA_TX_PMA_DELAY_50G_UX;
+			rx_pma_delay_ui = INTEL_FPGA_TX_PMA_DELAY_50G_UX;
+		} else { // XCVR_PMA_TYPE_FHT
+			tx_pma_delay_ui = INTEL_FPGA_TX_PMA_DELAY_50G_BK;
+			rx_pma_delay_ui = INTEL_FPGA_RX_PMA_DELAY_50G_BK;
+		}
+		break;
+	case LANE_100G:
+		ui_value = INTEL_FPGA_FTILE_UI_VALUE_100G;
+		tx_pma_delay_ui = INTEL_FPGA_TX_PMA_DELAY_100G_BK;
+		rx_pma_delay_ui = INTEL_FPGA_RX_PMA_DELAY_100G_BK;
 		break;
 	default:
 		netdev_err(priv->dev, "Unsupported PHY mode: %s\n", phy_modes(priv->phy_iface));
@@ -467,7 +515,7 @@ static int eth_ftile_tx_rx_user_flow(intel_fpga_xtile_eth_private *priv)
 		netdev_err(priv->dev, "Unsupported speed: %u\n", speed);
 		return -ENODEV;
 	}
-	num_pl = priv->pma_lanes_used;      // PL
+	num_pl = hssi_get_pma_lane_count(pdev, chan);    // PL
 	dev_info(priv->device, "DBG: %s speed=%u num_vl=%u num_fl=%u num_pl=%u\n", __func__, speed,
 		 num_vl, num_fl, num_pl);
 
@@ -1250,6 +1298,27 @@ static int eth_ftile_tx_rx_user_flow(intel_fpga_xtile_eth_private *priv)
 	return 0;
 }
 
+void ftile_pma_digital_reset(intel_fpga_xtile_eth_private *priv,
+			     bool tx_reset,
+			     bool rx_reset)
+{
+	struct platform_device *pdev = priv->pdev_hssi;
+	u32 chan = priv->tile_chan;
+
+	/* Trigger RX digital reset
+	 * 1.   EHIP CSR Write, Offset = 0x310, value = 0x4
+	 * Trigger TX digital reset
+	 * 1.   EHIP CSR Write, Offset = 0x310, value = 0x2
+	 */
+	if (rx_reset)
+		hssi_csrwr32_ba(pdev, HSSI_ETH_RECONFIG,
+				chan, eth_soft_csroffs(eth_reset), ETH_SOFT_RX_RST);
+	if (tx_reset)
+
+		hssi_csrwr32_ba(pdev, HSSI_ETH_RECONFIG,
+				chan, eth_soft_csroffs(eth_reset), ETH_SOFT_TX_RST);
+}
+
 void ftile_get_stats64(struct net_device *dev,
 		       struct rtnl_link_stats64 *storage)
 {
@@ -1261,21 +1330,21 @@ void ftile_get_stats64(struct net_device *dev,
 
 	/* rx stats */
 	lsb = hssi_csrrd32_ba(pdev, HSSI_ETH_RECONFIG, chan,
-			      eth_mac_ptp_csroffs(0, rx_frame_octetsok_lsb));
+			      eth_mac_ptp_csroffs(priv->eth_rate, rx_frame_octetsok_lsb));
 	msb = hssi_csrrd32_ba(pdev, HSSI_ETH_RECONFIG, chan,
-			      eth_mac_ptp_csroffs(0, rx_frame_octetsok_msb));
+			      eth_mac_ptp_csroffs(priv->eth_rate, rx_frame_octetsok_msb));
 	storage->rx_bytes = ((u64)msb << 32) | lsb;
 
 	lsb = hssi_csrrd32_ba(pdev, HSSI_ETH_RECONFIG, chan,
-			      eth_mac_ptp_csroffs(0, rx_mcast_data_ok_lsb));
+			      eth_mac_ptp_csroffs(priv->eth_rate, rx_mcast_data_ok_lsb));
 	msb = hssi_csrrd32_ba(pdev, HSSI_ETH_RECONFIG, chan,
-			      eth_mac_ptp_csroffs(0, rx_mcast_data_ok_msb));
+			      eth_mac_ptp_csroffs(priv->eth_rate, rx_mcast_data_ok_msb));
 	storage->multicast = ((u64)msb << 32) | lsb;
 
 	storage->collisions = 0;
 
 	lsb = hssi_csrrd32_ba(pdev, HSSI_ETH_RECONFIG, chan,
-			      eth_mac_ptp_csroffs(0, rx_lenerr_lsb));
+			      eth_mac_ptp_csroffs(priv->eth_rate, rx_lenerr_lsb));
 	msb = 0;
 	storage->rx_length_errors = ((u64)msb << 32) | lsb;
 
@@ -1294,18 +1363,18 @@ void ftile_get_stats64(struct net_device *dev,
 
 	/* tx stats */
 	lsb = hssi_csrrd32_ba(pdev, HSSI_ETH_RECONFIG, chan,
-			      eth_mac_ptp_csroffs(0, tx_frame_octetsok_lsb));
+			      eth_mac_ptp_csroffs(priv->eth_rate, tx_frame_octetsok_lsb));
 	msb = hssi_csrrd32_ba(pdev, HSSI_ETH_RECONFIG, chan,
-			      eth_mac_ptp_csroffs(0, tx_frame_octetsok_msb));
+			      eth_mac_ptp_csroffs(priv->eth_rate, tx_frame_octetsok_msb));
 	storage->tx_bytes = ((u64)msb << 32) | lsb;
 
 	lsb = hssi_csrrd32_ba(pdev, HSSI_ETH_RECONFIG, chan,
-			      eth_mac_ptp_csroffs(0, tx_malformed_ctrl_lsb));
+			      eth_mac_ptp_csroffs(priv->eth_rate, tx_malformed_ctrl_lsb));
 	msb = 0;
 	storage->tx_errors = ((u64)msb << 32) | lsb;
 
 	lsb = hssi_csrrd32_ba(pdev, HSSI_ETH_RECONFIG, chan,
-			      eth_mac_ptp_csroffs(0, tx_dropped_ctrl_lsb));
+			      eth_mac_ptp_csroffs(priv->eth_rate, tx_dropped_ctrl_lsb));
 	msb = 0;
 	storage->tx_dropped = ((u64)msb << 32) | lsb;
 
@@ -1333,34 +1402,6 @@ static bool ftile_ptp_rx_ready_bit_is_set(intel_fpga_xtile_eth_private *priv)
 	return is_set;
 }
 
-static void ftile_convert_eth_speed_to_eth_rate(intel_fpga_xtile_eth_private *priv)
-{
-	u32 eth_speed = priv->link_speed;
-
-	switch (eth_speed) {
-	case SPEED_10000:
-	case SPEED_25000:
-		priv->eth_rate = INTEL_FPGA_FTILE_ETH_RATE_10G_25G;
-		break;
-	case SPEED_50000:
-		priv->eth_rate = INTEL_FPGA_FTILE_ETH_RATE_50G;
-		break;
-	case SPEED_40000:
-	case SPEED_100000:
-		priv->eth_rate = INTEL_FPGA_FTILE_ETH_RATE_40G_100G;
-		break;
-	case SPEED_200000:
-		priv->eth_rate = INTEL_FPGA_FTILE_ETH_RATE_200G;
-		break;
-	case SPEED_400000:
-		priv->eth_rate = INTEL_FPGA_FTILE_ETH_RATE_400G;
-		break;
-	default:
-		pr_err("invalid eth speed %d, Failed to convert to eth_rate\n", eth_speed);
-		break;
-	}
-}
-
 int ftile_init(intel_fpga_xtile_eth_private *priv)
 {
 	/* Get eth_rate */
@@ -1380,6 +1421,9 @@ int ftile_init(intel_fpga_xtile_eth_private *priv)
 int ftile_start(intel_fpga_xtile_eth_private *priv)
 {
 	int ret;
+
+	/* Get eth_rate */
+	ftile_convert_eth_speed_to_eth_rate(priv);
 
 	/* Enable PTP feature */
 	if (priv->ptp_enable) {
@@ -1415,7 +1459,15 @@ int ftile_uninit(intel_fpga_xtile_eth_private *priv)
 	ftile_disable_mac_flow_ctrl(priv);
 
 	/* Just to make sure Ftile feature are disabled */
-	return ftile_stop(priv);
+	ftile_stop(priv);
+
+	/* Disable Ftile MAC datapath */
+	ftile_disable_mac(priv);
+
+	/* Disable Ftile MAC flow ctrl */
+	ftile_disable_mac_flow_ctrl(priv);
+
+	return 0;
 }
 
 int ftile_run_check(intel_fpga_xtile_eth_private *priv)

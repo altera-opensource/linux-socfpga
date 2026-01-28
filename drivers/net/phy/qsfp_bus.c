@@ -70,6 +70,7 @@ int qsfp_parse_port(struct qsfp_bus *bus, const struct qsfp_eeprom_id *id,
 		break;
 
 	case SFF8024_QSFP_DD_CONNECTOR_COPPER_PIGTAIL:
+	case SFF8024_QSFP_DD_CONNECTOR_COPPER:
 		port = PORT_DA;
 		break;
 

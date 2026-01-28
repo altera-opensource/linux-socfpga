@@ -129,14 +129,14 @@ void msgdma_pref_uninitialize(struct altera_dma_private *priv)
 
 bool msgdma_pref_is_txirq(struct altera_dma_private *priv)
 {
-       return tse_bit_is_set(priv->tx_pref_csr,
-		       msgdma_pref_csroffs(status), MSGDMA_PREF_STAT_IRQ);
+	return tse_bit_is_set(priv->tx_pref_csr,
+			      msgdma_pref_csroffs(status), MSGDMA_PREF_STAT_IRQ);
 }
 
 bool msgdma_pref_is_rxirq(struct altera_dma_private *priv)
 {
-       return tse_bit_is_set(priv->rx_pref_csr,
-		       msgdma_pref_csroffs(status), MSGDMA_PREF_STAT_IRQ);
+	return tse_bit_is_set(priv->rx_pref_csr,
+			      msgdma_pref_csroffs(status), MSGDMA_PREF_STAT_IRQ);
 }
 
 void msgdma_pref_enable_txirq(struct altera_dma_private *priv)
@@ -314,7 +314,7 @@ static void msgdma_confirm_fill_levels(struct altera_dma_private *priv)
 	counter = 0;
 	while (counter++ < ALTERA_TSE_SW_RESET_WATCHDOG_CNTR) {
 		ret = MSGDMA_CSR_RESP_FILL_LEVEL_GET(csrrd32(priv->tx_dma_csr,
-						     msgdma_csroffs(resp_fill_level)));
+							     msgdma_csroffs(resp_fill_level)));
 		if (ret == 0)
 			break;
 
@@ -329,7 +329,7 @@ static void msgdma_confirm_fill_levels(struct altera_dma_private *priv)
 	counter = 0;
 	while (counter++ < ALTERA_TSE_SW_RESET_WATCHDOG_CNTR) {
 		ret = MSGDMA_CSR_RESP_FILL_LEVEL_GET(csrrd32(priv->rx_dma_csr,
-						     msgdma_csroffs(resp_fill_level)));
+							     msgdma_csroffs(resp_fill_level)));
 		if (ret == 0)
 			break;
 
@@ -339,19 +339,17 @@ static void msgdma_confirm_fill_levels(struct altera_dma_private *priv)
 	if (counter >= ALTERA_TSE_SW_RESET_WATCHDOG_CNTR)
 		netdev_err(priv->dev,
 			   "Rx DMA RW Fill level never cleared! 0x%X\n", ret);
-
-	return;
 }
 
-void msgdma_pref_quiese(struct altera_dma_private *priv) {
-
+void msgdma_pref_quiese(struct altera_dma_private *priv)
+{
 	int counter;
 
 	/* Stop the dispatcher from processing any descriptor */
-	tse_set_bit(priv->tx_dma_csr, msgdma_csroffs(control),MSGDMA_CSR_CTL_STOP_DESCS);
-	tse_set_bit(priv->rx_dma_csr, msgdma_csroffs(control),MSGDMA_CSR_CTL_STOP_DESCS);
+	tse_set_bit(priv->tx_dma_csr, msgdma_csroffs(control), MSGDMA_CSR_CTL_STOP_DESCS);
+	tse_set_bit(priv->rx_dma_csr, msgdma_csroffs(control), MSGDMA_CSR_CTL_STOP_DESCS);
 
-        /* wait for the stop */
+	/* wait for the stop */
 	counter = 0;
 	while (counter++ < ALTERA_TSE_SW_RESET_WATCHDOG_CNTR) {
 		if (tse_bit_is_set(priv->tx_dma_csr,
@@ -360,7 +358,7 @@ void msgdma_pref_quiese(struct altera_dma_private *priv) {
 			break;
 
 		udelay(1);
-        }
+	}
 
 	if (counter >= ALTERA_TSE_SW_RESET_WATCHDOG_CNTR)
 		netdev_err(priv->dev,
@@ -373,7 +371,7 @@ void msgdma_pref_quiese(struct altera_dma_private *priv) {
 				   MSGDMA_CSR_STAT_STOPPED))
 			break;
 
-            udelay(1);
+		udelay(1);
 	}
 }
 

@@ -378,7 +378,13 @@ void hssiss_reset_port(struct platform_device *pdev, int port);
 int hssiss_set_mtu(struct platform_device *pdev, u32 cmd, void *mtu_data);
 int hssiss_set_ethport_status(struct platform_device *pdev, int port, u32 data);
 int hssiss_hotplug_disable_status(struct platform_device *pdev);
-int hssiss_enable_disable_loopback(struct platform_device *pdev, u32 cmdid, void *data);
+int hssiss_enable_disable_loopback(struct platform_device *pdev, u32 cmdid,void *data);
+
+int hssiss_anlt_update(struct platform_device *pdev, int port, bool enable_anlt);
+u32 hssiss_anlt_get_status(struct platform_device *pdev, int port);
+u32 hssiss_anlt_get_cfg(struct platform_device *pdev, int port);
+u32 hssiss_anlt_get_ext_status(struct platform_device *pdev, int port, int *an_status);
+
  #ifdef CONFIG_DEBUG_FS
 struct hssiss_dbg *hssiss_dbgfs_init(struct platform_device *pdev);
 void hssiss_dbgfs_remove(struct hssiss_dbg *d);

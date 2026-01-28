@@ -30,6 +30,11 @@
  #define FTILE_25G_RX_TX_MIN_UI		0x9EDC00
  #define FTILE_25G_RX_TX_MAX_UI		0x9EE420
 
+#define FTILE_50G_RX_TX_MIN_UI          0x4F6DF1
+#define FTILE_50G_RX_TX_MAX_UI          0x4F7202
+
+#define MAX_TAM_SNAPSHOT_READ_VALID	5
+
 /* write protected read for the ui enable status */
 static inline bool wpr_get_uienable_status(intel_fpga_xtile_eth_private *priv)
 {
@@ -57,14 +62,18 @@ static void get_min_max_ui(intel_fpga_xtile_eth_private *priv, u64 *min_ui, u64 
 		return;
 	}
 
-	switch (priv->link_speed) {
-	case SPEED_10000:
+	switch (hssi_get_profile_lane_speed(priv->pdev_hssi, priv->tile_chan)) {
+	case LANE_10G:
 				   *min_ui = FTILE_10G_RX_TX_MIN_UI;
 				   *max_ui = FTILE_10G_RX_TX_MAX_UI;
 				break;
-	case SPEED_25000:
+	case LANE_25G:
 				   *min_ui = FTILE_25G_RX_TX_MIN_UI;
 				   *max_ui = FTILE_25G_RX_TX_MAX_UI;
+				break;
+	case LANE_50G:
+				   *min_ui = FTILE_50G_RX_TX_MIN_UI;
+				   *max_ui = FTILE_50G_RX_TX_MAX_UI;
 				break;
 	default:
 				   dev_warn(priv->device, "%s: Eth link speed  unknown\n",
@@ -132,12 +141,14 @@ void ftile_ui_adjustments(struct work_struct *work)
 	u32 rx_tam_l_nth, rx_tam_h_nth, rx_tam_count_nth;
 	u64 tx_tam_nth, rx_tam_nth;
 	u32 tx_tam_interval = 0, rx_tam_interval = 0;
-	u32 ui_value, tx_tam_count, rx_tam_count;
+	u32 ptp_uim_tam_snapshot;
+	u32 snapshot_waitgaurd = 0;
+	u32 tx_tam_count, rx_tam_count;
 	u8  tx_tam_valid, rx_tam_valid;
 	u64 tx_tam_delta, rx_tam_delta;
 	u64 tx_ui, rx_ui;
 	u64 min_ui = 0, max_ui = 0;
-	u16 num_pl = priv->pma_lanes_used;
+	u16 num_pl = hssi_get_pma_lane_count(pdev, chan);
 	u8 eth_rate = priv->eth_rate;
 
 	if (priv->ui_adjust_interval == 0)
@@ -151,8 +162,25 @@ void ftile_ui_adjustments(struct work_struct *work)
 	/* Set tam_snapshot to 1 to take the first snapshot of the Time of
 	 * Alignment marker (TAM)
 	 */
+	/* Clear snapshot first */
+	hssi_clear_bit_ba(pdev, HSSI_ETH_RECONFIG, chan,  eth_soft_csroffs(ptp_uim_tam_snapshot),
+			  ETH_TX_TAM_SNAPSHOT | ETH_RX_TAM_SNAPSHOT);
 	hssi_set_bit_ba(pdev, HSSI_ETH_RECONFIG, chan,  eth_soft_csroffs(ptp_uim_tam_snapshot),
 			ETH_TX_TAM_SNAPSHOT | ETH_RX_TAM_SNAPSHOT);
+
+	do {
+		ptp_uim_tam_snapshot = hssi_csrrd32_ba(pdev, HSSI_ETH_RECONFIG, chan,
+						       eth_soft_csroffs(ptp_uim_tam_snapshot));
+		if (ptp_uim_tam_snapshot)
+			dev_warn(priv->device, "%d - ptp_uim_tam_snapshot Reg: 0x%x 0x%lx 0x%lx\n",
+				 __LINE__, ptp_uim_tam_snapshot, ETH_TX_TAM_SNAPSHOT,
+				 ETH_RX_TAM_SNAPSHOT);
+		if (snapshot_waitgaurd++ > MAX_TAM_SNAPSHOT_READ_VALID) {
+			dev_err(priv->device, "1st Snapshot not valid. Retry...");
+			goto ui_restart;
+		}
+	} while ((ptp_uim_tam_snapshot & ETH_TX_TAM_SNAPSHOT) ||
+		 (ptp_uim_tam_snapshot & ETH_RX_TAM_SNAPSHOT));
 
 	/* Read snapshotted initial TX TAM and counter values */
 	tx_tam_l_initial = hssi_csrrd32_ba(pdev, HSSI_ETH_RECONFIG, chan,
@@ -174,10 +202,6 @@ void ftile_ui_adjustments(struct work_struct *work)
 	rx_tam_count_initial = (ptp_rx_uim_tam_info1 & ETH_RX_TAM_CNT_MASK) >> ETH_RX_TAM_CNT_SHIFT;
 	rx_tam_valid = (ptp_rx_uim_tam_info1 & ETH_RX_TAM_VALID) ? 1 : 0;
 
-	/* Clear snapshot */
-	hssi_clear_bit_ba(pdev, HSSI_ETH_RECONFIG, chan,  eth_soft_csroffs(ptp_uim_tam_snapshot),
-			  ETH_TX_TAM_SNAPSHOT | ETH_RX_TAM_SNAPSHOT);
-
 	if (!rx_tam_valid || !tx_tam_valid) {
 		dev_warn(priv->device, "%s: Initial rx_tam_valid=%u tx_tam_valid=%u\n", __func__,
 			 rx_tam_valid, tx_tam_valid);
@@ -187,8 +211,25 @@ void ftile_ui_adjustments(struct work_struct *work)
 	udelay(5300);
 
 	/* Request snapshot of Nth TX TAM and RX TAM */
+	/* Clear snapshot first*/
+	hssi_clear_bit_ba(pdev, HSSI_ETH_RECONFIG, chan,  eth_soft_csroffs(ptp_uim_tam_snapshot),
+			  ETH_TX_TAM_SNAPSHOT | ETH_RX_TAM_SNAPSHOT);
 	hssi_set_bit_ba(pdev, HSSI_ETH_RECONFIG, chan, eth_soft_csroffs(ptp_uim_tam_snapshot),
 			ETH_TX_TAM_SNAPSHOT | ETH_RX_TAM_SNAPSHOT);
+	snapshot_waitgaurd = 0;
+	do {
+		ptp_uim_tam_snapshot = hssi_csrrd32_ba(pdev, HSSI_ETH_RECONFIG, chan,
+						       eth_soft_csroffs(ptp_uim_tam_snapshot));
+		if (ptp_uim_tam_snapshot)
+			dev_warn(priv->device, "%d - ptp_uim_tam_snapshot Reg: 0x%x 0x%lx 0x%lx\n",
+				 __LINE__, ptp_uim_tam_snapshot, ETH_TX_TAM_SNAPSHOT,
+				 ETH_RX_TAM_SNAPSHOT);
+		if (snapshot_waitgaurd++ > MAX_TAM_SNAPSHOT_READ_VALID) {
+			dev_err(priv->device, "Nth Snapshot not valid. Retry...");
+			goto ui_restart;
+		}
+	} while ((ptp_uim_tam_snapshot & ETH_TX_TAM_SNAPSHOT) ||
+		 (ptp_uim_tam_snapshot & ETH_RX_TAM_SNAPSHOT));
 
 	/* Read snapshotted of Nth TX TAM and counter values */
 	tx_tam_l_nth =  hssi_csrrd32_ba(pdev, HSSI_ETH_RECONFIG, chan,
@@ -210,9 +251,6 @@ void ftile_ui_adjustments(struct work_struct *work)
 	rx_tam_count_nth = (ptp_rx_uim_tam_info1 & ETH_RX_TAM_CNT_MASK) >> ETH_RX_TAM_CNT_SHIFT;
 	rx_tam_valid = (ptp_rx_uim_tam_info1 & ETH_RX_TAM_VALID) ? 1 : 0;
 
-	/* Clear snapshot */
-	hssi_clear_bit_ba(pdev, HSSI_ETH_RECONFIG, chan, eth_soft_csroffs(ptp_uim_tam_snapshot),
-			  ETH_TX_TAM_SNAPSHOT | ETH_RX_TAM_SNAPSHOT);
 	if ((get_jiffies_64() - start_jiffies) > HZ) {
 		dev_warn(priv->device, "%s: 1st to Nth snapshot takes more than 1 second\n",
 			 __func__);
@@ -280,19 +318,6 @@ void ftile_ui_adjustments(struct work_struct *work)
 	dev_dbg(priv->device, "%s rx_tam_initial:0x%llx rx_tam_nth:0x%llx rx_tam_delta:0x%llx\n",
 		__func__, rx_tam_initial, rx_tam_nth, rx_tam_delta);
 
-	// TBD add other PHY modes and ui_value for those...
-	switch (priv->phy_iface) {
-	case PHY_INTERFACE_MODE_10GKR:
-	case PHY_INTERFACE_MODE_10GBASER:
-		ui_value = INTEL_FPGA_FTILE_UI_VALUE_10G;
-		break;
-	case PHY_INTERFACE_MODE_25GKR:
-		ui_value = INTEL_FPGA_FTILE_UI_VALUE_25G;
-		break;
-	default:
-		ui_value = 0; //invalid value
-	}
-
 	/* Step 7c Calculate TAM count value */
 	if (tx_tam_count_nth <= tx_tam_count_initial)
 		tx_tam_count = (tx_tam_count_nth + (1 << 15)) - tx_tam_count_initial;
@@ -302,9 +327,11 @@ void ftile_ui_adjustments(struct work_struct *work)
 		rx_tam_count = (rx_tam_count_nth + (1 << 15)) - rx_tam_count_initial;
 	else
 		rx_tam_count = rx_tam_count_nth - rx_tam_count_initial;
-	dev_dbg(priv->device, "%s tx_tam_count_initial:0x%08x tx_tam_count_nth:0x%08x tx_tam_count:0x%08x\n",
+	dev_dbg(priv->device,
+		"%s tx_tam_count_initial:0x%08x tx_tam_count_nth:0x%08x tx_tam_count:0x%08x\n",
 		__func__, tx_tam_count_initial, tx_tam_count_nth, tx_tam_count);
-	dev_dbg(priv->device, "%s rx_tam_count_initial:0x%08x rx_tam_count_nth:0x%08x rx_tam_count:0x%08x\n",
+	dev_dbg(priv->device,
+		"%s rx_tam_count_initial:0x%08x rx_tam_count_nth:0x%08x	rx_tam_count:0x%08x\n",
 		__func__, rx_tam_count_initial, rx_tam_count_nth, rx_tam_count);
 
 	/* Step 7d Calculate UI value */
@@ -316,14 +343,47 @@ void ftile_ui_adjustments(struct work_struct *work)
 	get_min_max_ui(priv, &min_ui, &max_ui);
 	// check new tx_ui / rx_ui against min./max. ui_value
 	if (tx_ui > max_ui || tx_ui < min_ui) {
-		dev_warn(priv->device, "%s: TX UI value (0x%llX) is not within (0x%llx) to (0x%llx) range\n",
-			 __func__, tx_ui, min_ui, max_ui);
+		dev_warn(priv->device,
+			 "TX val (0x%llX) not within (0x%llx) to (0x%llx) range. RX UI(0x%llX)\n",
+			 tx_ui, min_ui, max_ui, rx_ui);
+		dev_warn(priv->device,
+			 "tx_tam_initial:0x%llx tx_tam_nth:0x%llx tx_tam_delta:0x%llx\n",
+			 tx_tam_initial, tx_tam_nth, tx_tam_delta);
+		dev_warn(priv->device,
+			 "rx_tam_initial:0x%llx rx_tam_nth:0x%llx rx_tam_delta:0x%llx\n",
+			 rx_tam_initial, rx_tam_nth, rx_tam_delta);
+		dev_warn(priv->device,
+			 "tx_tam_count_init:0x%08x tx_tam_count_nth:0x%08x tx_tam_count:0x%08x\n",
+			  tx_tam_count_initial, tx_tam_count_nth, tx_tam_count);
+		dev_warn(priv->device,
+			 "rx_tam_count_init:0x%08x rx_tam_count_nth:0x%08x rx_tam_count:0x%08x\n",
+			 rx_tam_count_initial, rx_tam_count_nth, rx_tam_count);
+		dev_warn(priv->device,
+			 "Eth rate: %d tx_tam_interval:0x%08x rx_tam_interval: 0x%08x pl: %d\n",
+			 eth_rate, tx_tam_interval, rx_tam_interval, num_pl);
+
 		goto ui_restart;
 	}
 
 	if (rx_ui > max_ui || rx_ui < min_ui) {
-		dev_warn(priv->device, "%s: RX UI value (0x%llX) is not within (0x%llx) to (0x%llx) range\n",
-			 __func__, rx_ui, min_ui, max_ui);
+		dev_warn(priv->device,
+			 "RX val (0x%llX) not within (0x%llx) to (0x%llx) range, TX UI(0x%llX)\n",
+			 rx_ui, min_ui, max_ui, tx_ui);
+		dev_warn(priv->device,
+			 "tx_tam_initial:0x%llx tx_tam_nth:0x%llx tx_tam_delta:0x%llx\n",
+			 tx_tam_initial, tx_tam_nth, tx_tam_delta);
+		dev_warn(priv->device,
+			 "rx_tam_initial:0x%llx rx_tam_nth:0x%llx rx_tam_delta:0x%llx\n",
+			 rx_tam_initial, rx_tam_nth, rx_tam_delta);
+		dev_warn(priv->device,
+			 "tx_tam_count_init:0x%08x tx_tam_count_nth:0x%08x tx_tam_count:0x%08x\n",
+			  tx_tam_count_initial, tx_tam_count_nth, tx_tam_count);
+		dev_warn(priv->device,
+			 "rx_tam_count_init:0x%08x rx_tam_count_nth:0x%08x rx_tam_count:0x%08x\n",
+			 rx_tam_count_initial, rx_tam_count_nth, rx_tam_count);
+		dev_warn(priv->device,
+			 "Eth rate: %d tx_tam_interval:0x%08x rx_tam_interval: 0x%08x pl: %d\n",
+			 eth_rate, tx_tam_interval, rx_tam_interval, num_pl);
 		goto ui_restart;
 	}
 	hssi_csrwr32_ba(pdev, HSSI_ETH_RECONFIG, chan, eth_mac_ptp_csroffs(eth_rate, tx_ptp_ui),

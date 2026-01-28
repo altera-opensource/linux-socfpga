@@ -230,7 +230,7 @@ static int eth_etile_tx_rx_user_flow(intel_fpga_xtile_eth_private *priv)
 	// Adjust TX UI
 
 	/* Check for 25G FEC variants */
-	if ((priv->link_speed == SPEED_25000) &&
+	if (priv->link_speed == SPEED_25000 &&
 	    !strcasecmp(kr_fec, priv->fec_type)) {
 		/*  Step 2a Read RX FEC codeword position */
 		switch (priv->rsfec_cw_pos_rx) {

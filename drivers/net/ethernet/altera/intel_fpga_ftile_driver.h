@@ -25,4 +25,6 @@ void ftile_get_stats64(struct net_device *dev,
 int ftile_check_counter_complete(intel_fpga_xtile_eth_private *priv, u32 regbank,
 				 size_t offs, u8 bit_mask, bool set_bit, int align);
 bool ftile_check_dts_param(intel_fpga_xtile_eth_private *priv);
+void ftile_pma_digital_reset(intel_fpga_xtile_eth_private *priv, bool tx_reset, bool rx_reset);
+
  #endif

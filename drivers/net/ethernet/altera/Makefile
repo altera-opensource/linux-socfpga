@@ -37,9 +37,12 @@ ifeq ($(CONFIG_INTEL_FPGA_FREQ_CTRL), y)
 	intel_frequency_ctrl_driver-objs := $(addprefix dpll/, $(intel_frequency_ctrl_driver-objs))
 endif
 
+ifeq ($(CONFIG_INTEL_FPGA_FREQ_CTRL), y)
+	obj-$(CONFIG_INTEL_FPGA_FREQ_CTRL) += intel_freq_control.o
+endif
+
 ifeq ($(CONFIG_INTEL_FPGA_TOD), y)
-	obj-$(CONFIG_INTEL_FPGA_TOD)  += intel_freq_control.o \
-					 intel_fpga_tod.o
+	obj-$(CONFIG_INTEL_FPGA_TOD)  += intel_fpga_tod.o
 endif
 
 ifeq ($(CONFIG_ALTERA_TSE),y)
@@ -87,6 +90,7 @@ ifeq ($(CONFIG_INTEL_FPGA_HSSI_XTILE),y)
 				      intel_fpga_ftile_driver.o		\
 				      intel_fpga_hssi_ftile_fec.o	\
 				      intel_fpga_hssi_ftile_ethtool.o	\
+				      altera_fpga_anlt.o
 
 endif
 
@@ -103,5 +107,6 @@ ifeq ($(CONFIG_INTEL_FPGA_GTS_TILE), y)
                                     intel_fpga_hssi_etile_ethtool.o \
 				    intel_fpga_ftile_driver.o       \
 				    intel_fpga_hssi_ftile_fec.o	    \
-				    intel_fpga_hssi_ftile_ethtool.o
+				    intel_fpga_hssi_ftile_ethtool.o \
+				    altera_fpga_anlt.o
 endif

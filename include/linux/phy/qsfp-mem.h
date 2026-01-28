@@ -17,11 +17,22 @@
 #include <linux/netdevice.h>
 #include <linux/regmap.h>
 #include <linux/uaccess.h>
+#include <linux/qsfp.h>
+#include <linux/ethtool.h>
 
 enum qsfp_init_status {
 	QSFP_INIT_RESET = 0,
 	QSFP_INIT_DONE,
 };
+
+#define QSFP_EEPROM_BASE_SIZE	(ETH_MODULE_SFF_8079_LEN/sizeof(u32))
+#pragma pack(push, 1)
+typedef union qsfp_eeprom_id_mem {
+	u32 data[QSFP_EEPROM_BASE_SIZE];
+	struct qsfp_eeprom_base base;
+} qsfp_eeprom_id_mem;
+#pragma pack(pop)
+
 
 /**
  * struct qsfp - device private data structure
@@ -39,6 +50,8 @@ struct qsfp {
 	struct device *dev;
 	enum qsfp_init_status init;
 	struct mutex lock;
+	struct qsfp_bus *qsfp_bus;
+	qsfp_eeprom_id_mem mem;
 };
 
 int qsfp_init_work(struct qsfp *qsfp);

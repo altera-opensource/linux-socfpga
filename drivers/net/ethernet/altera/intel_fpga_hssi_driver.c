@@ -487,3 +487,124 @@ int hssidrv_probe_init(struct platform_device *pdev)
 
 	return 0;
 }
+
+u32 hssidrv_anlt_get_status(struct platform_device *pdev, int port)
+{
+	u32 hssi_port = port;
+	struct hssiss_private *hssi_priv = platform_get_drvdata(pdev);
+	void __iomem *base = hssi_priv->sscsr;
+	u32 anlt_base, an_status;
+
+	anlt_base = HSSISS_CSR_ANLT_BASE + (hssi_port * HSSISS_CSR_ANLT_RANGE);
+	an_status = csrrd32(base, anlt_base + HSSISS_CSR_AN_STATUS);
+
+	return an_status;
+}
+
+u32 hssidrv_anlt_get_cfg(struct platform_device *pdev, int port)
+{
+	u32 hssi_port = port;
+	struct hssiss_private *hssi_priv = platform_get_drvdata(pdev);
+	void __iomem *base = hssi_priv->sscsr;
+	u32 anlt_base, an_cfg;
+
+	anlt_base = HSSISS_CSR_ANLT_BASE + (hssi_port * HSSISS_CSR_ANLT_RANGE);
+	an_cfg = csrrd32(base, anlt_base + HSSISS_CSR_AN_CFG_1);
+
+	return an_cfg;
+}
+
+u32 hssidrv_anlt_get_ext_status(struct platform_device *pdev, int port, int *an_status)
+{
+	u32 hssi_port = port;
+	struct hssiss_private *hssi_priv = platform_get_drvdata(pdev);
+	void __iomem *base = hssi_priv->sscsr;
+	u32 anlt_base, i;
+
+	anlt_base = HSSISS_CSR_ANLT_BASE + (hssi_port * HSSISS_CSR_ANLT_RANGE);
+	for (i = 0; i < HSSISS_CSR_AN_STATUS_NUM; i++)
+		an_status[i] = csrrd32(base, anlt_base + HSSISS_CSR_AN_STATUS_1 + (i * 4));
+
+	return 0;
+}
+
+int hssidrv_anlt_update(struct platform_device *pdev, int port, bool enable_anlt)
+{
+	u32 hssi_port = port;
+	struct hssiss_private *hssi_priv = platform_get_drvdata(pdev);
+	void __iomem *base = hssi_priv->sscsr;
+	u32 val = 0;
+	int ret = 0;
+	/* Write 1 to an_cfg1[0] i.e. enable AN*/
+	/* Write 1 to lt_cfg1[0] i.e. enable LT*/
+	/* Write 1 to seq_cfg[0] i.e. restart ANLT sequencer */
+	u32 anlt_base, an_cfg_1, lt_cfg_1, anlt_seq_cfg;
+
+	anlt_base = HSSISS_CSR_ANLT_BASE + (hssi_port * HSSISS_CSR_ANLT_RANGE);
+
+	an_cfg_1 = csrrd32(base, anlt_base + HSSISS_CSR_AN_CFG_1);
+	lt_cfg_1 = csrrd32(base, anlt_base + HSSISS_CSR_LT_CFG_1);
+	anlt_seq_cfg = csrrd32(base, anlt_base + HSSISS_CSR_ANLT_SEQ_CFG);
+
+	if (enable_anlt) {
+		// Enable ANLT
+		if ((an_cfg_1 & HSSISS_CSR_AN_ENABLE_AN) &&
+		    (lt_cfg_1 & HSSISS_CSR_LT_ENABLE_LINK_TRAINING)) {
+			// if already set return invalid argument
+			ret = -EINVAL;
+		} else {
+			/* Write 1 to an_cfg1[0] i.e. enable AN*/
+			/* Write 1 to lt_cfg1[0] i.e. enable LT*/
+			/* Write 1 to seq_cfg[0] i.e. restart ANLT sequencer */
+
+			val = an_cfg_1 | HSSISS_CSR_AN_ENABLE_AN;
+			csrwr32(val, base, anlt_base + HSSISS_CSR_AN_CFG_1);
+
+			val = lt_cfg_1 | HSSISS_CSR_LT_ENABLE_LINK_TRAINING;
+			csrwr32(val, base, anlt_base + HSSISS_CSR_LT_CFG_1);
+
+			val = anlt_seq_cfg | HSSISS_CSR_ANLT_SEQ_RESET_SEQ;
+			csrwr32(val, base, anlt_base + HSSISS_CSR_ANLT_SEQ_CFG);
+
+			//read back and check
+			an_cfg_1 = csrrd32(base, anlt_base + HSSISS_CSR_AN_CFG_1);
+			lt_cfg_1 = csrrd32(base, anlt_base + HSSISS_CSR_LT_CFG_1);
+			if (((an_cfg_1 & HSSISS_CSR_AN_ENABLE_AN) == 0) &&
+			    ((lt_cfg_1 & HSSISS_CSR_LT_ENABLE_LINK_TRAINING) == 0)) {
+				// if values not updated return IO err
+				ret = -EIO;
+			}
+		}
+	} else {
+		//Disable ANLT
+		if ((an_cfg_1 & HSSISS_CSR_AN_ENABLE_AN) &&
+		    (lt_cfg_1 & HSSISS_CSR_LT_ENABLE_LINK_TRAINING)) {
+			/* Write 0 to an_cfg1[0] i.e. disable AN*/
+			/* Write 0 to lt_cfg1[0] i.e. disable AN*/
+			/* Write 1 to seq_cfg[0] i.e. restart ANLT sequencer */
+			val = an_cfg_1 & ~(HSSISS_CSR_AN_ENABLE_AN);
+			csrwr32(val, base, anlt_base + HSSISS_CSR_AN_CFG_1);
+
+			val = lt_cfg_1 & ~(HSSISS_CSR_LT_ENABLE_LINK_TRAINING);
+			csrwr32(val, base, anlt_base + HSSISS_CSR_LT_CFG_1);
+
+			val = anlt_seq_cfg | HSSISS_CSR_ANLT_SEQ_RESET_SEQ;
+			csrwr32(val, base, anlt_base + HSSISS_CSR_ANLT_SEQ_CFG);
+
+			//read back and check
+
+			an_cfg_1 = csrrd32(base, anlt_base + HSSISS_CSR_AN_CFG_1);
+			lt_cfg_1 = csrrd32(base, anlt_base + HSSISS_CSR_LT_CFG_1);
+
+			if (((an_cfg_1 & HSSISS_CSR_AN_ENABLE_AN) != 0) &&
+			    ((lt_cfg_1 & HSSISS_CSR_LT_ENABLE_LINK_TRAINING) != 0)) {
+				ret = -EIO;
+			}
+		} else {
+			ret = -EINVAL;
+		}
+	}
+
+	return ret;
+}
+

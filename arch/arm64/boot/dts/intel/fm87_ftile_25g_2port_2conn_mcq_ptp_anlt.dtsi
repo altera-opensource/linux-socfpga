@@ -19,13 +19,21 @@
 			#size-cells = <1>;
 			ranges =	<0x00000000 0x00000000 0xf9000000 0x00001000>,
 					<0x00000001 0x00000000 0x80000000 0x04000000>,
-					<0x00000001 0x00000000 0x84040000 0x00000040>,
-					<0x00000001 0x00000000 0x84040100 0x00000140>,
-					<0x00000001 0x04040050 0x84040050 0x00000010>,
-					<0x00000001 0x04040040 0x84040040 0x00000010>,
-					<0x00000001 0x00000000 0x84050000 0x00010000>,
-					<0x00000001 0x00000000 0x84060000 0x00010000>,
-					<0x00000001 0x00000000 0x84070000 0x00010000>;
+					<0x00000001 0x00000000 0x84000000 0x04000000>,
+					<0x00000001 0x00000000 0x88040000 0x00000040>,
+					<0x00000001 0x00000000 0x88040100 0x00000140>,
+					<0x00000001 0x08040050 0x88040050 0x00000010>,
+					<0x00000001 0x08040040 0x88040040 0x00000010>,
+					<0x00000001 0x00000000 0x88050000 0x00010000>,
+					<0x00000001 0x00000000 0x88060000 0x00010000>,
+					<0x00000001 0x00000000 0x88070000 0x00010000>,
+					<0x00000001 0x00000000 0x88480000 0x00000100>,
+					<0x00000001 0x00000000 0x884C0000 0x00000100>,
+					<0x00000001 0x00000000 0x88500000 0x00000100>,
+					<0x00000001 0x00000000 0x88540000 0x00000100>,
+					<0x00000001 0x00000000 0x88580000 0x00000100>,
+					<0x00000001 0x00000000 0x885C0000 0x00000100>,
+					<0x00000001 0x00000000 0x884D0000 0x00001000>;
 
 			qsfp_eth0: qsfp-eth0 {
 				compatible = "sff,qsfp";
@@ -40,9 +48,9 @@
 				status = "okay";
 			};
 
-			qsfpdd_status_pio: gpio@4040050 {
+			qsfpdd_status_pio: gpio@8040050 {
 				compatible = "altr,pio-1.0";
-				reg = <0x00000001 0x04040050 0x10>;
+				reg = <0x00000001 0x08040050 0x10>;
 				interrupt-parent = <&intc>;
 				interrupts = <0 22 4>;
 				altr,gpio-bank-width = <4>;
@@ -52,14 +60,13 @@
 				status = "okay";
 			};
 
-			qsfpdd_ctrl_pio: gpio@4040040 {
+			qsfpdd_ctrl_pio: gpio@8040040 {
 				compatible = "altr,pio-1.0";
-				reg = <0x00000001 0x04040040 0x10>;
+				reg = <0x00000001 0x08040040 0x10>;
 				interrupt-parent = <&intc>;
 				interrupts = <0 23 4>;
 				altr,gpio-bank-width = <4>;
 				altr,interrupt-type = <2>;
-				altr,interrupt_type = <2>;
 				#gpio-cells = <2>;
 				gpio-controller;
 				status = "okay";
@@ -86,8 +93,8 @@
 			compatible = "intel, tod";
 			reg-names =	"tod_ctrl",
 					"pps_ctrl";
-			reg =	<0x84040000 0x00000040>,
-				<0x84040100 0x00000040>;
+			reg =	<0x88040000 0x00000040>,
+				<0x88040100 0x00000040>;
 			interrupt-parent = <&intc>;
 			interrupt-names = "pps_irq";
 			interrupts = <0 19 4>;
@@ -104,22 +111,33 @@
 			reg = <0x80000000 0x04000000>;
 			reset-mode ="reg";
 		};
+		hssiss_1_hssiss: hssiss_1_hssiss {
+			compatible = "intel, hssiss-1.0";
+			reg-names = "sscsr";
+			reg = <0x84000000 0x04000000>;
+			reset-mode ="reg";
+		};
 		pktgen_0: pktgen@81010000 {
 			compatible = "generic-uio";
-			reg = <0x84060000 0x10000>;
+			reg = <0x88060000 0x10000>;
 			reg-names = "pkt_cli";
 		};
 		pktgen_1: pktgen@81020000 {
 			compatible = "generic-uio";
-			reg = <0x84070000 0x10000>;
+			reg = <0x88070000 0x10000>;
 			reg-names = "pkt_cli";
 		};
 		packetswitch_0: packetswitch@81000000 {
 			compatible = "generic-uio";
-			reg = <0x84050000 0x10000>;
+			reg = <0x88050000 0x10000>;
 			reg-names = "packetswitch";
 		};
-
+		qsfp_eth1: qsfp-eth1 {
+			compatible = "intel,qsfp-mem";
+			reg-names = "qsfp-mem-ctrl";
+			reg = <0x884D0000 0x00001000>;
+			status = "okay";
+	    	};
 		hssi_0_eth: hssi_0_eth {
 			compatible = "altr,hssi-ftile-1.0";
 			#address-cells = <1>;
@@ -140,12 +158,15 @@
 			altr,rx-external-phy-delay-ns = <0x0>;
 			fec-cw-pos-rx = <0x0>;
 			fec-type="kr-fec";
+			qsfp = <&qsfp_eth0>;
 			qsfp-lane = <0x0>;
 			altr,has-ptp;
 			ptp_accu_mode = "Advanced";
-			ptp_tx_routing_adj = <54093>; //0.8254 * 65536
-			ptp_rx_routing_adj = <55948>; //0.8537 * 65536
+			ptp_tx_routing_adj = <24707>; //0.377   * 65536
+			ptp_rx_routing_adj = <22249>; //0.3395  * 65536
 			status = "okay";
+			altr,has-anlt;
+			autoneg_enabled = "yes";
 			ui-adj-interval = <250>;
 			num_channels = <3>;
 			interrupt-parent = <&intc>;
@@ -166,12 +187,12 @@
 						"rx_pref"  ,
 						"rx_csr"   ,
 						"rx_fifo";
-				reg =	<0x84480000 0x00000020>,
-					<0x84480020 0x00000020>,
-					<0x84480040 0x00000020>,
-					<0x84480080 0x00000020>,
-					<0x844800A0 0x00000020>,
-					<0x844800C0 0x00000010>;
+				reg =	<0x88480000 0x00000020>,
+					<0x88480020 0x00000020>,
+					<0x88480040 0x00000020>,
+					<0x88480080 0x00000020>,
+					<0x884800A0 0x00000020>,
+					<0x884800C0 0x00000010>;
 				tx-poll-freq=<128>;
 				rx-poll-freq=<128>;
 				rx-fifo-depth = <0x4000>;
@@ -186,12 +207,12 @@
 						"rx_pref"  ,
 						"rx_csr"   ,
 						"rx_fifo";
-				reg =	<0x844C0000 0x00000020>,
-					<0x844C0020 0x00000020>,
-					<0x844C0040 0x00000020>,
-					<0x844C0080 0x00000020>,
-					<0x844C00A0 0x00000020>,
-					<0x844C00C0 0x00000010>;
+				reg =	<0x884C0000 0x00000020>,
+					<0x884C0020 0x00000020>,
+					<0x884C0040 0x00000020>,
+					<0x884C0080 0x00000020>,
+					<0x884C00A0 0x00000020>,
+					<0x884C00C0 0x00000010>;
 				tx-poll-freq=<512>;
 				rx-poll-freq=<512>;
 				rx-fifo-depth = <0x4000>;
@@ -206,12 +227,12 @@
 						"rx_pref"  ,
 						"rx_csr"   ,
 						"rx_fifo";
-				reg =	<0x84500000 0x00000020>,
-					<0x84500020 0x00000020>,
-					<0x84500040 0x00000020>,
-					<0x84500080 0x00000020>,
-					<0x845000A0 0x00000020>,
-					<0x845000C0 0x00000010>;
+				reg =	<0x88500000 0x00000020>,
+					<0x88500020 0x00000020>,
+					<0x88500040 0x00000020>,
+					<0x88500080 0x00000020>,
+					<0x885000A0 0x00000020>,
+					<0x885000C0 0x00000010>;
 				tx-poll-freq=<1024>;
 				rx-poll-freq=<1024>;
 				rx-fifo-depth = <0x4000>;
@@ -225,11 +246,11 @@
 			#address-cells = <1>;
 			#size-cells = <1>;
 			ranges;
-			tile_chan = <0x9>;
-			hssi_port = <0x9>;
+			tile_chan = <0x8>;
+			hssi_port = <0x8>;
 			phy-mode = "25gbase-kr";
 			tod = <&tod_0_clk>;
-			hssiss = <&hssiss_0_hssiss>;
+			hssiss = <&hssiss_1_hssiss>;
 			pma_type = <0x0>; // FGT - 0x00, FHT = 0x1000
 			monitor_poll_interval = <10>;
 			altr,tx-pma-delay-ns = <0xD>;
@@ -240,12 +261,15 @@
 			altr,rx-external-phy-delay-ns = <0x0>;
 			fec-cw-pos-rx = <0x0>;
 			fec-type="kr-fec";
+			qsfp = <&qsfp_eth1>;
 			qsfp-lane = <0x0>;
 			altr,has-ptp;
 			ptp_accu_mode = "Advanced";
-			ptp_tx_routing_adj = <55417>; //0.8456 * 65536
-			ptp_rx_routing_adj = <58838>; //0.8978 * 65536
+			ptp_tx_routing_adj = <15335>; // 0.234   * 65536
+			ptp_rx_routing_adj = <20627>; // 0.31475 * 65536
 			status = "okay";
+			altr,has-anlt;
+			autoneg_enabled = "yes";
 			ui-adj-interval = <250>;
 			num_channels = <3>;
 			interrupt-parent = <&intc>;
@@ -254,7 +278,7 @@
 						"dma2_tx_irq", "dma2_rx_irq";
 			interrupts =	<0 34 4>, <0 35 4>,
 					<0 32 4>, <0 33 4>,
-					<0 30 4>, <0 31 4>;
+					<0 31 4>, <0 30 4>;
 			fixed-link {
 				speed =<25000>;
 				full-duplex;
@@ -266,12 +290,12 @@
 						"rx_pref"  ,
 						"rx_csr"   ,
 						"rx_fifo";
-				reg =	<0x84540000 0x00000020>,
-					<0x84540020 0x00000020>,
-					<0x84540040 0x00000020>,
-					<0x84540080 0x00000020>,
-					<0x845400A0 0x00000020>,
-					<0x845400C0 0x00000010>;
+				reg =	<0x88540000 0x00000020>,
+					<0x88540020 0x00000020>,
+					<0x88540040 0x00000020>,
+					<0x88540080 0x00000020>,
+					<0x885400A0 0x00000020>,
+					<0x885400C0 0x00000010>;
 				tx-poll-freq=<128>;
 				rx-poll-freq=<128>;
 				rx-fifo-depth = <0x4000>;
@@ -286,12 +310,12 @@
 						"rx_pref"  ,
 						"rx_csr"   ,
 						"rx_fifo";
-				reg =	<0x84580000 0x00000020>,
-					<0x84580020 0x00000020>,
-					<0x84580040 0x00000020>,
-					<0x84580080 0x00000020>,
-					<0x845800A0 0x00000020>,
-					<0x845800C0 0x00000010>;
+				reg =	<0x88580000 0x00000020>,
+					<0x88580020 0x00000020>,
+					<0x88580040 0x00000020>,
+					<0x88580080 0x00000020>,
+					<0x885800A0 0x00000020>,
+					<0x885800C0 0x00000010>;
 				tx-poll-freq=<512>;
 				rx-poll-freq=<512>;
 				rx-fifo-depth = <0x4000>;
@@ -306,12 +330,12 @@
 						"rx_pref"  ,
 						"rx_csr"   ,
 						"rx_fifo";
-				reg =	<0x845C0000 0x00000020>,
-					<0x845C0020 0x00000020>,
-					<0x845C0040 0x00000020>,
-					<0x845C0080 0x00000020>,
-					<0x845C00A0 0x00000020>,
-					<0x845C00C0 0x00000010>;
+				reg =	<0x885C0000 0x00000020>,
+					<0x885C0020 0x00000020>,
+					<0x885C0040 0x00000020>,
+					<0x885C0080 0x00000020>,
+					<0x885C00A0 0x00000020>,
+					<0x885C00C0 0x00000010>;
 				tx-poll-freq=<1024>;
 				rx-poll-freq=<1024>;
 				rx-fifo-depth = <0x4000>;

@@ -112,6 +112,13 @@ int hssiss_set_ethport_status(struct platform_device *pdev, int port, u32 data)
 	return priv->spec_ops->ops->set_ethport_status(pdev, port, data);
 }
 
+hssi_eth_port_attr hssiss_get_ethport_attr(struct platform_device *pdev, int port)
+{
+	struct hssiss_private *priv = platform_get_drvdata(pdev);
+
+	return priv->spec_ops->ops->get_ethport_attr(pdev, port);
+}
+
 void hssiss_hotplug_enable(struct platform_device *pdev, bool enable)
 {
 	struct hssiss_private *priv = platform_get_drvdata(pdev);
@@ -176,6 +183,42 @@ void hssiss_reset_port(struct platform_device *pdev, int port)
 
 	if (priv->spec_ops->ops->reset_port)
 		return priv->spec_ops->ops->reset_port(pdev, port);
+}
+
+int hssiss_anlt_update(struct platform_device *pdev, int port, bool enable_anlt)
+{
+	struct hssiss_private *priv = platform_get_drvdata(pdev);
+
+	if (priv->spec_ops->ops->anlt_update)
+		return priv->spec_ops->ops->anlt_update(pdev, port, enable_anlt);
+	return 0;
+}
+
+u32 hssiss_anlt_get_status(struct platform_device *pdev, int port)
+{
+	struct hssiss_private *priv = platform_get_drvdata(pdev);
+
+	if (priv->spec_ops->ops->anlt_get_status)
+		return priv->spec_ops->ops->anlt_get_status(pdev, port);
+	return 0;
+}
+
+u32 hssiss_anlt_get_cfg(struct platform_device *pdev, int port)
+{
+	struct hssiss_private *priv = platform_get_drvdata(pdev);
+
+	if (priv->spec_ops->ops->anlt_get_cfg)
+		return priv->spec_ops->ops->anlt_get_cfg(pdev, port);
+	return 0;
+}
+
+u32 hssiss_anlt_get_ext_status(struct platform_device *pdev, int port, int *an_status)
+{
+	struct hssiss_private *priv = platform_get_drvdata(pdev);
+
+	if (priv->spec_ops->ops->anlt_get_ext_status)
+		return priv->spec_ops->ops->anlt_get_ext_status(pdev, port, an_status);
+	return 0;
 }
 
 static int execute_sal_cmd(struct platform_device *pdev,
@@ -249,30 +292,30 @@ int hssiss_execute_sal_cmd(struct platform_device *pdev,
 	return execute_sal_cmd(pdev, cmd, data);
 }
 
-static ssize_t hssiss_hotplug_disable_show(struct device *dev,
-					   struct device_attribute *attr, char *buf)
+static ssize_t hssi_hotplug_disable_show(struct device *dev,
+					 struct device_attribute *attr, char *buf)
 {
 	struct platform_device *pdev = to_platform_device(dev);
 
 	return sprintf(buf, "%u\n", hssiss_hotplug_disable_status(pdev));
 }
 
-static ssize_t hssiss_hotplug_disable_store(struct device *dev,
-					    struct device_attribute *attr,
+static ssize_t hssi_hotplug_disable_store(struct device *dev,
+					  struct device_attribute *attr,
 					    const char *buf, size_t len)
 {
 	struct platform_device *pdev = to_platform_device(dev);
 	int disable;
 
-	sscanf(buf, "%d", &disable);
+	(void)kstrtouint(buf, 10, &disable);
 
 	hssiss_hotplug_enable(pdev, (disable ? false : true));
 
 	return len;
 }
 
-static ssize_t hssiss_err_wa_show(struct device *dev,
-				  struct device_attribute *attr, char *buf)
+static ssize_t hssi_err_wa_show(struct device *dev,
+				struct device_attribute *attr, char *buf)
 {
 	struct platform_device *pdev = to_platform_device(dev);
 	struct hssiss_private *priv = platform_get_drvdata(pdev);
@@ -280,20 +323,20 @@ static ssize_t hssiss_err_wa_show(struct device *dev,
 	return sprintf(buf, "%d\n", priv->hssi_err_wa);
 }
 
-static ssize_t hssiss_err_wa_store(struct device *dev,
-				   struct device_attribute *attr, const char *buf, size_t len)
+static ssize_t hssi_err_wa_store(struct device *dev,
+				 struct device_attribute *attr, const char *buf, size_t len)
 {
 	struct platform_device *pdev = to_platform_device(dev);
 	struct hssiss_private *priv = platform_get_drvdata(pdev);
 
-	sscanf(buf, "%d", &priv->hssi_err_wa);
+	(void)kstrtouint(buf, 10, &priv->hssi_err_wa);
 
 	return len;
 }
 
-static DEVICE_ATTR(hssi_hotplug_disable, 0644, hssiss_hotplug_disable_show,
-		   hssiss_hotplug_disable_store);
-static DEVICE_ATTR(hssi_err_wa, 0644, hssiss_err_wa_show, hssiss_err_wa_store);
+static DEVICE_ATTR(hssi_hotplug_disable, 0644, hssi_hotplug_disable_show,
+		   hssi_hotplug_disable_store);
+static DEVICE_ATTR_RW(hssi_err_wa);
 
 static struct attribute *hssiss_sysfs_attrs[] = {
 	&dev_attr_hssi_hotplug_disable.attr,
@@ -319,6 +362,7 @@ static struct hssi_gen_ops hssi_gen_ops = {
 	.get_set_dr_profile = hssidrv_get_set_dr_profile,
 	.get_ethport_status = hssidrv_get_ethport_status,
 	.set_ethport_status = hssidrv_set_ethport_status,
+	.get_ethport_attr = hssidrv_get_ethport_attr,
 	.enable_disable_loopback = hssidrv_enable_disable_loopback,
 	.hotplug_enable = hssidrv_hotplug_enable,
 	.perform_cold_rst = hssidrv_cold_rst,
@@ -326,6 +370,10 @@ static struct hssi_gen_ops hssi_gen_ops = {
 	.reset_mac_stat = hssidrv_reset_mac_stat,
 	.test_nios = hssidrv_test_nios,
 	.probe_init = hssidrv_probe_init,
+	.anlt_get_status = hssidrv_anlt_get_status,
+	.anlt_get_cfg = hssidrv_anlt_get_cfg,
+	.anlt_get_ext_status = hssidrv_anlt_get_ext_status,
+	.anlt_update = hssidrv_anlt_update,
 };
 
 struct hssi_spec_ops hssi_xtile_data = {

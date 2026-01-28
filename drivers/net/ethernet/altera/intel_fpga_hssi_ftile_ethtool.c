@@ -22,6 +22,9 @@
  #include "intel_fpga_eth_ftile.h"
  #include "intel_fpga_eth_hssi_itf.h"
  #include "intel_fpga_ftile_driver.h"
+ #include <linux/qsfp.h>
+ #include "intel_fpga_hssi_driver.h"
+ #include "altera_fpga_anlt.h"
 
  #define FTILE_STATS_LEN	ARRAY_SIZE(stat_gstrings)
  #define FTILE_NUM_REGS	555
@@ -430,1008 +433,1010 @@ static void ftile_get_regs(struct net_device *dev, struct ethtool_regs *regs,
 	/* F-tile EHIP PHY registers: */
 	/* 0x000 - 0x07C : PCS Config */
 	buf[98] = hssi_csrrd32_ba(pdev, HSSI_ETH_RECONFIG, chan,
-				  eth_phy_csroffs(0, config_ctrl));			// 0x000
+				  eth_phy_csroffs(priv->eth_rate, config_ctrl));	// 0x000
 	buf[99] = hssi_csrrd32_ba(pdev, HSSI_ETH_RECONFIG, chan,
-				  eth_phy_csroffs(0, ehip_reset_and_debug));		// 0x00C
+				  eth_phy_csroffs(priv->eth_rate, ehip_reset_and_debug));// 0x00C
 	buf[100] = hssi_csrrd32_ba(pdev, HSSI_ETH_RECONFIG, chan,
-				   eth_phy_csroffs(0, phy_tx_pld_conf));		// 0x010
+				   eth_phy_csroffs(priv->eth_rate, phy_tx_pld_conf));	// 0x010
 	buf[101] = hssi_csrrd32_ba(pdev, HSSI_ETH_RECONFIG, chan,
-				   eth_phy_csroffs(0, phy_rx_pld_conf));		// 0x014
+				   eth_phy_csroffs(priv->eth_rate, phy_rx_pld_conf));	// 0x014
 	buf[102] = hssi_csrrd32_ba(pdev, HSSI_ETH_RECONFIG, chan,
-				   eth_phy_csroffs(0, phy_ehip_pcs_modes));		// 0x048
+				   eth_phy_csroffs(priv->eth_rate, phy_ehip_pcs_modes));// 0x048
 	buf[103] = hssi_csrrd32_ba(pdev, HSSI_ETH_RECONFIG, chan,
-				   eth_phy_csroffs(0, phy_rx_pcs_conf));		// 0x04C
+				   eth_phy_csroffs(priv->eth_rate, phy_rx_pcs_conf));	// 0x04C
 	buf[104] = hssi_csrrd32_ba(pdev, HSSI_ETH_RECONFIG, chan,
-				   eth_phy_csroffs(0, phy_tx_am_enc[0]));		// 0x050
+				   eth_phy_csroffs(priv->eth_rate, phy_tx_am_enc[0]));	// 0x050
 	buf[105] = hssi_csrrd32_ba(pdev, HSSI_ETH_RECONFIG, chan,
-				   eth_phy_csroffs(0, phy_tx_am_enc[1]));		// 0x054
+				   eth_phy_csroffs(priv->eth_rate, phy_tx_am_enc[1]));	// 0x054
 	buf[106] = hssi_csrrd32_ba(pdev, HSSI_ETH_RECONFIG, chan,
-				   eth_phy_csroffs(0, phy_tx_am_enc[2]));		// 0x058
+				   eth_phy_csroffs(priv->eth_rate, phy_tx_am_enc[2]));	// 0x058
 	buf[107] = hssi_csrrd32_ba(pdev, HSSI_ETH_RECONFIG, chan,
-				   eth_phy_csroffs(0, phy_tx_am_enc[3]));		// 0x05C
+				   eth_phy_csroffs(priv->eth_rate, phy_tx_am_enc[3]));	// 0x05C
 	buf[108] = hssi_csrrd32_ba(pdev, HSSI_ETH_RECONFIG, chan,
-				   eth_phy_csroffs(0, phy_rx_am_enc[0]));		// 0x060
+				   eth_phy_csroffs(priv->eth_rate, phy_rx_am_enc[0]));	// 0x060
 	buf[109] = hssi_csrrd32_ba(pdev, HSSI_ETH_RECONFIG, chan,
-				   eth_phy_csroffs(0, phy_rx_am_enc[1]));		// 0x064
+				   eth_phy_csroffs(priv->eth_rate, phy_rx_am_enc[1]));	// 0x064
 	buf[110] = hssi_csrrd32_ba(pdev, HSSI_ETH_RECONFIG, chan,
-				   eth_phy_csroffs(0, phy_rx_am_enc[2]));		// 0x068
+				   eth_phy_csroffs(priv->eth_rate, phy_rx_am_enc[2]));	// 0x068
 	buf[111] = hssi_csrrd32_ba(pdev, HSSI_ETH_RECONFIG, chan,
-				   eth_phy_csroffs(0, phy_rx_am_enc[3]));		// 0x06C
+				   eth_phy_csroffs(priv->eth_rate, phy_rx_am_enc[3]));	// 0x06C
 	buf[112] = hssi_csrrd32_ba(pdev, HSSI_ETH_RECONFIG, chan,
-				   eth_phy_csroffs(0, phy_timer_window_hiber_check));	// 0x070
+				   eth_phy_csroffs(priv->eth_rate, phy_timer_window_hiber_check));
 	buf[113] = hssi_csrrd32_ba(pdev, HSSI_ETH_RECONFIG, chan,
-				   eth_phy_csroffs(0, phy_hiber_frm_err));		// 0x074
+				   eth_phy_csroffs(priv->eth_rate, phy_hiber_frm_err));	// 0x074
 	buf[114] = hssi_csrrd32_ba(pdev, HSSI_ETH_RECONFIG, chan,
-				   eth_phy_csroffs(0, phy_pcs_err_inject));		// 0x078
+				   eth_phy_csroffs(priv->eth_rate, phy_pcs_err_inject));// 0x078
 	// 0x080 - 0x1FC : PCS Status
 	buf[115] = hssi_csrrd32_ba(pdev, HSSI_ETH_RECONFIG, chan,
-				   eth_phy_csroffs(0, phy_frm_err_detect));		// 0x080
+				   eth_phy_csroffs(priv->eth_rate, phy_frm_err_detect));// 0x080
 	buf[116] = hssi_csrrd32_ba(pdev, HSSI_ETH_RECONFIG, chan,
-				   eth_phy_csroffs(0, phy_pcs_stat_anlt));		// 0x084
+				   eth_phy_csroffs(priv->eth_rate, phy_pcs_stat_anlt));	// 0x084
 	buf[117] = hssi_csrrd32_ba(pdev, HSSI_ETH_RECONFIG, chan,
-				   eth_phy_csroffs(0, phy_am_lock));			// 0x088
+				   eth_phy_csroffs(priv->eth_rate, phy_am_lock));	// 0x088
 	buf[118] = hssi_csrrd32_ba(pdev, HSSI_ETH_RECONFIG, chan,
-				   eth_phy_csroffs(0, phy_lanes_deskewed));		// 0x08C
+				   eth_phy_csroffs(priv->eth_rate, phy_lanes_deskewed));// 0x08C
 	buf[119] = hssi_csrrd32_ba(pdev, HSSI_ETH_RECONFIG, chan,
-				   eth_phy_csroffs(0, phy_ber_cnt));			// 0x090
+				   eth_phy_csroffs(priv->eth_rate, phy_ber_cnt));	// 0x090
 	buf[120] = hssi_csrrd32_ba(pdev, HSSI_ETH_RECONFIG, chan,
-				   eth_phy_csroffs(0, phy_pcs_virtual_ln_0));		// 0x094
+				   eth_phy_csroffs(priv->eth_rate, phy_pcs_virtual_ln_0));// 0x094
 	buf[121] = hssi_csrrd32_ba(pdev, HSSI_ETH_RECONFIG, chan,
-				   eth_phy_csroffs(0, phy_pcs_virtual_ln_1));		// 0x098
+				   eth_phy_csroffs(priv->eth_rate, phy_pcs_virtual_ln_1));// 0x098
 	buf[122] = hssi_csrrd32_ba(pdev, HSSI_ETH_RECONFIG, chan,
-				   eth_phy_csroffs(0, phy_pcs_virtual_ln_2));		// 0x09C
+				   eth_phy_csroffs(priv->eth_rate, phy_pcs_virtual_ln_2));// 0x09C
 	buf[123] = hssi_csrrd32_ba(pdev, HSSI_ETH_RECONFIG, chan,
-				   eth_phy_csroffs(0, phy_pcs_virtual_ln_3));		// 0x0A0
+				   eth_phy_csroffs(priv->eth_rate, phy_pcs_virtual_ln_3));// 0x0A0
+	// 0x0A4 - 0x0F0
 	for (i = 0; i < 20; ++i)
 		buf[124 + i] = hssi_csrrd32_ba(pdev, HSSI_ETH_RECONFIG, chan,
-					       eth_phy_csroffs(0, phy_bip_cnt[i]));// 0x0A4 - 0x0F0
+					       eth_phy_csroffs(priv->eth_rate, phy_bip_cnt[i]));
 	buf[144] = hssi_csrrd32_ba(pdev, HSSI_ETH_RECONFIG, chan,
-				   eth_phy_csroffs(0, phy_err_block_cnt));		// 0x0F4
+				   eth_phy_csroffs(priv->eth_rate, phy_err_block_cnt));	// 0x0F4
 	buf[145] = hssi_csrrd32_ba(pdev, HSSI_ETH_RECONFIG, chan,
-				   eth_phy_csroffs(0, phy_deskew_dept[0]));		// 0x0FC
+				   eth_phy_csroffs(priv->eth_rate, phy_deskew_dept[0]));// 0x0FC
 	buf[146] = hssi_csrrd32_ba(pdev, HSSI_ETH_RECONFIG, chan,
-				   eth_phy_csroffs(0, phy_deskew_dept[1]));		// 0x100
+				   eth_phy_csroffs(priv->eth_rate, phy_deskew_dept[1]));// 0x100
 	buf[147] = hssi_csrrd32_ba(pdev, HSSI_ETH_RECONFIG, chan,
-				   eth_phy_csroffs(0, phy_deskew_dept[2]));		// 0x104
+				   eth_phy_csroffs(priv->eth_rate, phy_deskew_dept[2]));// 0x104
 	buf[148] = hssi_csrrd32_ba(pdev, HSSI_ETH_RECONFIG, chan,
-				   eth_phy_csroffs(0, phy_deskew_dept[3]));		// 0x108
+				   eth_phy_csroffs(priv->eth_rate, phy_deskew_dept[3]));// 0x108
 	buf[149] = hssi_csrrd32_ba(pdev, HSSI_ETH_RECONFIG, chan,
-				   eth_phy_csroffs(0, phy_rx_pcs_test_err_cnt));	// 0x10C
+				   eth_phy_csroffs(priv->eth_rate, phy_rx_pcs_test_err_cnt));
+	// 0x114 - 0x160
 	for (i = 0; i < 20; ++i)
 		buf[150 + i] = hssi_csrrd32_ba(pdev, HSSI_ETH_RECONFIG, chan,
-					       eth_phy_csroffs(0,
-							       ptp_vl_data_lsb[i]));// 0x114 - 0x160
+					       eth_phy_csroffs(priv->eth_rate,
+							       ptp_vl_data_lsb[i]));
 	for (i = 0; i < 20; ++i)
 		buf[170 + i] = hssi_csrrd32_ba(pdev, HSSI_ETH_RECONFIG, chan,
-					       eth_phy_csroffs(0,
+					       eth_phy_csroffs(priv->eth_rate,
 							       ptp_vl_data_msb[i]));// 0x164 - 0x1B0
 	buf[190] = hssi_csrrd32_ba(pdev, HSSI_ETH_RECONFIG, chan,
-				   eth_phy_csroffs(0, ptp_lal));			// 0x1B4
+				   eth_phy_csroffs(priv->eth_rate, ptp_lal));	// 0x1B4
 	buf[191] = hssi_csrrd32_ba(pdev, HSSI_ETH_RECONFIG, chan,
-				   eth_phy_csroffs(0, phy_tx_pld_stat));		// 0x1C0
+				   eth_phy_csroffs(priv->eth_rate, phy_tx_pld_stat));	// 0x1C0
 
 	/* F-tile EHIP MAC/PTP registers: */
 	/* 0x200 - 0x7FC : MAC/PTP Config */
 	buf[192] = hssi_csrrd32_ba(pdev, HSSI_ETH_RECONFIG, chan,
-				   eth_mac_ptp_csroffs(0,
+				   eth_mac_ptp_csroffs(priv->eth_rate,
 						       tx_mac_link_fault));		// 0x200
 	buf[193] = hssi_csrrd32_ba(pdev, HSSI_ETH_RECONFIG, chan,
-				   eth_mac_ptp_csroffs(0,
+				   eth_mac_ptp_csroffs(priv->eth_rate,
 						       tx_mac_ipg_col_rem));		// 0x204
 	buf[194] = hssi_csrrd32_ba(pdev, HSSI_ETH_RECONFIG, chan,
-				   eth_mac_ptp_csroffs(0,
+				   eth_mac_ptp_csroffs(priv->eth_rate,
 						       tx_mac_max_frm_size));		// 0x208
 	buf[195] = hssi_csrrd32_ba(pdev, HSSI_ETH_RECONFIG, chan,
-				   eth_mac_ptp_csroffs(0,
+				   eth_mac_ptp_csroffs(priv->eth_rate,
 						       tx_mac_conf));			// 0x20C
 	buf[196] = hssi_csrrd32_ba(pdev, HSSI_ETH_RECONFIG, chan,
-				   eth_mac_ptp_csroffs(0,
+				   eth_mac_ptp_csroffs(priv->eth_rate,
 						       tx_mac_ehip_conf));		// 0x210
 	buf[197] = hssi_csrrd32_ba(pdev, HSSI_ETH_RECONFIG, chan,
-				   eth_mac_ptp_csroffs(0,
+				   eth_mac_ptp_csroffs(priv->eth_rate,
 						       tx_mac_source_addr_lower_bytes));// 0x214
 	buf[198] = hssi_csrrd32_ba(pdev, HSSI_ETH_RECONFIG, chan,
-				   eth_mac_ptp_csroffs(0,
+				   eth_mac_ptp_csroffs(priv->eth_rate,
 						       tx_mac_source_addr_higher_bytes));// 0x218
 	buf[199] = hssi_csrrd32_ba(pdev, HSSI_ETH_RECONFIG, chan,
-				   eth_mac_ptp_csroffs(0,
+				   eth_mac_ptp_csroffs(priv->eth_rate,
 						       rx_mac_max_frm_size));		// 0x21C
 	buf[200] = hssi_csrrd32_ba(pdev, HSSI_ETH_RECONFIG, chan,
-				   eth_mac_ptp_csroffs(0,
+				   eth_mac_ptp_csroffs(priv->eth_rate,
 						       rx_mac_frwd_rx_crc));		// 0x220
 	buf[201] = hssi_csrrd32_ba(pdev, HSSI_ETH_RECONFIG, chan,
-				   eth_mac_ptp_csroffs(0,
+				   eth_mac_ptp_csroffs(priv->eth_rate,
 						       rx_mac_conf));			// 0x224
 	buf[202] = hssi_csrrd32_ba(pdev, HSSI_ETH_RECONFIG, chan,
-				   eth_mac_ptp_csroffs(0,
+				   eth_mac_ptp_csroffs(priv->eth_rate,
 						       rx_mac_ehip_conf));		// 0x228
 	buf[203] = hssi_csrrd32_ba(pdev, HSSI_ETH_RECONFIG, chan,
-				   eth_mac_ptp_csroffs(0,
+				   eth_mac_ptp_csroffs(priv->eth_rate,
 						       enable_tx_pause_ports));		// 0x22C
 	buf[204] = hssi_csrrd32_ba(pdev, HSSI_ETH_RECONFIG, chan,
-				   eth_mac_ptp_csroffs(0,
+				   eth_mac_ptp_csroffs(priv->eth_rate,
 						       tx_pause_request));		// 0x230
 	buf[205] = hssi_csrrd32_ba(pdev, HSSI_ETH_RECONFIG, chan,
-				   eth_mac_ptp_csroffs(0,// 0x234
+				   eth_mac_ptp_csroffs(priv->eth_rate,// 0x234
 						       enable_automatic_tx_pause_retransmission));
 	buf[206] = hssi_csrrd32_ba(pdev, HSSI_ETH_RECONFIG, chan,
-				   eth_mac_ptp_csroffs(0,
+				   eth_mac_ptp_csroffs(priv->eth_rate,
 						       retransmit_holdoff_quanta));	// 0x238
 	buf[207] = hssi_csrrd32_ba(pdev, HSSI_ETH_RECONFIG, chan,
-				   eth_mac_ptp_csroffs(0,
+				   eth_mac_ptp_csroffs(priv->eth_rate,
 						       retransmit_pause_quanta));	// 0x23C
 	buf[208] = hssi_csrrd32_ba(pdev, HSSI_ETH_RECONFIG, chan,
-				   eth_mac_ptp_csroffs(0,
+				   eth_mac_ptp_csroffs(priv->eth_rate,
 						       enable_tx_xoff));		// 0x240
 	buf[209] = hssi_csrrd32_ba(pdev, HSSI_ETH_RECONFIG, chan,
-				   eth_mac_ptp_csroffs(0,
+				   eth_mac_ptp_csroffs(priv->eth_rate,
 						       enable_uniform_holdoff));	// 0x244
 	buf[210] = hssi_csrrd32_ba(pdev, HSSI_ETH_RECONFIG, chan,
-				   eth_mac_ptp_csroffs(0,
+				   eth_mac_ptp_csroffs(priv->eth_rate,
 						       set_uniform_holdoff));		// 0x248
 	buf[211] = hssi_csrrd32_ba(pdev, HSSI_ETH_RECONFIG, chan,
-				   eth_mac_ptp_csroffs(0,
+				   eth_mac_ptp_csroffs(priv->eth_rate,
 						       flow_control_fields_lsb));	// 0x24C
 	buf[212] = hssi_csrrd32_ba(pdev, HSSI_ETH_RECONFIG, chan,
-				   eth_mac_ptp_csroffs(0,
+				   eth_mac_ptp_csroffs(priv->eth_rate,
 						       flow_control_fields_msb));	// 0x250
 	buf[213] = hssi_csrrd32_ba(pdev, HSSI_ETH_RECONFIG, chan,
-				   eth_mac_ptp_csroffs(0,
+				   eth_mac_ptp_csroffs(priv->eth_rate,
 						       flow_control_frames_lsb));	// 0x254
 	buf[214] = hssi_csrrd32_ba(pdev, HSSI_ETH_RECONFIG, chan,
-				   eth_mac_ptp_csroffs(0,
+				   eth_mac_ptp_csroffs(priv->eth_rate,
 						       flow_control_frames_msb));	// 0x258
 	buf[215] = hssi_csrrd32_ba(pdev, HSSI_ETH_RECONFIG, chan,
-				   eth_mac_ptp_csroffs(0,
+				   eth_mac_ptp_csroffs(priv->eth_rate,
 						       tx_flow_control_feature_cfg));	// 0x25C
 	buf[216] = hssi_csrrd32_ba(pdev, HSSI_ETH_RECONFIG, chan,
-				   eth_mac_ptp_csroffs(0,// 0x260
+				   eth_mac_ptp_csroffs(priv->eth_rate,// 0x260
 						       enable_rx_pause_frame_processing_fields));
 	buf[217] = hssi_csrrd32_ba(pdev, HSSI_ETH_RECONFIG, chan,
-				   eth_mac_ptp_csroffs(0,
+				   eth_mac_ptp_csroffs(priv->eth_rate,
 						       forward_flow_control_frames));	// 0x264
 	buf[218] = hssi_csrrd32_ba(pdev, HSSI_ETH_RECONFIG, chan,
-				   eth_mac_ptp_csroffs(0,
+				   eth_mac_ptp_csroffs(priv->eth_rate,
 						       rx_pause_frames_lsb));		// 0x268
 	buf[219] = hssi_csrrd32_ba(pdev, HSSI_ETH_RECONFIG, chan,
-				   eth_mac_ptp_csroffs(0,
+				   eth_mac_ptp_csroffs(priv->eth_rate,
 						       rx_pause_frames_msb));		// 0x26C
 	buf[220] = hssi_csrrd32_ba(pdev, HSSI_ETH_RECONFIG, chan,
-				   eth_mac_ptp_csroffs(0,
+				   eth_mac_ptp_csroffs(priv->eth_rate,
 						       rx_flow_control_feature_cfg));	// 0x270
 	buf[221] = hssi_csrrd32_ba(pdev, HSSI_ETH_RECONFIG, chan,
-				   eth_mac_ptp_csroffs(0,
+				   eth_mac_ptp_csroffs(priv->eth_rate,
 						       tx_cntr_config));		// 0x274
 	buf[222] = hssi_csrrd32_ba(pdev, HSSI_ETH_RECONFIG, chan,
-				   eth_mac_ptp_csroffs(0,
+				   eth_mac_ptp_csroffs(priv->eth_rate,
 						       rx_cntr_config));		// 0x278
 	buf[223] = hssi_csrrd32_ba(pdev, HSSI_ETH_RECONFIG, chan,
-				   eth_mac_ptp_csroffs(0,
+				   eth_mac_ptp_csroffs(priv->eth_rate,
 						       pause_quanta_0));		// 0x284
 	buf[224] = hssi_csrrd32_ba(pdev, HSSI_ETH_RECONFIG, chan,
-				   eth_mac_ptp_csroffs(0,
+				   eth_mac_ptp_csroffs(priv->eth_rate,
 						       pause_quanta_1));		// 0x288
 	buf[225] = hssi_csrrd32_ba(pdev, HSSI_ETH_RECONFIG, chan,
-				   eth_mac_ptp_csroffs(0,
+				   eth_mac_ptp_csroffs(priv->eth_rate,
 						       pause_quanta_2));		// 0x28C
 	buf[226] = hssi_csrrd32_ba(pdev, HSSI_ETH_RECONFIG, chan,
-				   eth_mac_ptp_csroffs(0,
+				   eth_mac_ptp_csroffs(priv->eth_rate,
 						       pause_quanta_3));		// 0x290
 	buf[227] = hssi_csrrd32_ba(pdev, HSSI_ETH_RECONFIG, chan,
-				   eth_mac_ptp_csroffs(0,
+				   eth_mac_ptp_csroffs(priv->eth_rate,
 						       pause_quanta_4));		// 0x294
 	buf[228] = hssi_csrrd32_ba(pdev, HSSI_ETH_RECONFIG, chan,
-				   eth_mac_ptp_csroffs(0,
+				   eth_mac_ptp_csroffs(priv->eth_rate,
 						       pause_quanta_5));		// 0x298
 	buf[229] = hssi_csrrd32_ba(pdev, HSSI_ETH_RECONFIG, chan,
-				   eth_mac_ptp_csroffs(0,
+				   eth_mac_ptp_csroffs(priv->eth_rate,
 						       pause_quanta_6));		// 0x29C
 	buf[230] = hssi_csrrd32_ba(pdev, HSSI_ETH_RECONFIG, chan,
-				   eth_mac_ptp_csroffs(0,
+				   eth_mac_ptp_csroffs(priv->eth_rate,
 						       pause_quanta_7));		// 0x2A0
 	buf[231] = hssi_csrrd32_ba(pdev, HSSI_ETH_RECONFIG, chan,
-				   eth_mac_ptp_csroffs(0,
+				   eth_mac_ptp_csroffs(priv->eth_rate,
 						       pfc_holdoff_quanta_0));		// 0x2A4
 	buf[232] = hssi_csrrd32_ba(pdev, HSSI_ETH_RECONFIG, chan,
-				   eth_mac_ptp_csroffs(0,
+				   eth_mac_ptp_csroffs(priv->eth_rate,
 						       pfc_holdoff_quanta_1));		// 0x2A8
 	buf[233] = hssi_csrrd32_ba(pdev, HSSI_ETH_RECONFIG, chan,
-				   eth_mac_ptp_csroffs(0,
+				   eth_mac_ptp_csroffs(priv->eth_rate,
 						       pfc_holdoff_quanta_2));		// 0x2AC
 	buf[234] = hssi_csrrd32_ba(pdev, HSSI_ETH_RECONFIG, chan,
-				   eth_mac_ptp_csroffs(0,
+				   eth_mac_ptp_csroffs(priv->eth_rate,
 						       pfc_holdoff_quanta_3));		// 0x2B0
 	buf[235] = hssi_csrrd32_ba(pdev, HSSI_ETH_RECONFIG, chan,
-				   eth_mac_ptp_csroffs(0,
+				   eth_mac_ptp_csroffs(priv->eth_rate,
 						       pfc_holdoff_quanta_4));		// 0x2B4
 	buf[236] = hssi_csrrd32_ba(pdev, HSSI_ETH_RECONFIG, chan,
-				   eth_mac_ptp_csroffs(0,
+				   eth_mac_ptp_csroffs(priv->eth_rate,
 						       pfc_holdoff_quanta_5));		// 0x2B8
 	buf[237] = hssi_csrrd32_ba(pdev, HSSI_ETH_RECONFIG, chan,
-				   eth_mac_ptp_csroffs(0,
+				   eth_mac_ptp_csroffs(priv->eth_rate,
 						       pfc_holdoff_quanta_6));		// 0x2BC
 	buf[238] = hssi_csrrd32_ba(pdev, HSSI_ETH_RECONFIG, chan,
-				   eth_mac_ptp_csroffs(0,
+				   eth_mac_ptp_csroffs(priv->eth_rate,
 						       pfc_holdoff_quanta_7));		// 0x2C0
 	buf[239] = hssi_csrrd32_ba(pdev, HSSI_ETH_RECONFIG, chan,
-				   eth_mac_ptp_csroffs(0,
+				   eth_mac_ptp_csroffs(priv->eth_rate,
 						       tx_ptp_extra_latency));		// 0x2E0
 	buf[240] = hssi_csrrd32_ba(pdev, HSSI_ETH_RECONFIG, chan,
-				   eth_mac_ptp_csroffs(0,
+				   eth_mac_ptp_csroffs(priv->eth_rate,
 						       tx_ptp_ui));			// 0x2E4
 	buf[241] = hssi_csrrd32_ba(pdev, HSSI_ETH_RECONFIG, chan,
-				   eth_mac_ptp_csroffs(0,
+				   eth_mac_ptp_csroffs(priv->eth_rate,
 						       tx_ptp_phy_lane_num));		// 0x2EC
 	buf[242] = hssi_csrrd32_ba(pdev, HSSI_ETH_RECONFIG, chan,
-				   eth_mac_ptp_csroffs(0,
+				   eth_mac_ptp_csroffs(priv->eth_rate,
 						       tx_ptp_ap_filter));		// 0x2F0
 	for (i = 0; i < 20; ++i)
 		buf[243 + i] = hssi_csrrd32_ba(pdev, HSSI_ETH_RECONFIG, chan,
-					       eth_mac_ptp_csroffs(0,// 0x2F4 - 0x340
+					       eth_mac_ptp_csroffs(priv->eth_rate,// 0x2F4 - 0x340
 								   tx_ptp_vl_offset[i]));
 	buf[263] = hssi_csrrd32_ba(pdev, HSSI_ETH_RECONFIG, chan,
-				   eth_mac_ptp_csroffs(0,
+				   eth_mac_ptp_csroffs(priv->eth_rate,
 						       rx_ptp_extra_latency));		// 0x344
 	buf[264] = hssi_csrrd32_ba(pdev, HSSI_ETH_RECONFIG, chan,
-				   eth_mac_ptp_csroffs(0,
+				   eth_mac_ptp_csroffs(priv->eth_rate,
 						       rx_ptp_ui));			// 0x348
 	buf[265] = hssi_csrrd32_ba(pdev, HSSI_ETH_RECONFIG, chan,
-				   eth_mac_ptp_csroffs(0,
+				   eth_mac_ptp_csroffs(priv->eth_rate,
 						       rx_ptp_phy_lane_num));		// 0x350
 	buf[266] = hssi_csrrd32_ba(pdev, HSSI_ETH_RECONFIG, chan,
-				   eth_mac_ptp_csroffs(0,
+				   eth_mac_ptp_csroffs(priv->eth_rate,
 						       rx_ptp_ap_filter));		// 0x354
 	for (i = 0; i < 20; ++i)
 		buf[267 + i] = hssi_csrrd32_ba(pdev, HSSI_ETH_RECONFIG, chan,
-					       eth_mac_ptp_csroffs(0,// 0x358 - 0x3A4
+					       eth_mac_ptp_csroffs(priv->eth_rate,// 0x358 - 0x3A4
 								   rx_ptp_vl_offset[i]));
 	for (i = 0; i < 20; ++i)
 		buf[287 + i] = hssi_csrrd32_ba(pdev, HSSI_ETH_RECONFIG, chan,
-					       eth_mac_ptp_csroffs(0,// 0x3A8 - 0x3F4
+					       eth_mac_ptp_csroffs(priv->eth_rate,// 0x3A8 - 0x3F4
 								   rx_ptp_vl_to_pl[i]));
 	buf[307] = hssi_csrrd32_ba(pdev, HSSI_ETH_RECONFIG, chan,
-				   eth_mac_ptp_csroffs(0,
+				   eth_mac_ptp_csroffs(priv->eth_rate,
 						       rx_pkt_n_ts_rx_ctr));		// 0x3F8
 	/* 0x800 - 0xFFC : MAC/PTP Statistics */
 	buf[308] = hssi_csrrd32_ba(pdev, HSSI_ETH_RECONFIG, chan,
-				   eth_mac_ptp_csroffs(0,
+				   eth_mac_ptp_csroffs(priv->eth_rate,
 						       tx_fragments_lsb));		// 0x800
 	buf[309] = hssi_csrrd32_ba(pdev, HSSI_ETH_RECONFIG, chan,
-				   eth_mac_ptp_csroffs(0,
+				   eth_mac_ptp_csroffs(priv->eth_rate,
 						       tx_jabbers_lsb));		// 0x808
 	buf[310] = hssi_csrrd32_ba(pdev, HSSI_ETH_RECONFIG, chan,
-				   eth_mac_ptp_csroffs(0, tx_fcserr_lsb));		// 0x818
+				   eth_mac_ptp_csroffs(priv->eth_rate, tx_fcserr_lsb));	// 0x818
 	buf[311] = hssi_csrrd32_ba(pdev, HSSI_ETH_RECONFIG, chan,
-				   eth_mac_ptp_csroffs(0,
+				   eth_mac_ptp_csroffs(priv->eth_rate,
 						       tx_mcast_data_err_lsb));		// 0x820
 	buf[312] = hssi_csrrd32_ba(pdev, HSSI_ETH_RECONFIG, chan,
-				   eth_mac_ptp_csroffs(0,
+				   eth_mac_ptp_csroffs(priv->eth_rate,
 						       tx_bcast_data_err_lsb));		// 0x828
 	buf[313] = hssi_csrrd32_ba(pdev, HSSI_ETH_RECONFIG, chan,
-				   eth_mac_ptp_csroffs(0,
+				   eth_mac_ptp_csroffs(priv->eth_rate,
 						       tx_ucast_data_err_lsb));		// 0x830
 	buf[314] = hssi_csrrd32_ba(pdev, HSSI_ETH_RECONFIG, chan,
-				   eth_mac_ptp_csroffs(0,
+				   eth_mac_ptp_csroffs(priv->eth_rate,
 						       tx_mcast_ctrl_err_lsb));		// 0x838
 	buf[315] = hssi_csrrd32_ba(pdev, HSSI_ETH_RECONFIG, chan,
-				   eth_mac_ptp_csroffs(0,
+				   eth_mac_ptp_csroffs(priv->eth_rate,
 						       tx_bcast_ctrl_err_lsb));		// 0x840
 	buf[316] = hssi_csrrd32_ba(pdev, HSSI_ETH_RECONFIG, chan,
-				   eth_mac_ptp_csroffs(0,
+				   eth_mac_ptp_csroffs(priv->eth_rate,
 						       tx_ucast_ctrl_err_lsb));		// 0x848
 	buf[317] = hssi_csrrd32_ba(pdev, HSSI_ETH_RECONFIG, chan,
-				   eth_mac_ptp_csroffs(0,
+				   eth_mac_ptp_csroffs(priv->eth_rate,
 						       tx_pause_err_lsb));		// 0x850
 	buf[318] = hssi_csrrd32_ba(pdev, HSSI_ETH_RECONFIG, chan,
-				   eth_mac_ptp_csroffs(0,
+				   eth_mac_ptp_csroffs(priv->eth_rate,
 						       tx_64b_lsb));			// 0x858
 	buf[319] = hssi_csrrd32_ba(pdev, HSSI_ETH_RECONFIG, chan,
-				   eth_mac_ptp_csroffs(0,
+				   eth_mac_ptp_csroffs(priv->eth_rate,
 						       tx_64b_msb));			// 0x85C
 	buf[320] = hssi_csrrd32_ba(pdev, HSSI_ETH_RECONFIG, chan,
-				   eth_mac_ptp_csroffs(0,
+				   eth_mac_ptp_csroffs(priv->eth_rate,
 						       tx_65to127b_lsb));		// 0x860
 	buf[321] = hssi_csrrd32_ba(pdev, HSSI_ETH_RECONFIG, chan,
-				   eth_mac_ptp_csroffs(0,
+				   eth_mac_ptp_csroffs(priv->eth_rate,
 						       tx_65to127b_msb));		// 0x864
 	buf[322] = hssi_csrrd32_ba(pdev, HSSI_ETH_RECONFIG, chan,
-				   eth_mac_ptp_csroffs(0,
+				   eth_mac_ptp_csroffs(priv->eth_rate,
 						       tx_128to255b_lsb));		// 0x868
 	buf[323] = hssi_csrrd32_ba(pdev, HSSI_ETH_RECONFIG, chan,
-				   eth_mac_ptp_csroffs(0,
+				   eth_mac_ptp_csroffs(priv->eth_rate,
 						       tx_128to255b_msb));		// 0x86C
 	buf[324] = hssi_csrrd32_ba(pdev, HSSI_ETH_RECONFIG, chan,
-				   eth_mac_ptp_csroffs(0,
+				   eth_mac_ptp_csroffs(priv->eth_rate,
 						       tx_256to511b_lsb));		// 0x870
 	buf[325] = hssi_csrrd32_ba(pdev, HSSI_ETH_RECONFIG, chan,
-				   eth_mac_ptp_csroffs(0,
+				   eth_mac_ptp_csroffs(priv->eth_rate,
 						       tx_256to511b_msb));		// 0x874
 	buf[326] = hssi_csrrd32_ba(pdev, HSSI_ETH_RECONFIG, chan,
-				   eth_mac_ptp_csroffs(0,
+				   eth_mac_ptp_csroffs(priv->eth_rate,
 						       tx_512to1023b_lsb));		// 0x878
 	buf[327] = hssi_csrrd32_ba(pdev, HSSI_ETH_RECONFIG, chan,
-				   eth_mac_ptp_csroffs(0,
+				   eth_mac_ptp_csroffs(priv->eth_rate,
 						       tx_512to1023b_msb));		// 0x87C
 	buf[328] = hssi_csrrd32_ba(pdev, HSSI_ETH_RECONFIG, chan,
-				   eth_mac_ptp_csroffs(0,
+				   eth_mac_ptp_csroffs(priv->eth_rate,
 						       tx_1024to1518b_lsb));		// 0x880
 	buf[329] = hssi_csrrd32_ba(pdev, HSSI_ETH_RECONFIG, chan,
-				   eth_mac_ptp_csroffs(0,
+				   eth_mac_ptp_csroffs(priv->eth_rate,
 						       tx_1024to1518b_msb));		// 0x884
 	buf[330] = hssi_csrrd32_ba(pdev, HSSI_ETH_RECONFIG, chan,
-				   eth_mac_ptp_csroffs(0,
+				   eth_mac_ptp_csroffs(priv->eth_rate,
 						       tx_1519tomaxb_lsb));		// 0x888
 	buf[331] = hssi_csrrd32_ba(pdev, HSSI_ETH_RECONFIG, chan,
-				   eth_mac_ptp_csroffs(0,
+				   eth_mac_ptp_csroffs(priv->eth_rate,
 						       tx_1519tomaxb_msb));		// 0x88C
 	buf[332] = hssi_csrrd32_ba(pdev, HSSI_ETH_RECONFIG, chan,
-				   eth_mac_ptp_csroffs(0,
+				   eth_mac_ptp_csroffs(priv->eth_rate,
 						       tx_oversize_lsb));		// 0x890
 	buf[333] = hssi_csrrd32_ba(pdev, HSSI_ETH_RECONFIG, chan,
-				   eth_mac_ptp_csroffs(0,
+				   eth_mac_ptp_csroffs(priv->eth_rate,
 						       tx_mcast_data_ok_lsb));		// 0x898
 	buf[334] = hssi_csrrd32_ba(pdev, HSSI_ETH_RECONFIG, chan,
-				   eth_mac_ptp_csroffs(0,
+				   eth_mac_ptp_csroffs(priv->eth_rate,
 						       tx_mcast_data_ok_msb));		// 0x89C
 	buf[335] = hssi_csrrd32_ba(pdev, HSSI_ETH_RECONFIG, chan,
-				   eth_mac_ptp_csroffs(0,
+				   eth_mac_ptp_csroffs(priv->eth_rate,
 						       tx_bcast_data_ok_lsb));		// 0x8A0
 	buf[336] = hssi_csrrd32_ba(pdev, HSSI_ETH_RECONFIG, chan,
-				   eth_mac_ptp_csroffs(0,
+				   eth_mac_ptp_csroffs(priv->eth_rate,
 						       tx_bcast_data_ok_msb));		// 0x8A4
 	buf[337] = hssi_csrrd32_ba(pdev, HSSI_ETH_RECONFIG, chan,
-				   eth_mac_ptp_csroffs(0,
+				   eth_mac_ptp_csroffs(priv->eth_rate,
 						       tx_ucast_data_ok_lsb));		// 0x8A8
 	buf[338] = hssi_csrrd32_ba(pdev, HSSI_ETH_RECONFIG, chan,
-				   eth_mac_ptp_csroffs(0,
+				   eth_mac_ptp_csroffs(priv->eth_rate,
 						       tx_ucast_data_ok_msb));		// 0x8AC
 	buf[339] = hssi_csrrd32_ba(pdev, HSSI_ETH_RECONFIG, chan,
-				   eth_mac_ptp_csroffs(0,
+				   eth_mac_ptp_csroffs(priv->eth_rate,
 						       tx_mcast_ctrl_ok_lsb));		// 0x8B0
 	buf[340] = hssi_csrrd32_ba(pdev, HSSI_ETH_RECONFIG, chan,
-				   eth_mac_ptp_csroffs(0,
+				   eth_mac_ptp_csroffs(priv->eth_rate,
 						       tx_mcast_ctrl_ok_msb));		// 0x8B4
 	buf[341] = hssi_csrrd32_ba(pdev, HSSI_ETH_RECONFIG, chan,
-				   eth_mac_ptp_csroffs(0,
+				   eth_mac_ptp_csroffs(priv->eth_rate,
 						       tx_bcast_ctrl_ok_lsb));		// 0x8B8
 	buf[342] = hssi_csrrd32_ba(pdev, HSSI_ETH_RECONFIG, chan,
-				   eth_mac_ptp_csroffs(0,
+				   eth_mac_ptp_csroffs(priv->eth_rate,
 						       tx_bcast_ctrl_ok_msb));		// 0x8BC
 	buf[343] = hssi_csrrd32_ba(pdev, HSSI_ETH_RECONFIG, chan,
-				   eth_mac_ptp_csroffs(0,
+				   eth_mac_ptp_csroffs(priv->eth_rate,
 						       tx_ucast_ctrl_ok_lsb));		// 0x8C0
 	buf[344] = hssi_csrrd32_ba(pdev, HSSI_ETH_RECONFIG, chan,
-				   eth_mac_ptp_csroffs(0,
+				   eth_mac_ptp_csroffs(priv->eth_rate,
 						       tx_ucast_ctrl_ok_msb));		// 0x8C4
 	buf[345] = hssi_csrrd32_ba(pdev, HSSI_ETH_RECONFIG, chan,
-				   eth_mac_ptp_csroffs(0,
+				   eth_mac_ptp_csroffs(priv->eth_rate,
 						       tx_pause_lsb));			// 0x8C8
 	buf[346] = hssi_csrrd32_ba(pdev, HSSI_ETH_RECONFIG, chan,
-				   eth_mac_ptp_csroffs(0,
+				   eth_mac_ptp_csroffs(priv->eth_rate,
 						       tx_pause_msb));			// 0x8CC
 	buf[347] = hssi_csrrd32_ba(pdev, HSSI_ETH_RECONFIG, chan,
-				   eth_mac_ptp_csroffs(0,
+				   eth_mac_ptp_csroffs(priv->eth_rate,
 						       tx_rnt_lsb));			// 0x8D0
 	buf[348] = hssi_csrrd32_ba(pdev, HSSI_ETH_RECONFIG, chan,
-				   eth_mac_ptp_csroffs(0,
+				   eth_mac_ptp_csroffs(priv->eth_rate,
 						       tx_st_lsb));			// 0x8D8
 	buf[349] = hssi_csrrd32_ba(pdev, HSSI_ETH_RECONFIG, chan,
-				   eth_mac_ptp_csroffs(0,
+				   eth_mac_ptp_csroffs(priv->eth_rate,
 						       tx_st_msb));			// 0x8DC
 	buf[350] = hssi_csrrd32_ba(pdev, HSSI_ETH_RECONFIG, chan,
-				   eth_mac_ptp_csroffs(0,
+				   eth_mac_ptp_csroffs(priv->eth_rate,
 						       tx_lenerr_lsb));			// 0x8E0
 	buf[351] = hssi_csrrd32_ba(pdev, HSSI_ETH_RECONFIG, chan,
-				   eth_mac_ptp_csroffs(0,
+				   eth_mac_ptp_csroffs(priv->eth_rate,
 						       tx_pfc_err_lsb));		// 0x8E8
 	buf[352] = hssi_csrrd32_ba(pdev, HSSI_ETH_RECONFIG, chan,
-				   eth_mac_ptp_csroffs(0,
+				   eth_mac_ptp_csroffs(priv->eth_rate,
 						       tx_pfc_lsb));			// 0x8F0
 	buf[353] = hssi_csrrd32_ba(pdev, HSSI_ETH_RECONFIG, chan,
-				   eth_mac_ptp_csroffs(0,
+				   eth_mac_ptp_csroffs(priv->eth_rate,
 						       tx_pfc_msb));			// 0x8F4
 	buf[354] = hssi_csrrd32_ba(pdev, HSSI_ETH_RECONFIG, chan,
-				   eth_mac_ptp_csroffs(0,
+				   eth_mac_ptp_csroffs(priv->eth_rate,
 						       tx_payload_octetsok_lsb));	// 0x8F8
 	buf[355] = hssi_csrrd32_ba(pdev, HSSI_ETH_RECONFIG, chan,
-				   eth_mac_ptp_csroffs(0,
+				   eth_mac_ptp_csroffs(priv->eth_rate,
 						       tx_payload_octetsok_msb));	// 0x8FC
 	buf[356] = hssi_csrrd32_ba(pdev, HSSI_ETH_RECONFIG, chan,
-				   eth_mac_ptp_csroffs(0,
+				   eth_mac_ptp_csroffs(priv->eth_rate,
 						       tx_frame_octetsok_lsb));		// 0x900
 	buf[357] = hssi_csrrd32_ba(pdev, HSSI_ETH_RECONFIG, chan,
-				   eth_mac_ptp_csroffs(0,
+				   eth_mac_ptp_csroffs(priv->eth_rate,
 						       tx_frame_octetsok_msb));		// 0x904
 	buf[358] = hssi_csrrd32_ba(pdev, HSSI_ETH_RECONFIG, chan,
-				   eth_mac_ptp_csroffs(0,
+				   eth_mac_ptp_csroffs(priv->eth_rate,
 						       tx_malformed_ctrl_lsb));		// 0x908
 	buf[359] = hssi_csrrd32_ba(pdev, HSSI_ETH_RECONFIG, chan,
-				   eth_mac_ptp_csroffs(0,
+				   eth_mac_ptp_csroffs(priv->eth_rate,
 						       tx_dropped_ctrl_lsb));		// 0x910
 	buf[360] = hssi_csrrd32_ba(pdev, HSSI_ETH_RECONFIG, chan,
-				   eth_mac_ptp_csroffs(0,
+				   eth_mac_ptp_csroffs(priv->eth_rate,
 						       tx_badlt_ctrl_lsb));		// 0x918
 	buf[361] = hssi_csrrd32_ba(pdev, HSSI_ETH_RECONFIG, chan,
-				   eth_mac_ptp_csroffs(0,
+				   eth_mac_ptp_csroffs(priv->eth_rate,
 						       tx_total_ptp_pkts));		// 0x920
 	buf[362] = hssi_csrrd32_ba(pdev, HSSI_ETH_RECONFIG, chan,
-				   eth_mac_ptp_csroffs(0,
+				   eth_mac_ptp_csroffs(priv->eth_rate,
 						       tx_total_1step_ptp_pkts));	// 0x924
 	buf[363] = hssi_csrrd32_ba(pdev, HSSI_ETH_RECONFIG, chan,
-				   eth_mac_ptp_csroffs(0,
+				   eth_mac_ptp_csroffs(priv->eth_rate,
 						       tx_total_2step_ptp_pkts));	// 0x928
 	buf[364] = hssi_csrrd32_ba(pdev, HSSI_ETH_RECONFIG, chan,
-				   eth_mac_ptp_csroffs(0,
+				   eth_mac_ptp_csroffs(priv->eth_rate,
 						       tx_total_v1_ptp_pkts));		// 0x92C
 	buf[365] = hssi_csrrd32_ba(pdev, HSSI_ETH_RECONFIG, chan,
-				   eth_mac_ptp_csroffs(0,
+				   eth_mac_ptp_csroffs(priv->eth_rate,
 						       tx_total_v2_ptp_pkts));		// 0x930
 	buf[366] = hssi_csrrd32_ba(pdev, HSSI_ETH_RECONFIG, chan,
-				   eth_mac_ptp_csroffs(0,
+				   eth_mac_ptp_csroffs(priv->eth_rate,
 						       rx_fragments_lsb));		// 0x934
 	buf[367] = hssi_csrrd32_ba(pdev, HSSI_ETH_RECONFIG, chan,
-				   eth_mac_ptp_csroffs(0,
+				   eth_mac_ptp_csroffs(priv->eth_rate,
 						       rx_jabbers_lsb));		// 0x93C
 	buf[368] = hssi_csrrd32_ba(pdev, HSSI_ETH_RECONFIG, chan,
-				   eth_mac_ptp_csroffs(0,
+				   eth_mac_ptp_csroffs(priv->eth_rate,
 						       rx_fcserr_lsb));			// 0x94C
 	buf[369] = hssi_csrrd32_ba(pdev, HSSI_ETH_RECONFIG, chan,
-				   eth_mac_ptp_csroffs(0,
+				   eth_mac_ptp_csroffs(priv->eth_rate,
 						       rx_mcast_data_err_lsb));		// 0x954
 	buf[370] = hssi_csrrd32_ba(pdev, HSSI_ETH_RECONFIG, chan,
-				   eth_mac_ptp_csroffs(0,
+				   eth_mac_ptp_csroffs(priv->eth_rate,
 						       rx_bcast_data_err_lsb));		// 0x95C
 	buf[371] = hssi_csrrd32_ba(pdev, HSSI_ETH_RECONFIG, chan,
-				   eth_mac_ptp_csroffs(0,
+				   eth_mac_ptp_csroffs(priv->eth_rate,
 						       rx_ucast_data_err_lsb));		// 0x964
 	buf[372] = hssi_csrrd32_ba(pdev, HSSI_ETH_RECONFIG, chan,
-				   eth_mac_ptp_csroffs(0,
+				   eth_mac_ptp_csroffs(priv->eth_rate,
 						       rx_mcast_ctrl_err_lsb));		// 0x96C
 	buf[373] = hssi_csrrd32_ba(pdev, HSSI_ETH_RECONFIG, chan,
-				   eth_mac_ptp_csroffs(0,
+				   eth_mac_ptp_csroffs(priv->eth_rate,
 						       rx_bcast_ctrl_err_lsb));		// 0x974
 	buf[374] = hssi_csrrd32_ba(pdev, HSSI_ETH_RECONFIG, chan,
-				   eth_mac_ptp_csroffs(0,
+				   eth_mac_ptp_csroffs(priv->eth_rate,
 						       rx_ucast_ctrl_err_lsb));		// 0x97C
 	buf[375] = hssi_csrrd32_ba(pdev, HSSI_ETH_RECONFIG, chan,
-				   eth_mac_ptp_csroffs(0,
+				   eth_mac_ptp_csroffs(priv->eth_rate,
 						       rx_pause_err_lsb));		// 0x984
 	buf[376] = hssi_csrrd32_ba(pdev, HSSI_ETH_RECONFIG, chan,
-				   eth_mac_ptp_csroffs(0,
+				   eth_mac_ptp_csroffs(priv->eth_rate,
 						       rx_64b_lsb));			// 0x98C
 	buf[377] = hssi_csrrd32_ba(pdev, HSSI_ETH_RECONFIG, chan,
-				   eth_mac_ptp_csroffs(0,
+				   eth_mac_ptp_csroffs(priv->eth_rate,
 						       rx_64b_msb));			// 0x990
 	buf[378] = hssi_csrrd32_ba(pdev, HSSI_ETH_RECONFIG, chan,
-				   eth_mac_ptp_csroffs(0,
+				   eth_mac_ptp_csroffs(priv->eth_rate,
 						       rx_65to127b_lsb));		// 0x994
 	buf[379] = hssi_csrrd32_ba(pdev, HSSI_ETH_RECONFIG, chan,
-				   eth_mac_ptp_csroffs(0,
+				   eth_mac_ptp_csroffs(priv->eth_rate,
 						       rx_65to127b_msb));		// 0x998
 	buf[380] = hssi_csrrd32_ba(pdev, HSSI_ETH_RECONFIG, chan,
-				   eth_mac_ptp_csroffs(0,
+				   eth_mac_ptp_csroffs(priv->eth_rate,
 						       rx_128to255b_lsb));		// 0x99C
 	buf[381] = hssi_csrrd32_ba(pdev, HSSI_ETH_RECONFIG, chan,
-				   eth_mac_ptp_csroffs(0,
+				   eth_mac_ptp_csroffs(priv->eth_rate,
 						       rx_128to255b_msb));		// 0x9A0
 	buf[382] = hssi_csrrd32_ba(pdev, HSSI_ETH_RECONFIG, chan,
-				   eth_mac_ptp_csroffs(0,
+				   eth_mac_ptp_csroffs(priv->eth_rate,
 						       rx_256to511b_lsb));		// 0x9A4
 	buf[383] = hssi_csrrd32_ba(pdev, HSSI_ETH_RECONFIG, chan,
-				   eth_mac_ptp_csroffs(0,
+				   eth_mac_ptp_csroffs(priv->eth_rate,
 						       rx_256to511b_msb));		// 0x9A8
 	buf[384] = hssi_csrrd32_ba(pdev, HSSI_ETH_RECONFIG, chan,
-				   eth_mac_ptp_csroffs(0,
+				   eth_mac_ptp_csroffs(priv->eth_rate,
 						       rx_512to1023b_lsb));		// 0x9AC
 	buf[385] = hssi_csrrd32_ba(pdev, HSSI_ETH_RECONFIG, chan,
-				   eth_mac_ptp_csroffs(0,
+				   eth_mac_ptp_csroffs(priv->eth_rate,
 						       rx_512to1023b_msb));		// 0x9B0
 	buf[386] = hssi_csrrd32_ba(pdev, HSSI_ETH_RECONFIG, chan,
-				   eth_mac_ptp_csroffs(0,
+				   eth_mac_ptp_csroffs(priv->eth_rate,
 						       rx_1024to1518b_lsb));		// 0x9B4
 	buf[387] = hssi_csrrd32_ba(pdev, HSSI_ETH_RECONFIG, chan,
-				   eth_mac_ptp_csroffs(0,
+				   eth_mac_ptp_csroffs(priv->eth_rate,
 						       rx_1024to1518b_msb));		// 0x9B8
 	buf[388] = hssi_csrrd32_ba(pdev, HSSI_ETH_RECONFIG, chan,
-				   eth_mac_ptp_csroffs(0,
+				   eth_mac_ptp_csroffs(priv->eth_rate,
 						       rx_1519tomaxb_lsb));		// 0x9BC
 	buf[389] = hssi_csrrd32_ba(pdev, HSSI_ETH_RECONFIG, chan,
-				   eth_mac_ptp_csroffs(0,
+				   eth_mac_ptp_csroffs(priv->eth_rate,
 						       rx_1519tomaxb_msb));		// 0x9C0
 	buf[390] = hssi_csrrd32_ba(pdev, HSSI_ETH_RECONFIG, chan,
-				   eth_mac_ptp_csroffs(0,
+				   eth_mac_ptp_csroffs(priv->eth_rate,
 						       rx_oversize_lsb));		// 0x9C4
 	buf[391] = hssi_csrrd32_ba(pdev, HSSI_ETH_RECONFIG, chan,
-				   eth_mac_ptp_csroffs(0,
+				   eth_mac_ptp_csroffs(priv->eth_rate,
 						       rx_mcast_data_ok_lsb));		// 0x9CC
 	buf[392] = hssi_csrrd32_ba(pdev, HSSI_ETH_RECONFIG, chan,
-				   eth_mac_ptp_csroffs(0,
+				   eth_mac_ptp_csroffs(priv->eth_rate,
 						       rx_mcast_data_ok_msb));		// 0x9D0
 	buf[393] = hssi_csrrd32_ba(pdev, HSSI_ETH_RECONFIG, chan,
-				   eth_mac_ptp_csroffs(0,
+				   eth_mac_ptp_csroffs(priv->eth_rate,
 						       rx_bcast_data_ok_lsb));		// 0x9D4
 	buf[394] = hssi_csrrd32_ba(pdev, HSSI_ETH_RECONFIG, chan,
-				   eth_mac_ptp_csroffs(0,
+				   eth_mac_ptp_csroffs(priv->eth_rate,
 						       rx_bcast_data_ok_msb));		// 0x9D8
 	buf[395] = hssi_csrrd32_ba(pdev, HSSI_ETH_RECONFIG, chan,
-				   eth_mac_ptp_csroffs(0,
+				   eth_mac_ptp_csroffs(priv->eth_rate,
 						       rx_ucast_data_ok_lsb));		// 0x9DC
 	buf[396] = hssi_csrrd32_ba(pdev, HSSI_ETH_RECONFIG, chan,
-				   eth_mac_ptp_csroffs(0,
+				   eth_mac_ptp_csroffs(priv->eth_rate,
 						       rx_ucast_data_ok_msb));		// 0x9E0
 	buf[397] = hssi_csrrd32_ba(pdev, HSSI_ETH_RECONFIG, chan,
-				   eth_mac_ptp_csroffs(0,
+				   eth_mac_ptp_csroffs(priv->eth_rate,
 						       rx_mcast_ctrl_ok_lsb));		// 0x9E4
 	buf[398] = hssi_csrrd32_ba(pdev, HSSI_ETH_RECONFIG, chan,
-				   eth_mac_ptp_csroffs(0,
+				   eth_mac_ptp_csroffs(priv->eth_rate,
 						       rx_mcast_ctrl_ok_msb));		// 0x9E8
 	buf[399] = hssi_csrrd32_ba(pdev, HSSI_ETH_RECONFIG, chan,
-				   eth_mac_ptp_csroffs(0,
+				   eth_mac_ptp_csroffs(priv->eth_rate,
 						       rx_bcast_ctrl_ok_lsb));		// 0x9EC
 	buf[400] = hssi_csrrd32_ba(pdev, HSSI_ETH_RECONFIG, chan,
-				   eth_mac_ptp_csroffs(0,
+				   eth_mac_ptp_csroffs(priv->eth_rate,
 						       rx_bcast_ctrl_ok_msb));		// 0x9F0
 	buf[401] = hssi_csrrd32_ba(pdev, HSSI_ETH_RECONFIG, chan,
-				   eth_mac_ptp_csroffs(0,
+				   eth_mac_ptp_csroffs(priv->eth_rate,
 						       rx_ucast_ctrl_ok_lsb));		// 0x9F4
 	buf[402] = hssi_csrrd32_ba(pdev, HSSI_ETH_RECONFIG, chan,
-				   eth_mac_ptp_csroffs(0,
+				   eth_mac_ptp_csroffs(priv->eth_rate,
 						       rx_ucast_ctrl_ok_msb));		// 0x9F8
 	buf[403] = hssi_csrrd32_ba(pdev, HSSI_ETH_RECONFIG, chan,
-				   eth_mac_ptp_csroffs(0,
+				   eth_mac_ptp_csroffs(priv->eth_rate,
 						       rx_pause_lsb));			// 0x9FC
 	buf[404] = hssi_csrrd32_ba(pdev, HSSI_ETH_RECONFIG, chan,
-				   eth_mac_ptp_csroffs(0,
+				   eth_mac_ptp_csroffs(priv->eth_rate,
 						       rx_pause_msb));			// 0xA00
 	buf[405] = hssi_csrrd32_ba(pdev, HSSI_ETH_RECONFIG, chan,
-				   eth_mac_ptp_csroffs(0,
+				   eth_mac_ptp_csroffs(priv->eth_rate,
 						       rx_rnt_lsb));			// 0xA04
 	buf[406] = hssi_csrrd32_ba(pdev, HSSI_ETH_RECONFIG, chan,
-				   eth_mac_ptp_csroffs(0,
+				   eth_mac_ptp_csroffs(priv->eth_rate,
 						       rx_st_lsb));			// 0xA0C
 	buf[407] = hssi_csrrd32_ba(pdev, HSSI_ETH_RECONFIG, chan,
-				   eth_mac_ptp_csroffs(0,
+				   eth_mac_ptp_csroffs(priv->eth_rate,
 						       rx_st_msb));			// 0xA10
 	buf[408] = hssi_csrrd32_ba(pdev, HSSI_ETH_RECONFIG, chan,
-				   eth_mac_ptp_csroffs(0,
+				   eth_mac_ptp_csroffs(priv->eth_rate,
 						       rx_lenerr_lsb));			// 0xA14
 	buf[409] = hssi_csrrd32_ba(pdev, HSSI_ETH_RECONFIG, chan,
-				   eth_mac_ptp_csroffs(0,
+				   eth_mac_ptp_csroffs(priv->eth_rate,
 						       rx_pfc_err_lsb));		// 0xA1C
 	buf[410] = hssi_csrrd32_ba(pdev, HSSI_ETH_RECONFIG, chan,
-				   eth_mac_ptp_csroffs(0,
+				   eth_mac_ptp_csroffs(priv->eth_rate,
 						       rx_pfc_lsb));			// 0xA24
 	buf[411] = hssi_csrrd32_ba(pdev, HSSI_ETH_RECONFIG, chan,
-				   eth_mac_ptp_csroffs(0,
+				   eth_mac_ptp_csroffs(priv->eth_rate,
 						       rx_pfc_msb));			// 0xA28
 	buf[412] = hssi_csrrd32_ba(pdev, HSSI_ETH_RECONFIG, chan,
-				   eth_mac_ptp_csroffs(0,
+				   eth_mac_ptp_csroffs(priv->eth_rate,
 						       rx_payload_octetsok_lsb));	// 0xA2C
 	buf[413] = hssi_csrrd32_ba(pdev, HSSI_ETH_RECONFIG, chan,
-				   eth_mac_ptp_csroffs(0,
+				   eth_mac_ptp_csroffs(priv->eth_rate,
 						       rx_payload_octetsok_msb));	// 0xA30
 	buf[414] = hssi_csrrd32_ba(pdev, HSSI_ETH_RECONFIG, chan,
-				   eth_mac_ptp_csroffs(0,
+				   eth_mac_ptp_csroffs(priv->eth_rate,
 						       rx_frame_octetsok_lsb));		// 0xA34
 	buf[415] = hssi_csrrd32_ba(pdev, HSSI_ETH_RECONFIG, chan,
-				   eth_mac_ptp_csroffs(0,
+				   eth_mac_ptp_csroffs(priv->eth_rate,
 						       rx_frame_octetsok_msb));		// 0xA38
 	buf[416] = hssi_csrrd32_ba(pdev, HSSI_ETH_RECONFIG, chan,
-				   eth_mac_ptp_csroffs(0,
+				   eth_mac_ptp_csroffs(priv->eth_rate,
 						       rx_malformed_lsb));		// 0xA3C
 	buf[417] = hssi_csrrd32_ba(pdev, HSSI_ETH_RECONFIG, chan,
-				   eth_mac_ptp_csroffs(0,
+				   eth_mac_ptp_csroffs(priv->eth_rate,
 						       rx_dropped_lsb));		// 0xA44
 	buf[418] = hssi_csrrd32_ba(pdev, HSSI_ETH_RECONFIG, chan,
-				   eth_mac_ptp_csroffs(0,
+				   eth_mac_ptp_csroffs(priv->eth_rate,
 						       rx_badlt_lsb));			// 0xA4C
 	buf[419] = hssi_csrrd32_ba(pdev, HSSI_ETH_RECONFIG, chan,
-				   eth_mac_ptp_csroffs(0,
+				   eth_mac_ptp_csroffs(priv->eth_rate,
 						       rx_total_ptp_ts));		// 0xA54
 	buf[420] = hssi_csrrd32_ba(pdev, HSSI_ETH_RECONFIG, chan,
-				   eth_mac_ptp_csroffs(0,
+				   eth_mac_ptp_csroffs(priv->eth_rate,
 						       tx_ptp_cf_overflow));		// 0xA58
 	buf[421] = hssi_csrrd32_ba(pdev, HSSI_ETH_RECONFIG, chan,
-				   eth_mac_ptp_csroffs(0,
+				   eth_mac_ptp_csroffs(priv->eth_rate,
 						       tx_ptp_tam_lo_pl_0));		// 0xA5C
 	buf[422] = hssi_csrrd32_ba(pdev, HSSI_ETH_RECONFIG, chan,
-				   eth_mac_ptp_csroffs(0,
+				   eth_mac_ptp_csroffs(priv->eth_rate,
 						       tx_ptp_tam_med_pl_0));		// 0xA60
 	buf[423] = hssi_csrrd32_ba(pdev, HSSI_ETH_RECONFIG, chan,
-				   eth_mac_ptp_csroffs(0,
+				   eth_mac_ptp_csroffs(priv->eth_rate,
 						       tx_ptp_tam_hi_pl_0));		// 0xA64
 	buf[424] = hssi_csrrd32_ba(pdev, HSSI_ETH_RECONFIG, chan,
-				   eth_mac_ptp_csroffs(0,
+				   eth_mac_ptp_csroffs(priv->eth_rate,
 						       tx_ptp_tam_adj_pl_0));		// 0xA68
 	buf[425] = hssi_csrrd32_ba(pdev, HSSI_ETH_RECONFIG, chan,
-				   eth_mac_ptp_csroffs(0,
+				   eth_mac_ptp_csroffs(priv->eth_rate,
 						       tx_ptp_tam_lo_pl_1));		// 0xA6C
 	buf[426] = hssi_csrrd32_ba(pdev, HSSI_ETH_RECONFIG, chan,
-				   eth_mac_ptp_csroffs(0,
+				   eth_mac_ptp_csroffs(priv->eth_rate,
 						       tx_ptp_tam_med_pl_1));		// 0xA70
 	buf[427] = hssi_csrrd32_ba(pdev, HSSI_ETH_RECONFIG, chan,
-				   eth_mac_ptp_csroffs(0,
+				   eth_mac_ptp_csroffs(priv->eth_rate,
 						       tx_ptp_tam_hi_pl_1));		// 0xA74
 	buf[428] = hssi_csrrd32_ba(pdev, HSSI_ETH_RECONFIG, chan,
-				   eth_mac_ptp_csroffs(0,
+				   eth_mac_ptp_csroffs(priv->eth_rate,
 						       tx_ptp_tam_adj_pl_1));		// 0xA78
 	buf[429] = hssi_csrrd32_ba(pdev, HSSI_ETH_RECONFIG, chan,
-				   eth_mac_ptp_csroffs(0,
+				   eth_mac_ptp_csroffs(priv->eth_rate,
 						       tx_ptp_tam_lo_pl_2));		// 0xA7C
 	buf[430] = hssi_csrrd32_ba(pdev, HSSI_ETH_RECONFIG, chan,
-				   eth_mac_ptp_csroffs(0,
+				   eth_mac_ptp_csroffs(priv->eth_rate,
 						       tx_ptp_tam_med_pl_2));		// 0xA80
 	buf[431] = hssi_csrrd32_ba(pdev, HSSI_ETH_RECONFIG, chan,
-				   eth_mac_ptp_csroffs(0,
+				   eth_mac_ptp_csroffs(priv->eth_rate,
 						       tx_ptp_tam_hi_pl_2));		// 0xA84
 	buf[432] = hssi_csrrd32_ba(pdev, HSSI_ETH_RECONFIG, chan,
-				   eth_mac_ptp_csroffs(0,
+				   eth_mac_ptp_csroffs(priv->eth_rate,
 						       tx_ptp_tam_adj_pl_2));		// 0xA88
 	buf[433] = hssi_csrrd32_ba(pdev, HSSI_ETH_RECONFIG, chan,
-				   eth_mac_ptp_csroffs(0,
+				   eth_mac_ptp_csroffs(priv->eth_rate,
 						       tx_ptp_tam_lo_pl_3));		// 0xA8C
 	buf[434] = hssi_csrrd32_ba(pdev, HSSI_ETH_RECONFIG, chan,
-				   eth_mac_ptp_csroffs(0,
+				   eth_mac_ptp_csroffs(priv->eth_rate,
 						       tx_ptp_tam_med_pl_3));		// 0xA90
 	buf[435] = hssi_csrrd32_ba(pdev, HSSI_ETH_RECONFIG, chan,
-				   eth_mac_ptp_csroffs(0,
+				   eth_mac_ptp_csroffs(priv->eth_rate,
 						       tx_ptp_tam_hi_pl_3));		// 0xA94
 	buf[436] = hssi_csrrd32_ba(pdev, HSSI_ETH_RECONFIG, chan,
-				   eth_mac_ptp_csroffs(0,
+				   eth_mac_ptp_csroffs(priv->eth_rate,
 						       tx_ptp_tam_adj_pl_3));		// 0xA98
 	buf[437] = hssi_csrrd32_ba(pdev, HSSI_ETH_RECONFIG, chan,
-				   eth_mac_ptp_csroffs(0,
+				   eth_mac_ptp_csroffs(priv->eth_rate,
 						       tx_ptp_tam_lo_pl_4));		// 0xA9C
 	buf[438] = hssi_csrrd32_ba(pdev, HSSI_ETH_RECONFIG, chan,
-				   eth_mac_ptp_csroffs(0,
+				   eth_mac_ptp_csroffs(priv->eth_rate,
 						       tx_ptp_tam_med_pl_4));		// 0xAA0
 	buf[439] = hssi_csrrd32_ba(pdev, HSSI_ETH_RECONFIG, chan,
-				   eth_mac_ptp_csroffs(0,
+				   eth_mac_ptp_csroffs(priv->eth_rate,
 						       tx_ptp_tam_hi_pl_4));		// 0xAA4
 	buf[440] = hssi_csrrd32_ba(pdev, HSSI_ETH_RECONFIG, chan,
-				   eth_mac_ptp_csroffs(0,
+				   eth_mac_ptp_csroffs(priv->eth_rate,
 						       tx_ptp_tam_adj_pl_4));		// 0xAA8
 	buf[441] = hssi_csrrd32_ba(pdev, HSSI_ETH_RECONFIG, chan,
-				   eth_mac_ptp_csroffs(0,
+				   eth_mac_ptp_csroffs(priv->eth_rate,
 						       tx_ptp_tam_lo_pl_5));		// 0xAAC
 	buf[442] = hssi_csrrd32_ba(pdev, HSSI_ETH_RECONFIG, chan,
-				   eth_mac_ptp_csroffs(0,
+				   eth_mac_ptp_csroffs(priv->eth_rate,
 						       tx_ptp_tam_med_pl_5));		// 0xAB0
 	buf[443] = hssi_csrrd32_ba(pdev, HSSI_ETH_RECONFIG, chan,
-				   eth_mac_ptp_csroffs(0,
+				   eth_mac_ptp_csroffs(priv->eth_rate,
 						       tx_ptp_tam_hi_pl_5));		// 0xAB4
 	buf[444] = hssi_csrrd32_ba(pdev, HSSI_ETH_RECONFIG, chan,
-				   eth_mac_ptp_csroffs(0,
+				   eth_mac_ptp_csroffs(priv->eth_rate,
 						       tx_ptp_tam_adj_pl_5));		// 0xAB8
 	buf[445] = hssi_csrrd32_ba(pdev, HSSI_ETH_RECONFIG, chan,
-				   eth_mac_ptp_csroffs(0,
+				   eth_mac_ptp_csroffs(priv->eth_rate,
 						       tx_ptp_tam_lo_pl_6));		// 0xABC
 	buf[446] = hssi_csrrd32_ba(pdev, HSSI_ETH_RECONFIG, chan,
-				   eth_mac_ptp_csroffs(0,
+				   eth_mac_ptp_csroffs(priv->eth_rate,
 						       tx_ptp_tam_med_pl_6));		// 0xAC0
 	buf[447] = hssi_csrrd32_ba(pdev, HSSI_ETH_RECONFIG, chan,
-				   eth_mac_ptp_csroffs(0,
+				   eth_mac_ptp_csroffs(priv->eth_rate,
 						       tx_ptp_tam_hi_pl_6));		// 0xAC4
 	buf[448] = hssi_csrrd32_ba(pdev, HSSI_ETH_RECONFIG, chan,
-				   eth_mac_ptp_csroffs(0,
+				   eth_mac_ptp_csroffs(priv->eth_rate,
 						       tx_ptp_tam_adj_pl_6));		// 0xAC8
 	buf[449] = hssi_csrrd32_ba(pdev, HSSI_ETH_RECONFIG, chan,
-				   eth_mac_ptp_csroffs(0,
+				   eth_mac_ptp_csroffs(priv->eth_rate,
 						       tx_ptp_tam_lo_pl_7));		// 0xACC
 	buf[450] = hssi_csrrd32_ba(pdev, HSSI_ETH_RECONFIG, chan,
-				   eth_mac_ptp_csroffs(0,
+				   eth_mac_ptp_csroffs(priv->eth_rate,
 						       tx_ptp_tam_med_pl_7));		// 0xAD0
 	buf[451] = hssi_csrrd32_ba(pdev, HSSI_ETH_RECONFIG, chan,
-				   eth_mac_ptp_csroffs(0,
+				   eth_mac_ptp_csroffs(priv->eth_rate,
 						       tx_ptp_tam_hi_pl_7));		// 0xAD4
 	buf[452] = hssi_csrrd32_ba(pdev, HSSI_ETH_RECONFIG, chan,
-				   eth_mac_ptp_csroffs(0,
+				   eth_mac_ptp_csroffs(priv->eth_rate,
 						       tx_ptp_tam_adj_pl_7));		// 0xAD8
 	buf[453] = hssi_csrrd32_ba(pdev, HSSI_ETH_RECONFIG, chan,
-				   eth_mac_ptp_csroffs(0,
+				   eth_mac_ptp_csroffs(priv->eth_rate,
 						       tx_ptp_tam_lo_pl_8));		// 0xADC
 	buf[454] = hssi_csrrd32_ba(pdev, HSSI_ETH_RECONFIG, chan,
-				   eth_mac_ptp_csroffs(0,
+				   eth_mac_ptp_csroffs(priv->eth_rate,
 						       tx_ptp_tam_med_pl_8));		// 0xAE0
 	buf[455] = hssi_csrrd32_ba(pdev, HSSI_ETH_RECONFIG, chan,
-				   eth_mac_ptp_csroffs(0,
+				   eth_mac_ptp_csroffs(priv->eth_rate,
 						       tx_ptp_tam_hi_pl_8));		// 0xAE4
 	buf[456] = hssi_csrrd32_ba(pdev, HSSI_ETH_RECONFIG, chan,
-				   eth_mac_ptp_csroffs(0,
+				   eth_mac_ptp_csroffs(priv->eth_rate,
 						       tx_ptp_tam_adj_pl_8));		// 0xAE8
 	buf[457] = hssi_csrrd32_ba(pdev, HSSI_ETH_RECONFIG, chan,
-				   eth_mac_ptp_csroffs(0,
+				   eth_mac_ptp_csroffs(priv->eth_rate,
 						       tx_ptp_tam_lo_pl_9));		// 0xAEC
 	buf[458] = hssi_csrrd32_ba(pdev, HSSI_ETH_RECONFIG, chan,
-				   eth_mac_ptp_csroffs(0,
+				   eth_mac_ptp_csroffs(priv->eth_rate,
 						       tx_ptp_tam_med_pl_9));		// 0xAF0
 	buf[459] = hssi_csrrd32_ba(pdev, HSSI_ETH_RECONFIG, chan,
-				   eth_mac_ptp_csroffs(0,
+				   eth_mac_ptp_csroffs(priv->eth_rate,
 						       tx_ptp_tam_hi_pl_9));		// 0xAF4
 	buf[460] = hssi_csrrd32_ba(pdev, HSSI_ETH_RECONFIG, chan,
-				   eth_mac_ptp_csroffs(0,
+				   eth_mac_ptp_csroffs(priv->eth_rate,
 						       tx_ptp_tam_adj_pl_9));		// 0xAF8
 	buf[461] = hssi_csrrd32_ba(pdev, HSSI_ETH_RECONFIG, chan,
-				   eth_mac_ptp_csroffs(0,
+				   eth_mac_ptp_csroffs(priv->eth_rate,
 						       tx_ptp_tam_lo_pl_10));		// 0xAFC
 	buf[462] = hssi_csrrd32_ba(pdev, HSSI_ETH_RECONFIG, chan,
-				   eth_mac_ptp_csroffs(0,
+				   eth_mac_ptp_csroffs(priv->eth_rate,
 						       tx_ptp_tam_med_pl_10));		// 0xB00
 	buf[463] = hssi_csrrd32_ba(pdev, HSSI_ETH_RECONFIG, chan,
-				   eth_mac_ptp_csroffs(0,
+				   eth_mac_ptp_csroffs(priv->eth_rate,
 						       tx_ptp_tam_hi_pl_10));		// 0xB04
 	buf[464] = hssi_csrrd32_ba(pdev, HSSI_ETH_RECONFIG, chan,
-				   eth_mac_ptp_csroffs(0,
+				   eth_mac_ptp_csroffs(priv->eth_rate,
 						       tx_ptp_tam_adj_pl_10));		// 0xB08
 	buf[465] = hssi_csrrd32_ba(pdev, HSSI_ETH_RECONFIG, chan,
-				   eth_mac_ptp_csroffs(0,
+				   eth_mac_ptp_csroffs(priv->eth_rate,
 						       tx_ptp_tam_lo_pl_11));		// 0xB0C
 	buf[466] = hssi_csrrd32_ba(pdev, HSSI_ETH_RECONFIG, chan,
-				   eth_mac_ptp_csroffs(0,
+				   eth_mac_ptp_csroffs(priv->eth_rate,
 						       tx_ptp_tam_med_pl_11));		// 0xB10
 	buf[467] = hssi_csrrd32_ba(pdev, HSSI_ETH_RECONFIG, chan,
-				   eth_mac_ptp_csroffs(0,
+				   eth_mac_ptp_csroffs(priv->eth_rate,
 						       tx_ptp_tam_hi_pl_11));		// 0xB14
 	buf[468] = hssi_csrrd32_ba(pdev, HSSI_ETH_RECONFIG, chan,
-				   eth_mac_ptp_csroffs(0,
+				   eth_mac_ptp_csroffs(priv->eth_rate,
 						       tx_ptp_tam_adj_pl_11));		// 0xB18
 	buf[469] = hssi_csrrd32_ba(pdev, HSSI_ETH_RECONFIG, chan,
-				   eth_mac_ptp_csroffs(0,
+				   eth_mac_ptp_csroffs(priv->eth_rate,
 						       tx_ptp_tam_lo_pl_12));		// 0xB1C
 	buf[470] = hssi_csrrd32_ba(pdev, HSSI_ETH_RECONFIG, chan,
-				   eth_mac_ptp_csroffs(0,
+				   eth_mac_ptp_csroffs(priv->eth_rate,
 						       tx_ptp_tam_med_pl_12));		// 0xB20
 	buf[471] = hssi_csrrd32_ba(pdev, HSSI_ETH_RECONFIG, chan,
-				   eth_mac_ptp_csroffs(0,
+				   eth_mac_ptp_csroffs(priv->eth_rate,
 						       tx_ptp_tam_hi_pl_12));		// 0xB24
 	buf[472] = hssi_csrrd32_ba(pdev, HSSI_ETH_RECONFIG, chan,
-				   eth_mac_ptp_csroffs(0,
+				   eth_mac_ptp_csroffs(priv->eth_rate,
 						       tx_ptp_tam_adj_pl_12));		// 0xB28
 	buf[473] = hssi_csrrd32_ba(pdev, HSSI_ETH_RECONFIG, chan,
-				   eth_mac_ptp_csroffs(0,
+				   eth_mac_ptp_csroffs(priv->eth_rate,
 						       tx_ptp_tam_lo_pl_13));		// 0xB2C
 	buf[474] = hssi_csrrd32_ba(pdev, HSSI_ETH_RECONFIG, chan,
-				   eth_mac_ptp_csroffs(0,
+				   eth_mac_ptp_csroffs(priv->eth_rate,
 						       tx_ptp_tam_med_pl_13));		// 0xB30
 	buf[475] = hssi_csrrd32_ba(pdev, HSSI_ETH_RECONFIG, chan,
-				   eth_mac_ptp_csroffs(0,
+				   eth_mac_ptp_csroffs(priv->eth_rate,
 						       tx_ptp_tam_hi_pl_13));		// 0xB34
 	buf[476] = hssi_csrrd32_ba(pdev, HSSI_ETH_RECONFIG, chan,
-				   eth_mac_ptp_csroffs(0,
+				   eth_mac_ptp_csroffs(priv->eth_rate,
 						       tx_ptp_tam_adj_pl_13));		// 0xB38
 	buf[477] = hssi_csrrd32_ba(pdev, HSSI_ETH_RECONFIG, chan,
-				   eth_mac_ptp_csroffs(0,
+				   eth_mac_ptp_csroffs(priv->eth_rate,
 						       tx_ptp_tam_lo_pl_14));		// 0xB3C
 	buf[478] = hssi_csrrd32_ba(pdev, HSSI_ETH_RECONFIG, chan,
-				   eth_mac_ptp_csroffs(0,
+				   eth_mac_ptp_csroffs(priv->eth_rate,
 						       tx_ptp_tam_med_pl_14));		// 0xB40
 	buf[479] = hssi_csrrd32_ba(pdev, HSSI_ETH_RECONFIG, chan,
-				   eth_mac_ptp_csroffs(0,
+				   eth_mac_ptp_csroffs(priv->eth_rate,
 						       tx_ptp_tam_hi_pl_14));		// 0xB44
 	buf[480] = hssi_csrrd32_ba(pdev, HSSI_ETH_RECONFIG, chan,
-				   eth_mac_ptp_csroffs(0,
+				   eth_mac_ptp_csroffs(priv->eth_rate,
 						       tx_ptp_tam_adj_pl_14));		// 0xB48
 	buf[481] = hssi_csrrd32_ba(pdev, HSSI_ETH_RECONFIG, chan,
-				   eth_mac_ptp_csroffs(0,
+				   eth_mac_ptp_csroffs(priv->eth_rate,
 						       tx_ptp_tam_lo_pl_15));		// 0xB4C
 	buf[482] = hssi_csrrd32_ba(pdev, HSSI_ETH_RECONFIG, chan,
-				   eth_mac_ptp_csroffs(0,
+				   eth_mac_ptp_csroffs(priv->eth_rate,
 						       tx_ptp_tam_med_pl_15));		// 0xB50
 	buf[483] = hssi_csrrd32_ba(pdev, HSSI_ETH_RECONFIG, chan,
-				   eth_mac_ptp_csroffs(0,
+				   eth_mac_ptp_csroffs(priv->eth_rate,
 						       tx_ptp_tam_hi_pl_15));		// 0xB54
 	buf[484] = hssi_csrrd32_ba(pdev, HSSI_ETH_RECONFIG, chan,
-				   eth_mac_ptp_csroffs(0,
+				   eth_mac_ptp_csroffs(priv->eth_rate,
 						       tx_ptp_tam_adj_pl_15));		// 0xB58
 	buf[485] = hssi_csrrd32_ba(pdev, HSSI_ETH_RECONFIG, chan,
-				   eth_mac_ptp_csroffs(0,
+				   eth_mac_ptp_csroffs(priv->eth_rate,
 						       tx_ts_ss_lo));			// 0xB5C
 	buf[486] = hssi_csrrd32_ba(pdev, HSSI_ETH_RECONFIG, chan,
-				   eth_mac_ptp_csroffs(0,
+				   eth_mac_ptp_csroffs(priv->eth_rate,
 						       tx_ts_ss_mid));			// 0xB60
 	buf[487] = hssi_csrrd32_ba(pdev, HSSI_ETH_RECONFIG, chan,
-				   eth_mac_ptp_csroffs(0,
+				   eth_mac_ptp_csroffs(priv->eth_rate,
 						       tx_ts_ss_hi));			// 0xB64
 	buf[488] = hssi_csrrd32_ba(pdev, HSSI_ETH_RECONFIG, chan,
-				   eth_mac_ptp_csroffs(0,
+				   eth_mac_ptp_csroffs(priv->eth_rate,
 						       rx_ptp_tam_lo_pl_0));		// 0xB6C
 	buf[489] = hssi_csrrd32_ba(pdev, HSSI_ETH_RECONFIG, chan,
-				   eth_mac_ptp_csroffs(0,
+				   eth_mac_ptp_csroffs(priv->eth_rate,
 						       rx_ptp_tam_med_pl_0));		// 0xB70
 	buf[490] = hssi_csrrd32_ba(pdev, HSSI_ETH_RECONFIG, chan,
-				   eth_mac_ptp_csroffs(0,
+				   eth_mac_ptp_csroffs(priv->eth_rate,
 						       rx_ptp_tam_hi_pl_0));		// 0xB74
 	buf[491] = hssi_csrrd32_ba(pdev, HSSI_ETH_RECONFIG, chan,
-				   eth_mac_ptp_csroffs(0,
+				   eth_mac_ptp_csroffs(priv->eth_rate,
 						       rx_ptp_tam_adj_pl_0));		// 0xB78
 	buf[492] = hssi_csrrd32_ba(pdev, HSSI_ETH_RECONFIG, chan,
-				   eth_mac_ptp_csroffs(0,
+				   eth_mac_ptp_csroffs(priv->eth_rate,
 						       rx_ptp_tam_lo_pl_1));		// 0xB7C
 	buf[493] = hssi_csrrd32_ba(pdev, HSSI_ETH_RECONFIG, chan,
-				   eth_mac_ptp_csroffs(0,
+				   eth_mac_ptp_csroffs(priv->eth_rate,
 						       rx_ptp_tam_med_pl_1));		// 0xB80
 	buf[494] = hssi_csrrd32_ba(pdev, HSSI_ETH_RECONFIG, chan,
-				   eth_mac_ptp_csroffs(0,
+				   eth_mac_ptp_csroffs(priv->eth_rate,
 						       rx_ptp_tam_hi_pl_1));		// 0xB84
 	buf[495] = hssi_csrrd32_ba(pdev, HSSI_ETH_RECONFIG, chan,
-				   eth_mac_ptp_csroffs(0,
+				   eth_mac_ptp_csroffs(priv->eth_rate,
 						       rx_ptp_tam_adj_pl_1));		// 0xB88
 	buf[496] = hssi_csrrd32_ba(pdev, HSSI_ETH_RECONFIG, chan,
-				   eth_mac_ptp_csroffs(0,
+				   eth_mac_ptp_csroffs(priv->eth_rate,
 						       rx_ptp_tam_lo_pl_2));		// 0xB8C
 	buf[497] = hssi_csrrd32_ba(pdev, HSSI_ETH_RECONFIG, chan,
-				   eth_mac_ptp_csroffs(0,
+				   eth_mac_ptp_csroffs(priv->eth_rate,
 						       rx_ptp_tam_med_pl_2));		// 0xB90
 	buf[498] = hssi_csrrd32_ba(pdev, HSSI_ETH_RECONFIG, chan,
-				   eth_mac_ptp_csroffs(0,
+				   eth_mac_ptp_csroffs(priv->eth_rate,
 						       rx_ptp_tam_hi_pl_2));		// 0xB94
 	buf[499] = hssi_csrrd32_ba(pdev, HSSI_ETH_RECONFIG, chan,
-				   eth_mac_ptp_csroffs(0,
+				   eth_mac_ptp_csroffs(priv->eth_rate,
 						       rx_ptp_tam_adj_pl_2));		// 0xB98
 	buf[500] = hssi_csrrd32_ba(pdev, HSSI_ETH_RECONFIG, chan,
-				   eth_mac_ptp_csroffs(0,
+				   eth_mac_ptp_csroffs(priv->eth_rate,
 						       rx_ptp_tam_lo_pl_3));		// 0xB9C
 	buf[501] = hssi_csrrd32_ba(pdev, HSSI_ETH_RECONFIG, chan,
-				   eth_mac_ptp_csroffs(0,
+				   eth_mac_ptp_csroffs(priv->eth_rate,
 						       rx_ptp_tam_med_pl_3));		// 0xBA0
 	buf[502] = hssi_csrrd32_ba(pdev, HSSI_ETH_RECONFIG, chan,
-				   eth_mac_ptp_csroffs(0,
+				   eth_mac_ptp_csroffs(priv->eth_rate,
 						       rx_ptp_tam_hi_pl_3));		// 0xBA4
 	buf[503] = hssi_csrrd32_ba(pdev, HSSI_ETH_RECONFIG, chan,
-				   eth_mac_ptp_csroffs(0,
+				   eth_mac_ptp_csroffs(priv->eth_rate,
 						       rx_ptp_tam_adj_pl_3));		// 0xBA8
 	buf[504] = hssi_csrrd32_ba(pdev, HSSI_ETH_RECONFIG, chan,
-				   eth_mac_ptp_csroffs(0,
+				   eth_mac_ptp_csroffs(priv->eth_rate,
 						       rx_ptp_tam_lo_pl_4));		// 0xBAC
 	buf[505] = hssi_csrrd32_ba(pdev, HSSI_ETH_RECONFIG, chan,
-				   eth_mac_ptp_csroffs(0,
+				   eth_mac_ptp_csroffs(priv->eth_rate,
 						       rx_ptp_tam_med_pl_4));		// 0xBB0
 	buf[506] = hssi_csrrd32_ba(pdev, HSSI_ETH_RECONFIG, chan,
-				   eth_mac_ptp_csroffs(0,
+				   eth_mac_ptp_csroffs(priv->eth_rate,
 						       rx_ptp_tam_hi_pl_4));		// 0xBB4
 	buf[507] = hssi_csrrd32_ba(pdev, HSSI_ETH_RECONFIG, chan,
-				   eth_mac_ptp_csroffs(0,
+				   eth_mac_ptp_csroffs(priv->eth_rate,
 						       rx_ptp_tam_adj_pl_4));		// 0xBB8
 	buf[508] = hssi_csrrd32_ba(pdev, HSSI_ETH_RECONFIG, chan,
-				   eth_mac_ptp_csroffs(0,
+				   eth_mac_ptp_csroffs(priv->eth_rate,
 						       rx_ptp_tam_lo_pl_5));		// 0xBBC
 	buf[509] = hssi_csrrd32_ba(pdev, HSSI_ETH_RECONFIG, chan,
-				   eth_mac_ptp_csroffs(0,
+				   eth_mac_ptp_csroffs(priv->eth_rate,
 						       rx_ptp_tam_med_pl_5));		// 0xBC0
 	buf[510] = hssi_csrrd32_ba(pdev, HSSI_ETH_RECONFIG, chan,
-				   eth_mac_ptp_csroffs(0,
+				   eth_mac_ptp_csroffs(priv->eth_rate,
 						       rx_ptp_tam_hi_pl_5));		// 0xBC4
 	buf[511] = hssi_csrrd32_ba(pdev, HSSI_ETH_RECONFIG, chan,
-				   eth_mac_ptp_csroffs(0,
+				   eth_mac_ptp_csroffs(priv->eth_rate,
 						       rx_ptp_tam_adj_pl_5));		// 0xBC8
 	buf[512] = hssi_csrrd32_ba(pdev, HSSI_ETH_RECONFIG, chan,
-				   eth_mac_ptp_csroffs(0,
+				   eth_mac_ptp_csroffs(priv->eth_rate,
 						       rx_ptp_tam_lo_pl_6));		// 0xBCC
 	buf[513] = hssi_csrrd32_ba(pdev, HSSI_ETH_RECONFIG, chan,
-				   eth_mac_ptp_csroffs(0,
+				   eth_mac_ptp_csroffs(priv->eth_rate,
 						       rx_ptp_tam_med_pl_6));		// 0xBD0
 	buf[514] = hssi_csrrd32_ba(pdev, HSSI_ETH_RECONFIG, chan,
-				   eth_mac_ptp_csroffs(0,
+				   eth_mac_ptp_csroffs(priv->eth_rate,
 						       rx_ptp_tam_hi_pl_6));		// 0xBD4
 	buf[515] = hssi_csrrd32_ba(pdev, HSSI_ETH_RECONFIG, chan,
-				   eth_mac_ptp_csroffs(0,
+				   eth_mac_ptp_csroffs(priv->eth_rate,
 						       rx_ptp_tam_adj_pl_6));		// 0xBD8
 	buf[516] = hssi_csrrd32_ba(pdev, HSSI_ETH_RECONFIG, chan,
-				   eth_mac_ptp_csroffs(0,
+				   eth_mac_ptp_csroffs(priv->eth_rate,
 						       rx_ptp_tam_lo_pl_7));		// 0xBDC
 	buf[517] = hssi_csrrd32_ba(pdev, HSSI_ETH_RECONFIG, chan,
-				   eth_mac_ptp_csroffs(0,
+				   eth_mac_ptp_csroffs(priv->eth_rate,
 						       rx_ptp_tam_med_pl_7));		// 0xBE0
 	buf[518] = hssi_csrrd32_ba(pdev, HSSI_ETH_RECONFIG, chan,
-				   eth_mac_ptp_csroffs(0,
+				   eth_mac_ptp_csroffs(priv->eth_rate,
 						       rx_ptp_tam_hi_pl_7));		// 0xBE4
 	buf[519] = hssi_csrrd32_ba(pdev, HSSI_ETH_RECONFIG, chan,
-				   eth_mac_ptp_csroffs(0,
+				   eth_mac_ptp_csroffs(priv->eth_rate,
 						       rx_ptp_tam_adj_pl_7));		// 0xBE8
 	buf[520] = hssi_csrrd32_ba(pdev, HSSI_ETH_RECONFIG, chan,
-				   eth_mac_ptp_csroffs(0,
+				   eth_mac_ptp_csroffs(priv->eth_rate,
 						       rx_ptp_tam_lo_pl_8));		// 0xBEC
 	buf[521] = hssi_csrrd32_ba(pdev, HSSI_ETH_RECONFIG, chan,
-				   eth_mac_ptp_csroffs(0,
+				   eth_mac_ptp_csroffs(priv->eth_rate,
 						       rx_ptp_tam_med_pl_8));		// 0xBF0
 	buf[522] = hssi_csrrd32_ba(pdev, HSSI_ETH_RECONFIG, chan,
-				   eth_mac_ptp_csroffs(0,
+				   eth_mac_ptp_csroffs(priv->eth_rate,
 						       rx_ptp_tam_hi_pl_8));		// 0xBF4
 	buf[523] = hssi_csrrd32_ba(pdev, HSSI_ETH_RECONFIG, chan,
-				   eth_mac_ptp_csroffs(0,
+				   eth_mac_ptp_csroffs(priv->eth_rate,
 						       rx_ptp_tam_adj_pl_8));		// 0xBF8
 	buf[524] = hssi_csrrd32_ba(pdev, HSSI_ETH_RECONFIG, chan,
-				   eth_mac_ptp_csroffs(0,
+				   eth_mac_ptp_csroffs(priv->eth_rate,
 						       rx_ptp_tam_lo_pl_9));		// 0xBFC
 	buf[525] = hssi_csrrd32_ba(pdev, HSSI_ETH_RECONFIG, chan,
-				   eth_mac_ptp_csroffs(0,
+				   eth_mac_ptp_csroffs(priv->eth_rate,
 						       rx_ptp_tam_med_pl_9));		// 0xC00
 	buf[526] = hssi_csrrd32_ba(pdev, HSSI_ETH_RECONFIG, chan,
-				   eth_mac_ptp_csroffs(0,
+				   eth_mac_ptp_csroffs(priv->eth_rate,
 						       rx_ptp_tam_hi_pl_9));		// 0xC04
 	buf[527] = hssi_csrrd32_ba(pdev, HSSI_ETH_RECONFIG, chan,
-				   eth_mac_ptp_csroffs(0,
+				   eth_mac_ptp_csroffs(priv->eth_rate,
 						       rx_ptp_tam_adj_pl_9));		// 0xC08
 	buf[528] = hssi_csrrd32_ba(pdev, HSSI_ETH_RECONFIG, chan,
-				   eth_mac_ptp_csroffs(0,
+				   eth_mac_ptp_csroffs(priv->eth_rate,
 						       rx_ptp_tam_lo_pl_10));		// 0xC0C
 	buf[529] = hssi_csrrd32_ba(pdev, HSSI_ETH_RECONFIG, chan,
-				   eth_mac_ptp_csroffs(0,
+				   eth_mac_ptp_csroffs(priv->eth_rate,
 						       rx_ptp_tam_med_pl_10));		// 0xC10
 	buf[530] = hssi_csrrd32_ba(pdev, HSSI_ETH_RECONFIG, chan,
-				   eth_mac_ptp_csroffs(0,
+				   eth_mac_ptp_csroffs(priv->eth_rate,
 						       rx_ptp_tam_hi_pl_10));		// 0xC14
 	buf[531] = hssi_csrrd32_ba(pdev, HSSI_ETH_RECONFIG, chan,
-				   eth_mac_ptp_csroffs(0,
+				   eth_mac_ptp_csroffs(priv->eth_rate,
 						       rx_ptp_tam_adj_pl_10));		// 0xC18
 	buf[532] = hssi_csrrd32_ba(pdev, HSSI_ETH_RECONFIG, chan,
-				   eth_mac_ptp_csroffs(0,
+				   eth_mac_ptp_csroffs(priv->eth_rate,
 						       rx_ptp_tam_lo_pl_11));		// 0xC1C
 	buf[533] = hssi_csrrd32_ba(pdev, HSSI_ETH_RECONFIG, chan,
-				   eth_mac_ptp_csroffs(0,
+				   eth_mac_ptp_csroffs(priv->eth_rate,
 						       rx_ptp_tam_med_pl_11));		// 0xC20
 	buf[534] = hssi_csrrd32_ba(pdev, HSSI_ETH_RECONFIG, chan,
-				   eth_mac_ptp_csroffs(0,
+				   eth_mac_ptp_csroffs(priv->eth_rate,
 						       rx_ptp_tam_hi_pl_11));		// 0xC24
 	buf[535] = hssi_csrrd32_ba(pdev, HSSI_ETH_RECONFIG, chan,
-				   eth_mac_ptp_csroffs(0,
+				   eth_mac_ptp_csroffs(priv->eth_rate,
 						       rx_ptp_tam_adj_pl_11));		// 0xC28
 	buf[536] = hssi_csrrd32_ba(pdev, HSSI_ETH_RECONFIG, chan,
-				   eth_mac_ptp_csroffs(0,
+				   eth_mac_ptp_csroffs(priv->eth_rate,
 						       rx_ptp_tam_lo_pl_12));		// 0xC2C
 	buf[537] = hssi_csrrd32_ba(pdev, HSSI_ETH_RECONFIG, chan,
-				   eth_mac_ptp_csroffs(0,
+				   eth_mac_ptp_csroffs(priv->eth_rate,
 						       rx_ptp_tam_med_pl_12));		// 0xC30
 	buf[538] = hssi_csrrd32_ba(pdev, HSSI_ETH_RECONFIG, chan,
-				   eth_mac_ptp_csroffs(0,
+				   eth_mac_ptp_csroffs(priv->eth_rate,
 						       rx_ptp_tam_hi_pl_12));		// 0xC34
 	buf[539] = hssi_csrrd32_ba(pdev, HSSI_ETH_RECONFIG, chan,
-				   eth_mac_ptp_csroffs(0,
+				   eth_mac_ptp_csroffs(priv->eth_rate,
 						       rx_ptp_tam_adj_pl_12));		// 0xC38
 	buf[540] = hssi_csrrd32_ba(pdev, HSSI_ETH_RECONFIG, chan,
-				   eth_mac_ptp_csroffs(0,
+				   eth_mac_ptp_csroffs(priv->eth_rate,
 						       rx_ptp_tam_lo_pl_13));		// 0xC3C
 	buf[541] = hssi_csrrd32_ba(pdev, HSSI_ETH_RECONFIG, chan,
-				   eth_mac_ptp_csroffs(0,
+				   eth_mac_ptp_csroffs(priv->eth_rate,
 						       rx_ptp_tam_med_pl_13));		// 0xC40
 	buf[542] = hssi_csrrd32_ba(pdev, HSSI_ETH_RECONFIG, chan,
-				   eth_mac_ptp_csroffs(0,
+				   eth_mac_ptp_csroffs(priv->eth_rate,
 						       rx_ptp_tam_hi_pl_13));		// 0xC44
 	buf[543] = hssi_csrrd32_ba(pdev, HSSI_ETH_RECONFIG, chan,
-				   eth_mac_ptp_csroffs(0,
+				   eth_mac_ptp_csroffs(priv->eth_rate,
 						       rx_ptp_tam_adj_pl_13));		// 0xC48
 	buf[544] = hssi_csrrd32_ba(pdev, HSSI_ETH_RECONFIG, chan,
-				   eth_mac_ptp_csroffs(0,
+				   eth_mac_ptp_csroffs(priv->eth_rate,
 						       rx_ptp_tam_lo_pl_14));		// 0xC4C
 	buf[545] = hssi_csrrd32_ba(pdev, HSSI_ETH_RECONFIG, chan,
-				   eth_mac_ptp_csroffs(0,
+				   eth_mac_ptp_csroffs(priv->eth_rate,
 						       rx_ptp_tam_med_pl_14));		// 0xC50
 	buf[546] = hssi_csrrd32_ba(pdev, HSSI_ETH_RECONFIG, chan,
-				   eth_mac_ptp_csroffs(0,
+				   eth_mac_ptp_csroffs(priv->eth_rate,
 						       rx_ptp_tam_hi_pl_14));		// 0xC54
 	buf[547] = hssi_csrrd32_ba(pdev, HSSI_ETH_RECONFIG, chan,
-				   eth_mac_ptp_csroffs(0,
+				   eth_mac_ptp_csroffs(priv->eth_rate,
 						       rx_ptp_tam_adj_pl_14));		// 0xC58
 	buf[548] = hssi_csrrd32_ba(pdev, HSSI_ETH_RECONFIG, chan,
-				   eth_mac_ptp_csroffs(0,
+				   eth_mac_ptp_csroffs(priv->eth_rate,
 						       rx_ptp_tam_lo_pl_15));		// 0xC5C
 	buf[549] = hssi_csrrd32_ba(pdev, HSSI_ETH_RECONFIG, chan,
-				   eth_mac_ptp_csroffs(0,
+				   eth_mac_ptp_csroffs(priv->eth_rate,
 						       rx_ptp_tam_med_pl_15));		// 0xC60
 	buf[550] = hssi_csrrd32_ba(pdev, HSSI_ETH_RECONFIG, chan,
-				   eth_mac_ptp_csroffs(0,
+				   eth_mac_ptp_csroffs(priv->eth_rate,
 						       rx_ptp_tam_hi_pl_15));		// 0xC64
 	buf[551] = hssi_csrrd32_ba(pdev, HSSI_ETH_RECONFIG, chan,
-				   eth_mac_ptp_csroffs(0,
+				   eth_mac_ptp_csroffs(priv->eth_rate,
 						       rx_ptp_tam_adj_pl_15));		// 0xC68
 	buf[552] = hssi_csrrd32_ba(pdev, HSSI_ETH_RECONFIG, chan,
-				   eth_mac_ptp_csroffs(0,
+				   eth_mac_ptp_csroffs(priv->eth_rate,
 						       rx_ts_ss_lo));			// 0xC6C
 	buf[553] = hssi_csrrd32_ba(pdev, HSSI_ETH_RECONFIG, chan,
-				   eth_mac_ptp_csroffs(0,
+				   eth_mac_ptp_csroffs(priv->eth_rate,
 						       rx_ts_ss_mid));			// 0xC70
 	buf[554] = hssi_csrrd32_ba(pdev, HSSI_ETH_RECONFIG, chan,
-				   eth_mac_ptp_csroffs(0,
+				   eth_mac_ptp_csroffs(priv->eth_rate,
 						       rx_ts_ss_hi));			// 0xC74
 
 	/* F-Tile RS-FEC / XCVRIF Register Base Addresses
@@ -1455,13 +1460,15 @@ static void ftile_get_regs(struct net_device *dev, struct ethtool_regs *regs,
 static void ftile_get_pauseparam(struct net_device *dev,
 				 struct ethtool_pauseparam *pauseparam)
 {
+	intel_fpga_xtile_eth_private *priv = netdev_priv(dev);
+
 	pauseparam->rx_pause = 0;
 	pauseparam->tx_pause = 0;
 	pauseparam->autoneg = 0;
 
-//	if (priv->flow_ctrl & FLOW_RX)
+	if (priv->flow_ctrl & FLOW_RX)
 		pauseparam->rx_pause = 1;
-//	if (priv->flow_ctrl & FLOW_TX)
+	if (priv->flow_ctrl & FLOW_TX)
 		pauseparam->tx_pause = 1;
 }
 
@@ -1485,27 +1492,27 @@ static int ftile_set_pauseparam(struct net_device *dev,
 	if (pauseparam->rx_pause) {
 		new_pause |= FLOW_RX;
 		hssi_set_bit_ba(pdev, HSSI_ETH_RECONFIG, chan,
-				eth_mac_ptp_csroffs(0, rx_flow_control_feature_cfg),
+				eth_mac_ptp_csroffs(priv->eth_rate, rx_flow_control_feature_cfg),
 				ETH_RX_EN_STD_FLOW_CTRL);
 	} else {
 		hssi_clear_bit_ba(pdev, HSSI_ETH_RECONFIG, chan,
-				  eth_mac_ptp_csroffs(0, rx_flow_control_feature_cfg),
+				  eth_mac_ptp_csroffs(priv->eth_rate, rx_flow_control_feature_cfg),
 				  ETH_RX_EN_STD_FLOW_CTRL);
 	}
 
 	if (pauseparam->tx_pause) {
 		new_pause |= FLOW_TX;
 		hssi_set_bit_ba(pdev, HSSI_ETH_RECONFIG, chan,
-				eth_mac_ptp_csroffs(0, tx_flow_control_feature_cfg),
+				eth_mac_ptp_csroffs(priv->eth_rate, tx_flow_control_feature_cfg),
 				ETH_TX_EN_STD_FLOW_CTRL);
 	} else {
 		hssi_clear_bit_ba(pdev, HSSI_ETH_RECONFIG, chan,
-				  eth_mac_ptp_csroffs(0, tx_flow_control_feature_cfg),
+				  eth_mac_ptp_csroffs(priv->eth_rate, tx_flow_control_feature_cfg),
 				  ETH_TX_EN_STD_FLOW_CTRL);
 	}
 
 	hssi_csrwr32_ba(pdev, HSSI_ETH_RECONFIG, chan,
-			eth_mac_ptp_csroffs(0, pause_quanta_0), priv->pause);
+			eth_mac_ptp_csroffs(priv->eth_rate, pause_quanta_0), priv->pause);
 	priv->flow_ctrl = new_pause;
 out:
 	spin_unlock(&priv->mac_cfg_lock);
@@ -1542,11 +1549,28 @@ static int ftile_set_link_ksettings(struct net_device *dev,
 {
 	intel_fpga_xtile_eth_private *priv = netdev_priv(dev);
 
-	//if (!priv || !priv->phylink)
-	if (!priv)
-		return -ENODEV;
+	struct platform_device *pdev  = priv->pdev_hssi;
+	u32 hssi_port = priv->hssi_port;
+	int ret = 0;
 
-	return phylink_ethtool_ksettings_set(priv->phylink, cmd);
+	if (cmd->base.autoneg == AUTONEG_ENABLE) {
+		if (!priv->anlt)
+			return -EOPNOTSUPP;
+		priv->autoneg = true;
+		ret = hssi_anlt_enable(pdev, hssi_port);
+	} else {
+		if (!priv->anlt)
+			return -EOPNOTSUPP;
+		priv->autoneg = false;
+		ret = hssi_anlt_disable(pdev, hssi_port);
+	}
+	if (ret) {
+		priv->autoneg = !(priv->autoneg);
+		return ret;
+	}
+
+	//return phylink_ethtool_ksettings_set(priv->phylink, cmd);
+	return 0;
 }
 
 /* Get link ksettings (phy address, speed) for ethtools */
@@ -1554,12 +1578,222 @@ static int ftile_get_link_ksettings(struct net_device *dev,
 				    struct ethtool_link_ksettings *cmd)
 {
 	intel_fpga_xtile_eth_private *priv = netdev_priv(dev);
+	struct platform_device *pdev;
+	u32 an_status, an_sts_e[6], an_cfg;
+	u32 an_tec_abl, an_con_abl, temp;
 
-	//if (!priv || !priv->phylink)
+	phylink_ethtool_ksettings_get(priv->phylink, cmd);
+
+	ethtool_link_ksettings_zero_link_mode(cmd, supported);
+	ethtool_link_ksettings_zero_link_mode(cmd, advertising);
+	ethtool_link_ksettings_zero_link_mode(cmd, lp_advertising);
+
+	ethtool_link_ksettings_del_link_mode(cmd, supported, MII);
+	ethtool_link_ksettings_add_link_mode(cmd, supported, FIBRE);
+	ethtool_link_ksettings_add_link_mode(cmd, supported, TP);
+	cmd->base.port = PORT_FIBRE;
+
+	ethtool_link_ksettings_del_link_mode(cmd, supported, Pause);
+	if ((priv->flow_ctrl & FLOW_RX) && (priv->flow_ctrl & FLOW_TX))
+		ethtool_link_ksettings_add_link_mode(cmd, supported, Pause);
+	if ((priv->flow_ctrl & FLOW_TX) || (priv->flow_ctrl & FLOW_TX))
+		ethtool_link_ksettings_add_link_mode(cmd, supported, Asym_Pause);
+
+	pdev = priv->pdev_hssi;
+	if (priv->anlt)
+		an_status = hssiss_anlt_get_status(pdev, priv->hssi_port);
+
+	if (priv->anlt && an_status & HSSISS_CSR_PHY_AN_ABILITY) {
+		ethtool_link_ksettings_add_link_mode(cmd, supported, Autoneg);
+
+		an_cfg = hssiss_anlt_get_cfg(pdev, priv->hssi_port);
+		if (!(an_cfg & HSSISS_CSR_AN_ENABLE_AN)) {
+			ethtool_link_ksettings_zero_link_mode(cmd, advertising);
+			ethtool_link_ksettings_zero_link_mode(cmd, supported);
+		}
+
+		if (an_status & HSSISS_CSR_AN_LP_ABILITY) {
+			ethtool_link_ksettings_add_link_mode(cmd, lp_advertising, Autoneg);
+			if (hssiss_anlt_get_ext_status(pdev, priv->hssi_port, an_sts_e) == 0) {
+				if (an_sts_e[0] & HSSISS_CSR_AN_STATUS_1_LP_PAUSE_MASK) {
+					if (an_sts_e[0] & HSSISS_CSR_AN_STATUS_1_LP_PAUSE_SUPP)
+						ethtool_link_ksettings_add_link_mode(cmd,
+										     lp_advertising,
+										     Pause);
+					if (an_sts_e[0] & HSSISS_CSR_AN_STATUS_1_LP_ASYM_PAUSE_SUPP)
+						ethtool_link_ksettings_add_link_mode(cmd,
+										     lp_advertising,
+										     Asym_Pause);
+				}
+				if (an_sts_e[1] & HSSISS_AN2_LP_TECH_ABL_MASK) {
+					an_tec_abl = an_sts_e[1] &
+						     HSSISS_AN2_LP_TECH_ABL_MASK;
+					an_tec_abl = altera_rm_trail0(an_tec_abl,
+								     HSSISS_AN2_LP_TECH_ABL_START);
+					set_ethtool_linkmodes(cmd->link_modes.lp_advertising,
+							      AN_IEEE_ABILITY_TYPE, an_tec_abl);
+				}
+				if (an_sts_e[1] & HSSISS_CSR_AN_STATUS_2_LP_FEC_MASK) {
+					if (an_sts_e[1] & HSSISS_CSR_AN_STATUS_2_LP_FEC_LLFEC)
+						ethtool_link_ksettings_add_link_mode(cmd,
+										     lp_advertising,
+										     FEC_LLRS);
+					if (an_sts_e[1] & HSSISS_CSR_AN_STATUS_2_LP_FEC_RSFEC)
+						ethtool_link_ksettings_add_link_mode(cmd,
+										     lp_advertising,
+										     FEC_RS);
+					if (an_sts_e[1] & HSSISS_CSR_AN_STATUS_2_LP_FEC_BASER)
+						ethtool_link_ksettings_add_link_mode(cmd,
+										     lp_advertising,
+										     FEC_BASER);
+				}
+				if (an_status & HSSISS_CSR_CONSORTIUM_NEXT_PAGE_RCVD) {
+					if (an_sts_e[5] &
+						HSSISS_AN6_LP_CONS_NPG_ABL_MASK) {
+						an_con_abl = an_sts_e[5] &
+								HSSISS_AN6_LP_CONS_NPG_ABL_MASK_25G;
+						an_con_abl = altera_rm_trail0(an_con_abl,
+									     HSSISS_AN6_LP_CONS_NPG_ABL_MASK_25G_START);
+						temp = an_sts_e[5] &
+							HSSISS_AN6_LP_CONS_NPG_ABL_MASK_50G;
+						temp = altera_rm_trail0(temp,
+								       HSSISS_AN6_LP_CONS_NPG_ABL_MASK_50G_START);
+						temp = temp <<
+						       HSSISS_AN_LP_NPG_ABL_MASK_25G_NUM_BITS;
+						an_con_abl |= temp;
+						set_ethtool_linkmodes(cmd->link_modes.lp_advertising,
+								      AN_CONSORTIUM_ABILITY_TYPE,
+								      an_con_abl);
+					}
+				}
+				if (an_sts_e[3] & HSSISS_CSR_AN_STATUS_4_LP_NEXT_PAGE) {
+					if (an_sts_e[3] & HSSISS_AN4_NPG_ABL_MASK) {
+						an_con_abl = an_sts_e[3] &
+							     HSSISS_AN4_NPG_ABL_MASK_25G;
+						an_con_abl = altera_rm_trail0(an_con_abl,
+									     HSSISS_AN4_NPG_ABL_MASK_25G_START);
+						temp = an_sts_e[3] & HSSISS_AN4_NPG_ABL_MASK_50G;
+						temp = altera_rm_trail0(temp,
+								       HSSISS_AN4_NPG_ABL_MASK_50G_START);
+						temp = temp <<
+						       HSSISS_AN_LP_NPG_ABL_MASK_25G_NUM_BITS;
+						an_con_abl |= temp;
+						temp = 0;
+						temp = an_sts_e[3] & HSSISS_AN4_400GBASE_KR8_CR8;
+						temp = altera_rm_trail0(temp,
+								       HSSISS_AN4_400GBASE_KR8_CR8);
+						temp = temp <<
+							(HSSISS_AN_LP_NPG_ABL_MASK_25G_NUM_BITS +
+							HSSISS_AN_LP_NPG_ABL_MASK_50G_NUM_BITS);
+						an_con_abl |= temp;
+						set_ethtool_linkmodes(cmd->link_modes.lp_advertising,
+								      AN_CONSORTIUM_ABILITY_TYPE,
+								      an_con_abl);
+					}
+					if (an_sts_e[3] & HSSISS_AN4_F1_FEC_CTL_ADV_RSFEC)
+						ethtool_link_ksettings_add_link_mode(cmd,
+										     lp_advertising,
+										     FEC_RS);
+					if (an_sts_e[3] & HSSISS_AN4_F2_FEC_CTL_ADV_BASERFEC)
+						ethtool_link_ksettings_add_link_mode(cmd,
+										     lp_advertising,
+										     FEC_BASER);
+					if (an_sts_e[3] & HSSISS_AN4_LFR_LL_RSFEC_REQ)
+						ethtool_link_ksettings_add_link_mode(cmd,
+										     lp_advertising,
+										     FEC_LLRS);
+				}
+			}
+		} else {
+			ethtool_link_ksettings_zero_link_mode(cmd, lp_advertising);
+		}
+
+		if (an_status & HSSISS_CSR_AN_COMPLETE) {
+			ethtool_link_ksettings_add_link_mode(cmd, advertising, Autoneg);
+			if (an_status & HSSISS_CSR_IEEE_NEG_PORT_MASK) {
+				an_tec_abl = an_status & HSSISS_CSR_IEEE_NEG_PORT_MASK;
+				an_tec_abl = altera_rm_trail0(an_tec_abl,
+							     HSSISS_CSR_IEEE_NEG_PORT_MASK_START);
+				set_ethtool_linkmodes(cmd->link_modes.supported,
+						      AN_IEEE_NEG_ABILITY_TYPE, an_tec_abl);
+				set_ethtool_linkmodes(cmd->link_modes.advertising,
+						      AN_IEEE_NEG_ABILITY_TYPE, an_tec_abl);
+			}
+			if (an_status & HSSISS_CSR_CONS_NEG_PORT_MASK) {
+				an_con_abl = an_status & HSSISS_CSR_CONS_NEG_PORT_MASK;
+				an_con_abl = altera_rm_trail0(an_con_abl,
+							     HSSISS_CSR_CONS_NEG_PORT_MASK_START);
+				set_ethtool_linkmodes(cmd->link_modes.supported,
+						      AN_CONSORTIUM_ABILITY_TYPE, an_con_abl);
+				set_ethtool_linkmodes(cmd->link_modes.advertising,
+						      AN_CONSORTIUM_ABILITY_TYPE, an_con_abl);
+			}
+			if (an_status & HSSISS_CSR_CONS_NEG_PORT_400_KR4_CR4) {
+				an_tec_abl = an_status & HSSISS_CSR_CONS_NEG_PORT_400_KR4_CR4;
+				an_tec_abl = altera_rm_trail0(an_tec_abl,
+							     HSSISS_IEEE_EXT_NEG_PORT_MASK_START);
+				set_ethtool_linkmodes(cmd->link_modes.supported,
+						      AN_IEEE_NEG_ABILITY_TYPE_EXT, an_tec_abl);
+				set_ethtool_linkmodes(cmd->link_modes.advertising,
+						      AN_IEEE_NEG_ABILITY_TYPE_EXT, an_tec_abl);
+			}
+			if (an_status & HSSISS_CSR_FEC_MODES_MASK) {
+				if (an_status & HSSISS_CSR_RS_FEC_NEGOTIATED) {
+					ethtool_link_ksettings_add_link_mode(cmd, supported,
+									     FEC_RS);
+					ethtool_link_ksettings_add_link_mode(cmd, advertising,
+									     FEC_RS);
+				}
+				if (an_status & HSSISS_CSR_LL_FEC_NEGOTIATED) {
+					ethtool_link_ksettings_add_link_mode(cmd, supported,
+									     FEC_LLRS);
+					ethtool_link_ksettings_add_link_mode(cmd, advertising,
+									     FEC_LLRS);
+				}
+			}
+			cmd->base.speed = priv->link_speed;
+			cmd->base.duplex = priv->duplex;
+			cmd->base.autoneg = AUTONEG_ENABLE;
+		}
+	} else {
+		cmd->base.autoneg = AUTONEG_DISABLE;
+		cmd->base.speed = priv->link_speed;
+		cmd->base.duplex = priv->duplex;
+	}
+
+	/*
+	 * printk("%s:%d Supp: 0x%lx Adv: 0x%lx LP: 0x%lx\n", __FUNCTION__,__LINE__,
+	 * *(cmd->link_modes.supported),*(cmd->link_modes.advertising),
+	 * *(cmd->link_modes.lp_advertising));
+	 */
+
+	return 0;
+}
+
+static int ftile_get_module_info(struct net_device *dev, struct ethtool_modinfo *info)
+{
+	intel_fpga_xtile_eth_private *priv = netdev_priv(dev);
+
 	if (!priv)
 		return -ENODEV;
 
-	return phylink_ethtool_ksettings_get(priv->phylink, cmd);
+	if (!priv->phylink || !priv->dev || !priv->dev->qsfp_bus)
+		return -ENODEV;
+
+	return qsfp_get_module_info(priv->dev->qsfp_bus, info);
+}
+
+static int ftile_get_module_eeprom(struct net_device *dev, struct ethtool_eeprom *eeprom, u8 *data)
+{
+	intel_fpga_xtile_eth_private *priv = netdev_priv(dev);
+
+	if (!priv)
+		return -ENODEV;
+
+	if (!priv->phylink || !priv->dev || !priv->dev->qsfp_bus)
+		return -ENODEV;
+
+	return qsfp_get_module_eeprom(priv->dev->qsfp_bus, eeprom, data);
 }
 
 static const struct ethtool_ops ftile_ethtool_ops = {
@@ -1577,6 +1811,8 @@ static const struct ethtool_ops ftile_ethtool_ops = {
 	.get_ts_info = ftile_get_ts_info,
 	.get_link_ksettings = ftile_get_link_ksettings,
 	.set_link_ksettings = ftile_set_link_ksettings,
+	.get_module_info = ftile_get_module_info,
+	.get_module_eeprom = ftile_get_module_eeprom,
 };
 
 void intel_fpga_ftile_set_ethtool_ops(struct net_device *netdev)

@@ -1,11 +1,11 @@
 // SPDX-License-Identifier: GPL-2.0
 /* Altera FPGA HSSI generic glue logic driver
-* Copyright (C) 2024, 2025 Altera Corporation. All rights reserved
-*
-* Contributors:
-*   Preetam Narayan
-*
-*/
+ * Copyright (C) 2024, 2025 Altera Corporation. All rights reserved
+ *
+ * Contributors:
+ *   Preetam Narayan
+ *
+ */
 #define DEBUG
 
 #include <linux/kernel.h>
