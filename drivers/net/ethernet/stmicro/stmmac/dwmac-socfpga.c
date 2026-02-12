@@ -21,6 +21,8 @@
 #include "stmmac_platform.h"
 #include "stmmac_ptp.h"
 
+#include "altr_tse_pcs.h"
+
 #define SYSMGR_EMACGRP_CTRL_PHYSEL_ENUM_GMII_MII 0x0
 #define SYSMGR_EMACGRP_CTRL_PHYSEL_ENUM_RGMII 0x1
 #define SYSMGR_EMACGRP_CTRL_PHYSEL_ENUM_RMII 0x2
@@ -71,6 +73,8 @@ struct socfpga_dwmac {
 	bool f2h_ptp_ref_clk;
 	phy_interface_t mac_interface;
 	const struct socfpga_dwmac_ops *ops;
+	struct mdio_device *pcs_mdiodev;
+	struct tse_pcs pcs;
 };
 
 static int socfpga_of_get_mac_mode(struct device_node *np)
@@ -96,10 +100,14 @@ static void socfpga_dwmac_fix_mac_speed(void *bsp_priv, int speed,
 	struct socfpga_dwmac *dwmac = (struct socfpga_dwmac *)bsp_priv;
 	struct stmmac_priv *priv = netdev_priv(dev_get_drvdata(dwmac->dev));
 	void __iomem *splitter_base = dwmac->splitter_base;
-	void __iomem *sgmii_adapter_base = dwmac->sgmii_adapter_base;
+	void __iomem *tse_pcs_base = dwmac->pcs.tse_pcs_base;
+	void __iomem *sgmii_adapter_base = dwmac->pcs.sgmii_adapter_base;
+	struct device *dev = dwmac->dev;
+	struct net_device *ndev = dev_get_drvdata(dev);
+	struct phy_device *phy_dev = ndev->phydev;
 	u32 val;
 
-	if (sgmii_adapter_base)
+	if ((tse_pcs_base) && (sgmii_adapter_base))
 		writew(SGMII_ADAPTER_DISABLE,
 		       sgmii_adapter_base + SGMII_ADAPTER_CTRL_REG);
 
@@ -128,6 +136,8 @@ static void socfpga_dwmac_fix_mac_speed(void *bsp_priv, int speed,
 	     sgmii_adapter_base)
 		writew(SGMII_ADAPTER_ENABLE,
 		       sgmii_adapter_base + SGMII_ADAPTER_CTRL_REG);
+	if (tse_pcs_base && sgmii_adapter_base)
+		tse_pcs_fix_mac_speed(&dwmac->pcs, phy_dev, speed);
 }
 
 static int socfpga_dwmac_parse_data(struct socfpga_dwmac *dwmac, struct device *dev)
@@ -199,6 +209,9 @@ static int socfpga_dwmac_parse_data(struct socfpga_dwmac *dwmac, struct device *
 			    devm_ioremap_resource(dev, &res_splitter);
 
 			if (IS_ERR(dwmac->splitter_base)) {
+				dev_err(dev,
+					"%s: ERROR: failed mapping emac splitter\n",
+					__func__);
 				ret = PTR_ERR(dwmac->splitter_base);
 				goto err_node_put;
 			}
@@ -217,11 +230,13 @@ static int socfpga_dwmac_parse_data(struct socfpga_dwmac *dwmac, struct device *
 				goto err_node_put;
 			}
 
-			dwmac->sgmii_adapter_base =
+			dwmac->pcs.sgmii_adapter_base =
 			    devm_ioremap_resource(dev, &res_sgmii_adapter);
 
-			if (IS_ERR(dwmac->sgmii_adapter_base)) {
-				ret = PTR_ERR(dwmac->sgmii_adapter_base);
+			if (IS_ERR(dwmac->pcs.sgmii_adapter_base)) {
+				dev_err(dev, "%s: failed to mapping adapter\n",
+					__func__);
+				ret = PTR_ERR(dwmac->pcs.sgmii_adapter_base);
 				goto err_node_put;
 			}
 		}
@@ -239,12 +254,16 @@ static int socfpga_dwmac_parse_data(struct socfpga_dwmac *dwmac, struct device *
 				goto err_node_put;
 			}
 
-			dwmac->tse_pcs_base =
+			dwmac->pcs.tse_pcs_base =
 			    devm_ioremap_resource(dev, &res_tse_pcs);
 
-			if (IS_ERR(dwmac->tse_pcs_base)) {
-				ret = PTR_ERR(dwmac->tse_pcs_base);
+			if (IS_ERR(dwmac->pcs.tse_pcs_base)) {
+				dev_err(dev,
+					"%s: ERROR: failed ioremap tse control port\n",
+					__func__);
+				ret = PTR_ERR(dwmac->pcs.tse_pcs_base);
 				goto err_node_put;
+
 			}
 		}
 	}
@@ -264,13 +283,6 @@ err_node_put:
 static int socfpga_get_plat_phymode(struct socfpga_dwmac *dwmac)
 {
 	return dwmac->mac_interface;
-}
-
-static void socfpga_sgmii_config(struct socfpga_dwmac *dwmac, bool enable)
-{
-	u16 val = enable ? SGMII_ADAPTER_ENABLE : SGMII_ADAPTER_DISABLE;
-
-	writew(val, dwmac->sgmii_adapter_base + SGMII_ADAPTER_CTRL_REG);
 }
 
 static int socfpga_set_phy_mode_common(int phymode, u32 *val)
@@ -455,8 +467,12 @@ static int socfpga_gen5_set_phy_mode(struct socfpga_dwmac *dwmac)
 	 */
 	reset_control_deassert(dwmac->stmmac_ocp_rst);
 	reset_control_deassert(dwmac->stmmac_rst);
-	if (phymode == PHY_INTERFACE_MODE_SGMII)
-		socfpga_sgmii_config(dwmac, true);
+	if (phymode == PHY_INTERFACE_MODE_SGMII) {
+		if (tse_pcs_init(dwmac->pcs.tse_pcs_base, &dwmac->pcs) != 0) {
+			dev_err(dwmac->dev, "Unable to initialize TSE PCS");
+			return -EINVAL;
+		}
+	}
 
 	return 0;
 }
@@ -508,8 +524,12 @@ static int socfpga_gen10_set_phy_mode(struct socfpga_dwmac *dwmac)
 	 */
 	reset_control_deassert(dwmac->stmmac_ocp_rst);
 	reset_control_deassert(dwmac->stmmac_rst);
-	if (phymode == PHY_INTERFACE_MODE_SGMII)
-		socfpga_sgmii_config(dwmac, true);
+	if (phymode == PHY_INTERFACE_MODE_SGMII) {
+		if (tse_pcs_init(dwmac->pcs.tse_pcs_base, &dwmac->pcs) != 0) {
+			dev_err(dwmac->dev, "Unable to initialize TSE PCS");
+			return -EINVAL;
+		}
+	}
 	return 0;
 }
 
