@@ -1,0 +1,13 @@
+name: "Setup Resource Version"
+description: "define the resource versions to be used across the CI Pipelines"
+outputs:
+  SOCFPGA_REFDES_VERSION:
+    description: "GSRD/GHRD resource used for regtest"
+    value: ${{ steps.set-version.outputs.SOCFPGA_REFDES_VERSION }}
+runs:
+  using: "composite"
+  steps:
+  - id: set-version
+    shell: bash
+    run: |
+      echo "SOCFPGA_REFDES_VERSION=mainline/668" >> $GITHUB_OUTPUT

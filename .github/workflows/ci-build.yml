@@ -1,0 +1,45 @@
+name: Linux Reusable build flow
+
+on:
+  workflow_call:
+    secrets:
+      GIT_USER:
+        required: true
+      GIT_TOKEN:
+        required: true
+
+env:
+  WORKFLOW_REPO_REF: cicd-2025.12
+
+jobs:
+  #This action performs a build test using an ubuntu container.
+  ci-reusable-build:
+    # The type of runner that the job will run on
+    runs-on: [ arc, lapwing, workspace_type=tmp-workspace, gcc/9.3.0, python/3.12.10 ]
+    env:
+      # Disable the warnings of Security violation. We need to check why this is trigger later, plaintext password.
+      EC_DISABLE_VAL: project,system
+    # Steps represent a sequence of tasks that will be executed as part of the job
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Workflow Script checkout
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ env.WORKFLOW_REPO_REF }}
+          repository: altera-innersource/applications.devops.build-bot.github-pr-workflow
+          path: workflow_scripts
+          token: ${{ secrets.GIT_TOKEN }}
+
+      - name: Linux Build
+        shell: bash
+        run: |
+          export WORK_DIR=$RUNNER_TEMP
+          python3 workflow_scripts/workflow_Build.py ${{ github.workspace }} --github-repo ${{ github.event.repository.name }}
+
+      - name: linux-image
+        uses: actions/upload-artifact@v4
+        with:
+          name: linux-image
+          path: ${{ github.workspace }}/linux_output.tar
+          retention-days: 14

@@ -1,0 +1,127 @@
+name: Test Selection Flow For CI
+
+on:
+  workflow_call:
+    secrets:
+      GIT_USER:
+        required: true
+      GIT_TOKEN:
+        required: true
+      AGPT_TOKEN:
+        required: true
+    inputs:
+      base_ref:
+        required: true
+        type: string
+      head_ref:
+        required: true
+        type: string
+
+env:
+  WORKFLOW_REPO_REF: cicd-2025.12
+
+jobs:
+  ci-testrun-ai-filter:
+    runs-on: [lapwing, arc, workspace_type=tmp-workspace, mem=16000, git, python/3.12.10]
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0  # Full history for accurate diff
+          ref: ${{ inputs.head_ref }}
+
+      - name: Fetch base branch
+        run: |
+          git fetch origin ${{ inputs.base_ref }}
+
+      - name: Checkout workflow script
+        uses: actions/checkout@v4
+        with:
+          repository: altera-innersource/applications.devops.build-bot.github-pr-workflow
+          ref: ${{ env.WORKFLOW_REPO_REF }}
+          path: workflow_scripts
+          token: ${{ secrets.GIT_TOKEN }}
+
+      - name: create PR diff file
+        run: |
+          if [ "${{ github.event_name }}" = "pull_request" ]; then
+            python3 workflow_scripts/make_pr_diff_json.py \
+              --local-diff-base origin/${{ inputs.base_ref }} \
+              --local-diff-head ${{ inputs.head_ref }} \
+              --repo ${{ github.repository }} \
+              --title "${{ github.event.pull_request.title }}" \
+              --output pr_diff.json
+          else
+            echo "Not a pull request event, skipping PR diff creation"
+            touch pr_diff.json
+          fi
+          echo "Generated PR diff:"
+          cat pr_diff.json
+
+      - name: AGPT select test
+        env:
+          AGPT_API_KEY: ${{ secrets.AGPT_TOKEN }}
+          AGPT_SESSION_PATH: ${{ runner.temp }}
+        run: |
+          python3 workflow_scripts/agpt_run.py \
+            --file pr_diff.json \
+            --file workflow_scripts/regtest/test_config.json \
+            --save-answer filtered_tests.json \
+            --new \
+            -p "You are an expert Linux kernel developer. Analyze the following pull request changes and determine which hardware subsystems or features are affected. \
+
+            Instructions:
+            1. Identify all affected subsystems and drivers based on your understanding on the linux kernel.
+            2. Select the test(s) from test_config.json that should be run, we need minimum of 5 tests from each target category. If uncertain, include a broader test.
+            3. even if input file is empty, still select tests with the same criteria for sanity purpose
+            4. Return the filtered test case(s) in the exact same JSON format as the input.
+            5. Do not change the structure or keys of the original input.
+            6. Output ONLY the resulting JSON object.
+            7. **Do not include any markdown code block markers (such as \`\`\`json or \`\`\`) in your output.**
+            "
+
+      - name: Explain the reason of test selection
+        id: agpt_explain
+        env:
+          AGPT_API_KEY: ${{ secrets.AGPT_TOKEN }}
+          AGPT_SESSION_PATH: ${{ runner.temp }}
+        run: |
+          echo "content<<EOF" >> $GITHUB_OUTPUT
+          python3 workflow_scripts/agpt_run.py \
+            -p "Explain the reasoning behind the test selection in a concise manner. \
+
+            Instructions:
+            1. List down test cases selected for each target category (board, simics, other).
+            2. For each test case grouped by target category, provide a brief explanation of why it was selected based on the PR changes. Focus on the relevance of the test case to the affected subsystems or features.
+            3. Format the explanation in markdown for better readability, using bullet points or numbered lists.
+            " >> $GITHUB_OUTPUT
+          echo "EOF" >> $GITHUB_OUTPUT
+
+      - name: Post test selection reason as PR comment
+        if: github.event_name == 'pull_request'
+        uses: actions/github-script@v7
+        with:
+          github-token: ${{ secrets.GIT_TOKEN }}
+          script: |
+            const [owner, repo] = '${{ github.repository }}'.split('/');
+            const body = `## 🤖 AI Test Selection Reasoning\n\n${{ steps.agpt_explain.outputs.content }}`;
+            await github.rest.issues.createComment({
+              owner,
+              repo,
+              issue_number: ${{ github.event.pull_request.number }},
+              body
+            });
+
+      - name: Fallback to default CI checkin test suite
+        if: failure()
+        run: |
+          echo "AGPT script failed, using full test config as fallback"
+          cp workflow_scripts/regtest/test_config.json filtered_tests.json
+
+      - name: Upload filtered test JSON
+        uses: actions/upload-artifact@v4
+        with:
+          name: filtered-test-json
+          path: ${{ github.workspace }}/filtered_tests.json
+          retention-days: 1
+

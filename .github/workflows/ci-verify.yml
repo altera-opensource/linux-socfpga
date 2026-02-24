@@ -1,0 +1,117 @@
+name: Reusable CI Verification Flow for CI
+
+on:
+  workflow_call:
+    secrets:
+      GIT_USER:
+        required: true
+      GIT_TOKEN:
+        required: true
+    inputs:
+      socfpga_refdes_version:
+        required: true
+        type: string
+      simics_version:
+        required: false
+        type: string
+
+env:
+  WORKFLOW_REPO_REF: cicd-2025.12
+  SIMICS_VERSION: ${{ inputs.simics_version || 25.3 }}
+  SOCFPGA_REFDES_VERSION: ${{ inputs.socfpga_refdes_version }}
+
+jobs:
+  ci-testrun-prepare:
+    runs-on: [lapwing, arc, workspace_type=tmp-workspace, mem=16000, _site=png, git, python/3.12.10]
+    outputs:
+      test_matrix: ${{ steps.test-setup.outputs.test_matrix }}
+      testrun_root_dir: ${{ steps.test-setup.outputs.testrun_root_dir }}
+    env:
+      TMP_DIR_ROOT: /p/psg/swip/etools/esv/gh_build_temp
+    steps:
+      - name: Checkout workflow script
+        uses: actions/checkout@v4
+        with:
+          repository: altera-innersource/applications.devops.build-bot.github-pr-workflow
+          ref: ${{ env.WORKFLOW_REPO_REF }}
+          path: workflow_scripts
+          token: ${{ secrets.GIT_TOKEN }}
+
+      - name: Remove old testrun directory
+        run: |
+          find $TMP_DIR_ROOT/ -maxdepth 1 -name test-linux-run${{ github.run_number }}-* -type d -user $USER
+          find $TMP_DIR_ROOT/ -maxdepth 1 -name test-linux-run${{ github.run_number }}-* -type d -user $USER -exec rm -rf {} +
+
+      - name: Download linux artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: linux-image
+
+      - name: extract Linux artifacts
+        run: |
+          tar -xvf linux_output.tar
+
+      - name: Download filtered test json
+        uses: actions/download-artifact@v4
+        with:
+          name: filtered-test-json
+
+      - name: setup regtest directories and repositories
+        id: test-setup
+        run: |
+          python workflow_scripts/workflow_Regtest_Prepare.py filtered_tests.json -c linux --github-token=${{ secrets.GIT_TOKEN }} -o test_matrix.json --rundir-prefix=run${{ github.run_number }}
+          if [ $? -ne 0 ]; then
+            echo "Error: Matrix generation failed!"
+            exit 1
+          fi
+          echo "Generated matrix: `cat test_matrix.json`"
+          cat test_matrix.json >> $GITHUB_OUTPUT
+
+  ci-testrun-board:
+    needs: [ci-testrun-prepare]
+    uses: ./.github/workflows/ci-testrun-multistage.yml
+    secrets:
+      GIT_USER: ${{ secrets.GIT_USER }}
+      GIT_TOKEN: ${{ secrets.GIT_TOKEN }}
+    with:
+      socfpga_refdes_version: ${{ inputs.socfpga_refdes_version }}
+      simics_version: ${{ inputs.simics_version || '25.3' }}
+      test_matrix: ${{ toJSON(fromJSON(needs.ci-testrun-prepare.outputs.test_matrix)['board']) }}
+
+  ci-testrun-simics:
+    needs: [ci-testrun-prepare]
+    uses: ./.github/workflows/ci-testrun-multistage.yml
+    secrets:
+      GIT_USER: ${{ secrets.GIT_USER }}
+      GIT_TOKEN: ${{ secrets.GIT_TOKEN }}
+    with:
+      socfpga_refdes_version: ${{ inputs.socfpga_refdes_version }}
+      simics_version: ${{ inputs.simics_version || '25.3' }}
+      test_matrix: ${{ toJSON(fromJSON(needs.ci-testrun-prepare.outputs.test_matrix)['simics']) }}
+
+  ci-testrun-other:
+    needs: [ci-testrun-prepare]
+    uses: ./.github/workflows/ci-testrun-multistage.yml
+    secrets:
+      GIT_USER: ${{ secrets.GIT_USER }}
+      GIT_TOKEN: ${{ secrets.GIT_TOKEN }}
+    with:
+      socfpga_refdes_version: ${{ inputs.socfpga_refdes_version }}
+      simics_version: ${{ inputs.simics_version || '25.3' }}
+      test_matrix: ${{ toJSON(fromJSON(needs.ci-testrun-prepare.outputs.test_matrix)['other']) }}
+
+  ci-testrun-cleanup:
+    runs-on: [lapwing, arc, workspace_type=tmp-workspace, _site=png]
+    needs: [ci-testrun-prepare, ci-testrun-board, ci-testrun-simics, ci-testrun-other]
+    if: always()
+    steps:
+      - name: change permission of test run root directory
+        run: |
+          chmod -R a+rw ${{ needs.ci-testrun-prepare.outputs.testrun_root_dir }}
+
+      - name: Cleanup Test Directory
+        if: ${{ (needs.ci-testrun-stage1.result == 'success' || needs.ci-testrun-stage1.result == 'skipped')
+             && (needs.ci-testrun-stage2.result == 'success' || needs.ci-testrun-stage2.result == 'skipped') }}
+        run: |
+          echo "Deleting ${{ needs.ci-testrun-prepare.outputs.testrun_root_dir }}"
+          rm -rf ${{ needs.ci-testrun-prepare.outputs.testrun_root_dir }}

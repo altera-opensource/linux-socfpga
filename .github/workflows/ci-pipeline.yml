@@ -5,7 +5,7 @@ name: altera-linux-ci-pipeline
 
 on:
   pull_request:
-     branches: [ "socfpga-*" ]
+     branches: [ "socfpga-*", "cicd-*" ]
      types: [opened, synchronize, reopened, review_requested, review_submission]
 
   # Allows to run this workflow manually from the Actions tab
@@ -15,18 +15,29 @@ defaults:
   run:
     shell: bash
 
+env:
+  WORKFLOW_REPO_REF: cicd-2025.12
+  TMP_DIR_ROOT: /p/psg/swip/etools/esv/gh_build_temp
+
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 
 # A workflow run is made up of one or more jobs that can run sequentially or in parallel
 jobs:
+  ci-cleanup-workspace:
+    runs-on: [lapwing, arc, workspace_type=tmp-workspace, mem=8000, git, _site=png]
+    steps:
+      - name: delete workspace older than 1 day
+        run: |
+          find $TMP_DIR_ROOT -maxdepth 1 -name *-linux-* -type d -mtime +1 -user $USER
+          find $TMP_DIR_ROOT -maxdepth 1 -name *-linux-* -type d -mtime +1 -user $USER -exec rm -rf {} +
+
 #This action extracts the new commits and performs checkpatch checks on it.
   ci-checkpatch:
-    runs-on: [self-hosted,pg-embedded-runner]
-    container:
-      image: amr-registry.sc.altera.com/pse-pswe-software-ba/embedded_coverity:ubuntu20.04.0_6-new-proxy-inbuilt
-      options: -v /mnt/nfs_share/site/proj/psg:/p/psg
+    if: ${{ github.event_name == 'pull_request' }}
+    continue-on-error: ${{  !startswith(github.base_ref, 'socfpga-')  }}
+    runs-on: [lapwing, arc, workspace_type=tmp-workspace, git]
     # Check patch only can run at pull request as it is hard to determine the commit during the push event.
     env:
       GITHUB_EVENT_NAME: ${{ github.event_name }}
@@ -37,241 +48,69 @@ jobs:
           fetch-depth: 0 # This will pull the whole repo, otherwise cannot compare commit.
           ref: ${{ github.event.pull_request.base.ref }}
 
+      - name: Workflow Script checkout
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ env.WORKFLOW_REPO_REF }}
+          repository: altera-innersource/applications.devops.build-bot.github-pr-workflow
+          path: workflow_scripts
+          token: ${{ secrets.GIT_TOKEN }}
+
       - name: Checkpatch.pl
         run: |
-          git config --global --add safe.directory /__w/${{ github.event.repository.name }}/${{ github.event.repository.name }}
-          git clone https://${{ secrets.GIT_USER }}:${{ secrets.GIT_TOKEN }}@github.com/altera-innersource/applications.devops.build-bot.github-pr-workflow
-          cd applications.devops.build-bot.github-pr-workflow
-          git checkout master
-          bash workflow_Checkpatch.sh ../ ${{ github.event.repository.name }} ${{ secrets.GITHUB_TOKEN }} ${{ github.event.pull_request.number }} ${{ github.head_ref }} ${{ github.base_ref }}
+          bash workflow_scripts/workflow_Checkpatch.sh ${{ github.workspace }} ${{ github.event.repository.name }} ${{ secrets.GITHUB_TOKEN }} ${{ github.event.pull_request.number }} ${{ github.head_ref }} ${{ github.base_ref }}
 
-  ci-coverity:
-    runs-on: [self-hosted,pg-embedded-runner]
-    container:
-        image: amr-registry.sc.altera.com/pse-pswe-software-ba/embedded_coverity:ubuntu20.04.0_6-cov-2024
-    env:
-      # Disable the warnings of Security violation. We need to check why this is trigger later, plaintext password.
-      EC_DISABLE_VAL: project,system
-
+  ci-resource-version:
+    runs-on:  [ altera-innersource.prod.amr.quartus ]
+    outputs:
+      SOCFPGA_REFDES_VERSION: ${{ steps.set-version.outputs.SOCFPGA_REFDES_VERSION }}
     steps:
       - uses: actions/checkout@v4
-      - name : Download coverity script
-        run: |
-          git config --global credential.helper store
-          git clone https://${{ secrets.GIT_USER }}:${{ secrets.GIT_TOKEN }}@github.com/altera-innersource/applications.devops.build-bot.github-pr-workflow
-          cd applications.devops.build-bot.github-pr-workflow
-          git checkout master
+      - id: set-version
+        uses: ./.github/actions/ci-resource-version
 
-      - name: Run Coverity Build
-        run: |
-          cd applications.devops.build-bot.github-pr-workflow
-          bash workflow_Coverity.sh ${{ github.workspace }} ${{ github.event.repository.name }} linux-socfpga-github-workflow ${{ github.head_ref }} ${{ github.base_ref }}
-
-      - name: linux-coverity-prechange-report
-        uses: actions/upload-artifact@v4
-        with:
-          name: linux-coverity-prechange-report
-          path: ${{ github.workspace }}/linux_output_defect_prechange.json
-          retention-days: 14
-
-      - name: linux-coverity-postchange-report
-        uses: actions/upload-artifact@v4
-        with:
-          name: linux-coverity-postchange-report
-          path: ${{ github.workspace }}/linux_output_defect_postchange.json
-          retention-days: 14
-
-  ci-coverity-parse-result:
-    needs: ci-coverity
-    runs-on: [self-hosted,pg-embedded-runner]
-    container:
-        image: amr-registry.sc.altera.com/pse-pswe-software-ba/embedded_coverity:ubuntu20.04.0_6-cov-2024
-
-    steps:
-      - name: Download prechange coverity result
-        uses: actions/download-artifact@v4
-        with:
-          name: linux-coverity-prechange-report
-      - run: |
-          ls
-          pwd
-          rm -rf /tmp/coverity-result-json
-          mkdir /tmp/coverity-result-json
-          cp linux_output_defect_prechange.json /tmp/coverity-result-json/
-          ls /tmp/coverity-result-json/*
-
-      - name: Download postchange coverity result
-        uses: actions/download-artifact@v4
-        with:
-          name: linux-coverity-postchange-report
-      - run: |
-          cp linux_output_defect_postchange.json /tmp/coverity-result-json/
-          ls /tmp/coverity-result-json/*
-
-      - uses: actions/checkout@v4
-      - name : Download coverity parser script
-        run: |
-          git config --global credential.helper store
-          git clone https://${{ secrets.GIT_USER }}:${{ secrets.GIT_TOKEN }}@github.com/altera-innersource/applications.devops.build-bot.github-pr-workflow
-          cd applications.devops.build-bot.github-pr-workflow
-          git checkout master
-
-      - name : Run Coverity Parser
-        run: |
-          cd applications.devops.build-bot.github-pr-workflow
-          mv /tmp/coverity-result-json/* .
-          rm -rf /tmp/coverity-result-json
-          bash workflow_Coverity_Parser.sh ${{ github.workspace }} ${{ github.event.repository.name }} ${{ secrets.GITHUB_TOKEN }} ${{ github.event.pull_request.number }}
-
-      - name: linux-coverity-report
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: linux-coverity-report
-          path: |
-            ${{ github.workspace }}/linux_output_defect.csv
-          retention-days: 14
 
 #This action performs a build test using an ubuntu container.
   ci-build:
-    # The type of runner that the job will run on
-    runs-on: [self-hosted,pg-embedded-runner]
-    container:
-        image: amr-registry.sc.altera.com/pse-pswe-software-ba/embedded_coverity:ubuntu20.04.0_6-new-proxy-inbuilt
-    env:
-      # Disable the warnings of Security violation. We need to check why this is trigger later, plaintext password.
-      EC_DISABLE_VAL: project,system
-    # Steps represent a sequence of tasks that will be executed as part of the job
-    steps:
-      - uses: actions/checkout@v4
-      - name: Linux Build
-        run: |
-          DIR=$(pwd)
-          git config --global credential.helper store
-          git clone https://${{ secrets.GIT_USER }}:${{ secrets.GIT_TOKEN }}@github.com/altera-innersource/applications.devops.build-bot.github-pr-workflow
-          cd applications.devops.build-bot.github-pr-workflow
-          git checkout master
-          bash workflow_Build.sh $DIR ${{ github.event.repository.name }} linux-socfpga-github-workflow
+    uses: ./.github/workflows/ci-build.yml
+    secrets:
+      GIT_USER: ${{ secrets.GIT_USER }}
+      GIT_TOKEN: ${{ secrets.GIT_TOKEN }}
 
-      - name: linux-image
-        uses: actions/upload-artifact@v4
-        with:
-          name: linux-image
-          path: ${{ github.workspace }}/linux_output.tar
-          retention-days: 14
+  ci-test-select:
+    uses: ./.github/workflows/ci-test-select.yml
+    secrets:
+      GIT_USER: ${{ secrets.GIT_USER }}
+      GIT_TOKEN: ${{ secrets.GIT_TOKEN }}
+      AGPT_TOKEN: ${{ secrets.AGPT_TOKEN }}
+    with:
+      #for pull request, use head/base ref, for push/workflow run, use head of branch with default branch as base
+      head_ref: ${{ (github.event_name == 'pull_request' && github.head_ref)
+                || github.ref_name }}
+      base_ref: ${{ (github.event_name == 'pull_request' && github.base_ref)
+                || github.event.repository.default_branch }}
 
-#This action runs the simic regression test
+#This action runs regression test
   ci-verification:
-     runs-on: [ arc, lapwing, workspace_type=tmp-workspace, _site=png ]
-     needs: ci-build
-     outputs:
-      parent_id: ${{ steps.extract.outputs.parent_id }}
-      spect_url: ${{ steps.extract.outputs.spetc_link }}
-     env:
-      # Disable the warnings of Security violation. We need to check why this is trigger later, plaintext password.
-      EC_DISABLE_VAL: project,system
-      GITHUB_EVENT_NAME: ${{ github.event_name }}
-     steps:
-      - name: Cleaning workspace
-        run: |
-          rm -rf applications.devops.build-bot.github-pr-workflow
-          rm -rf ${GITHUB_WORKSPACE}/.git*
+    needs: [ci-resource-version, ci-build, ci-test-select]
+    uses: ./.github/workflows/ci-verify.yml
+    secrets:
+      GIT_USER: ${{ secrets.GIT_USER }}
+      GIT_TOKEN: ${{ secrets.GIT_TOKEN }}
+    with:
+      socfpga_refdes_version: ${{ needs.ci-resource-version.outputs.SOCFPGA_REFDES_VERSION }}
 
-      - name: Download linux artifacts
-        uses: actions/download-artifact@v4
-        with:
-          name: linux-image
-      - run: |
-          tar -xvf linux_output.tar
-          ls
-          pwd
-
-      - name: Simics Regtest
-        run: |
-          git clone https://${{ secrets.GIT_USER }}:${{ secrets.GIT_TOKEN }}@github.com/altera-innersource/applications.devops.build-bot.github-pr-workflow
-          cd applications.devops.build-bot.github-pr-workflow
-          git checkout master
-          bash workflow_Regtest.sh ${{ github.workspace }} ${{ github.event.repository.name }} ${{ github.event.pull_request.number }} ${{ secrets.GITHUB_TOKEN }} | tee $GITHUB_WORKSPACE/output.log
-      - name: Extract Job id and spect url
-        id: extract
-        run: |
-          PARENT_ID=$(grep -oP 'The ID of the top-level farm job is \K[0-9]+' $GITHUB_WORKSPACE/output.log)
-          echo "Extracted Parent ID: $PARENT_ID"
-          echo "parent_id=$PARENT_ID" >> $GITHUB_OUTPUT
-          SPETC_LINK=$(grep -oP 'Link to SPeTC:\s*\K\S+' "$GITHUB_WORKSPACE/output.log")
-          echo "Extracted SPeTC Link: $SPETC_LINK"
-          echo "spetc_link=$SPETC_LINK" >> "$GITHUB_OUTPUT"
-
-#This action runs the on-board regression test
-  ci-on-board-verification:
-    runs-on: [ arc, lapwing, workspace_type=tmp-workspace, _site=png ]
-    needs: ci-build
-    outputs:
-      parent_id: ${{ steps.extract.outputs.parent_id }}
-      spect_url: ${{ steps.extract.outputs.spetc_link }}
-    env:
-      # Disable the warnings of Security violation. We need to check why this is trigger later, plaintext password.
-      EC_DISABLE_VAL: project,system
-      GITHUB_EVENT_NAME: ${{ github.event_name }}
-    steps:
-    - name: Cleaning workspace
-      run: |
-        rm -rf applications.devops.build-bot.github-pr-workflow
-        rm -rf ${GITHUB_WORKSPACE}/.git*
-
-    - name: Download linux artifacts
-      uses: actions/download-artifact@v4
-      with:
-        name: linux-image
-    - run: |
-        tar -xvf linux_output.tar
-        ls
-        pwd
-
-    - name: On-board Regtest
-      run: |
-        git clone https://${{ secrets.GIT_USER }}:${{ secrets.GIT_TOKEN }}@github.com/altera-innersource/applications.devops.build-bot.github-pr-workflow
-        cd applications.devops.build-bot.github-pr-workflow
-        git checkout master
-        bash workflow_On_Board_Regtest.sh ${{ github.workspace }} ${{ github.event.repository.name }} ${{ github.event.pull_request.number }} ${{ secrets.GITHUB_TOKEN }} | tee $GITHUB_WORKSPACE/output.log
-
-    - name: Extract Job id and spect url
-      id: extract
-      run: |
-        PARENT_ID=$(grep -oP 'The ID of the top-level farm job is \K[0-9]+' $GITHUB_WORKSPACE/output.log)
-        echo "Extracted Parent ID: $PARENT_ID"
-        echo "parent_id=$PARENT_ID" >> $GITHUB_OUTPUT
-        SPETC_LINK=$(grep -oP 'Link to SPeTC:\s*\K\S+' "$GITHUB_WORKSPACE/output.log")
-        echo "Extracted SPeTC Link: $SPETC_LINK"
-        echo "spetc_link=$SPETC_LINK" >> "$GITHUB_OUTPUT"
-
-#This actions checks the status of the on-board regression test
-  ci-on-board-verification-status:
-    runs-on: [ arc, lapwing, workspace_type=tmp-workspace, _site=png ]
-    needs: ci-on-board-verification
-    steps:
-      - name: Extract regtest parent ID
-        run: echo "Parent ID is ${{ needs.ci-on-board-verification.outputs.parent_id }}"
-      - name: On-board Regtest Status
-        run: |
-          git clone https://${{ secrets.GIT_USER }}:${{ secrets.GIT_TOKEN }}@github.com/altera-innersource/applications.devops.build-bot.github-pr-workflow
-          cd applications.devops.build-bot.github-pr-workflow
-          git checkout master
-          bash workflow_Regtest_status_check.sh ${{ github.workspace }} ${{ github.event.repository.name }} ${{ github.event.pull_request.number }} ${{ secrets.GITHUB_TOKEN }} ${{ needs.ci-on-board-verification.outputs.parent_id }} ${{ needs.ci-on-board-verification.outputs.spect_url }}
-
-#This actions checks the status of the simic regression test
-  ci-verification-status:
-    runs-on: [ arc, lapwing, workspace_type=tmp-workspace, _site=png ]
-    needs: ci-verification
-    steps:
-      - name: Extract regtest parent ID
-        run: echo "Parent ID is ${{ needs.ci-on-board-verification.outputs.parent_id }}"
-      - name: Simic Regtest Status
-        run: |
-          git clone https://${{ secrets.GIT_USER }}:${{ secrets.GIT_TOKEN }}@github.com/altera-innersource/applications.devops.build-bot.github-pr-workflow
-          cd applications.devops.build-bot.github-pr-workflow
-          git checkout master
-          bash workflow_Regtest_status_check.sh ${{ github.workspace }} ${{ github.event.repository.name }} ${{ github.event.pull_request.number }} ${{ secrets.GITHUB_TOKEN }} ${{ needs.ci-verification.outputs.parent_id }} ${{ needs.ci-verification.outputs.spect_url }}
+  ci-coverity:
+    uses: ./.github/workflows/ci-coverity.yml
+    secrets:
+      GIT_USER: ${{ secrets.GIT_USER }}
+      GIT_TOKEN: ${{ secrets.GIT_TOKEN }}
+    with:
+      #for pull request, use head/base ref, for push/workflow run, use head of branch with default branch as base
+      head_ref: ${{ (github.event_name == 'pull_request' && github.head_ref)
+                || github.ref_name }}
+      base_ref: ${{ (github.event_name == 'pull_request' && github.base_ref)
+                || github.event.repository.default_branch }}
 
 #This action checks if the branch has been released and if so block PR until approved by repo Admin
   ci-check-tag:
@@ -295,16 +134,19 @@ jobs:
           cd applications.devops.build-bot.github-pr-workflow
           bash workflow_Check_Tag.sh ${{ github.workspace }} ${{ github.event.repository.name }} ${{ github.event.pull_request.number }} ${{ github.base_ref }} ${{ secrets.GITHUB_TOKEN }}
 
-#This is the commit gate that ensures all required checks are passing before the PR is allowed to be merged.
+  #This is the commit gate that ensures all required checks are passing before the PR is allowed to be merged.
   ci-check-pr-status:
-    runs-on: [self-hosted,pg-embedded-runner]
-    container:
-      image: amr-registry.sc.altera.com/pse-pswe-software-ba/embedded_coverity:ubuntu20.04.0_6-new-proxy-inbuilt
-      options: -v /mnt/nfs_share/site/proj/psg:/p/psg
-    needs: [ci-coverity-parse-result, ci-verification-status, ci-checkpatch, ci-check-tag, ci-on-board-verification-status]
+    runs-on: [ arc, lapwing, workspace_type=tmp-workspace ]
+    needs: [ci-checkpatch, ci-build, ci-verification, ci-check-tag, ci-coverity]
+    #always runs even if ci-checkpatch is skipped when running PR not from socfpga_v*
+    if: always()
     steps:
      - name: On failure
-       if: ${{ needs.ci-coverity-parse-result.result != 'success' || needs.ci-verification-status.result != 'success' || needs.ci-checkpatch.result != 'success' || needs.ci-check-tag.result != 'success' || needs.ci-on-board-verification-status.result != 'success'}}
+       if: ${{ needs.ci-checkpatch.result == 'failure'
+            || needs.ci-build.result != 'success'
+            || needs.ci-verification.result != 'success'
+            || needs.ci-check-tag.result != 'success'
+            || needs.ci-coverity.result != 'success' }}
        run: |
           echo "Status check has failed."
           exit 1

@@ -1,0 +1,56 @@
+name: Reusable CI Multistage Testrun Flow For CI
+
+on:
+  workflow_call:
+    secrets:
+      GIT_USER:
+        required: true
+      GIT_TOKEN:
+        required: true
+    inputs:
+      test_matrix:
+        description: 'JSON string with [[stage1 test_configs], [stage2 test_configs]]'
+        required: true
+        type: string
+      socfpga_refdes_version:
+        required: true
+        type: string
+      simics_version:
+        required: true
+        type: string
+
+jobs:
+  ci-testrun-stage1:
+    if: ${{ join(fromJSON(inputs.test_matrix)[0]) != '' }}
+    uses: ./.github/workflows/ci-testrun.yml
+    secrets:
+      GIT_USER: ${{ secrets.GIT_USER }}
+      GIT_TOKEN: ${{ secrets.GIT_TOKEN }}
+    with:
+      socfpga_refdes_version: ${{ inputs.socfpga_refdes_version }}
+      simics_version: ${{ inputs.simics_version }}
+      test_matrix: ${{ toJSON(fromJSON(inputs.test_matrix)[0]) }}
+
+  ci-testrun-stage2:
+    if: ${{ join(fromJSON(inputs.test_matrix)[1]) != '' }}
+    needs: [ci-testrun-stage1]
+    uses: ./.github/workflows/ci-testrun.yml
+    secrets:
+      GIT_USER: ${{ secrets.GIT_USER }}
+      GIT_TOKEN: ${{ secrets.GIT_TOKEN }}
+    with:
+      socfpga_refdes_version: ${{ inputs.socfpga_refdes_version }}
+      simics_version: ${{ inputs.simics_version }}
+      test_matrix: ${{ toJSON(fromJSON(inputs.test_matrix)[1]) }}
+
+  ci-testrun-status:
+    needs: [ci-testrun-stage1, ci-testrun-stage2]
+    runs-on: [lapwing, arc, workspace_type=tmp-workspace]
+    if: always()
+    steps:
+      - name: On failure
+        if: ${{ needs.ci-testrun-stage1.result == 'failure'
+             || needs.ci-testrun-stage2.result == 'failure' }}
+        run: |
+          echo "One of the test stage has failed."
+          exit 1

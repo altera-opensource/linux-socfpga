@@ -1,0 +1,48 @@
+name: Reusable CI Test Run Workflow
+
+on:
+  workflow_call:
+    secrets:
+      GIT_USER:
+        required: true
+      GIT_TOKEN:
+        required: true
+    inputs:
+      socfpga_refdes_version:
+        required: true
+        type: string
+      simics_version:
+        required: true
+        type: string
+      test_matrix:
+        required: true
+        type: string
+
+env:
+  WORKFLOW_REPO_REF: cicd-2025.12
+  SIMICS_VERSION: ${{ inputs.simics_version }}
+  SOCFPGA_REFDES_VERSION: ${{ inputs.socfpga_refdes_version }}
+
+jobs:
+  ci-testrun:
+    name: ${{ matrix.test_name }}
+    runs-on: [lapwing, arc, workspace_type=tmp-workspace, mem=16000, _site=png, git, python/3.12.10, bundle/regtest]
+    env:
+      # Disable the warnings of Security violation. We need to check why this is trigger later, plaintext password.
+      EC_DISABLE_VAL: project,system
+      GITHUB_EVENT_NAME: ${{ github.event_name }}
+    strategy:
+      matrix:
+        include: ${{ fromJSON(inputs.test_matrix) }}
+    steps:
+      - name: Checkout workflow script
+        uses: actions/checkout@v4
+        with:
+          repository: altera-innersource/applications.devops.build-bot.github-pr-workflow
+          ref: ${{ env.WORKFLOW_REPO_REF }}
+          path: workflow_scripts
+          token: ${{ secrets.GIT_TOKEN }}
+
+      - name: Run Regtest
+        run: |
+          python3 workflow_scripts/workflow_Regtest.py -C ${{ matrix.testrun_dir }} ${{ matrix.testrun_args }}
