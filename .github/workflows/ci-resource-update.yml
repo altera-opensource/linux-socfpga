@@ -1,0 +1,50 @@
+name: Linux Auto Resource Update
+
+on:
+  push:
+    paths:
+      - '.github/workflows/ci-resource-update.yml'
+
+  #allow manual trigger from github
+  workflow_dispatch:
+  schedule:
+    - cron: '*/30 * * * *' #every 30mins
+
+permissions:
+  contents: write       #to create branch and commit
+  pull-requests: write  #to create PR
+
+env:
+  WORKFLOW_REPO_REF: cicd-2025.12
+
+jobs:
+  update-dependency:
+    runs-on: [ arc, lapwing, workspace_type=tmp-workspace, python/3.12.10 ]
+    strategy:
+      matrix:
+        #use current branch if push event, else use default branch
+        branch: [ "${{ github.event_name != 'push' && github.event.repository.default_branch || github.ref }}" ]
+    env:
+      GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ matrix.branch }}
+
+      - name: Workflow Script checkout
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ env.WORKFLOW_REPO_REF }}
+          repository: altera-innersource/applications.devops.build-bot.github-pr-workflow
+          path: workflow_scripts
+          token: ${{ secrets.GIT_TOKEN }}
+
+      - name: Check and Update Dependency (Dryrun)
+        if: ${{ github.event_name == 'push' }}
+        run: |
+          python workflow_scripts/workflow_ResourceUpdate.py ${{ github.workspace }} .github/actions/ci-resource-version/action.yml -n
+
+      - name: Check and Update Dependency
+        if: ${{ github.event_name != 'push' }}
+        run: |
+          python workflow_scripts/workflow_ResourceUpdate.py ${{ github.workspace }} .github/actions/ci-resource-version/action.yml
