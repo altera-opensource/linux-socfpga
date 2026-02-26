@@ -1124,8 +1124,8 @@ static int stratix10_rsu_probe(struct platform_device *pdev)
 		if (ret) {
 			dev_err(dev, "Error, getting RSU retry %i\n", ret);
 			stratix10_svc_free_channel(priv->chan);
+			return ret;
 		}
-		return ret;
 	}
 
 	/* get DCMF version from firmware */
