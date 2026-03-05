@@ -1,0 +1,15 @@
+// SPDX-License-Identifier:     GPL-2.0
+/*
+ * Copyright (C) 2026, Altera Corporation
+ */
+#include "socfpga_agilex5_socdk_modular.dts"
+
+/ {
+	model = "SoCFPGA Agilex5 SoCDK A0 - Modular development kit";
+};
+
+&mmc {
+	no-1-8-v;
+	/delete-property/ sd-uhs-sdr104;
+	sdhci-caps-mask = <0x00002007 0x0000ff00>;
+};
