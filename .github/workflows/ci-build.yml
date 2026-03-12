@@ -9,7 +9,7 @@ on:
         required: true
 
 env:
-  WORKFLOW_REPO_REF: cicd-2025.12
+  WORKFLOW_REPO_REF: cicd-2026.03
 
 jobs:
   #This action performs a build test using an ubuntu container.
@@ -34,8 +34,8 @@ jobs:
       - name: Linux Build
         shell: bash
         run: |
-          export WORK_DIR=$RUNNER_TEMP
-          python3 workflow_scripts/workflow_Build.py ${{ github.workspace }} --github-repo ${{ github.event.repository.name }}
+          export TMP_ROOT=$RUNNER_TEMP
+          python3 workflow_scripts/workflow_Build.py --workspace ${{ github.workspace }} -c linux -j 16
 
       - name: linux-image
         uses: actions/upload-artifact@v4
