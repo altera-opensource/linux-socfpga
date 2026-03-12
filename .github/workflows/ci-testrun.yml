@@ -8,20 +8,16 @@ on:
       GIT_TOKEN:
         required: true
     inputs:
-      socfpga_refdes_version:
-        required: true
-        type: string
-      simics_version:
-        required: true
-        type: string
       test_matrix:
         required: true
         type: string
+    outputs:
+      arc_job_ids:
+        description: "JSON array of the top level ARC job when running reg_exe for each test"
+        value: ${{ jobs.ci-testrun-status.outputs.arc_job_ids }}
 
 env:
-  WORKFLOW_REPO_REF: cicd-2025.12
-  SIMICS_VERSION: ${{ inputs.simics_version }}
-  SOCFPGA_REFDES_VERSION: ${{ inputs.socfpga_refdes_version }}
+  WORKFLOW_REPO_REF: cicd-2026.03
 
 jobs:
   ci-testrun:
@@ -32,8 +28,11 @@ jobs:
       EC_DISABLE_VAL: project,system
       GITHUB_EVENT_NAME: ${{ github.event_name }}
     strategy:
+      fail-fast: false
       matrix:
         include: ${{ fromJSON(inputs.test_matrix) }}
+    outputs:
+      arc_job_id: ${{ steps.testrun.outputs.ARC_JOB_ID }}
     steps:
       - name: Checkout workflow script
         uses: actions/checkout@v4
@@ -44,5 +43,37 @@ jobs:
           token: ${{ secrets.GIT_TOKEN }}
 
       - name: Run Regtest
+        id: testrun
         run: |
-          python3 workflow_scripts/workflow_Regtest.py -C ${{ matrix.testrun_dir }} ${{ matrix.testrun_args }}
+          python3 workflow_scripts/workflow_Regtest.py -C ${{ matrix.testrun_dir }} ${{ matrix.testrun_args }} -o testrun_arc_jobid.txt
+
+  ci-testrun-status:
+    needs: [ ci-testrun ]
+    runs-on: [lapwing, arc, workspace_type=tmp-workspace, _site=png]
+    if: always()
+    outputs:
+        arc_job_ids: ${{ steps.collect-arc-job-id.outputs.arc_job_ids }}
+    steps:
+      - name: Checkout workflow script
+        uses: actions/checkout@v4
+        with:
+          repository: altera-innersource/applications.devops.build-bot.github-pr-workflow
+          ref: ${{ env.WORKFLOW_REPO_REF }}
+          path: workflow_scripts
+          token: ${{ secrets.GIT_TOKEN }}
+
+      - name: Collect ARC job IDs
+        id: collect-arc-job-id
+        run: |
+          echo '${{ inputs.test_matrix }}' >> test_matrix.json
+          python3 workflow_scripts/collect_testrun_arc_jobid_from_matrix.py --json-file=test_matrix.json -o testrun_arc_job_ids.json
+          arc_job_ids=$(cat testrun_arc_job_ids.json)
+          echo "arc_job_ids=$arc_job_ids"
+          echo "arc_job_ids=$arc_job_ids" >> $GITHUB_OUTPUT
+
+      - name: On failure
+        if: ${{ needs.ci-testrun-stage1.result == 'failure'
+             || needs.ci-testrun-stage2.result == 'failure' }}
+        run: |
+          echo "One of the test stage has failed."
+          exit 1

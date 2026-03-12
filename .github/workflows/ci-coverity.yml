@@ -16,7 +16,7 @@ on:
         type: string
 
 env:
-  WORKFLOW_REPO_REF: cicd-2025.12
+  WORKFLOW_REPO_REF: cicd-2026.03
 
 jobs:
   ci-coverity-build:
@@ -37,24 +37,32 @@ jobs:
           path: workflow_scripts
           token: ${{ secrets.GIT_TOKEN }}
 
-      - name: Run Coverity Build
-        id: coverity-build
+      #we are interested in steps.run-options.outputs.full_coverity, but since uboot build everything this is not used ATM
+      - name: Get CI Run Options
+        id: run-options
+        uses: ./.github/actions/ci-run-options
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          script_dir: workflow_scripts
+
+      - name: Run Coverity Build (PR flow)
+        if: ${{ github.event_name == 'pull_request' }}
         run: |
-          export WORK_DIR=$RUNNER_TEMP
-          python3 workflow_scripts/workflow_Coverity_Build.py ${{ github.workspace }} --software-component linux ${{ inputs.head_ref }} ${{ inputs.base_ref }}
+          export TMP_ROOT=$RUNNER_TEMP
+          python3 workflow_scripts/workflow_Coverity_Build.py ${{ github.workspace }} -c linux ${{ inputs.head_ref }} ${{ inputs.base_ref }} \
+            --github-token ${{ secrets.GIT_TOKEN }} --github-pr ${{ github.event.pull_request.number }}
 
-      - name: linux-coverity-report-prechange
+      - name: Run Coverity Build (non-PR flow)
+        if: ${{ github.event_name != 'pull_request' }}
+        run: |
+          export TMP_ROOT=$RUNNER_TEMP
+          python3 workflow_scripts/workflow_Coverity_Build.py ${{ github.workspace }} -c linux ${{ inputs.head_ref }} ${{ inputs.base_ref }}
+
+      - name: linux-coverity-result-json
         uses: actions/upload-artifact@v4
         with:
-          name: linux-coverity-report-prechange
-          path: linux_output_defect_prechange.json
-          retention-days: 1
-
-      - name: linux-coverity-report-postchange
-        uses: actions/upload-artifact@v4
-        with:
-          name: linux-coverity-report-postchange
-          path: linux_output_defect_postchange.json
+          name: linux-coverity-result-json
+          path: ${{ github.workspace }}/coverity_results.tar.gz
           retention-days: 1
 
   ci-coverity-parse-result:
@@ -62,10 +70,6 @@ jobs:
     runs-on: [ arc, lapwing, workspace_type=tmp-workspace, python/3.12.10 ]
 
     steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
-        with:
-          clean: true
 
       - name: Workflow Script checkout
         uses: actions/checkout@v4
@@ -75,25 +79,26 @@ jobs:
           path: workflow_scripts
           token: ${{ secrets.GIT_TOKEN }}
 
-      - name: Download coverity result prechange
+      - name: Download coverity result
         uses: actions/download-artifact@v4
         with:
-          name: linux-coverity-report-prechange
+          name: linux-coverity-result-json
 
-      - name: Download coverity result postchange
-        uses: actions/download-artifact@v4
-        with:
-          name: linux-coverity-report-postchange
+      - name: Extract coverity result
+        run: |
+          tar -xzf coverity_results.tar.gz
+          ls -al *.json
 
       - name : Run Coverity Parser
         run: |
-          export PYTHONUSERBASE=$RUNNER_TEMP/.local
-          mkdir -p $PYTHONUSERBASE
-          bash workflow_scripts/workflow_Coverity_Parser.sh ${{ github.workspace }} ${{ github.event.repository.name }} ${{ secrets.GITHUB_TOKEN }} ${{ github.event.pull_request.number }}
+          python3 workflow_scripts/workflow_Coverity_Check_Result.py --github-repo ${{ github.repository }} -p ${{ github.event.pull_request.number || 0 }} \
+            --github-token ${{ secrets.GITHUB_TOKEN }} linux_output_defect_prechange.json linux_output_defect_postchange.json -o linux_output_defect.csv
 
       - name: linux-coverity-report
+        # Run Coverity Parser may fail if it detects new defects, but we always need to upload the report
+        if: always()
         uses: actions/upload-artifact@v4
         with:
           name: linux-coverity-report
-          path: linux_output_defect.csv
+          path: ${{ github.workspace }}/linux_output_defect.csv
           retention-days: 14

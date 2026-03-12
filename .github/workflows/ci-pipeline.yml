@@ -5,8 +5,8 @@ name: altera-linux-ci-pipeline
 
 on:
   pull_request:
-     branches: [ "socfpga-*", "cicd-*" ]
-     types: [opened, synchronize, reopened, review_requested, review_submission]
+    branches: [ "socfpga-*" ]
+    types: [opened, synchronize, reopened, review_requested, review_submission]
 
   # Allows to run this workflow manually from the Actions tab
   workflow_dispatch:
@@ -16,8 +16,8 @@ defaults:
     shell: bash
 
 env:
-  WORKFLOW_REPO_REF: cicd-2025.12
-  TMP_DIR_ROOT: /p/psg/swip/etools/esv/gh_build_temp
+  WORKFLOW_REPO_REF: cicd-2026.03
+  TMP_DIR_ROOT: ${{ vars.CI_EXEC_ROOT }}
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
@@ -37,10 +37,7 @@ jobs:
   ci-checkpatch:
     if: ${{ github.event_name == 'pull_request' }}
     continue-on-error: ${{  !startswith(github.base_ref, 'socfpga-')  }}
-    runs-on: [lapwing, arc, workspace_type=tmp-workspace, git]
-    # Check patch only can run at pull request as it is hard to determine the commit during the push event.
-    env:
-      GITHUB_EVENT_NAME: ${{ github.event_name }}
+    runs-on: [arc, lapwing, workspace_type=tmp-workspace, git, python/3.12.10]
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -56,22 +53,47 @@ jobs:
           path: workflow_scripts
           token: ${{ secrets.GIT_TOKEN }}
 
-      - name: Checkpatch.pl
+      - name: Run Checkpatch.pl
         run: |
-          bash workflow_scripts/workflow_Checkpatch.sh ${{ github.workspace }} ${{ github.event.repository.name }} ${{ secrets.GITHUB_TOKEN }} ${{ github.event.pull_request.number }} ${{ github.head_ref }} ${{ github.base_ref }}
+          python3 workflow_scripts/workflow_Checkpatch.py -w ${{ github.workspace }} --github-token ${{ secrets.GITHUB_TOKEN }} -p ${{ github.event.pull_request.number }}
 
-  ci-resource-version:
-    runs-on:  [ altera-innersource.prod.amr.quartus ]
+  ci-run-options:
+    runs-on: [ arc, lapwing, workspace_type=tmp-workspace, python/3.12.10 ]
     outputs:
       SOCFPGA_REFDES_VERSION: ${{ steps.set-version.outputs.SOCFPGA_REFDES_VERSION }}
+      QPDS_VERSION_agilex5: ${{ steps.set-version.outputs.QPDS_VERSION_agilex5 }}
+      GHRD_VERSION_agilex5: ${{ steps.set-version.outputs.GHRD_VERSION_agilex5 }}
+      skip_testrun: ${{ steps.run-options.outputs.skip_testrun }}
     steps:
+      #need this since we need to use composite action
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+
+      - run: |
+          git sparse-checkout init --cone
+          git sparse-checkout set .github
+          git checkout
+
+      - name: Workflow Script checkout
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ env.WORKFLOW_REPO_REF }}
+          repository: altera-innersource/applications.devops.build-bot.github-pr-workflow
+          path: workflow_scripts
+          token: ${{ secrets.GIT_TOKEN }}
+
       - id: set-version
         uses: ./.github/actions/ci-resource-version
 
+      - id: run-options
+        uses: ./.github/actions/ci-run-options
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          script_dir: workflow_scripts
 
-#This action performs a build test using an ubuntu container.
   ci-build:
+    needs: [ci-run-options]
     uses: ./.github/workflows/ci-build.yml
     secrets:
       GIT_USER: ${{ secrets.GIT_USER }}
@@ -90,15 +112,19 @@ jobs:
       base_ref: ${{ (github.event_name == 'pull_request' && github.base_ref)
                 || github.event.repository.default_branch }}
 
-#This action runs regression test
   ci-verification:
-    needs: [ci-resource-version, ci-build, ci-test-select]
+    needs: [ci-run-options, ci-build, ci-test-select]
+    #skip_testrun is only useful for refining ci-test-select, the pipeline will nor pass without ci-verification
+    if: ${{ needs.ci-run-options.outputs.skip_testrun != 'true' }}
     uses: ./.github/workflows/ci-verify.yml
     secrets:
       GIT_USER: ${{ secrets.GIT_USER }}
       GIT_TOKEN: ${{ secrets.GIT_TOKEN }}
     with:
-      socfpga_refdes_version: ${{ needs.ci-resource-version.outputs.SOCFPGA_REFDES_VERSION }}
+      qpds_version_agilex5: ${{ needs.ci-run-options.outputs.QPDS_VERSION_agilex5 }}
+      ghrd_version_agilex5: ${{ needs.ci-run-options.outputs.GHRD_VERSION_agilex5 }}
+      socfpga_refdes_version: ${{ needs.ci-run-options.outputs.SOCFPGA_REFDES_VERSION }}
+      CI_EXEC_ROOT: ${{ vars.CI_EXEC_ROOT }}
 
   ci-coverity:
     uses: ./.github/workflows/ci-coverity.yml
@@ -114,25 +140,22 @@ jobs:
 
 #This action checks if the branch has been released and if so block PR until approved by repo Admin
   ci-check-tag:
-    runs-on: [self-hosted,pg-embedded-runner]
-    container:
-      image: amr-registry.sc.altera.com/pse-pswe-software-ba/embedded_coverity:ubuntu20.04.0_6-new-proxy-inbuilt
-      options: -v /mnt/nfs_share/site/proj/psg:/p/psg
-    env:
-      GITHUB_EVENT_NAME: ${{ github.event_name }}
+    if: ${{ github.event_name == 'pull_request' }}
+    runs-on: [ arc, lapwing, workspace_type=tmp-workspace, python/3.12.10, git ]
     steps:
       - uses: actions/checkout@v4
-      - name : Download check_tag script
-        run: |
-          git config --global credential.helper store
-          git clone https://${{ secrets.GIT_USER }}:${{ secrets.GIT_TOKEN }}@github.com/altera-innersource/applications.devops.build-bot.github-pr-workflow
-          cd applications.devops.build-bot.github-pr-workflow
-          git checkout master
+
+      - name: Workflow Script checkout
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ env.WORKFLOW_REPO_REF }}
+          repository: altera-innersource/applications.devops.build-bot.github-pr-workflow
+          path: workflow_scripts
+          token: ${{ secrets.GIT_TOKEN }}
 
       - name: Check_Tag
         run: |
-          cd applications.devops.build-bot.github-pr-workflow
-          bash workflow_Check_Tag.sh ${{ github.workspace }} ${{ github.event.repository.name }} ${{ github.event.pull_request.number }} ${{ github.base_ref }} ${{ secrets.GITHUB_TOKEN }}
+          python workflow_scripts/workflow_Check_Tag.py -w ${{ github.workspace }} -c linux -p ${{ github.event.pull_request.number }} --github-token ${{ secrets.GITHUB_TOKEN }}
 
   #This is the commit gate that ensures all required checks are passing before the PR is allowed to be merged.
   ci-check-pr-status:
@@ -145,7 +168,7 @@ jobs:
        if: ${{ needs.ci-checkpatch.result == 'failure'
             || needs.ci-build.result != 'success'
             || needs.ci-verification.result != 'success'
-            || needs.ci-check-tag.result != 'success'
+            || needs.ci-check-tag.result == 'failure'
             || needs.ci-coverity.result != 'success' }}
        run: |
           echo "Status check has failed."

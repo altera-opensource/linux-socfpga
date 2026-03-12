@@ -18,7 +18,7 @@ on:
         type: string
 
 env:
-  WORKFLOW_REPO_REF: cicd-2025.12
+  WORKFLOW_REPO_REF: cicd-2026.03
 
 jobs:
   ci-testrun-ai-filter:
@@ -30,10 +30,6 @@ jobs:
           fetch-depth: 0  # Full history for accurate diff
           ref: ${{ inputs.head_ref }}
 
-      - name: Fetch base branch
-        run: |
-          git fetch origin ${{ inputs.base_ref }}
-
       - name: Checkout workflow script
         uses: actions/checkout@v4
         with:
@@ -42,7 +38,26 @@ jobs:
           path: workflow_scripts
           token: ${{ secrets.GIT_TOKEN }}
 
+      - name: Get CI Run Options
+        id: run-options
+        uses: ./.github/actions/ci-run-options
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          script_dir: workflow_scripts
+
+      - name: Setup Default Outputs
+        run: |
+          echo test_tags="${{ steps.run-options.outputs.test_tags }}"
+          echo test_user_prompt="${{ steps.run-options.outputs.user_test_prompt }}"
+          echo '[]' > user_filtered_tests.json
+          touch default_reasoning.txt
+
+      - name: Fetch base branch
+        run: |
+          git fetch origin ${{ inputs.base_ref }}
+
       - name: create PR diff file
+        shell: bash
         run: |
           if [ "${{ github.event_name }}" = "pull_request" ]; then
             python3 workflow_scripts/make_pr_diff_json.py \
@@ -58,65 +73,127 @@ jobs:
           echo "Generated PR diff:"
           cat pr_diff.json
 
-      - name: AGPT select test
+      - name: AGPT user test select
+        if: ${{ !contains(fromJSON(steps.run-options.outputs.test_tags), 'all') && steps.run-options.outputs.user_test_prompt }}
+        shell: bash
         env:
           AGPT_API_KEY: ${{ secrets.AGPT_TOKEN }}
           AGPT_SESSION_PATH: ${{ runner.temp }}
         run: |
           python3 workflow_scripts/agpt_run.py \
             --file pr_diff.json \
-            --file workflow_scripts/regtest/test_config.json \
-            --save-answer filtered_tests.json \
+            --file workflow_scripts/regtest/linux/test_config.json \
+            --save-answer user_filtered_tests.json \
             --new \
-            -p "You are an expert Linux kernel developer. Analyze the following pull request changes and determine which hardware subsystems or features are affected. \
+            -p "${{ steps.run-options.outputs.user_test_prompt }}"
 
-            Instructions:
-            1. Identify all affected subsystems and drivers based on your understanding on the linux kernel.
-            2. Select the test(s) from test_config.json that should be run, we need minimum of 5 tests from each target category. If uncertain, include a broader test.
-            3. even if input file is empty, still select tests with the same criteria for sanity purpose
-            4. Return the filtered test case(s) in the exact same JSON format as the input.
-            5. Do not change the structure or keys of the original input.
-            6. Output ONLY the resulting JSON object.
-            7. **Do not include any markdown code block markers (such as \`\`\`json or \`\`\`) in your output.**
-            "
-
-      - name: Explain the reason of test selection
-        id: agpt_explain
+      - name: Explain the reason of user test selection
+        if: ${{ !contains(fromJSON(steps.run-options.outputs.test_tags), 'all') && steps.run-options.outputs.user_test_prompt }}
         env:
           AGPT_API_KEY: ${{ secrets.AGPT_TOKEN }}
           AGPT_SESSION_PATH: ${{ runner.temp }}
         run: |
-          echo "content<<EOF" >> $GITHUB_OUTPUT
-          python3 workflow_scripts/agpt_run.py \
-            -p "Explain the reasoning behind the test selection in a concise manner. \
+          python3 workflow_scripts/agpt_run.py --raw-output=answer \
+            < workflow_scripts/prompts/common/describe_test_select.txt >> user_reasoning.txt
+          cat user_reasoning.txt
 
-            Instructions:
-            1. List down test cases selected for each target category (board, simics, other).
-            2. For each test case grouped by target category, provide a brief explanation of why it was selected based on the PR changes. Focus on the relevance of the test case to the affected subsystems or features.
-            3. Format the explanation in markdown for better readability, using bullet points or numbered lists.
-            " >> $GITHUB_OUTPUT
-          echo "EOF" >> $GITHUB_OUTPUT
+      - name: AGPT select test
+        if: ${{ !contains(fromJSON(steps.run-options.outputs.test_tags), 'all') }}
+        shell: bash
+        env:
+          AGPT_API_KEY: ${{ secrets.AGPT_TOKEN }}
+          AGPT_SESSION_PATH: ${{ runner.temp }}
+        run: |
+          python3 workflow_scripts/agpt_run.py \
+            --file pr_diff.json \
+            --file workflow_scripts/regtest/linux/test_config.json \
+            --save-answer default_filtered_tests.json \
+            --new \
+            < workflow_scripts/prompts/linux/default_test_select.txt \
+          || {
+            echo -e "\033[1;31m AI prompt failed, default to force full test run\033[0m"
+            cp workflow_scripts/regtest/linux/test_config.json default_filtered_tests.json
+          }
+
+      - name: Explain the reason of test selection
+        if: ${{ !contains(fromJSON(steps.run-options.outputs.test_tags), 'all') }}
+        env:
+          AGPT_API_KEY: ${{ secrets.AGPT_TOKEN }}
+          AGPT_SESSION_PATH: ${{ runner.temp }}
+        run: |
+          python3 workflow_scripts/agpt_run.py --raw-output=answer \
+            < workflow_scripts/prompts/common/describe_test_select.txt \
+            >> default_reasoning.txt
+          cat default_reasoning.txt
+
+      - name: Merge user-selected and AI-selected tests
+        if: ${{ !contains(fromJSON(steps.run-options.outputs.test_tags), 'all') }}
+        run: |
+          python3 workflow_scripts/testcase_db_manager.py --database default_filtered_tests.json \
+            --output filtered_tests.json add-test-cases --new-database user_filtered_tests.json
+          echo "hello"
+
+      - name: Merge AI test select report
+        if: ${{ !contains(fromJSON(steps.run-options.outputs.test_tags), 'all') }}
+        env:
+          AGPT_API_KEY: ${{ secrets.AGPT_TOKEN }}
+          AGPT_SESSION_PATH: ${{ runner.temp }}
+        run: |
+          echo "## � AI Test Selection Reasoning" > reasoning.txt
+          if [ -f 'user_reasoning.txt' ]; then
+            python3 workflow_scripts/agpt_run.py --new --raw-output=answer \
+              --file default_reasoning.txt --file user_reasoning.txt \
+              < workflow_scripts/prompts/common/merge_test_select_report.txt \
+              >> reasoning.txt
+          else
+            echo 'no user_reasoning.txt, skip report merging'
+            cat default_reasoning.txt >> reasoning.txt
+          fi
+          cat reasoning.txt
+
+      - name: Manual Test Select
+        if: ${{ contains(fromJSON(steps.run-options.outputs.test_tags), 'all') }}
+        run: |
+          keyword_q=$(echo '${{ steps.run-options.outputs.test_tags }}' | jq -r 'map(select(. != "all")) | map("contains(keyword, `" + . + "`)") | join(" || ")')
+          if [ -n "$keyword_q" ]; then
+            keyword_q='keyword && ('$keyword_q') &&'
+          fi
+          jmes='[?'$keyword_q' (!disabled || disabled == `0`)]'
+          echo $jmes
+          python3 workflow_scripts/testcase_db_manager.py \
+            --database workflow_scripts/regtest/linux/test_config.json \
+            --output filtered_tests.json \
+            list-test-cases "$jmes"
+
+      - name: Manual test selection report
+        if: ${{ contains(fromJSON(steps.run-options.outputs.test_tags), 'all') }}
+        env:
+          AGPT_API_KEY: ${{ secrets.AGPT_TOKEN }}
+          AGPT_SESSION_PATH: ${{ runner.temp }}
+        run: |
+          keywords=$(echo '${{ steps.run-options.outputs.test_tags }}' | jq -r 'join(",")' )
+          echo "## Manual Test Select Report" > reasoning.txt
+          python3 workflow_scripts/workflow_GenerateManualTestSelectReport.py filtered_tests.json --keywords="$keywords" \
+            >> reasoning.txt
+          cat reasoning.txt
 
       - name: Post test selection reason as PR comment
         if: github.event_name == 'pull_request'
-        uses: actions/github-script@v7
-        with:
-          github-token: ${{ secrets.GIT_TOKEN }}
-          script: |
-            const [owner, repo] = '${{ github.repository }}'.split('/');
-            const body = `## 🤖 AI Test Selection Reasoning\n\n${{ steps.agpt_explain.outputs.content }}`;
-            await github.rest.issues.createComment({
-              owner,
-              repo,
-              issue_number: ${{ github.event.pull_request.number }},
-              body
-            });
-
-      - name: Fallback to default CI checkin test suite
-        if: failure()
         run: |
-          echo "AGPT script failed, using full test config as fallback"
-          cp workflow_scripts/regtest/test_config.json filtered_tests.json
+          python3 workflow_scripts/workflow_TestSelectReport.py --github-token ${{ secrets.GIT_TOKEN }} \
+            --github-repo ${{ github.repository }} -p ${{ github.event.pull_request.number }} \
+            -r ${{ github.run_id }} -a ${{ github.run_attempt }} \
+            --body-file reasoning.txt --header "<!-- TEST SELECTION REPORT -->"
+
+      - run: |
+            tar -cvf test_select_reports.tar *reasoning.txt
+
+      - name: Upload Test Select Report
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-select-report
+          path: ${{ github.workspace }}/test_select_reports.tar
+          retention-days: 1
 
       - name: Upload filtered test JSON
         uses: actions/upload-artifact@v4
@@ -124,4 +201,3 @@ jobs:
           name: filtered-test-json
           path: ${{ github.workspace }}/filtered_tests.json
           retention-days: 1
-

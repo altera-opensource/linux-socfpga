@@ -13,12 +13,41 @@ on:
         type: string
       simics_version:
         required: false
+        default: '25.3'
+        type: string
+      qpds_version:
+        description: 'default QPDS version to use when running test'
+        required: false
+        type: string
+      qpds_version_agilex5:
+        description: 'QPDS version to use when running agilex5 tests'
+        required: false
+        type: string
+      ghrd_version_agilex5:
+        description: 'agilex5 GHRD version to use for tests'
+        required: false
+        type: string
+      qpds_version_agilex3:
+        description: 'QPDS version to use when running agilex3 tests'
+        required: false
+        type: string
+      ghrd_version_agilex3:
+        description: 'agilex3 GHRD version to use for tests'
+        required: false
+        type: string
+      CI_EXEC_ROOT:
+        required: true
         type: string
 
 env:
-  WORKFLOW_REPO_REF: cicd-2025.12
-  SIMICS_VERSION: ${{ inputs.simics_version || 25.3 }}
+  WORKFLOW_REPO_REF: cicd-2026.03
+  SIMICS_VERSION: ${{ inputs.simics_version }}
   SOCFPGA_REFDES_VERSION: ${{ inputs.socfpga_refdes_version }}
+  QPDS_VERSION: ${{ inputs.qpds_version }}
+  QPDS_VERSION_agilex5: ${{ inputs.qpds_version_agilex5 }}
+  GHRD_VERSION_agilex5: ${{ inputs.ghrd_version_agilex5 }}
+  QPDS_VERSION_agilex3: ${{ inputs.qpds_version_agilex3 }}
+  GHRD_VERSION_agilex3: ${{ inputs.ghrd_version_agilex3 }}
 
 jobs:
   ci-testrun-prepare:
@@ -27,7 +56,7 @@ jobs:
       test_matrix: ${{ steps.test-setup.outputs.test_matrix }}
       testrun_root_dir: ${{ steps.test-setup.outputs.testrun_root_dir }}
     env:
-      TMP_DIR_ROOT: /p/psg/swip/etools/esv/gh_build_temp
+      TMP_DIR_ROOT: ${{ inputs.CI_EXEC_ROOT }}
     steps:
       - name: Checkout workflow script
         uses: actions/checkout@v4
@@ -74,8 +103,6 @@ jobs:
       GIT_USER: ${{ secrets.GIT_USER }}
       GIT_TOKEN: ${{ secrets.GIT_TOKEN }}
     with:
-      socfpga_refdes_version: ${{ inputs.socfpga_refdes_version }}
-      simics_version: ${{ inputs.simics_version || '25.3' }}
       test_matrix: ${{ toJSON(fromJSON(needs.ci-testrun-prepare.outputs.test_matrix)['board']) }}
 
   ci-testrun-simics:
@@ -85,8 +112,6 @@ jobs:
       GIT_USER: ${{ secrets.GIT_USER }}
       GIT_TOKEN: ${{ secrets.GIT_TOKEN }}
     with:
-      socfpga_refdes_version: ${{ inputs.socfpga_refdes_version }}
-      simics_version: ${{ inputs.simics_version || '25.3' }}
       test_matrix: ${{ toJSON(fromJSON(needs.ci-testrun-prepare.outputs.test_matrix)['simics']) }}
 
   ci-testrun-other:
@@ -96,18 +121,38 @@ jobs:
       GIT_USER: ${{ secrets.GIT_USER }}
       GIT_TOKEN: ${{ secrets.GIT_TOKEN }}
     with:
-      socfpga_refdes_version: ${{ inputs.socfpga_refdes_version }}
-      simics_version: ${{ inputs.simics_version || '25.3' }}
       test_matrix: ${{ toJSON(fromJSON(needs.ci-testrun-prepare.outputs.test_matrix)['other']) }}
+
+  ci-testrun-statistics:
+    needs: [ci-testrun-board]
+    runs-on: [lapwing, arc, workspace_type=tmp-workspace, _site=png, python/3.12.10]
+    if: always()
+    steps:
+      - name: Checkout workflow script
+        uses: actions/checkout@v4
+        with:
+          repository: altera-innersource/applications.devops.build-bot.github-pr-workflow
+          ref: ${{ env.WORKFLOW_REPO_REF }}
+          path: workflow_scripts
+          token: ${{ secrets.GIT_TOKEN }}
+
+      - name: collect board test statistics
+        run: |
+          echo "board test ARC jobs are"
+          echo '${{ needs.ci-testrun-board.outputs.arc_job_ids }}'
+          python3 workflow_scripts/board_test_statistics_query.py --json-str '${{ needs.ci-testrun-board.outputs.arc_job_ids }}' -o board_test_statistics.json
 
   ci-testrun-cleanup:
     runs-on: [lapwing, arc, workspace_type=tmp-workspace, _site=png]
-    needs: [ci-testrun-prepare, ci-testrun-board, ci-testrun-simics, ci-testrun-other]
+    needs: [ci-testrun-prepare, ci-testrun-board, ci-testrun-simics, ci-testrun-other, ci-testrun-statistics]
     if: always()
     steps:
       - name: change permission of test run root directory
+        if: ${{ needs.ci-testrun-prepare.outputs.testrun_root_dir }}
         run: |
           chmod -R a+rw ${{ needs.ci-testrun-prepare.outputs.testrun_root_dir }}
+          find ${{ needs.ci-testrun-prepare.outputs.testrun_root_dir }} -type d -exec chmod a+rx {} +
+          ls -l ${{ needs.ci-testrun-prepare.outputs.testrun_root_dir }}/*
 
       - name: Cleanup Test Directory
         if: ${{ (needs.ci-testrun-stage1.result == 'success' || needs.ci-testrun-stage1.result == 'skipped')

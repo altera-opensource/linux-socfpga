@@ -3,23 +3,23 @@ name: Linux Auto Resource Update
 on:
   push:
     paths:
-      - '.github/workflows/ci-resource-update.yml'
+      - '.github/workflows/ci-resource-update*'
 
   #allow manual trigger from github
   workflow_dispatch:
-  schedule:
-    - cron: '*/30 * * * *' #every 30mins
+  #schedule:
+  #  - cron: '*/30 * * * *' #every 30mins
 
 permissions:
   contents: write       #to create branch and commit
   pull-requests: write  #to create PR
 
 env:
-  WORKFLOW_REPO_REF: cicd-2025.12
+  WORKFLOW_REPO_REF: cicd-2026.03
 
 jobs:
   update-dependency:
-    runs-on: [ arc, lapwing, workspace_type=tmp-workspace, python/3.12.10 ]
+    runs-on: [ arc, lapwing, workspace_type=tmp-workspace, _site=png, python/3.12.10 ]
     strategy:
       matrix:
         #use current branch if push event, else use default branch
@@ -45,6 +45,6 @@ jobs:
           python workflow_scripts/workflow_ResourceUpdate.py ${{ github.workspace }} .github/actions/ci-resource-version/action.yml -n
 
       - name: Check and Update Dependency
-        if: ${{ github.event_name != 'push' }}
+        if: ${{ github.event_name == 'workflow_dispatch' || github.event_name == 'schedule' }}
         run: |
           python workflow_scripts/workflow_ResourceUpdate.py ${{ github.workspace }} .github/actions/ci-resource-version/action.yml

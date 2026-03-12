@@ -12,12 +12,10 @@ on:
         description: 'JSON string with [[stage1 test_configs], [stage2 test_configs]]'
         required: true
         type: string
-      socfpga_refdes_version:
-        required: true
-        type: string
-      simics_version:
-        required: true
-        type: string
+    outputs:
+      arc_job_ids:
+        description: "JSON array of the top level ARC job when running reg_exe for each test in each stage"
+        value: ${{ jobs.ci-testrun-multistage-status.outputs.arc_job_ids }}
 
 jobs:
   ci-testrun-stage1:
@@ -27,8 +25,6 @@ jobs:
       GIT_USER: ${{ secrets.GIT_USER }}
       GIT_TOKEN: ${{ secrets.GIT_TOKEN }}
     with:
-      socfpga_refdes_version: ${{ inputs.socfpga_refdes_version }}
-      simics_version: ${{ inputs.simics_version }}
       test_matrix: ${{ toJSON(fromJSON(inputs.test_matrix)[0]) }}
 
   ci-testrun-stage2:
@@ -39,15 +35,25 @@ jobs:
       GIT_USER: ${{ secrets.GIT_USER }}
       GIT_TOKEN: ${{ secrets.GIT_TOKEN }}
     with:
-      socfpga_refdes_version: ${{ inputs.socfpga_refdes_version }}
-      simics_version: ${{ inputs.simics_version }}
       test_matrix: ${{ toJSON(fromJSON(inputs.test_matrix)[1]) }}
 
-  ci-testrun-status:
+  ci-testrun-multistage-status:
     needs: [ci-testrun-stage1, ci-testrun-stage2]
     runs-on: [lapwing, arc, workspace_type=tmp-workspace]
     if: always()
+    outputs:
+        arc_job_ids: ${{ steps.collect-arc-job-id.outputs.arc_job_ids }}
     steps:
+      - name: Collect ARB job IDs
+        id: collect-arc-job-id
+        #ci-testrun will produce arc_job_ids output regardless of pass or fail
+        run: |
+          echo '${{ needs.ci-testrun-stage1.outputs.arc_job_ids }}' >> stage1_result.json
+          echo '${{ needs.ci-testrun-stage2.outputs.arc_job_ids }}' >> stage2_result.json
+          arc_job_ids=$(jq -c -s 'add' stage1_result.json stage2_result.json)
+          echo "arc_job_ids=$arc_job_ids"
+          echo "arc_job_ids=$arc_job_ids" >> $GITHUB_OUTPUT
+
       - name: On failure
         if: ${{ needs.ci-testrun-stage1.result == 'failure'
              || needs.ci-testrun-stage2.result == 'failure' }}
