@@ -1334,6 +1334,17 @@ config ROCKCHIP_ERRATUM_3568002
 
 	  If unsure, say Y.
 
+config ALTERA_SOCFPGA_AGILEX5_ERRATUM
+	bool "Altera SoCFPGA Agilex5: GIC600 can not access physical addresses higher than 4GB"
+	default y
+	help
+	  On SoCFPGA Agilex5 platforms, the integrated GIC600 is limited to
+	  32-bit AXI addressing and cannot access memory above 4GB. As a
+	  result, any GIC-visible resources placed outside this range may
+	  not be accessible and can lead to incorrect operation.
+
+	  If unsure, say Y.
+
 config ROCKCHIP_ERRATUM_3588001
 	bool "Rockchip 3588001: GIC600 can not support shareability attributes"
 	default y
