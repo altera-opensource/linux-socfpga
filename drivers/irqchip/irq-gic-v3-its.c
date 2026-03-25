@@ -4894,10 +4894,20 @@ static bool __maybe_unused its_enable_quirk_hip09_162100801(void *data)
 	return true;
 }
 
-static bool __maybe_unused its_enable_rk3568002(void *data)
+static bool __maybe_unused its_enable_dma32_quirk(void *data)
 {
-	if (!of_machine_is_compatible("rockchip,rk3566") &&
-	    !of_machine_is_compatible("rockchip,rk3568"))
+	static const char * const compatible[] = {
+#ifdef CONFIG_ROCKCHIP_ERRATUM_3568002
+		"rockchip,rk3566",
+		"rockchip,rk3568",
+#endif
+#ifdef CONFIG_ALTERA_SOCFPGA_AGILEX5_ERRATUM
+		"intel,socfpga-agilex5",
+#endif
+		NULL
+	};
+
+	if (!of_machine_compatible_match(compatible))
 		return false;
 
 	gfp_flags_quirk |= GFP_DMA32;
@@ -4972,14 +4982,12 @@ static const struct gic_quirk its_quirks[] = {
 		.property = "dma-noncoherent",
 		.init   = its_set_non_coherent,
 	},
-#ifdef CONFIG_ROCKCHIP_ERRATUM_3568002
 	{
-		.desc   = "ITS: Rockchip erratum RK3568002",
+		.desc   = "ITS: GIC600 integration limited to 32bit",
 		.iidr   = 0x0201743b,
 		.mask   = 0xffffffff,
-		.init   = its_enable_rk3568002,
+		.init   = its_enable_dma32_quirk,
 	},
-#endif
 	{
 	}
 };
