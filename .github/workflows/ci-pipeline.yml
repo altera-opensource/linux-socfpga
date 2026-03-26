@@ -1,6 +1,6 @@
 name: altera-linux-ci-pipeline
 ###############################################################################
-# Altera SOCFPGA linux Build Pipeline
+# Altera SOCFPGA Linux Build Pipeline
 ###############################################################################
 
 on:
@@ -10,166 +10,38 @@ on:
 
   # Allows to run this workflow manually from the Actions tab
   workflow_dispatch:
+    inputs:
+      base_ref:
+        description: 'Base branch for coverity and test selection (defaults to repository default branch)'
+        required: false
+        default: ''
 
 defaults:
   run:
     shell: bash
 
-env:
-  WORKFLOW_REPO_REF: cicd-2026.03
-  TMP_DIR_ROOT: ${{ vars.CI_EXEC_ROOT }}
-
-concurrency:
-  group: ${{ github.workflow }}-${{ github.ref }}
-  cancel-in-progress: true
-
-# A workflow run is made up of one or more jobs that can run sequentially or in parallel
 jobs:
-  ci-cleanup-workspace:
-    runs-on: [lapwing, arc, workspace_type=tmp-workspace, mem=8000, git, _site=png]
-    steps:
-      - name: delete workspace older than 1 day
-        run: |
-          find $TMP_DIR_ROOT -maxdepth 1 -name *-linux-* -type d -mtime +1 -user $USER
-          find $TMP_DIR_ROOT -maxdepth 1 -name *-linux-* -type d -mtime +1 -user $USER -exec rm -rf {} +
-
-#This action extracts the new commits and performs checkpatch checks on it.
-  ci-checkpatch:
-    if: ${{ github.event_name == 'pull_request' }}
-    continue-on-error: ${{  !startswith(github.base_ref, 'socfpga-')  }}
-    runs-on: [arc, lapwing, workspace_type=tmp-workspace, git, python/3.12.10]
-    steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
-        with:
-          fetch-depth: 0 # This will pull the whole repo, otherwise cannot compare commit.
-          ref: ${{ github.event.pull_request.base.ref }}
-
-      - name: Workflow Script checkout
-        uses: actions/checkout@v4
-        with:
-          ref: ${{ env.WORKFLOW_REPO_REF }}
-          repository: altera-innersource/applications.devops.build-bot.github-pr-workflow
-          path: workflow_scripts
-          token: ${{ secrets.GIT_TOKEN }}
-
-      - name: Run Checkpatch.pl
-        run: |
-          python3 workflow_scripts/workflow_Checkpatch.py -w ${{ github.workspace }} --github-token ${{ secrets.GITHUB_TOKEN }} -p ${{ github.event.pull_request.number }}
-
-  ci-run-options:
-    runs-on: [ arc, lapwing, workspace_type=tmp-workspace, python/3.12.10 ]
-    outputs:
-      SOCFPGA_REFDES_VERSION: ${{ steps.set-version.outputs.SOCFPGA_REFDES_VERSION }}
-      QPDS_VERSION_agilex5: ${{ steps.set-version.outputs.QPDS_VERSION_agilex5 }}
-      GHRD_VERSION_agilex5: ${{ steps.set-version.outputs.GHRD_VERSION_agilex5 }}
-      skip_testrun: ${{ steps.run-options.outputs.skip_testrun }}
-    steps:
-      #need this since we need to use composite action
-      - uses: actions/checkout@v4
-        with:
-          fetch-depth: 1
-
-      - run: |
-          git sparse-checkout init --cone
-          git sparse-checkout set .github
-          git checkout
-
-      - name: Workflow Script checkout
-        uses: actions/checkout@v4
-        with:
-          ref: ${{ env.WORKFLOW_REPO_REF }}
-          repository: altera-innersource/applications.devops.build-bot.github-pr-workflow
-          path: workflow_scripts
-          token: ${{ secrets.GIT_TOKEN }}
-
-      - id: set-version
-        uses: ./.github/actions/ci-resource-version
-
-      - id: run-options
-        uses: ./.github/actions/ci-run-options
-        with:
-          token: ${{ secrets.GITHUB_TOKEN }}
-          script_dir: workflow_scripts
-
-  ci-build:
-    needs: [ci-run-options]
-    uses: ./.github/workflows/ci-build.yml
-    secrets:
-      GIT_USER: ${{ secrets.GIT_USER }}
-      GIT_TOKEN: ${{ secrets.GIT_TOKEN }}
-
-  ci-test-select:
-    uses: ./.github/workflows/ci-test-select.yml
+  ci-pipeline:
+    uses: altera-innersource/applications.devops.build-bot.github-pr-workflow/.github/workflows/linux-ci-pipeline.yml@cicd-2026.04
     secrets:
       GIT_USER: ${{ secrets.GIT_USER }}
       GIT_TOKEN: ${{ secrets.GIT_TOKEN }}
       AGPT_TOKEN: ${{ secrets.AGPT_TOKEN }}
     with:
-      #for pull request, use head/base ref, for push/workflow run, use head of branch with default branch as base
-      head_ref: ${{ (github.event_name == 'pull_request' && github.head_ref)
-                || github.ref_name }}
-      base_ref: ${{ (github.event_name == 'pull_request' && github.base_ref)
-                || github.event.repository.default_branch }}
-
-  ci-verification:
-    needs: [ci-run-options, ci-build, ci-test-select]
-    #skip_testrun is only useful for refining ci-test-select, the pipeline will nor pass without ci-verification
-    if: ${{ needs.ci-run-options.outputs.skip_testrun != 'true' }}
-    uses: ./.github/workflows/ci-verify.yml
-    secrets:
-      GIT_USER: ${{ secrets.GIT_USER }}
-      GIT_TOKEN: ${{ secrets.GIT_TOKEN }}
-    with:
-      qpds_version_agilex5: ${{ needs.ci-run-options.outputs.QPDS_VERSION_agilex5 }}
-      ghrd_version_agilex5: ${{ needs.ci-run-options.outputs.GHRD_VERSION_agilex5 }}
-      socfpga_refdes_version: ${{ needs.ci-run-options.outputs.SOCFPGA_REFDES_VERSION }}
+      WORKFLOW_REPO_REF: cicd-2026.04
       CI_EXEC_ROOT: ${{ vars.CI_EXEC_ROOT }}
+      base_ref: ${{ (github.event_name == 'pull_request' && github.event.pull_request.base.ref)
+                 || inputs.base_ref
+                 || github.event.repository.default_branch }}
 
-  ci-coverity:
-    uses: ./.github/workflows/ci-coverity.yml
-    secrets:
-      GIT_USER: ${{ secrets.GIT_USER }}
-      GIT_TOKEN: ${{ secrets.GIT_TOKEN }}
-    with:
-      #for pull request, use head/base ref, for push/workflow run, use head of branch with default branch as base
-      head_ref: ${{ (github.event_name == 'pull_request' && github.head_ref)
-                || github.ref_name }}
-      base_ref: ${{ (github.event_name == 'pull_request' && github.base_ref)
-                || github.event.repository.default_branch }}
-
-#This action checks if the branch has been released and if so block PR until approved by repo Admin
-  ci-check-tag:
-    if: ${{ github.event_name == 'pull_request' }}
-    runs-on: [ arc, lapwing, workspace_type=tmp-workspace, python/3.12.10, git ]
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Workflow Script checkout
-        uses: actions/checkout@v4
-        with:
-          ref: ${{ env.WORKFLOW_REPO_REF }}
-          repository: altera-innersource/applications.devops.build-bot.github-pr-workflow
-          path: workflow_scripts
-          token: ${{ secrets.GIT_TOKEN }}
-
-      - name: Check_Tag
-        run: |
-          python workflow_scripts/workflow_Check_Tag.py -w ${{ github.workspace }} -c linux -p ${{ github.event.pull_request.number }} --github-token ${{ secrets.GITHUB_TOKEN }}
-
-  #This is the commit gate that ensures all required checks are passing before the PR is allowed to be merged.
+  #wrapper around ci-pipeline/ci-check-pr-status for PR to capture status
   ci-check-pr-status:
     runs-on: [ arc, lapwing, workspace_type=tmp-workspace ]
-    needs: [ci-checkpatch, ci-build, ci-verification, ci-check-tag, ci-coverity]
-    #always runs even if ci-checkpatch is skipped when running PR not from socfpga_v*
+    needs: [ci-pipeline]
     if: always()
     steps:
-     - name: On failure
-       if: ${{ needs.ci-checkpatch.result == 'failure'
-            || needs.ci-build.result != 'success'
-            || needs.ci-verification.result != 'success'
-            || needs.ci-check-tag.result == 'failure'
-            || needs.ci-coverity.result != 'success' }}
-       run: |
-          echo "Status check has failed."
+      - name: On failure
+        if: ${{ needs.ci-pipeline.result != 'success' }}
+        run: |
+          echo "Pipeline failed!"
           exit 1
