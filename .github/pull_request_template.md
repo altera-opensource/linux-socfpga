@@ -13,9 +13,15 @@ Reach of the change?
 
 Regression Test result: <Regtest result link .>
 
+<!-- specify all, <tags> to bypass AI test selection and run all tests that matchds <tags>
+example:
+all, linux
+all, uboot, networking
+all, boot
+-->
 Test Tags:
 <!-- TEST TAGS -->
-all
+N/A
 
 <!-- change line below to 'SKIP TESTRUN' to skip ci-verification so you can iterate on the user test prompt,
 note that CI will not pass with SKP TESTRUN--> 
