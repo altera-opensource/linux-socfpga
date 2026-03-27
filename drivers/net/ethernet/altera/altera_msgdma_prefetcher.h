@@ -27,7 +27,7 @@ void msgdma_pref_clear_txirq(struct altera_dma_private *priv);
 u32 msgdma_pref_tx_completions(struct altera_dma_private *priv);
 void msgdma_pref_add_rx_desc(struct altera_dma_private *priv,
 			     struct altera_dma_buffer *buffer);
-int msgdma_pref_tx_buffer(struct altera_dma_private *priv,
+netdev_tx_t msgdma_pref_tx_buffer(struct altera_dma_private *priv,
 			  struct altera_dma_buffer *buffer);
 u32 msgdma_pref_rx_status(struct altera_dma_private *priv);
 int msgdma_pref_initialize(struct altera_dma_private *priv);
