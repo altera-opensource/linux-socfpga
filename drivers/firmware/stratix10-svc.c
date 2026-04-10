@@ -2709,6 +2709,9 @@ static void psci_offline_secondary_cpus(void)
 static int psci_cpu_off_reboot_notifier(struct notifier_block *nb,
 					unsigned long action, void *data)
 {
+	if (reboot_mode != REBOOT_WARM)
+		return NOTIFY_DONE;
+
 	switch (action) {
 	case SYS_RESTART:
 	case SYS_POWER_OFF:
