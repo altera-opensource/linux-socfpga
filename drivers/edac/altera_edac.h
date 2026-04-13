@@ -244,6 +244,10 @@ struct altr_sdram_mc_data {
 #define ALTR_A10_ECC_TSERRB             BIT(16)
 #define ALTR_A10_ECC_TDERRB             BIT(24)
 
+/* Byte offset and shift to access bits[31:16] of INTTEST via 16-bit write */
+#define ALTR_A10_ECC_INTTEST_PORTB_OFST  2
+#define ALTR_A10_ECC_INTTEST_PORTB_SHIFT 16
+
 /* ECC Manager Defines */
 #define A10_SYSMGR_ECC_INTMASK_SET_OFST   0x94
 #define A10_SYSMGR_ECC_INTMASK_CLR_OFST   0x98

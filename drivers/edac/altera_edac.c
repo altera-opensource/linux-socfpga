@@ -2047,10 +2047,15 @@ altr_edac_a10_device_trig(struct file *file, const char __user *user_buf,
 		return -EFAULT;
 
 	local_irq_save(flags);
-	if (trig_type == ALTR_UE_TRIGGER_CHAR)
+	if (trig_type == ALTR_UE_TRIGGER_CHAR) {
 		writew(priv->ue_set_mask, set_addr);
-	else
+		writew(priv->ue_set_mask >> ALTR_A10_ECC_INTTEST_PORTB_SHIFT,
+		       set_addr + ALTR_A10_ECC_INTTEST_PORTB_OFST);
+	} else {
 		writew(priv->ce_set_mask, set_addr);
+		writew(priv->ce_set_mask >> ALTR_A10_ECC_INTTEST_PORTB_SHIFT,
+		       set_addr + ALTR_A10_ECC_INTTEST_PORTB_OFST);
+	}
 
 	/* Ensure the interrupt test bits are set */
 	wmb();
