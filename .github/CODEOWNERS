@@ -1,5 +1,5 @@
 # Specify reviewers for all files except the CODEOWNERS file
-* @rabara @ngboonkhai @tiensung @hoyin0722 @tanmaykathpalia @kuhanh @rohangt07 @skarnan @kromli @fongyankei
+* @rabara @ngboonkhai @tiensung @hoyin0722 @tanmaykathpalia @kuhanh @kahwaile @asyraaf-azhar @tzeyeeng @chanzhiwei @echiam @mnazimamirul @hangsuan @muhamm120
 
 # Specify reviewers for the CODEOWNERS file
-/.github/CODEOWNERS @vvijayak-devops
+/.github/CODEOWNERS @hoyin0722 @tiensung @rabara @kahwaile @chanzhiwei
