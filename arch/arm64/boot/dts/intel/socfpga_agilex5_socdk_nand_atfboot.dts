@@ -16,13 +16,18 @@
 			panic=-1 \
 			root=ubi0:rootfs rw rootwait rootfstype=ubifs ubi.mtd=2";
 	};
+
+	memory {
+		device_type = "memory";
+		reg = <0 0x80000000 0 0x80000000>;
+	};
 };
 
 &nand {
 	status = "okay";
-	/delete-node/ flash@0;
+	/delete-node/ nand@0;
 
-	flash@0 {
+	nand@0 {
 		#address-cells = <1>;
 		#size-cells = <1>;
 		reg = <0>;
