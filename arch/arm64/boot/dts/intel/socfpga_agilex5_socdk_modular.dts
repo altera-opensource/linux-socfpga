@@ -35,12 +35,6 @@
 	};
 };
 
-&mmc {
-	no-1-8-v;
-	/delete-property/ sd-uhs-sdr104;
-	sdhci-caps-mask = <0x00002007 0x0000ff00>;
-};
-
 &sd_io_1v8_reg {
 	gpios = <&expander1 1 GPIO_ACTIVE_HIGH>;
 };
