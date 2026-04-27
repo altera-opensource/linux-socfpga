@@ -10,7 +10,7 @@
 
 	chosen {
 		stdout-path = "serial0:115200n8";
-		bootargs = "console=ttys0,115200 earlycon panic=-1 root=/dev/mtdblock1 \
+		bootargs = "console=ttyS0,115200 earlycon panic=-1 root=/dev/mtdblock1 \
 			    rw rootfstype=jffs2 rootwait";
 
 	};
