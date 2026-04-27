@@ -10,7 +10,7 @@
 
 	chosen {
 		stdout-path = "serial0:115200n8";
-		bootargs = "console=ttys0,115200 root=/dev/ram0 rw \
+		bootargs = "console=ttyS0,115200 root=/dev/ram0 rw \
 		initrd=0x10000000 init=/sbin/init ramdisk_size=10000000 \
 		earlycon panic=-1 rootfstype=ext3";
 	};
