@@ -11,6 +11,8 @@
 	aliases {
 		serial0 = &uart0;
 		ethernet2 = &gmac2;
+		i3c0 = &i3c0;
+		i3c1 = &i3c1;
 	};
 
 	chosen {
@@ -76,6 +78,14 @@
 	status = "okay";
 };
 
+&i3c0 {
+	status = "okay";
+};
+
+&i3c1 {
+	status = "okay";
+};
+
 &sd_io_1v8_reg {
 	gpios = <&portb 3 GPIO_ACTIVE_HIGH>;
 };
@@ -101,6 +111,7 @@
 
 &qspi {
 	status = "okay";
+	cdns,fifo-depth = <0x400>;
 	flash@0 {
 		compatible = "jedec,spi-nor";
 		reg = <0>;
@@ -137,8 +148,80 @@
 	status = "okay";
 };
 
+&temp_volt {
+	voltage {
+		#address-cells = <1>;
+		#size-cells = <0>;
+		input@2 {
+			label = "0.8V VCC";
+			reg = <2>;
+		};
+
+		input@3 {
+			label = "1.8V VCCIO_SDM";
+			reg = <3>;
+		};
+
+		input@4 {
+			label = "1.8V VCCPT";
+			reg = <4>;
+		};
+
+		input@5 {
+			label = "1.2V VCCCRCORE";
+			reg = <5>;
+		};
+
+		input@6 {
+			label = "0.9V VCCH";
+			reg = <6>;
+		};
+
+		input@7 {
+			label = "0.8V VCCL";
+			reg = <7>;
+		};
+	};
+
+	temperature {
+		#address-cells = <1>;
+		#size-cells = <0>;
+
+		input@0 {
+			label = "Main Die SDM";
+			reg = <0x0>;
+		};
+
+		input@10001 {
+			label = "Main Die corner bottom left max";
+			reg = <0x10000>;
+		};
+
+		input@30001 {
+			label = "Main Die corner bottom right max";
+			reg = <0x30000>;
+		};
+
+		input@40001 {
+			label = "Main Die corner top right max";
+			reg = <0x40000>;
+		};
+	};
+};
+
 &uart0 {
 	status = "okay";
+};
+
+&usb0 {
+	status = "okay";
+	disable-over-current;
+};
+
+&usb31 {
+	status = "okay";
+	dr_mode = "host";
+	maximum-speed = "high-speed";
 };
 
 &watchdog0 {
