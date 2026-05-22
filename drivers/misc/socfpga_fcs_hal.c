@@ -686,6 +686,10 @@ FCS_HAL_INT hal_random_number(struct fcs_cmd_context *const k_ctx)
 	FCS_HAL_INT ret = 0;
 	FCS_HAL_VOID *s_buf = NULL;
 	struct fcs_cmd_context ctx;
+	int ext_hdr_size = RANDOM_NUMBER_EXT_HDR_SIZE;
+
+	if (priv->platform == N5X_PLAT)
+		ext_hdr_size = 0;
 
 	fcs_plat_memcpy(&ctx, k_ctx, sizeof(struct fcs_cmd_context));
 
@@ -702,7 +706,7 @@ FCS_HAL_INT hal_random_number(struct fcs_cmd_context *const k_ctx)
 	k_ctx->rng.rng_len = ctx.rng.rng_len;
 
 	s_buf = priv->plat_data->svc_alloc_memory(
-		priv, k_ctx->rng.rng_len + RANDOM_NUMBER_EXT_HDR_SIZE);
+		priv, k_ctx->rng.rng_len + ext_hdr_size);
 	if (IS_ERR(s_buf)) {
 		ret = -ENOMEM;
 		LOG_ERR("Failed to allocate memory for rng kernel source buffer ret: %d\n",
@@ -728,7 +732,7 @@ FCS_HAL_INT hal_random_number(struct fcs_cmd_context *const k_ctx)
 	}
 
 	ret = fcs_plat_copy_to_user(ctx.rng.rng,
-				    k_ctx->rng.rng + RANDOM_NUMBER_EXT_HDR_SIZE,
+				    k_ctx->rng.rng + ext_hdr_size,
 				    ctx.rng.rng_len);
 	if (ret)
 		LOG_ERR("Failed to copy random number to user ret: %d\n", ret);
