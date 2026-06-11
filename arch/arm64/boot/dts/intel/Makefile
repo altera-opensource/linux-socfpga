@@ -2,6 +2,7 @@
 dtb-$(CONFIG_ARCH_INTEL_SOCFPGA) += socfpga_n6000_10G_ptp.dtb \
 				socfpga_agilex5_eth_1p10g.dtb \
 				socfpga_agilex5_ptp_2p10g.dtb \
+				socfpga_agilex5_ptp_2p25g.dtb \
 				socfpga_n6000_10G_rel3_ptp.dtb \
 				socfpga_n6000_25G_ptp.dtb \
 				socfpga_n6000_25G_rel3_ptp.dtb \

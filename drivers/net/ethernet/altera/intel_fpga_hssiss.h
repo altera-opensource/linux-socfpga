@@ -23,10 +23,10 @@ enum hssiss_salcmd {
 	SAL_ENABLE_LOOPBACK,
 	SAL_DISABLE_LOOPBACK,
 	SAL_RESET_MAC_STAT,
-	SAL_RSVD,
+	SAL_SET_MTU,
 	SAL_NCSI_GET_LINK_STS,
 	SAL_FW_VERSION,
-	SAL_SET_MTU,
+	SAL_RSVD
 };
 
 enum hssiss_mac_stat_counter_type {

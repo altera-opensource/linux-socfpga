@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-2.0
 /* Altera FPGA GTS Forward Error Correction (FEC) Linux driver
- * Copyright (C) 2025 Altera Corporation. All rights reserved.
+ * Copyright (C) 2025-2026 Altera Corporation. All rights reserved.
  *
  * Contributors:
  *   Preetam Narayan
@@ -101,7 +101,7 @@ void gts_ui_adjustments_cancel_worker(intel_fpga_xtile_eth_private *priv)
 	cancel_work_sync(&priv->ui_worker);
 }
 
-#define MIN_UI_REF_TIME 5200
+#define MIN_UI_REF_TIME 5300
 static bool gts_ui_tx_tam_values(intel_fpga_xtile_eth_private *priv,
 				 u64 *tam_initial,
 				 u32 *tam_count_initial)
@@ -129,7 +129,7 @@ static bool gts_ui_tx_tam_values(intel_fpga_xtile_eth_private *priv,
 	} while (--snapshot_trial && !(ptp_tx_uim_tam_info1 & ETH_TX_TAM_VALID));
 
 	if (!(ptp_tx_uim_tam_info1 & ETH_TX_TAM_VALID)) {
-		dev_err(priv->device, "Tx snapshot capture failed \n");
+		dev_err(priv->device, "Tx snapshot capture failed\n");
 
 		goto failed;
 	}
@@ -174,17 +174,17 @@ static bool gts_ui_rx_tam_values(intel_fpga_xtile_eth_private *priv,
 		     ETH_RX_TAM_SNAPSHOT);
 
 	/* Snapshot should be set before proceeding to TAM calculation */
-        do {
-		udelay (1);
+	do {
+		udelay(1);
 
 		ptp_rx_uim_tam_info1 = hssi_csrrd32(pdev, HSSI_PTP_SOFTIP, chan,
 						    eth_softip_ptp_csroffs(ptp_rx_uim_tam_info1));
 
-        } while (--snapshot_trial && !(ptp_rx_uim_tam_info1 & ETH_RX_TAM_VALID));
+	} while (--snapshot_trial && !(ptp_rx_uim_tam_info1 & ETH_RX_TAM_VALID));
 
 	if (!(ptp_rx_uim_tam_info1 & ETH_RX_TAM_VALID)) {
-		dev_err(priv->device, "Rx snapshot capture failed \n");
-	
+		dev_err(priv->device, "Rx snapshot capture failed\n");
+
 		goto failed;
 	}
 
@@ -224,11 +224,8 @@ static bool calculate_tx_ui(intel_fpga_xtile_eth_private *priv,
 	struct platform_device *pdev = priv->pdev_hssi;
 	u32 chan = priv->tile_chan;
 
-	if ((priv->link_speed == SPEED_25000) || (priv->link_speed == SPEED_10000)) {
-		if (!strcasecmp(priv->fec_type, "kr-fec") ||
-		    (!strcasecmp(priv->fec_type, "no-fec")))
-			tx_tam_interval = 5406720;
-	}
+	if ((priv->link_speed == SPEED_25000) || (priv->link_speed == SPEED_10000))
+		tx_tam_interval = 5406720;
 
 	/* Calculate time elapsed */
 	if (tx_tam_nth <= tx_tam_initial)
@@ -253,14 +250,15 @@ static bool calculate_tx_ui(intel_fpga_xtile_eth_private *priv,
 		ui_value = 0; //invalid value
 	}
 
+	dev_dbg(priv->device,
+		"tx_tam_count_initial:0x%08x tx_tam_count_nth:0x%08x tx_tam_count:0x%08x\n",
+		tx_tam_count_initial, tx_tam_count_nth, tx_tam_count);
+
 	/* Calculate TAM count value */
 	if (tx_tam_count_nth <= tx_tam_count_initial)
 		tx_tam_count = (tx_tam_count_nth + (1 << 15)) - tx_tam_count_initial;
 	else
 		tx_tam_count = tx_tam_count_nth - tx_tam_count_initial;
-
-	dev_dbg(priv->device, "tx_tam_count_initial:0x%08x tx_tam_count_nth:0x%08x tx_tam_count:0x%08x\n",
-		tx_tam_count_initial, tx_tam_count_nth, tx_tam_count);
 
 	// Make sure the format is {4-bit nanoseconds, 28-bit fractional nanoseconds}
 	tx_ui = (tx_tam_delta << 12) / (((u64)tx_tam_count * tx_tam_interval) / num_pl);
@@ -295,12 +293,9 @@ static void calculate_rx_ui(intel_fpga_xtile_eth_private *priv,
 	struct platform_device *pdev = priv->pdev_hssi;
 	u32 chan = priv->tile_chan;
 
-	if ((priv->link_speed == SPEED_25000) || (priv->link_speed == SPEED_10000)) {
-		if (!strcasecmp(priv->fec_type, "kr-fec"))
-			rx_tam_interval = 5406720;
-		else if (!strcasecmp(priv->fec_type, "no-fec"))
-			rx_tam_interval = 168960;
-	}
+	rx_tam_interval = 168960;
+	if ((priv->link_speed == SPEED_25000) && !strcasecmp(priv->fec_type, "kr-fec"))
+		rx_tam_interval = 5406720;
 
 	/* Calculate time elapsed */
 	if (rx_tam_nth <= rx_tam_initial)
@@ -330,7 +325,8 @@ static void calculate_rx_ui(intel_fpga_xtile_eth_private *priv,
 	else
 		rx_tam_count = rx_tam_count_nth - rx_tam_count_initial;
 
-	dev_dbg(priv->device, "rx_tam_count_initial:0x%08x rx_tam_count_nth:0x%08x rx_tam_count:0x%08x\n",
+	dev_dbg(priv->device,
+		"rx_tam_count_initial:0x%08x rx_tam_count_nth:0x%08x rx_tam_count:0x%08x\n",
 		rx_tam_count_initial, rx_tam_count_nth, rx_tam_count);
 
 	// Make sure the format is {4-bit nanoseconds, 28-bit fractional nanoseconds}
@@ -405,8 +401,7 @@ void gts_ui_adjustments(struct work_struct *work)
 	}
 
 	if (calculate_tx_ui(priv, tx_tam_initial, tx_tam_nth,
-			tx_tam_count_initial, tx_tam_count_nth)) {
-
+			    tx_tam_count_initial, tx_tam_count_nth)) {
 		calculate_rx_ui(priv, rx_tam_initial, rx_tam_nth,
 				rx_tam_count_initial, rx_tam_count_nth);
 	}

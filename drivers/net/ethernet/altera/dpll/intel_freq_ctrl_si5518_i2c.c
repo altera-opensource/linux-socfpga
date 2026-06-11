@@ -109,6 +109,7 @@ static int i2c_si5518_read(const struct i2c_client *client, u8 rxbuf[], u8 rxlen
 	return FREQ_CTRL_ERROR_FAIL;
 }
 
+#if 0
 static int i2c_si5518_write_with_read_response(const struct i2c_client *client, u8 *txbuf, u8 txlen, u8 *rxbuf, u8 rxlen)
 {
 	int ret = 0;
@@ -145,6 +146,7 @@ static int i2c_si5518_write_with_read_response(const struct i2c_client *client, 
 #endif
 	return ret;
 }
+#endif
 
 void intel_freq_control_i2c_si5518(struct work_struct *work)
 {

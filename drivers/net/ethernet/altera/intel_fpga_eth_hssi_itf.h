@@ -15,6 +15,7 @@
 #include "intel_fpga_hssiss.h"
 
 #define INTEL_FPGA_RET_SUCCESS 0
+
 enum lane_speed {
 	LANE_10G,
 	LANE_25G,

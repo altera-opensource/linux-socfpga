@@ -1477,17 +1477,23 @@ static int ftile_set_pauseparam(struct net_device *dev,
 {
 	intel_fpga_xtile_eth_private *priv = netdev_priv(dev);
 	int new_pause = FLOW_OFF;
-	int ret = 0;
-	//struct intel_fpga_xtile_eth_private *priv = netdev_priv(dev);
 	struct platform_device *pdev  = priv->pdev_hssi;
 	u32 chan = priv->tile_chan;
 
-	spin_lock(&priv->mac_cfg_lock);
+	/*
+	 * Do not hold mac_cfg_lock (a spinlock) here. The CSR access path
+	 * through hssi_set_bit_ba/hssi_csrwr32_ba calls hssidrv_sal_execute()
+	 * which acquires sal_mutex (a sleepable mutex) and uses
+	 * read_poll_timeout(), both of which may sleep. Taking a spinlock
+	 * around sleepable operations causes a "scheduling while atomic" BUG.
+	 *
+	 * Serialization is already provided by:
+	 *   - the RTNL lock held by the ethtool core for all ethtool callbacks
+	 *   - sal_mutex inside hssidrv_sal_execute() for CSR access
+	 */
 
-	if (pauseparam->autoneg != 0) {
-		ret = -EINVAL;
-		goto out;
-	}
+	if (pauseparam->autoneg != 0)
+		return -EINVAL;
 
 	if (pauseparam->rx_pause) {
 		new_pause |= FLOW_RX;
@@ -1514,9 +1520,8 @@ static int ftile_set_pauseparam(struct net_device *dev,
 	hssi_csrwr32_ba(pdev, HSSI_ETH_RECONFIG, chan,
 			eth_mac_ptp_csroffs(priv->eth_rate, pause_quanta_0), priv->pause);
 	priv->flow_ctrl = new_pause;
-out:
-	spin_unlock(&priv->mac_cfg_lock);
-	return ret;
+
+	return 0;
 }
 
 static int ftile_get_ts_info(struct net_device *dev,

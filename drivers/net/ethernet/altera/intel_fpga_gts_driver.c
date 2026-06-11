@@ -266,15 +266,21 @@ void gts_disable_mac(intel_fpga_xtile_eth_private *priv)
 	netif_warn(priv, drv, priv->dev, "Tx and Rx datapath stop done\n");
 }
 
+static bool gts_is_fec_type(intel_fpga_xtile_eth_private *priv)
+{
+	return !!strcasecmp(priv->fec_type, "no-fec");
+}
+
 static int gts_rx_user_flow(intel_fpga_xtile_eth_private *priv)
 {
 	u32 regval = 0;
 	u32  rx_const_delay = 0;
-	bool rx_const_is_neg = false;
+	u32 rx_xcvr_if_pulse_adj = 0;
 	u32 rx_apulse_offset = 0;
+	bool rx_const_is_neg = false;
 	bool rx_apulse_is_neg = false;
-	u32 rx_spulse_offset = 0;
 	bool rx_spulse_is_neg = false;
+	u32 rx_spulse_offset = 0;
 	u32 rx_apulse_wdelay = 0;
 	u32 rx_apulse_time = 0;
 	u32 rx_tam_adjust = 0;
@@ -311,9 +317,35 @@ static int gts_rx_user_flow(intel_fpga_xtile_eth_private *priv)
 		return -EINVAL;
 	}
 
-	/* Step 2: check if its not a fec type. NA for no-fec type */
-	if (strcasecmp(priv->fec_type, "no-fec")) {
-		/* To be implemented */
+	/* Step 2: its a fec type */
+	if (gts_is_fec_type(priv)) {
+		/* Step 2a: Write value of 0x0 for pulse adjustment into IP*/
+		regval = hssi_csrrd32(pdev, HSSI_PMA_HARDIP, chan,
+				      eth_hardip_pma_csroffs(cfg_rx_lat_bit_for_async));
+		regval &= ~RX_LAT_ASYNC_MASK;
+		hssi_csrwr32(pdev, HSSI_PMA_HARDIP, chan,
+			     eth_hardip_pma_csroffs(cfg_rx_lat_bit_for_async), regval);
+
+		/* Step 2b: Read RX FEC codeword position and FEC channel mapping for each PMA */
+		regval = hssi_csrrd32(pdev, HSSI_PCS_FEC_HARDIP, chan,
+				      eth_hardip_pcsfec_csroffs(rsfec_cw_pos_rx));
+		rx_xcvr_if_pulse_adj = regval & RSFEC_CW_POS_MASK;
+
+		/* Step 2d: Write the pulse adjustments into the IP */
+		regval = hssi_csrrd32(pdev, HSSI_PMA_HARDIP, chan,
+				      eth_hardip_pma_csroffs(cfg_rx_lat_bit_for_async));
+		regval &= ~RX_LAT_ASYNC_MASK;
+		regval |= RX_LAT_ASYNC_MASK & rx_xcvr_if_pulse_adj;
+		hssi_csrwr32(pdev, HSSI_PMA_HARDIP, chan,
+			     eth_hardip_pma_csroffs(cfg_rx_lat_bit_for_async), regval);
+
+		/* Step 2e: Notify soft PTP that pulse adjustments have been configured */
+		  regval = hssi_csrrd32(pdev, HSSI_PTP_SOFTIP, chan,
+					eth_softip_ptp_csroffs(ptp_rx_user_cfg_status));
+		  regval |= ETH_PTP_RX_FEC_CW_POS_DONE;
+
+		  hssi_csrwr32(pdev, HSSI_PTP_SOFTIP, chan,
+			       eth_softip_ptp_csroffs(ptp_rx_user_cfg_status), regval);
 	}
 
 	/* Step 3: Wait until RX raw offset data are ready */
@@ -347,8 +379,7 @@ static int gts_rx_user_flow(intel_fpga_xtile_eth_private *priv)
 	rx_apulse_time = regval & GENMASK(27, 0);
 
 	/* Step 4a: 10GE/25GE no FEC variants */
-	if (!strcasecmp(priv->fec_type, "no-fec") &&
-	    (priv->link_speed == SPEED_25000 && priv->link_speed == SPEED_10000)) {
+	if (!gts_is_fec_type(priv)) {
 		u8 rx_dlpulse_cnt;
 		u64 bslip_p_dlpulse;
 
@@ -363,25 +394,22 @@ static int gts_rx_user_flow(intel_fpga_xtile_eth_private *priv)
 	}
 
 	/* Step 5: Determine synchronous pulse AM offsets with reference to asynchronous pulse */
-	/* Step 5a: For FEC variant */
-	if (strcasecmp(priv->fec_type, "no-fec")) {
-			/* To be implemented */
+	if (gts_is_fec_type(priv)) {
+		/* Step 5a: For FEC variant */
+		rx_spulse_offset = ((rx_xcvr_if_pulse_adj & GENMASK(4, 0)) * rx_ui_value);
+		rx_spulse_offset >>= (28 - 16);
+		rx_spulse_is_neg = false;
 	}
 
 	/* Step 6: Calculate Rx offsets */
-	/* Step 6a: Calculate Rx TAM adjust for FEC variant */
-	if (strcasecmp(priv->fec_type, "no-fec")) {
-		/* To be implemented */
-	} else {
-		/* Non FEC variant */
-		rx_tam_adjust = (rx_const_is_neg ? -rx_const_delay : rx_const_delay) +
-				(rx_apulse_is_neg ? -rx_apulse_offset : rx_apulse_offset) +
-				(rx_spulse_is_neg ? -rx_spulse_offset : rx_spulse_offset) -
-				rx_apulse_wdelay;
+	/* Step 6a: Calculate Rx TAM adjust for FEC/non-FEC variant */
+	rx_tam_adjust = (rx_const_is_neg ? -rx_const_delay : rx_const_delay) +
+			(rx_apulse_is_neg ? -rx_apulse_offset : rx_apulse_offset) +
+			(rx_spulse_is_neg ? -rx_spulse_offset : rx_spulse_offset) -
+			rx_apulse_wdelay;
 
-		/* Convert TAM adjust to a 32-bit 2's complement number */
-		rx_tam_adjust_2c = rx_tam_adjust;
-	}
+	/* Convert TAM adjust to a 32-bit 2's complement number */
+	rx_tam_adjust_2c = rx_tam_adjust;
 
 	/* Step 6b: Calculate RX extra latency */
 	/* The UI format differs from the format of other variables.

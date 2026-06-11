@@ -42,19 +42,19 @@
 			tr-type = <&gts_transceiver0>;
 		};
 
-		pktgen_0: pktgen@81010000 {
+		pktgen_0: pktgen@50000000 {
                          compatible = "generic-uio";
                          reg = <0x50000000 0x10000>;
                          reg-names = "pkt_cli";
                 };
 
-                pktgen_1: pktgen@81020000 {
+                pktgen_1: pktgen@50001000 {
                          compatible = "generic-uio";
                          reg = <0x50001000 0x10000>;
                          reg-names = "pkt_cli";
                 };
 
-                packetswitch_0: packetswitch@81000000 {
+                packetswitch_0: packetswitch@50010000 {
                          compatible = "generic-uio";
                          reg = <0x50010000 0x10000>;
                          reg-names = "packetswitch";
@@ -123,15 +123,15 @@
 			status = "okay";
 			qsfp = <&qsfp_eth0>;
 			tod = <&tod_0_clk>;
-			fec-type="no-fec";
-			phy-mode = "10gbase-r";
+			fec-type="kr-fec";
+			phy-mode = "25gbase-kr";
 			fec-cw-pos-rx = <0x0>;
 			ui-adj-interval = <250>;
 			hssiss = <&hssiss_0_hssiss>;
                         qsfp-lane = <0x0>;
                         altr,has-ptp;
 			fixed-link {
-				speed = <10000>;
+				speed = <25000>;
 				full-duplex;
 			};
 			dma_0 {
@@ -194,15 +194,15 @@
                         status = "okay";
                         qsfp = <&qsfp_eth1>;
                         tod = <&tod_0_clk>;
-                        fec-type="no-fec";
-                        phy-mode = "10gbase-r";
+                        fec-type="kr-fec";
+                        phy-mode = "25gbase-kr";
                         fec-cw-pos-rx = <0x0>;
                         ui-adj-interval = <250>;
                         qsfp-lane = <0x0>;
                         altr,has-ptp;
                         hssiss = <&hssiss_0_hssiss>;
                         fixed-link {
-                                speed = <10000>;
+                                speed = <25000>;
                                 full-duplex;
                         };
 

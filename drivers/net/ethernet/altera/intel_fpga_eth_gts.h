@@ -44,13 +44,14 @@
 #define ETH_DEASSERT_PMA_SER_LBK_ACK	    GENMASK(15, 14)
 #define ETH_SERV_REQ_NO_RESET		    BIT(15)
 #define ETH_NO_SERV_NO_RESET		    0
-#define ETH_ENABLE_FEC_LOOPBACK	    BIT(1)
+#define ETH_ENABLE_FEC_LOOPBACK	    	    BIT(1)
 #define ETH_ENABLE_XCVRIF_LOOPBACK	    BIT(0)
 #define ETH_ENABLE_MAC_LOOPBACK             BIT(2)
 #define ETH_ENABLE_NEAREND_PAR_PMA_LOOPBACK BIT(8)
 #define ETH_ENABLE_NEAREND_PCS_LOOPBACK     GENMASK(18, 16)
 #define ETH_ENABLE_FAREND_PCS_LOOPBACK      GENMASK(15, 13)
-
+#define RSFEC_CW_POS_MASK                   GENMASK(14, 0)
+#define RX_LAT_ASYNC_MASK		    GENMASK(17, 0)
 #define ETH_FREEZE_RX_MAC_STATS	BIT(2)
 #define ETH_FREEZE_TX_MAC_STATS	BIT(2)
 #define ETH_DEFREEZE_RX_MAC_STATS	BIT(2)
@@ -95,8 +96,8 @@
 #define ETH_RX_TAM_CNT_MASK                                     (0x7FFF << 16)
 #define ETH_RX_TAM_VALID                                        BIT(31)
 
-#define INTEL_FPGA_GTS_UI_VALUE_10G                   0x018D3019 // 10G-1
-#define INTEL_FPGA_GTS_UI_VALUE_25G                   0x009EE00A // 25G-1
+#define INTEL_FPGA_GTS_UI_VALUE_10G                     0x018D3019 // 10G-1
+#define INTEL_FPGA_GTS_UI_VALUE_25G                     0x009EE00A // 25G-1
 #define INTEL_FPGA_TX_PMA_DELAY_10G			79
 #define INTEL_FPGA_TX_PMA_DELAY_25G			INTEL_FPGA_TX_PMA_DELAY_10G
 #define INTEL_FPGA_RX_PMA_DELAY_10G                     88
@@ -109,6 +110,7 @@
 
 #define ETH_PTP_TX_USER_CFG_DONE                         BIT(0)
 #define ETH_PTP_RX_USER_CFG_DONE                         BIT(0)
+#define ETH_PTP_RX_FEC_CW_POS_DONE                       BIT(1)
 #define ETH_TX_PTP_READY                                 BIT(2)
 #define ETH_RX_PTP_READY                                 BIT(3)
 #define ETH_PHY_RX_PCS_ALIGNED                           BIT(0)
@@ -197,7 +199,7 @@ struct intel_fpga_gts_pcs_fec {
 	u32 rsfec_lane_cfg0;                // 0x7000C
 	u32 res10[6];                       // 0x70010 - 0x70027 (reserved)
 	u32 rsfec_err_inj_tx;               // 0x70028
-	u32 res11[11];                      // 0x7002C - 0x70203 (reserved)
+	u32 res11[118];                     // 0x7002C - 0x70203 (reserved)
 	u32 rsfec_lane_tx_stat;             // 0x70204
 	u32 rsfec_lane_tx_hold;             // 0x70208
 	u32 res12;                          // 0x7020C (reserved)
@@ -728,7 +730,6 @@ struct intel_fpga_gts_hardip_emac {
 	u32 rx_ts_ss_hi; //0x50674
 	u32 res46[0x3EA7]; // 0x50678 - 0x6010F (reserved)
 	u32 phy_rx_bitslip_cnt;  // 0x60110
-
 };
 
  #define eth_hardip_emac_csroffs(a) (offsetof(struct intel_fpga_gts_hardip_emac, a))
@@ -811,7 +812,9 @@ struct intel_fpga_gts_hardip_pma {
 	u32 SCMNG_PM_PHY_SIDE_CPI_REGS;       // 0xA4040
 	u32 res20[(0xA5000 - 0xA4044) / 4];
 	u32 GTS_Physical_LANE_Number;         // 0xA5000
-	u32 res21[(0xA5044 - 0xA5004) / 4];
+	u32 res21;
+	u32 cfg_rx_lat_bit_for_async;	      // 0xA5008
+	u32 res22[(0xA5044 - 0xA500C) / 4];
 	u32 pre_pma_lblk;                     // 0xA5044
 };
 
