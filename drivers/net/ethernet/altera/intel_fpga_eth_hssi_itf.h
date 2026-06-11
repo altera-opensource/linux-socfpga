@@ -16,6 +16,10 @@
 
 #define INTEL_FPGA_RET_SUCCESS 0
 
+#define RSFEC "rs-fec"
+#define BASER "base-r"
+#define NOFEC "no-fec"
+
 enum lane_speed {
 	LANE_10G,
 	LANE_25G,
@@ -153,5 +157,21 @@ int hssi_get_profile_lane_speed(struct platform_device *pdev, u32 port);
 void hssi_errpkt_cnt_reset(struct platform_device *pdev, int port);
 u32 hssi_errpkt_cnt_read(struct platform_device *pdev, u32 addr_offs);
 void hssi_errpkt_logic_en(struct platform_device *pdev, int port, bool enable);
-
+int hssi_get_dr_profile(struct platform_device *pdev, void *dr_data);
+int hssi_set_dr_profile(struct platform_device *pdev, void *dr_data);
+bool hssi_dr_profiles_available(struct platform_device *pdev);
+u32 hssi_num_dr_profiles(struct platform_device *pdev);
+int hssi_find_dr_profile(struct platform_device *pdev, u32 speed, u32 fec,
+			 u32 rel_port, u32 *profile_idx);
+int hssi_active_profile_fec(struct platform_device *pdev, u32 *fec);
+bool hssi_active_profile_valid(struct platform_device *pdev);
+u32 hssi_active_profile_idx(struct platform_device *pdev);
+u32 hssi_get_dr_profile_hw_id(struct platform_device *pdev, u32 arr_idx);
+void hssi_update_active_profile(struct platform_device *pdev, u32 idx);
+void hssi_invalidate_active_profile(struct platform_device *pdev);
+int hssi_get_active_profile(struct platform_device *pdev, u32 *profile);
+int hssi_get_active_profile_lane(struct platform_device *pdev);
+int hssi_get_active_fec_mode(struct platform_device *pdev);
+const char *hssi_fec_type_str(enum ftile_fec_type fec);
+int hssi_get_active_profile_speed(struct platform_device *pdev);
 #endif

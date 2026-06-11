@@ -21,7 +21,7 @@
 					<0x00000001 0x00000000 0x80000000 0x04000000>,
 					<0x00000001 0x00000000 0x84000000 0x04000000>,
 					<0x00000001 0x00000000 0x88040000 0x00000040>,
-					<0x00000001 0x00000000 0x88040100 0x00000140>,
+					<0x00000001 0x00000000 0x88040100 0x00000040>,
 					<0x00000001 0x08040050 0x88040050 0x00000010>,
 					<0x00000001 0x08040040 0x88040040 0x00000010>,
 					<0x00000001 0x00000000 0x88050000 0x00010000>,
@@ -33,7 +33,11 @@
 					<0x00000001 0x00000000 0x88540000 0x00000100>,
 					<0x00000001 0x00000000 0x88580000 0x00000100>,
 					<0x00000001 0x00000000 0x885C0000 0x00000100>,
-					<0x00000001 0x00000000 0x884D0000 0x00001000>;
+					<0x00000001 0x00000000 0x884D0000 0x00001000>,
+					<0x00000001 0x00000000 0x88040270 0x00000004>,
+					<0x00000001 0x00000000 0x88040280 0x00000004>,
+					<0x00000001 0x00000000 0x88040290 0x00000004>,
+					<0x00000001 0x00000000 0x880402A0 0x00000004>;
 
 			qsfp_eth0: qsfp-eth0 {
 				compatible = "sff,qsfp";
@@ -148,6 +152,9 @@
 			phy-mode = "25gbase-kr";
 			tod = <&tod_0_clk>;
 			hssiss = <&hssiss_0_hssiss>;
+			reg = <0x88040270 0x00000004>,
+			      <0x88040290 0x00000004>;
+			reg-names = "pio_speed", "pio_datapath_reset";
 			pma_type = <0x0>; // FGT - 0x00, FHT = 0x1000
 			monitor_poll_interval = <10>;
 			altr,tx-pma-delay-ns = <0xD>;
@@ -159,6 +166,7 @@
 			fec-cw-pos-rx = <0x0>;
 			fec-type="kr-fec";
 			qsfp = <&qsfp_eth0>;
+			if_name = "eth1";
 			qsfp-lane = <0x0>;
 			altr,has-ptp;
 			ptp_accu_mode = "Advanced";
@@ -251,6 +259,9 @@
 			phy-mode = "25gbase-kr";
 			tod = <&tod_0_clk>;
 			hssiss = <&hssiss_1_hssiss>;
+			reg = <0x88040280 0x00000004>,
+			      <0x880402A0 0x00000004>;
+			reg-names = "pio_speed", "pio_datapath_reset";
 			pma_type = <0x0>; // FGT - 0x00, FHT = 0x1000
 			monitor_poll_interval = <10>;
 			altr,tx-pma-delay-ns = <0xD>;
@@ -262,6 +273,7 @@
 			fec-cw-pos-rx = <0x0>;
 			fec-type="kr-fec";
 			qsfp = <&qsfp_eth1>;
+			if_name = "eth2";
 			qsfp-lane = <0x0>;
 			altr,has-ptp;
 			ptp_accu_mode = "Advanced";

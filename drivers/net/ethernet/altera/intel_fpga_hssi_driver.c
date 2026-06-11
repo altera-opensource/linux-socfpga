@@ -12,6 +12,7 @@
  #include <linux/kernel.h>
  #include <linux/delay.h>
  #include <linux/platform_device.h>
+ #include <linux/property.h>
  #include "altera_utils.h"
  #include "intel_fpga_hssiss.h"
  #include "intel_fpga_hssi_driver.h"
@@ -83,11 +84,12 @@ static int hssidrv_sal_execute(struct platform_device *pdev, u32 ctrl_addr,
 	ret = read_poll_timeout(base, csr_addroff,
 				HSSISS_CSR_CMDSTS, HSSI_SAL_CMDSTS_ACK);
 
-	/* WA: f-tile loopback enable sets the error bit */
-	/* Ignore for now if both ack and error set.     */
-	if (priv->hssi_err_wa && (ret & HSSI_SAL_CMDSTS_ACK) &&
-	    (ret & HSSI_SAL_CMDSTS_ERR)) {
+       /* WA: f-tile loopback enable sets the error bit */
+       /* Ignore for now if both ack and error set.     */
+       if (ret > 0 && priv->hssi_err_wa && (ret & HSSI_SAL_CMDSTS_ACK) &&
+	   (ret & HSSI_SAL_CMDSTS_ERR)) {
 		ret = 0;
+		dev_warn(&pdev->dev, "FW Error ignored\n");
 		goto unlock;
 	}
 
@@ -191,32 +193,32 @@ int hssidrv_test_nios(struct platform_device *pdev, u32 cmd)
 	return hssidrv_sal_execute(pdev, ctrl_addr, cmd_sts, NULL);
 }
 
-int hssidrv_get_set_dr_profile(struct platform_device *pdev, u32 cmd, void *dr_data,
-			       bool rd)
+int hssidrv_get_dr_profile(struct platform_device *pdev, u32 cmd, void *data)
 {
 	int ret;
 	u32 ctrl_addr = 0;
 	u32 cmd_sts = 0;
-	struct get_set_dr_data *data = (struct get_set_dr_data *)dr_data;
-	u32 val = 0;
+	struct get_set_dr_data *dr_data = (struct get_set_dr_data *)data;
 
-	ctrl_addr |= data->port << HSSI_SAL_CTRLADDR_PORT_SHIFT;
-	ctrl_addr |= cmd;
+	ctrl_addr = cmd | (dr_data->addr_offs << HSSI_SAL_CTRLADDR_ADDRBITS_SHIFT);
+	cmd_sts |= HSSI_SAL_CMDSTS_RD;
 
-	if (rd) {
-		cmd_sts |= HSSI_SAL_CMDSTS_RD;
-	} else {
-		cmd_sts |= HSSI_SAL_CMDSTS_WR;
-		val |= data->profile & HSSI_DR_PROFILE_MASK;
-		val |= (data->dr_grp << DR_GRP_INDEX) & HSSI_DR_GRP_MASK;
-	}
+	ret = hssidrv_sal_execute(pdev, ctrl_addr, cmd_sts, &dr_data->val);
 
-	ret = hssidrv_sal_execute(pdev, ctrl_addr, cmd_sts, &val);
+	return ret;
+}
 
-	if (rd && !ret) {
-		data->dr_grp = (val & HSSI_DR_GRP_MASK) >> DR_GRP_INDEX;
-		data->profile = val & HSSI_DR_PROFILE_MASK;
-	}
+int hssidrv_set_dr_profile(struct platform_device *pdev, u32 cmd, void *data)
+{
+	int ret;
+	u32 cmd_sts = 0;
+	u32 ctrl_addr = 0;
+	struct get_set_dr_data *dr_data = (struct get_set_dr_data *)data;
+
+	ctrl_addr = cmd | (dr_data->addr_offs << HSSI_SAL_CTRLADDR_ADDRBITS_SHIFT);
+	cmd_sts  |= HSSI_SAL_CMDSTS_WR;
+
+	ret = hssidrv_sal_execute(pdev, ctrl_addr, cmd_sts, &dr_data->val);
 
 	return ret;
 }
@@ -488,10 +490,35 @@ static unsigned int get_csr_addroff(void __iomem *base,
 	}
 }
 
+/**
+ * hssidrv_init_active_profile - set the initial active profile to the first
+ *                               entry in the dr-profiles table.
+ * @pdev: HSSI subsystem platform device
+ *
+ * The first entry in the dr-profiles DT array is always the boot-time default,
+ * regardless of what profile_idx value it carries.  No DTS property is needed.
+ * Called once during hssidrv_probe_init(), after the dr-profiles table has
+ * been populated.
+ */
+static void hssidrv_init_active_profile(struct platform_device *pdev)
+{
+	struct hssiss_private *priv = platform_get_drvdata(pdev);
+
+	priv->active_profile_idx   = 0;
+	priv->active_profile_valid = true;
+	dev_info(&pdev->dev, "active-profile: defaulting to first profile (array index 0, hw profile %u)\n",
+		 priv->dr_profiles[0].profile_idx);
+}
+
 int hssidrv_probe_init(struct platform_device *pdev)
 {
 	struct hssiss_private *priv = platform_get_drvdata(pdev);
+	struct device *dev = &pdev->dev;
 	unsigned int version;
+	u32 *buf = NULL;
+	u32 num, i;
+	int count;
+	int ret;
 
 	mutex_init(&priv->sal_mutex);
 	mutex_init(&priv->coldrst_mutex);
@@ -499,7 +526,7 @@ int hssidrv_probe_init(struct platform_device *pdev)
 
 	priv->dfh_feature_rev = get_dfh_feature_rev(priv->sscsr);
 	priv->csr_addroff = get_csr_addroff(priv->sscsr, priv->dfh_feature_rev);
-	dev_info(&pdev->dev, "csr_addr offset: %x, dfh_feature_rev: %x\n",
+	dev_info(dev, "csr_addr offset: %x, dfh_feature_rev: %x\n",
 		 priv->csr_addroff, priv->dfh_feature_rev);
 
 	priv->feature_list.full =
@@ -509,7 +536,68 @@ int hssidrv_probe_init(struct platform_device *pdev)
 	priv->ver = (version & HSSISS_VER_CSR_ADDR_MASK) >>
 				HSSISS_VER_CSR_ADDR_SHIFT;
 
+	priv->dr_profiles = NULL;
+	priv->num_dr_profiles = 0;
+	priv->active_profile_idx = 0;
+
+	/*
+	 * Read dynamic-reconfiguration profiles from device tree.
+	 * Property "dr-profiles" is a flat array of HSSI_DR_PROFILE_CELLS-wide
+	 * entries: <speed-Mbps fec lane profile-index>
+	 * where fec uses FTILE_FEC_* macros (see intel-fpga-hssi.h).
+	 */
+	count = device_property_count_u32(dev, "dr-profiles");
+	if (count < 0)
+		return 0;
+
+	if (count == 0 || (count % HSSI_DR_PROFILE_CELLS) != 0) {
+		dev_err(dev,
+			"dr-profiles: expected multiple of %d u32 cells, got %d\n",
+			HSSI_DR_PROFILE_CELLS, count);
+		return -EINVAL;
+	}
+
+	buf = kcalloc(count, sizeof(*buf), GFP_KERNEL);
+	if (!buf)
+		return -ENOMEM;
+
+	ret = device_property_read_u32_array(dev, "dr-profiles", buf, count);
+	if (ret) {
+		dev_err(dev, "Failed to read dr-profiles: %d\n", ret);
+		goto err_free_buf;
+	}
+
+	num = count / HSSI_DR_PROFILE_CELLS;
+	priv->dr_profiles = devm_kcalloc(dev, num, sizeof(*priv->dr_profiles),
+					 GFP_KERNEL);
+	if (!priv->dr_profiles) {
+		ret = -ENOMEM;
+		goto err_free_buf;
+	}
+
+	for (i = 0; i < num; i++) {
+		priv->dr_profiles[i].speed       = buf[i * HSSI_DR_PROFILE_CELLS + HSSI_DR_PROFILE_CELL_SPEED];
+		priv->dr_profiles[i].fec         = buf[i * HSSI_DR_PROFILE_CELLS + HSSI_DR_PROFILE_CELL_FEC];
+		priv->dr_profiles[i].lane        = buf[i * HSSI_DR_PROFILE_CELLS + HSSI_DR_PROFILE_CELL_LANE];
+		priv->dr_profiles[i].profile_idx = buf[i * HSSI_DR_PROFILE_CELLS + HSSI_DR_PROFILE_CELL_IDX];
+		dev_info(dev, "dr-profiles[%u]: speed=%u fec=%u lane=%u index=%u\n",
+			 i,
+			 priv->dr_profiles[i].speed,
+			 priv->dr_profiles[i].fec,
+			 priv->dr_profiles[i].lane,
+			 priv->dr_profiles[i].profile_idx);
+	}
+	priv->num_dr_profiles = num;
+	kfree(buf);
+
+	hssidrv_init_active_profile(pdev);
+
 	return 0;
+
+err_free_buf:
+	dev_info(dev, "DR: Error while reading DTS vars\n");
+	kfree(buf);
+	return ret;
 }
 
 u32 hssidrv_anlt_get_status(struct platform_device *pdev, int port)
@@ -631,4 +719,3 @@ int hssidrv_anlt_update(struct platform_device *pdev, int port, bool enable_anlt
 
 	return ret;
 }
-

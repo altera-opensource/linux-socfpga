@@ -65,6 +65,7 @@ static int intel_frequency_control_open(struct intel_freq_control_private *priv)
 	}
 
 	if (priv->intf_ops->clock_check(priv) != FREQ_CTRL_ERROR_SUCCESS) {
+		destroy_workqueue(priv->queued_work.workqueue);
 		ret = -EPROBE_DEFER;
 		goto err;
 	}
@@ -170,17 +171,17 @@ static int intel_fpga_fs_probe(struct platform_device *pdev)
 
 	ret = intel_frequency_control_open(priv);
 
-	if (ret == 0) {
+	if (!ret) {
 		priv->queued_work.scaled_ppm = 0;
 		INIT_WORK(&priv->queued_work.w, priv->intf_ops->clock_cleaner);
 
 		dev_set_drvdata(&pdev->dev, priv);
+	
+		if (priv->intf_ops->init_handler)
+			priv->intf_ops->init_handler(priv);
 	} else {
 		dev_err(&pdev->dev, "Device not detected which is unexpected, quitting");
 	}
-
-	if (priv->intf_ops->init_handler)
-		priv->intf_ops->init_handler(priv);
 
 clk_cleaner_err:
 	return ret;

@@ -1,0 +1,8 @@
+// SPDX-License-Identifier: GPL-2.0
+/*
+ * Copyright (C) 2019, Intel Corporation
+ */
+#include "socfpga_agilex.dtsi"
+#include "fm87_ftile_2port_2conn_mcq_ptp_dr.dtsi"
+#include "fm87_agilex_ftile.dtsi"
+#include <dt-bindings/net/intel-fpga-hssi.h>

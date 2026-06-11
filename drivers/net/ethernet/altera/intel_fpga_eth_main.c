@@ -20,6 +20,7 @@
  #include <linux/netdevice.h>
  #include <linux/of_device.h>
  #include <linux/of_net.h>
+ #include <linux/of_address.h>
  #include <linux/of_platform.h>
  #include <linux/phy.h>
  #include <linux/platform_device.h>
@@ -274,15 +275,25 @@ static inline void xtile_dmaintr_disable(struct intel_fpga_xtile_eth_private *pr
 
 static int xtile_fec_init(struct platform_device *pdev, struct intel_fpga_xtile_eth_private *priv)
 {
-	int ret;
+	int ret = 0;
+	u32 fec;
 
-	/* get FEC type from device tree */
-	ret  = of_property_read_string(pdev->dev.of_node, "fec-type",
-				       &priv->fec_type);
+	if (priv->dr_supported) {
+		ret = hssi_active_profile_fec(priv->pdev_hssi, &fec);
+		if (!ret)
+			priv->fec_type = hssi_fec_type_str(fec);
+	} else {
+		/* get FEC type from device tree */
+		ret  = of_property_read_string(pdev->dev.of_node, "fec-type",
+					       &priv->fec_type);
+	}
+
 	if (ret < 0) {
 		dev_err(&pdev->dev, "cannot obtain fec-type\n");
+
 		return ret;
 	}
+
 	dev_info(&pdev->dev, "\tFEC type is %s\n", priv->fec_type);
 
 	/* get FEC channel from device tree */
@@ -630,7 +641,7 @@ static int xtile_tx_complete(struct intel_xtile_msgdma_info *dma)
 #define XTILE_NUM_TX_BANDS  3
 static const u8 prio2band[TCQ_ETS_MAX_BANDS] = {1, 2, 2, 2, 1, 1, 0, 0, 1, 1, 1, 1, 1, 1, 1, 1};
 static u16 xtile_select_queue(struct net_device *dev, struct sk_buff *skb,
-		struct net_device *sb_dev)
+			      struct net_device *sb_dev)
 {
 	u32 num_queues = dev->real_num_tx_queues;
 	u32 flow_hash  = skb_get_hash(skb);
@@ -1329,7 +1340,7 @@ static int xtile_start_xmit(struct sk_buff *skb, struct net_device *dev)
 	dma_addr_t dma_addr;
 	struct altera_dma_buffer *buffer = NULL;
 	int nfrags = skb_shinfo(skb)->nr_frags;
-	unsigned int nopaged_len = 0;
+	unsigned int nopaged_len = skb_headlen(skb);
 	struct intel_fpga_xtile_eth_private *priv = netdev_priv(dev);
 	unsigned int txsize = 0;
 	struct netdev_queue *txq;
@@ -1337,11 +1348,16 @@ static int xtile_start_xmit(struct sk_buff *skb, struct net_device *dev)
 	if (priv->num_channels == 0)
 		return NETDEV_TX_BUSY;
 
-	if (unlikely(skb_padto(skb, ETH_ZLEN))) {
-		dev_kfree_skb_any(skb);
-		return NETDEV_TX_OK;
+	if (unlikely(skb->len < ETH_ZLEN)) {
+		if (unlikely(skb_padto(skb, ETH_ZLEN))) {
+			dev->stats.tx_dropped++;
+			dev_kfree_skb_any(skb);
+			return NETDEV_TX_OK;
+		}
+
+		nopaged_len = ETH_ZLEN;
 	}
-	nopaged_len = skb_headlen(skb);
+
 	queue = skb_get_queue_mapping(skb);
 	if (queue >= MAX_DMA_CHANNELS) {
 		netdev_err(dev, "SKB Queue is wrong: %d %d %p", queue, MAX_DMA_CHANNELS, skb);
@@ -1476,6 +1492,10 @@ static int xtile_set_hwtstamp_config(struct net_device *dev, struct ifreq *ifr)
 	case HWTSTAMP_TX_ON:
 		for (queue = 0; queue < priv->num_channels; queue++)
 			priv->dma_info[queue].dma_priv.hwts_tx_en = 1;
+		break;
+	case HWTSTAMP_TX_OFF:
+		for (queue = 0; queue < priv->num_channels; queue++)
+			priv->dma_info[queue].dma_priv.hwts_tx_en = 0;
 		break;
 	default:
 		return -ERANGE;
@@ -1652,6 +1672,7 @@ static int intel_fpga_xtile_validate(struct phylink_pcs *pcs,
 	    state->interface != PHY_INTERFACE_MODE_10GKR &&
 	    state->interface != PHY_INTERFACE_MODE_10GBASER &&
 	    state->interface != PHY_INTERFACE_MODE_25GKR &&
+	    state->interface != PHY_INTERFACE_MODE_25GBASER &&
 	    state->interface != PHY_INTERFACE_MODE_50GKP &&
 	    state->interface != PHY_INTERFACE_MODE_50GKR &&
 	    state->interface != PHY_INTERFACE_MODE_100GKP) {
@@ -1694,6 +1715,7 @@ static int intel_fpga_xtile_validate(struct phylink_pcs *pcs,
 		state->speed = SPEED_10000;
 		break;
 	case PHY_INTERFACE_MODE_25GKR:
+	case PHY_INTERFACE_MODE_25GBASER:
 		phylink_set(mask, 25000baseCR_Full);
 		phylink_set(mask, 25000baseKR_Full);
 		phylink_set(mask, 25000baseSR_Full);
@@ -1783,6 +1805,17 @@ static struct phylink_pcs *intel_fpga_xtile_mac_select_pcs(struct phylink_config
 	return &priv->pcs;
 }
 
+static phy_interface_t intel_fpga_xtile_speed_to_phy_iface(u32 speed)
+{
+	switch (speed) {
+	case SPEED_10000: return PHY_INTERFACE_MODE_10GBASER;
+	case SPEED_25000: return PHY_INTERFACE_MODE_25GBASER;
+	case SPEED_50000: return PHY_INTERFACE_MODE_50GKR;
+	case SPEED_100000: return PHY_INTERFACE_MODE_100GKR;
+	default:          return PHY_INTERFACE_MODE_NA;
+	}
+}
+
 static void intel_fpga_xtile_get_pcs_fixed_state(struct phylink_config *config,
 						 struct phylink_link_state *state)
 {
@@ -1798,6 +1831,13 @@ static void intel_fpga_xtile_get_pcs_fixed_state(struct phylink_config *config,
 		state->an_complete = AUTONEG_DISABLE;
 	else
 		state->an_complete = AUTONEG_ENABLE;
+
+	/* Keep the interface mode consistent with the current DR speed so
+	 * that phylink_start() configures the MAC with the correct mode
+	 * after an interface down/up cycle following a DR speed switch.
+	 */
+	if (priv->dr_supported && priv->link_speed > 0)
+		state->interface = intel_fpga_xtile_speed_to_phy_iface(priv->link_speed);
 }
 
 static void intel_fpga_xtile_mac_config(struct phylink_config *config,
@@ -1844,6 +1884,7 @@ static const struct phylink_mac_ops intel_fpga_xtile_phylink_ops = {
 };
 
 /* Probe MAC device */
+
 static int intel_fpga_xtile_probe(struct platform_device *pdev)
 {
 	int ret = -ENODEV;
@@ -1891,6 +1932,25 @@ static int intel_fpga_xtile_probe(struct platform_device *pdev)
 	priv->pcs.poll = true;
 	priv->dma_info = 0;
 
+	/* Read ptp_enable and check TOD availability immediately after priv
+	 * is initialized, before any resource allocation (DMA, IRQs, etc.)
+	 * so that EPROBE_DEFER is returned at minimal cost.
+	 */
+	priv->ptp_enable = of_property_read_bool(pdev->dev.of_node, "altr,has-ptp");
+	if (priv->ptp_enable) {
+		dev_tod  = of_parse_phandle(pdev->dev.of_node, "tod", 0);
+		pdev_tod = of_find_device_by_node(dev_tod);
+		of_node_put(dev_tod);
+		if (pdev_tod)
+			priv->ptp_priv = dev_get_drvdata(&pdev_tod->dev);
+		if (!pdev_tod || !priv->ptp_priv) {
+			dev_err(&pdev->dev, "PTP clock not available, retry!\n");
+			ret = -EPROBE_DEFER;
+			goto err_free_netdev;
+		}
+		dev_info(&pdev->dev, "\tPTP Clock: %s\n", priv->ptp_priv->ptp_clock_ops.name);
+	}
+
 	op_ptr = of_device_get_match_data(&pdev->dev);
 
 	if (!op_ptr) {
@@ -1924,14 +1984,18 @@ static int intel_fpga_xtile_probe(struct platform_device *pdev)
 		return -ENOENT;
 
 	pdev_hssi = of_find_device_by_node(dev_hssi);
-	if (!pdev_hssi) {
-		of_node_put(dev_hssi);
+	of_node_put(dev_hssi);
+	if (!pdev_hssi)
 		return -ENODEV;
-	}
 	priv->pdev_hssi = pdev_hssi;
 
 	/* Get the HSSI node device from the device tree node */
 	/* get hssi port no from device tree */
+	if (of_property_read_u32(np, "hssi_relative_port",
+				 &priv->hssi_rel_port)) {
+		priv->hssi_rel_port = 0;
+	}
+
 	if (of_property_read_u32(np, "hssi_port",
 				 &priv->hssi_port)) {
 		dev_err(&pdev->dev, "cannot obtain hssi port info\n");
@@ -1956,8 +2020,6 @@ static int intel_fpga_xtile_probe(struct platform_device *pdev)
 	priv->spec_ops = (struct xtile_spec_ops *)op_ptr;
 
 	/* PTP is only supported with a modified MSGDMA */
-	priv->ptp_enable = of_property_read_bool(pdev->dev.of_node,
-						 "altr,has-ptp");
 	if (priv->ptp_enable &&
 	    priv->spec_ops->dma_ops->altera_dtype != ALTERA_DTYPE_MSGDMA_PREF) {
 		dev_err(&pdev->dev, "PTP requires modified dma\n");
@@ -1965,20 +2027,22 @@ static int intel_fpga_xtile_probe(struct platform_device *pdev)
 		goto err_free_netdev;
 	}
 
-	if (priv->spec_ops->tile.check_dts_param) {
-		if (!priv->spec_ops->tile.check_dts_param(priv)) {
-			ret = -ENXIO;
+	/* Check TOD availability early to avoid wasting probe effort on
+	 * DMA mapping, IRQ registration and other setup when the TOD
+	 * driver has not yet been probed.
+	 */
+	if (priv->ptp_enable) {
+		dev_tod  = of_parse_phandle(pdev->dev.of_node, "tod", 0);
+		pdev_tod = of_find_device_by_node(dev_tod);
+		of_node_put(dev_tod);
+		if (pdev_tod)
+			priv->ptp_priv = dev_get_drvdata(&pdev_tod->dev);
+		if (!pdev_tod || !priv->ptp_priv) {
+			dev_err(&pdev->dev, "PTP clock not available, retry!\n");
+			ret = -EPROBE_DEFER;
 			goto err_free_netdev;
 		}
-	}
-
-	priv->ptp_clockcleaner_enable = of_property_read_bool(pdev->dev.of_node,
-							      "altr,has-ptp-clockcleaner");
-	/* ptp clock cleaner is not applicable for Ethernet only design */
-	if (priv->ptp_clockcleaner_enable && !priv->ptp_enable) {
-		dev_err(&pdev->dev, "Hardware Clock Frequency adjustment requires PTP\n");
-		ret = -ENODEV;
-		goto err_free_netdev;
+		dev_info(&pdev->dev, "\tPTP Clock: %s\n", priv->ptp_priv->ptp_clock_ops.name);
 	}
 
 	priv->dev->min_mtu = ETH_MIN_MTU;
@@ -2137,6 +2201,91 @@ static int intel_fpga_xtile_probe(struct platform_device *pdev)
 		dev_addr_set(ndev, macaddr);
 	}
 
+	priv->dr_supported  = hssi_dr_profiles_available(pdev_hssi);
+	dev_info(&pdev->dev, "DR support: %s\n", priv->dr_supported ? "yes" : "no");
+
+	/* Derive phy_iface from the boot DR profile (index 0) when DR is
+	 * available; fall back to the DTS "phy-mode" property otherwise.
+	 */
+	if (priv->dr_supported) {
+		int boot_speed = hssi_get_active_profile_speed(pdev_hssi);
+
+		priv->phy_iface = (boot_speed > 0) ?
+				  intel_fpga_xtile_speed_to_phy_iface(boot_speed) :
+				  PHY_INTERFACE_MODE_NA;
+
+		if (priv->phy_iface == PHY_INTERFACE_MODE_NA) {
+			dev_err(&pdev->dev,
+				"DR boot profile speed %d has no PHY interface mapping\n",
+				boot_speed);
+			ret = -EINVAL;
+			goto err_register_netdev;
+		}
+
+		dev_info(&pdev->dev, "phy-mode derived from DR profile: %s (speed=%d Mbps)\n",
+			 phy_modes(priv->phy_iface), boot_speed);
+
+	} else {
+		ret = of_get_phy_mode(np, &priv->phy_iface);
+		if (ret) {
+			dev_err(&pdev->dev, "incorrect phy-mode\n");
+			goto err_register_netdev;
+		}
+	}
+	
+	/* Check autoneg */
+	ret  = of_property_read_string(pdev->dev.of_node, "autoneg_enabled",
+				       &autoneg_enabled);
+	dev_info(&pdev->dev, "autoneg_enabled property: %s", autoneg_enabled);
+	priv->anlt = of_property_read_bool(pdev->dev.of_node,
+					   "altr,has-anlt");
+	priv->prev_anlt_err = -1;
+	priv->fec_type = fec_type_none;
+	if (priv->anlt) {
+		if (strcasecmp(autoneg_enabled, "yes") == 0) {
+			priv->autoneg = true;
+			ret = altera_fpga_anlt_get_capabilities(priv);
+			if (ret)
+				dev_err(&pdev->dev, "ANLT : %s", get_anlt_error(ret));
+		} else {
+			priv->autoneg = false;
+			dev_info(&pdev->dev, "Disabling ANLT");
+			//Disable ANLT
+			ret = hssi_anlt_disable(pdev_hssi, priv->hssi_port);
+			if (ret)
+				dev_err(&pdev->dev, "Could not disable ANLT\n");
+		}
+	}
+
+	if (!priv->autoneg) {
+		fixed_node = fwnode_get_named_child_node(pdev->dev.fwnode, "fixed-link");
+		if (fixed_node) {
+			if (!priv->dr_supported)
+				fwnode_property_read_u32(fixed_node, "speed", &priv->link_speed);
+			else
+				priv->link_speed = hssi_get_active_profile_speed(priv->pdev_hssi);
+
+			/* read the fixed link properties*/
+			priv->duplex = DUPLEX_FULL;
+			priv->autoneg = false;
+
+			dev_info(&pdev->dev, "\tfixed link speed:%d full duplex:%d\n",
+				 priv->link_speed, priv->duplex);
+			fwnode_handle_put(fixed_node);
+		} else {
+			dev_err(&pdev->dev, "fixed link property undefined\n");
+			ret = -ENODEV;
+			goto err_register_netdev;
+		}
+	}
+
+	if (priv->spec_ops->tile.check_dts_param) {
+		if (!priv->spec_ops->tile.check_dts_param(priv)) {
+			ret = -ENXIO;
+			goto err_free_netdev;
+		}
+	}
+
 	/* initialize netdev */
 	ndev->netdev_ops = &intel_fpga_xtile_netdev_ops;
 
@@ -2171,25 +2320,6 @@ static int intel_fpga_xtile_probe(struct platform_device *pdev)
 
 	rwlock_init(&priv->wr_lock);
 
-	/* check if phy-mode is present */
-	ret = of_get_phy_mode(np, &priv->phy_iface);
-	if (ret) {
-		dev_err(&pdev->dev, "incorrect phy-mode\n");
-		goto err_register_netdev;
-	}
-
-	if (priv->ptp_enable) {
-		dev_tod  = of_parse_phandle(pdev->dev.of_node, "tod", 0);
-		pdev_tod = of_find_device_by_node(dev_tod);
-		if (pdev_tod)
-			priv->ptp_priv = dev_get_drvdata(&pdev_tod->dev);
-		if (!pdev_tod || !priv->ptp_priv) {
-			dev_err(&pdev->dev, "PTP clock not available, retry!\n");
-			ret = -EPROBE_DEFER;
-			goto err_register_netdev;
-		}
-		dev_info(&pdev->dev, "\tPTP Clock: %s\n", priv->ptp_priv->ptp_clock_ops.name);
-	}
 
 	__set_bit(PHY_INTERFACE_MODE_10GBASER, priv->phylink_config.supported_interfaces);
 	__set_bit(PHY_INTERFACE_MODE_25GBASER, priv->phylink_config.supported_interfaces);
@@ -2205,48 +2335,6 @@ static int intel_fpga_xtile_probe(struct platform_device *pdev)
 		dev_err(&pdev->dev, "failed to create phylink\n");
 		ret = PTR_ERR(priv->phylink);
 		goto err_register_netdev;
-	}
-
-	/* Check autoneg */
-	ret  = of_property_read_string(pdev->dev.of_node, "autoneg_enabled",
-				       &autoneg_enabled);
-	dev_info(&pdev->dev, "autoneg_enabled property: %s", autoneg_enabled);
-	priv->anlt = of_property_read_bool(pdev->dev.of_node,
-					   "altr,has-anlt");
-	priv->prev_anlt_err = -1;
-	priv->fec_type = fec_type_none;
-	if (priv->anlt) {
-		if (strcasecmp(autoneg_enabled, "yes") == 0) {
-			priv->autoneg = true;
-			ret = altera_fpga_anlt_get_capabilities(priv);
-			if (ret)
-				dev_err(&pdev->dev, "ANLT : %s", get_anlt_error(ret));
-		} else {
-			priv->autoneg = false;
-			dev_info(&pdev->dev, "Disabling ANLT");
-			//Disable ANLT
-			ret = hssi_anlt_disable(pdev_hssi, priv->hssi_port);
-			if (ret)
-				dev_err(&pdev->dev, "Could not disable ANLT\n");
-		}
-	}
-
-	if (!priv->autoneg) {
-		fixed_node = fwnode_get_named_child_node(pdev->dev.fwnode, "fixed-link");
-		if (fixed_node) {
-			fwnode_property_read_u32(fixed_node, "speed", &priv->link_speed);
-			/* read the fixed link properties*/
-			priv->duplex = DUPLEX_FULL;
-			priv->autoneg = false;
-
-			dev_info(&pdev->dev, "\tfixed link speed:%d full duplex:%d\n",
-				 priv->link_speed, priv->duplex);
-			fwnode_handle_put(fixed_node);
-		} else {
-			dev_err(&pdev->dev, "fixed link property undefined\n");
-			ret = -ENODEV;
-			goto err_register_netdev;
-		}
 	}
 
 	ret  = of_property_read_string(pdev->dev.of_node, "if_name",
