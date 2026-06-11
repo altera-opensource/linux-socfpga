@@ -93,12 +93,24 @@ static int hssiss_read_mac_stat(struct platform_device *pdev, u32 cmd,
 	return priv->spec_ops->ops->read_mac_stat(pdev, cmd, priv_data);
 }
 
-static int hssiss_get_set_dr_profile(struct platform_device *pdev, u32 cmd, void *dr_data,
-				     bool rd)
+static int hssiss_get_dr_profile(struct platform_device *pdev, u32 cmd, void *dr_data)
 {
 	struct hssiss_private *priv = platform_get_drvdata(pdev);
 
-	return priv->spec_ops->ops->get_set_dr_profile(pdev, cmd, dr_data, rd);
+	if (priv->spec_ops->ops->get_dr_profile)
+		return priv->spec_ops->ops->get_dr_profile(pdev, cmd, dr_data);
+
+	return -EOPNOTSUPP;
+}
+
+static int hssiss_set_dr_profile(struct platform_device *pdev, u32 cmd, void *dr_data)
+{
+	struct hssiss_private *priv = platform_get_drvdata(pdev);
+
+	if (priv->spec_ops->ops->set_dr_profile)
+		return priv->spec_ops->ops->set_dr_profile(pdev, cmd, dr_data);
+
+	return -EOPNOTSUPP;
 }
 
 hssi_eth_port_sts hssiss_get_ethport_status(struct platform_device *pdev, int port)
@@ -265,11 +277,11 @@ static int execute_sal_cmd(struct platform_device *pdev,
 		break;
 
 	case SAL_GET_HSSI_PROFILE:
-		ret = hssiss_get_set_dr_profile(pdev, salcmd_name[cmd].cmdid, data, true);
+		ret = hssiss_get_dr_profile(pdev, salcmd_name[cmd].cmdid, data);
 		break;
 
 	case SAL_SET_HSSI_PROFILE:
-		ret = hssiss_get_set_dr_profile(pdev, salcmd_name[cmd].cmdid, data, false);
+		ret = hssiss_set_dr_profile(pdev, salcmd_name[cmd].cmdid, data);
 		break;
 
 	case SAL_RSVD:
@@ -395,7 +407,8 @@ static struct hssi_gen_ops hssi_gen_ops = {
 	.get_mtu = hssidrv_get_mtu,
 	.set_mtu = hssidrv_set_mtu,
 	.read_mac_stat = hssidrv_read_mac_stat,
-	.get_set_dr_profile = hssidrv_get_set_dr_profile,
+	.get_dr_profile = hssidrv_get_dr_profile,
+	.set_dr_profile = hssidrv_set_dr_profile,
 	.get_ethport_status = hssidrv_get_ethport_status,
 	.set_ethport_status = hssidrv_set_ethport_status,
 	.get_ethport_attr = hssidrv_get_ethport_attr,

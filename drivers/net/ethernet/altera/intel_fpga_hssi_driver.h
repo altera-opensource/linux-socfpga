@@ -256,10 +256,29 @@
  #define HSSI_SAL_RESET_MAC_STAT_RX      BIT(17)
 
  #define DR_GRP_INDEX    4
- #define HSSI_DR_GRP_MASK        GENMASK(6, 4)
- #define HSSI_DR_PROFILE_MASK    GENMASK(3, 0)
  #define HSSISS_VER_CSR_ADDR_MASK                GENMASK(31, 16)
  #define HSSISS_VER_CSR_ADDR_SHIFT               16
+
+ /* GET HSSI PROFILE Register details */
+ #define DYN_RCFG_DR_TRIGGER_REG 			0
+ #define DYN_RCFG_DR_TX_FULLY_OUT_RESET_REG		2
+ #define DYN_RCFG_DR_TX_SRC_ALARM_REG 			4
+ #define DYN_RCFG_DR_RX_FULLY_OUT_RESET_REG		6
+ #define DYN_RCFG_DR_RX_SRC_ALARM_REG 			8
+ #define DYN_RCFG_LOCAL_ERROR_STAT_CTRL_REG 	    0x200
+ #define DYN_RCFG_LOCAL_RX_SRC_ALARM_REG	       10
+
+ #define FIRMWARE_ERROR		 GENMASK(23, 16)
+ #define NEXT_PROFILE_LO_IND     BIT(15)
+ #define NEXT_PROFILE_HI_MASK    GENMASK(30, 16)
+ #define NEXT_PROFILE_LO_MASK    GENMASK(15, 0)
+ #define NEXT_PROFILE_HI_IND     BIT(31)
+ #define NEXT_PROFILE_MAX_ID     GENMASK(14, 0)  /* max valid profile index (0x7FFF) */
+ #define NEXT_PROFILE_ENABLE     BIT(15)         /* enable bit for two-register profile scheme */
+ #define READY_FOR_DR            BIT(1)
+
+ #define DYN_RCFG_DR_NEXT_PROFILE_0_REG 0x4
+ #define DYN_RCFG_DR_NEXT_PROFILE_1_REG (DYN_RCFG_DR_NEXT_PROFILE_0_REG + 4)
 
 /* Bestcase: 100ns, max: 10ms, driver interval: 10us
  * For DR and enable/disable loopback SAL sequences, the whole operation might
@@ -283,6 +302,7 @@
 
 int hssidrv_cold_rst(struct platform_device *pdev);
 void hssidrv_hotplug_enable(struct platform_device *pdev, bool enable);
+
 int hssidrv_probe_init(struct platform_device *pdev);
 int hssidrv_get_fw_version(struct platform_device *pdev, u32 cmd, void *priv_data);
 int hssidrv_ncsi_link_status(struct platform_device *pdev, u32 cmd, void *priv_data);
@@ -290,8 +310,8 @@ int hssidrv_read_mac_stat(struct platform_device *pdev, u32 cmd, void *priv_data
 int hssidrv_get_mtu(struct platform_device *pdev, u32 cmd, void *priv_data);
 int hssidrv_set_mtu(struct platform_device *pdev, u32 cmd, void *priv_data);
 int hssidrv_reset_mac_stat(struct platform_device *pdev, u32 cmd, void *priv_data);
-int hssidrv_get_set_dr_profile(struct platform_device *pdev, u32 cmd, void *dr_data,
-			       bool rd);
+int hssidrv_get_dr_profile(struct platform_device *pdev, u32 cmd, void *dr_data);
+int hssidrv_set_dr_profile(struct platform_device *pdev, u32 cmd, void *dr_data);
 int hssidrv_test_nios(struct platform_device *pdev, u32 cmd);
 int hssidrv_get_set_csr(struct platform_device *pdev, u32 cmd, void *csr_data,
 			bool rd);

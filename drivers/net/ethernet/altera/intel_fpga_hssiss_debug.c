@@ -204,9 +204,8 @@ static ssize_t hssiss_dbgfs_sal_write(struct file *filep, const char __user *ubu
 	buf[count] = 0;
 
 	/* Parse SAL command */
-	//ret = sscanf(buf, "%x", &cmd);
-	ret = kstrtouint(buf, 16, &cmd);
-	if (!ret) {
+	ret = sscanf(buf, "%x", &cmd);
+	if (ret != 1) {
 		ret = -EINVAL;
 		goto free_buf;
 	}
@@ -215,24 +214,6 @@ static ssize_t hssiss_dbgfs_sal_write(struct file *filep, const char __user *ubu
 
 	/* Parse and prepare data for command */
 	switch (cmd) {
-	case SAL_GET_HSSI_PROFILE:
-	case SAL_SET_HSSI_PROFILE:
-	{
-		struct get_set_dr_data data;
-
-		ret = sscanf(buf, "%x %x %x %u", &cmd, &data.dr_grp, &data.profile, &data.port);
-		if (ret != 4) {
-			ret = -EINVAL;
-			goto free_buf;
-		}
-
-		ret = hssiss_execute_sal_cmd(pdev, cmd, &data);
-
-		d->read.dr_grp = data.dr_grp;
-		d->read.profile = data.profile;
-
-		break;
-	}
 	case SAL_READ_MAC_STAT:
 	{
 		struct read_mac_stat_data data;
@@ -315,13 +296,15 @@ static ssize_t hssiss_dbgfs_sal_write(struct file *filep, const char __user *ubu
 	case SAL_DISABLE_LOOPBACK:
 	case SAL_ENABLE_LOOPBACK:
 	{
-		u32 data = 0;
+		struct set_loopback_data data = { 0 };
+		u32 type;
 
-		ret = sscanf(buf, "%x %x", &cmd, &data);
-		if (ret != 2) {
+		ret = sscanf(buf, "%x %u %u", &cmd, &type, &data.port);
+		if (ret != 3) {
 			ret = -EINVAL;
 			goto free_buf;
 		}
+		data.type = (enum hssiss_loopback_type)type;
 		ret = hssiss_execute_sal_cmd(pdev, cmd, &data);
 		break;
 	}
@@ -368,6 +351,15 @@ static ssize_t hssiss_dbgfs_readme_read(struct file *filep, char __user *ubuf,
 	ret += scnprintf(buf + ret, BUF_SIZE - ret, "\tcmd: SAL command\n");
 	ret += scnprintf(buf + ret, BUF_SIZE - ret, "\tx, y, z: SAL command specific data\n");
 	ret += scnprintf(buf + ret, BUF_SIZE - ret, "\tcat sal\n");
+	ret += scnprintf(buf + ret, BUF_SIZE - ret, "Enable/disable loopback:\n");
+	ret += scnprintf(buf + ret, BUF_SIZE - ret,
+			 "\techo \"7 <type> <port>\" > sal  (enable)\n");
+	ret += scnprintf(buf + ret, BUF_SIZE - ret,
+			 "\techo \"8 <type> <port>\" > sal  (disable)\n");
+	ret += scnprintf(buf + ret, BUF_SIZE - ret,
+			 "\ttype: 5=NEAREND_SER_PMA (only supported type)\n");
+	ret += scnprintf(buf + ret, BUF_SIZE - ret,
+			 "\tport: 0-based port index\n");
 	ret += scnprintf(buf + ret, BUF_SIZE - ret, "Execute direct SAL command:\n");
 	ret += scnprintf(buf + ret, BUF_SIZE - ret,
 			 "\techo <ctrladdr reg_data> > ctrladdr\n");

@@ -25,8 +25,10 @@ struct hssi_gen_ops {
 				    void *data);
 	int (*reset_mac_stat)(struct platform_device *pdev, enum hssiss_salcmd cmd,
 			      void *data);
-	int (*get_set_dr_profile)(struct platform_device *pdev, enum hssiss_salcmd cmd,
-				  void *data, bool get);
+	int (*get_dr_profile)(struct platform_device *pdev, enum hssiss_salcmd cmd,
+			      void *data);
+	int (*set_dr_profile)(struct platform_device *pdev, enum hssiss_salcmd cmd,
+			      void *data);
 	int (*test_nios)(struct platform_device *pdev, enum hssiss_salcmd cmd);
 	int (*get_mtu)(struct platform_device *pdev, enum hssiss_salcmd cmd,
 		       void *priv_data);

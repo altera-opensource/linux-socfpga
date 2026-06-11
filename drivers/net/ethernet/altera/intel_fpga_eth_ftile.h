@@ -1201,7 +1201,12 @@ struct intel_fpga_ftile_eth_soft_csr {
 	u32 rxmac_adapt_dropped_31_0;					// 0x0140
 	u32 rxmac_adapt_dropped_63_32;					// 0x0144
 	u32 rxmac_adapt_dropped_control;				// 0x0148
-	u32 reserved_014C[93];						// 0x014C - 0x02BC
+	u32 reserved_014C[45];						// 0x014C - 0x01FC
+	u32 profile_sel;						// 0x0200
+	u32 fec_mode;							// 0x0204
+	u32 sel_25g_10g;						// 0x0208
+	u32 preamble_passthrough;					// 0x020C
+	u32 reserved_0210[44];						// 0x0210 - 0x02BC
 	u32 anlt_sequencer_config;					// 0x02C0
 	u32 anlt_sequencer_status;					// 0x02C4
 	u32 reserved_02C8[14];						// 0x02C8 - 0x02FC

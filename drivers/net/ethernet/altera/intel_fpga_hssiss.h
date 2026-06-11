@@ -46,13 +46,11 @@ enum hssiss_mac_stat_counter_type {
 	MACSTAT_TX_DISCARDS,
 	MACSTAT_TX_UNICAST,
 	MACSTAT_TX_MULTICAST,
-	MACSTAT_TX_PTP_CTRL,
 	MACSTAT_TX_BROADCAST,
 	MACSTAT_ETHER_DROPS,
 	MACSTAT_RX_TOTAL_BYTES,
 	MACSTAT_RX_TOTAL_PACKETS,
 	MACSTAT_RX_UNDERSIZE,
-	MACSTAT_RX_PTP_CTRL,
 	MACSTAT_RX_OVERSIZE,
 	MACSTAT_RX_64_BYTES,
 	MACSTAT_RX_65_127_BYTES,
@@ -81,6 +79,8 @@ enum hssiss_mac_stat_counter_type {
 	MACSTAT_RX_SOP_COUNT,
 	MACSTAT_TX_CRC_ERRORS,
 	MACSTAT_TX_ALIGN_ERRORS,
+	MACSTAT_TX_PTP_CTRL,
+	MACSTAT_RX_PTP_CTRL,
 };
 
 enum hssiss_loopback_type {
@@ -107,9 +107,41 @@ struct hssiss_salcmd_to_name {
 
 /* data for get/set DR profile */
 struct get_set_dr_data {
-	u32 dr_grp;
-	u32 profile;
-	unsigned int port;
+	u32 addr_offs;
+	u32 val;
+};
+
+/* DR profile entry: <speed-Mbps fec lane profile-index>
+ * fec:  FTILE_FEC_NONE=0, FTILE_FEC_BASER=1, FTILE_FEC_RS=2
+ *       (use macros from arch/arm64/boot/dts/intel/intel-fpga-hssi.h in DTS)
+ * lane: starting PMA lane (e.g. 0–3 for 25GE-1_0 .. 25GE-1_3)
+ */
+#define HSSI_DR_PROFILE_CELLS		4	/* cells per dr-profiles entry */
+#define HSSI_DR_PROFILE_CELL_SPEED	0	/* cell index: link speed in Mbps */
+#define HSSI_DR_PROFILE_CELL_FEC	1	/* cell index: FEC mode */
+#define HSSI_DR_PROFILE_CELL_LANE	2	/* cell index: starting PMA lane */
+#define HSSI_DR_PROFILE_CELL_IDX	3	/* cell index: profile index */
+/**
+ * enum ftile_fec_type - FEC mode encoding used in DR profiles and ethtool.
+ *
+ * This encoding is used in the DTS "dr-profiles" fec cell, in priv->fec_type,
+ * and as the fec parameter throughout the DR/ethtool stack.
+ *
+ * @FTILE_FEC_NONE:  No FEC
+ * @FTILE_FEC_BASER: Base-R / KR FEC
+ * @FTILE_FEC_RS:    RS-FEC (Reed-Solomon)
+ */
+enum ftile_fec_type {
+	FTILE_FEC_NONE  = 0,
+	FTILE_FEC_BASER = 1,
+	FTILE_FEC_RS    = 2,
+};
+
+struct hssi_dr_profile {
+	u32 speed;	/* link speed in Mbps */
+	u32 fec;	/* FEC mode: 0 = no-FEC, 1 = Base-R FEC, 2 = RS-FEC */
+	u32 lane;	/* starting PMA lane index */
+	u32 profile_idx;/* profile index */
 };
 
 /* data for reset_mac_stat */
@@ -356,6 +388,10 @@ struct hssiss_private {
 	struct hssiss_sysfs_data sysfs;
 	struct cold_reset_register cold_rst_reg;
 	int hssi_err_wa;
+	struct hssi_dr_profile *dr_profiles; /* DR profiles from DTS */
+	u32 num_dr_profiles;                 /* number of DR profiles */
+	u32 active_profile_idx;              /* active index into dr_profiles array */
+	bool active_profile_valid;           /* true when active_profile_idx is valid */
 #ifdef CONFIG_DEBUG_FS
 	struct hssiss_dbg *dbgfs;
 #endif

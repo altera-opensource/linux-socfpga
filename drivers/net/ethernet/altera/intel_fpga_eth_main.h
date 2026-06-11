@@ -87,6 +87,7 @@ typedef struct intel_fpga_xtile_eth_private {
 
 	u32 tile_chan;
 	u32 hssi_port;
+	u32 hssi_rel_port;
 	u32 tx_irq;
 	u32 rx_irq;
 	u32 max_mtu;
@@ -120,6 +121,9 @@ typedef struct intel_fpga_xtile_eth_private {
 	bool autoneg;
 	bool anlt;
 	int prev_anlt_err;
+	bool dr_supported;
+	void __iomem *pio_speed_base;
+	void __iomem *pio_datapath_reset_base;
 	bool ptp_enable;
 	u32 link_state;
 	bool cable_unplugged;
@@ -146,8 +150,6 @@ typedef struct intel_fpga_xtile_eth_private {
 	struct intel_fpga_tod_private *ptp_priv;
 	hssi_eth_port_attr hssi_port_x_attr;
 	phy_interface_t phy_iface;
-	u32 ptp_clockcleaner_enable;
-
 } intel_fpga_xtile_eth_private;
 
 /* RX FIFO Address Space

@@ -7,7 +7,7 @@
  *
  */
 
- #include "intel_fpga_eth_hssi_itf.h"
+#include "intel_fpga_eth_hssi_itf.h"
 
 static int hssi_csrrd32_errcheck(struct platform_device *pdev,
 				 enum hssiss_tile_regbank regbank,
@@ -539,4 +539,200 @@ u32 hssi_errpkt_cnt_read(struct platform_device *pdev, u32 addr_offs)
 void hssi_errpkt_logic_en(struct platform_device *pdev, int port, bool enable)
 {
 	hssiss_usrspace_pkterr_logic_en(pdev, port, enable);
+}
+
+int hssi_get_dr_profile(struct platform_device *pdev, void *dr_data)
+{
+	return hssiss_execute_sal_cmd(pdev, SAL_GET_HSSI_PROFILE, dr_data);
+}
+
+int hssi_set_dr_profile(struct platform_device *pdev, void *dr_data)
+{
+	return hssiss_execute_sal_cmd(pdev, SAL_SET_HSSI_PROFILE, dr_data);
+}
+
+/**
+ * hssi_num_dr_profiles - return the number of DR profiles from the DTS table.
+ * @pdev: HSSI subsystem platform device
+ *
+ * Returns the profile count, or 0 if unavailable.
+ */
+u32 hssi_num_dr_profiles(struct platform_device *pdev)
+{
+	struct hssiss_private *priv = platform_get_drvdata(pdev);
+
+	return (priv && priv->dr_profiles) ? priv->num_dr_profiles : 0;
+}
+
+/**
+ * hssi_dr_profiles_available - check whether speed/FEC switching is possible.
+ * @pdev: HSSI subsystem platform device
+ *
+ * Returns true only when the DTS has provided a non-empty profile table.
+ */
+bool hssi_dr_profiles_available(struct platform_device *pdev)
+{
+	return hssi_num_dr_profiles(pdev) ? true : false;
+}
+
+/**
+ * hssi_find_dr_profile - find a DR profile array index matching the given speed
+ *                        and FEC mode from the DTS-provided profile table.
+ * @pdev:        HSSI subsystem platform device
+ * @speed:       link speed in Mbps (e.g. 10000, 25000)
+ * @fec:         FEC mode: 0 = no-fec, 1 = baser, 2 = rs
+ * @rel_port:	 its the relative hssi port index from the base port 0
+ * @profile_idx: output - array index into dr_profiles[] for the matching entry
+ *
+ * Returns 0 on success, -ENOENT when no matching profile is found.
+ */
+int hssi_find_dr_profile(struct platform_device *pdev, u32 speed, u32 fec,
+			 u32 rel_port, u32 *profile_idx)
+{
+	struct hssiss_private *priv = platform_get_drvdata(pdev);
+	u32 i;
+
+	if (!hssi_num_dr_profiles(pdev))
+		return -ENOENT;
+
+	for (i = 0; i < priv->num_dr_profiles; i++) {
+		if (priv->dr_profiles[i].speed == speed &&
+		    priv->dr_profiles[i].fec   == fec &&
+		    priv->dr_profiles[i].lane == rel_port){
+			*profile_idx = i;
+			return 0;
+		}
+	}
+
+	return -ENOENT;
+}
+
+static struct hssi_dr_profile *hssi_find_active_dr_profile(struct hssiss_private *priv)
+{
+	return &priv->dr_profiles[priv->active_profile_idx];
+}
+
+/**
+ * hssi_active_profile_fec - return the FEC mode of the currently active profile.
+ * @pdev: HSSI subsystem platform device
+ * @fec:  output - FEC mode (0 = no-fec, 1 = baser, 2 = rs)
+ *
+ * Looks up the active profile index from HSSI private data and returns the
+ * corresponding FEC field from the DTS-provided profile table.
+ * Returns 0 on success, -ENOENT when the active profile is not in the table.
+ */
+int hssi_active_profile_fec(struct platform_device *pdev, u32 *fec)
+{
+	struct hssiss_private *priv = platform_get_drvdata(pdev);
+	struct hssi_dr_profile *p;
+
+	if (!hssi_num_dr_profiles(pdev))
+		return -ENOENT;
+
+	p = hssi_find_active_dr_profile(priv);
+	if (!p)
+		return -ENOENT;
+
+	*fec = p->fec;
+	return 0;
+}
+
+bool hssi_active_profile_valid(struct platform_device *pdev)
+{
+	struct hssiss_private *priv = platform_get_drvdata(pdev);
+
+	return priv && priv->active_profile_valid;
+}
+
+u32 hssi_active_profile_idx(struct platform_device *pdev)
+{
+	struct hssiss_private *priv = platform_get_drvdata(pdev);
+
+	return priv->active_profile_idx;
+}
+
+void hssi_update_active_profile(struct platform_device *pdev, u32 idx)
+{
+	struct hssiss_private *priv = platform_get_drvdata(pdev);
+
+	priv->active_profile_idx   = idx;
+	priv->active_profile_valid = true;
+}
+
+void hssi_invalidate_active_profile(struct platform_device *pdev)
+{
+	struct hssiss_private *priv = platform_get_drvdata(pdev);
+
+	priv->active_profile_idx   = 0;
+	priv->active_profile_valid = false;
+}
+
+u32 hssi_get_dr_profile_hw_id(struct platform_device *pdev, u32 arr_idx)
+{
+	struct hssiss_private *priv = platform_get_drvdata(pdev);
+
+	return priv->dr_profiles[arr_idx].profile_idx;
+}
+
+int hssi_get_active_profile(struct platform_device *pdev, u32 *profile)
+{
+	if (!hssi_active_profile_valid(pdev))
+		return -EINVAL;
+
+	*profile = hssi_active_profile_idx(pdev);
+
+	return 0;
+}
+
+int hssi_get_active_profile_lane(struct platform_device *pdev)
+{
+	struct hssiss_private *priv = platform_get_drvdata(pdev);
+	struct hssi_dr_profile *p;
+
+	if (!priv->active_profile_valid)
+		return -EINVAL;
+
+	p = hssi_find_active_dr_profile(priv);
+	return p ? (int)p->lane : -EINVAL;
+}
+
+int hssi_get_active_fec_mode(struct platform_device *pdev)
+{
+	u32 fec;
+
+	if (hssi_active_profile_valid(pdev) &&
+	    hssi_active_profile_fec(pdev, &fec) == 0)
+		return fec;
+
+	return -EINVAL;
+}
+
+const char *hssi_fec_type_str(enum ftile_fec_type fec)
+{
+	switch (fec) {
+	case FTILE_FEC_RS:    return RSFEC;
+	case FTILE_FEC_BASER: return BASER;
+	case FTILE_FEC_NONE:
+	default:              return NOFEC;
+	}
+}
+
+/**
+ * hssi_get_active_profile_speed - return the link speed (Mbps) of the active
+ *                                 DR profile.
+ * @pdev: HSSI subsystem platform device
+ *
+ * Returns the speed in Mbps on success, or -EINVAL when no valid active
+ * profile is found.
+ */
+int hssi_get_active_profile_speed(struct platform_device *pdev)
+{
+	struct hssiss_private *priv = platform_get_drvdata(pdev);
+	struct hssi_dr_profile *p;
+
+	if (!hssi_active_profile_valid(pdev) || !priv->dr_profiles)
+		return -EINVAL;
+
+	p = hssi_find_active_dr_profile(priv);
+	return p ? (int)p->speed : -EINVAL;
 }

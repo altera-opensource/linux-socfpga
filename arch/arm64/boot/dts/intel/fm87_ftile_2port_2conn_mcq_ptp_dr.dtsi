@@ -3,10 +3,11 @@
  * Copyright(C) 2024, Altera Corporation
  */
 
-/* Add this piece of dtsi fragment as #include "fm87_ftile_50g_ptp.dtsi"
- * in the file socfpga_fm87_ftile_50g_ptp.dts. Compile it in the kernel along with
+/* Add this piece of dtsi fragment as #include "fm87_ftile_25g_ptp.dtsi"
+ * in the file socfpga_fm87_ftile_25g_ptp.dts. Compile it in the kernel along with
  * socfpga_agilex.dtsi
  */
+#include <dt-bindings/net/intel-fpga-hssi.h>
 
 /{
 	soc {
@@ -22,8 +23,8 @@
 					<0x00000001 0x00000000 0x84000000 0x04000000>,
 					<0x00000001 0x00000000 0x88040000 0x00000040>,
 					<0x00000001 0x00000000 0x88040100 0x00000040>,
-					<0x00000001 0x08040050 0x88040050 0x00000010>,
-					<0x00000001 0x08040040 0x88040040 0x00000010>,
+					<0x00000001 0x88040250 0x88040250 0x00000010>,
+					<0x00000001 0x88040240 0x88040240 0x00000010>,
 					<0x00000001 0x00000000 0x88050000 0x00010000>,
 					<0x00000001 0x00000000 0x88060000 0x00010000>,
 					<0x00000001 0x00000000 0x88070000 0x00010000>,
@@ -52,9 +53,9 @@
 				status = "okay";
 			};
 
-			qsfpdd_status_pio: gpio@8040050 {
+			qsfpdd_status_pio: gpio@88040250 {
 				compatible = "altr,pio-1.0";
-				reg = <0x00000001 0x08040050 0x10>;
+				reg = <0x00000001 0x88040250 0x10>;
 				interrupt-parent = <&intc>;
 				interrupts = <0 22 4>;
 				altr,gpio-bank-width = <4>;
@@ -64,9 +65,9 @@
 				status = "okay";
 			};
 
-			qsfpdd_ctrl_pio: gpio@8040040 {
+			qsfpdd_ctrl_pio: gpio@88040240 {
 				compatible = "altr,pio-1.0";
-				reg = <0x00000001 0x08040040 0x10>;
+				reg = <0x00000001 0x88040240 0x10>;
 				interrupt-parent = <&intc>;
 				interrupts = <0 23 4>;
 				altr,gpio-bank-width = <4>;
@@ -75,6 +76,7 @@
 				gpio-controller;
 				status = "okay";
 			};
+
 		};
 		clocks {
 			tod_in_clock: tod_in_clock {
@@ -114,28 +116,43 @@
 			reg-names = "sscsr";
 			reg = <0x80000000 0x04000000>;
 			reset-mode ="reg";
+			 /* DR profiles: <speed-Mbps fec lane profile-index> */
+			dr-profiles = <25000 FTILE_FEC_RS    0 1>,
+				      <10000 FTILE_FEC_NONE  0 2>,
+				      <25000 FTILE_FEC_NONE  0 3>,
+				      <25000 FTILE_FEC_BASER 0 4>;
 		};
+
 		hssiss_1_hssiss: hssiss_1_hssiss {
 			compatible = "intel, hssiss-1.0";
 			reg-names = "sscsr";
 			reg = <0x84000000 0x04000000>;
 			reset-mode ="reg";
+			 /* DR profiles: <speed-Mbps fec lane profile-index> */
+			dr-profiles = <25000 FTILE_FEC_RS    0 100>,
+				      <10000 FTILE_FEC_NONE  0 101>,
+				      <25000 FTILE_FEC_NONE  0 102>,
+				      <25000 FTILE_FEC_BASER 0 103>;
 		};
-		pktgen_0: pktgen@81010000 {
+
+		pktgen_0: pktgen@88060000 {
 			compatible = "generic-uio";
 			reg = <0x88060000 0x10000>;
 			reg-names = "pkt_cli";
 		};
-		pktgen_1: pktgen@81020000 {
+
+		pktgen_1: pktgen@88070000 {
 			compatible = "generic-uio";
 			reg = <0x88070000 0x10000>;
 			reg-names = "pkt_cli";
 		};
-		packetswitch_0: packetswitch@81000000 {
+
+		packetswitch_0: packetswitch@88050000{
 			compatible = "generic-uio";
 			reg = <0x88050000 0x10000>;
 			reg-names = "packetswitch";
 		};
+
 		qsfp_eth1: qsfp-eth1 {
 			compatible = "intel,qsfp-mem";
 			reg-names = "qsfp-mem-ctrl";
@@ -149,7 +166,7 @@
 			ranges;
 			tile_chan = <0x8>;
 			hssi_port = <0x8>;
-			phy-mode = "50gbase-kr";
+			hssi_relative_port = <0x0>;
 			tod = <&tod_0_clk>;
 			hssiss = <&hssiss_0_hssiss>;
 			reg = <0x88040270 0x00000004>,
@@ -164,17 +181,14 @@
 			altr,tx-external-phy-delay-ns = <0x0>;
 			altr,rx-external-phy-delay-ns = <0x0>;
 			fec-cw-pos-rx = <0x0>;
-			fec-type="kr-fec";
 			qsfp = <&qsfp_eth0>;
 			if_name = "eth1";
 			qsfp-lane = <0x0>;
 			altr,has-ptp;
 			ptp_accu_mode = "Advanced";
-			ptp_tx_routing_adj = <30867>; //0.471 * 65536
-			ptp_rx_routing_adj = <14303>; //0.21825 * 65536
+			ptp_tx_routing_adj = <70795>; //1.08025 * 65536
+			ptp_rx_routing_adj = <67797>; //1.0345 * 65536
 			status = "okay";
-			altr,has-anlt;
-			autoneg_enabled = "yes";
 			ui-adj-interval = <250>;
 			num_channels = <3>;
 			interrupt-parent = <&intc>;
@@ -185,7 +199,10 @@
 					<0 38 4>, <0 39 4>,
 					<0 36 4>, <0 37 4>;
 			fixed-link {
-				speed =<50000>;
+				/* Dummy speed: actual value is derived at runtime
+				 * from the active DR profile via get_fixed_state().
+				 */
+				speed = <25000>;
 				full-duplex;
 			};
 			dma_0 {
@@ -256,7 +273,7 @@
 			ranges;
 			tile_chan = <0x8>;
 			hssi_port = <0x8>;
-			phy-mode = "50gbase-kr";
+			phy-mode = "25gbase-kr";
 			tod = <&tod_0_clk>;
 			hssiss = <&hssiss_1_hssiss>;
 			reg = <0x88040280 0x00000004>,
@@ -271,17 +288,14 @@
 			altr,tx-external-phy-delay-ns = <0x0>;
 			altr,rx-external-phy-delay-ns = <0x0>;
 			fec-cw-pos-rx = <0x0>;
-			fec-type="kr-fec";
 			qsfp = <&qsfp_eth1>;
 			if_name = "eth2";
 			qsfp-lane = <0x0>;
 			altr,has-ptp;
 			ptp_accu_mode = "Advanced";
-			ptp_tx_routing_adj = <27770>; // 0.42375 * 65536
-			ptp_rx_routing_adj = <27803>; // 0.42425 * 65536
+			ptp_tx_routing_adj = <64733>; // 0.98775 * 65536
+			ptp_rx_routing_adj = <75365>; // 1.15  * 65536
 			status = "okay";
-			altr,has-anlt;
-			autoneg_enabled = "yes";
 			ui-adj-interval = <250>;
 			num_channels = <3>;
 			interrupt-parent = <&intc>;
@@ -292,7 +306,10 @@
 					<0 32 4>, <0 33 4>,
 					<0 31 4>, <0 30 4>;
 			fixed-link {
-				speed =<50000>;
+				/* Dummy speed: actual value is derived at runtime
+				 * from the active DR profile via get_fixed_state().
+				 */
+				speed = <25000>;
 				full-duplex;
 			};
 			dma_0 {

@@ -270,10 +270,13 @@ void ftile_ui_adjustments(struct work_struct *work)
 	/* Step 7a Get TAM interval */
 	switch (eth_rate) {
 	case INTEL_FPGA_FTILE_ETH_RATE_10G_25G:  // 10G / 25G
-		if (!strcasecmp(priv->fec_type, "kr-fec")) {
+		/* Base-R/KR FEC and RS-FEC share the same TAM intervals */
+		if (!strcasecmp(priv->fec_type, "kr-fec") ||
+		    !strcasecmp(priv->fec_type, "rs-fec")) {
 			tx_tam_interval = 5406720;
 			rx_tam_interval = 5406720;
-		} else if (!strcasecmp(priv->fec_type, "no-fec")) {
+		} else if (!strcasecmp(priv->fec_type, "no-fec") ||
+			   !strcasecmp(priv->fec_type, "base-r")) {
 			tx_tam_interval = 5406720;
 			rx_tam_interval = 168960;
 		}
@@ -282,7 +285,7 @@ void ftile_ui_adjustments(struct work_struct *work)
 		if (!strcasecmp(priv->fec_type, "no-fec")) {
 			tx_tam_interval = 4325376;
 			rx_tam_interval = 4325376;
-		} else { // KR-FEC / KP-FEC / LL-FEC
+		} else { // RS-FEC / KR-FEC / KP-FEC / LL-FEC
 			tx_tam_interval = 5406720;
 			rx_tam_interval = 5406720;
 		}

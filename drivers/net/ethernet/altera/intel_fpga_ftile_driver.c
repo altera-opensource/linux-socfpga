@@ -9,6 +9,7 @@
  */
 
  #include <linux/phylink.h>
+ #include "altera_utils.h"
  #include "intel_fpga_eth_ftile.h"
  #include "intel_fpga_eth_hssi_itf.h"
  #include "intel_fpga_ftile_driver.h"
@@ -456,6 +457,7 @@ static int eth_ftile_tx_rx_user_flow(intel_fpga_xtile_eth_private *priv)
 	speed = priv->link_speed;
 
 	lane_speed = hssi_get_profile_lane_speed(pdev, chan);
+
 	// TBD add other PHY modes
 	switch (lane_speed) {
 	case LANE_10G:
@@ -516,8 +518,8 @@ static int eth_ftile_tx_rx_user_flow(intel_fpga_xtile_eth_private *priv)
 		return -ENODEV;
 	}
 	num_pl = hssi_get_pma_lane_count(pdev, chan);    // PL
-	dev_info(priv->device, "DBG: %s speed=%u num_vl=%u num_fl=%u num_pl=%u\n", __func__, speed,
-		 num_vl, num_fl, num_pl);
+	dev_info(priv->device, "DBG: lane_speed=%d fec_type=%s speed=%u num_vl=%u num_fl=%u num_pl=%u\n",
+		 lane_speed, priv->fec_type, speed, num_vl, num_fl, num_pl);
 
 	/* TX User Flow */
 	/* Step 1 After power up or reset, wait until TX raw offset data are ready */
@@ -1402,6 +1404,38 @@ static bool ftile_ptp_rx_ready_bit_is_set(intel_fpga_xtile_eth_private *priv)
 	return is_set;
 }
 
+void ftile_pio_speed_set(intel_fpga_xtile_eth_private *priv, u8 lane, u32 speed)
+{
+	if (!priv->pio_speed_base)
+		return;
+
+	switch (speed) {
+	case SPEED_10000:
+		tse_set_bit(priv->pio_speed_base, 0, BIT(lane));
+		break;
+	case SPEED_25000:
+	case SPEED_40000:
+	case SPEED_50000:
+	case SPEED_100000:
+	case SPEED_200000:
+	case SPEED_400000:
+	default:
+		tse_clear_bit(priv->pio_speed_base, 0, BIT(lane));
+		break;
+	}
+}
+
+void ftile_pio_datapath_reset(intel_fpga_xtile_eth_private *priv, u8 lane, bool assert)
+{
+	if (!priv->pio_datapath_reset_base)
+		return;
+
+	if (assert)
+		tse_set_bit(priv->pio_datapath_reset_base, 0, BIT(lane));
+	else
+		tse_clear_bit(priv->pio_datapath_reset_base, 0, BIT(lane));
+}
+
 int ftile_init(intel_fpga_xtile_eth_private *priv)
 {
 	/* Get eth_rate */
@@ -1415,6 +1449,10 @@ int ftile_init(intel_fpga_xtile_eth_private *priv)
 
 	/* Enable flow ctrl */
 	ftile_enable_mac_flow_ctrl(priv);
+
+	if (priv->dr_supported)
+		priv->link_speed = hssi_get_active_profile_speed(priv->pdev_hssi);
+
 	return 0;
 }
 
@@ -1424,6 +1462,10 @@ int ftile_start(intel_fpga_xtile_eth_private *priv)
 
 	/* Get eth_rate */
 	ftile_convert_eth_speed_to_eth_rate(priv);
+
+	/* only when both speed is set for both ANLT/non-ANLT we set the bit */
+	if (priv->link_speed > 0)
+		ftile_pio_speed_set(priv, priv->hssi_rel_port, priv->link_speed);
 
 	/* Enable PTP feature */
 	if (priv->ptp_enable) {
@@ -1500,12 +1542,19 @@ static bool ftile_check_local_remote_fault_status(intel_fpga_xtile_eth_private *
 {
 	bool curr_link_state = true;
 
-	u32 rx_mac_link_fault = hssi_csrrd32_ba(priv->pdev_hssi,
-						HSSI_ETH_RECONFIG,
-						priv->tile_chan,
-						eth_soft_csroffs(link_fault_status));
+	u32 rx_mac_link_fault = 0;
 
-	if (rx_mac_link_fault & ETH_RX_MAC_REMOTE_FAULT)
+	hssi_csrwr32_ba(priv->pdev_hssi, HSSI_ETH_RECONFIG, priv->tile_chan,
+			eth_soft_csroffs(link_fault_status),
+			ETH_RX_MAC_REMOTE_FAULT | ETH_RX_MAC_LOCAL_FAULT);
+
+	rx_mac_link_fault = hssi_csrrd32_ba(priv->pdev_hssi,
+					    HSSI_ETH_RECONFIG,
+					    priv->tile_chan,
+					    eth_soft_csroffs(link_fault_status));
+
+	if ((rx_mac_link_fault & ETH_RX_MAC_REMOTE_FAULT) ||
+	    (rx_mac_link_fault & ETH_RX_MAC_LOCAL_FAULT))
 		curr_link_state = false;
 
 	return curr_link_state;
@@ -1513,6 +1562,8 @@ static bool ftile_check_local_remote_fault_status(intel_fpga_xtile_eth_private *
 
 bool ftile_check_dts_param(intel_fpga_xtile_eth_private *priv)
 {
+	struct resource *pio_spd_res = NULL;
+	struct resource *pio_dr_res =  NULL;
 	struct platform_device *pdev;
 	struct device_node *np;
 	int ret;
@@ -1546,6 +1597,41 @@ bool ftile_check_dts_param(intel_fpga_xtile_eth_private *priv)
 				priv->ptp_rx_routing_adj = 0;
 			}
 		}
+	}
+
+	pio_dr_res = platform_get_resource_byname(pdev, IORESOURCE_MEM,
+						  "pio_datapath_reset");
+
+	if (pio_dr_res) {
+		priv->pio_datapath_reset_base =
+			devm_ioremap_resource(&pdev->dev, pio_dr_res);
+
+		if (IS_ERR(priv->pio_datapath_reset_base)) {
+			dev_warn(&pdev->dev, "Failed to map pio_datapath_reset register\n");
+			priv->pio_datapath_reset_base = NULL;
+		} else {
+			dev_info(&pdev->dev, "pio_datapath_reset register mapped at %pa\n",
+				 &pio_dr_res->start);
+		}
+	} else {
+		priv->pio_datapath_reset_base = NULL;
+	}
+
+	pio_spd_res = platform_get_resource_byname(pdev, IORESOURCE_MEM, "pio_speed");
+
+	if (pio_spd_res) {
+		priv->pio_speed_base =
+			devm_ioremap_resource(&pdev->dev, pio_spd_res);
+
+		if (IS_ERR(priv->pio_speed_base)) {
+			dev_warn(&pdev->dev, "Failed to map pio_speed register\n");
+			priv->pio_speed_base = NULL;
+		} else {
+			dev_info(&pdev->dev, "pio_speed register mapped at %pa\n",
+				 &pio_spd_res->start);
+		}
+	} else {
+		priv->pio_speed_base = NULL;
 	}
 
 	return true;
