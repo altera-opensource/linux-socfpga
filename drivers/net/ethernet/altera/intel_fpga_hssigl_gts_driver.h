@@ -9,6 +9,8 @@
 #ifndef __INTEL_FPGA_HSSIGL_GTS_DRIVER_H__
 #define __INTEL_FPGA_HSSIGL_GTS_DRIVER_H__
 
+#include "intel_fpga_eth_gts.h"
+
 /* *_BASE_START address is relative offset from the sscsr register as
  * selected by the DTS
  */
@@ -17,21 +19,21 @@
 #define  DR_BASE_START         0x011000
 #define  DR_BASE_LEN           0x000080
 #define  SOFTIP_BASE_START     0x000100
-#define  SOFTIP_BASE_LEN       0x00004F
+#define  SOFTIP_BASE_LEN       sizeof (struct intel_fpga_gts_eth_softip_csr)
 #define  SOFTIP_PTP_START      0x000800
-#define  SOFTIP_PTP_LEN        0x000118
+#define  SOFTIP_PTP_LEN        sizeof (struct intel_fpga_gts_eth_softip_ptp)
 #define  HARDIP_PLD_START      0x020000
 #define  HARDIP_PLD_LEN        0x0003FF
 #define  HARDIP_PTP_START      0x040000
-#define  HARDIP_PTP_LEN	       0x0007FF
+#define  HARDIP_PTP_LEN	       sizeof (struct intel_fpga_gts_hardip_ptp)
 #define  HARDIP_EMAC_START     0x050000
-#define  HARDIP_EMAC_LEN       0x000FFF
+#define  HARDIP_EMAC_LEN       sizeof(struct intel_fpga_gts_hardip_emac)
 #define  HARDIP_PCS_FEC_START  0x051000
-#define  HARDIP_PCS_FEC_LEN    (0x2F0000 - 1)
+#define  HARDIP_PCS_FEC_LEN    sizeof (struct intel_fpga_gts_pcs_fec)
 #define  HARDIP_XCVR_PMA_START 0x080000
-#define  HARDIP_XCVR_PMA_LEN   0x001FFF
+#define  HARDIP_XCVR_PMA_LEN   sizeof (struct intel_fpga_gts_hardip_xcvr_pma)
 #define  HARDIP_PMA_START      0x090000
-#define  HARDIP_PMA_LEN	       0x0D0000
+#define  HARDIP_PMA_LEN	       sizeof (struct intel_fpga_gts_hardip_pma)
 #define  USER_CSR_START        0x000000
 #define  USER_CSR_LEN	       0x001000
 

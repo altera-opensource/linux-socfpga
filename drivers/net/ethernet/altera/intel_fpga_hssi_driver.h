@@ -288,6 +288,7 @@ int hssidrv_get_fw_version(struct platform_device *pdev, u32 cmd, void *priv_dat
 int hssidrv_ncsi_link_status(struct platform_device *pdev, u32 cmd, void *priv_data);
 int hssidrv_read_mac_stat(struct platform_device *pdev, u32 cmd, void *priv_data);
 int hssidrv_get_mtu(struct platform_device *pdev, u32 cmd, void *priv_data);
+int hssidrv_set_mtu(struct platform_device *pdev, u32 cmd, void *priv_data);
 int hssidrv_reset_mac_stat(struct platform_device *pdev, u32 cmd, void *priv_data);
 int hssidrv_get_set_dr_profile(struct platform_device *pdev, u32 cmd, void *dr_data,
 			       bool rd);

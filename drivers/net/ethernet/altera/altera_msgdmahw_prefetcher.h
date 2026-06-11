@@ -50,7 +50,7 @@ struct msgdma_pref_extended_desc {
 	u32 timestamp_96b[3];
 	/* desc_control */
 	u32 desc_control;
-};
+}  __aligned(64);;
 
 /* mSGDMA Prefetcher Descriptor Status bits */
 #define MSGDMA_PREF_DESC_STAT_STOPPED_ON_EARLY		BIT(8)

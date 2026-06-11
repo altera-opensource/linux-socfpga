@@ -74,6 +74,13 @@
                         status = "okay";
                 };
 
+                sfp_eth0: sfp-eth0 {
+                        compatible = "altera,sfp-mem";
+                        reg-names = "sfp-mem-ctrl";
+                        reg = <0x44040000 0x00001000>;
+                        status = "okay";
+                };
+
 		msgdma_gts_0_eth: msgdma_gts_0_eth {
 			compatible = "altr,msgdma-gts-1.0";
 			#address-cells = <1>;

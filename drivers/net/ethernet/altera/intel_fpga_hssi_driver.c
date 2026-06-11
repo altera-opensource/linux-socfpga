@@ -267,6 +267,30 @@ int hssidrv_get_mtu(struct platform_device *pdev, u32 cmd,
 	return ret;
 }
 
+int hssidrv_set_mtu(struct platform_device *pdev, u32 cmd,
+		    void *priv_data)
+{
+	int ret;
+	u32 ctrl_addr = 0;
+	u32 cmd_sts = 0;
+	u32 val;
+	struct set_mtu_data *data = (struct set_mtu_data *)priv_data;
+	struct hssiss_private *priv = platform_get_drvdata(pdev);
+
+	if (!test_reg_bits(priv->feature_list.part.port_enable_mask, data->port, 1))
+		return -EIO;
+
+	ctrl_addr |= data->port << HSSI_SAL_CTRLADDR_PORT_SHIFT;
+	ctrl_addr |= cmd;
+	cmd_sts |= HSSI_SAL_CMDSTS_WR;
+
+	val = data->max_tx_frame_size << 16 | data->max_rx_frame_size;
+
+	ret = hssidrv_sal_execute(pdev, ctrl_addr, cmd_sts, &val);
+
+	return ret;
+}
+
 int hssidrv_read_mac_stat(struct platform_device *pdev, u32 cmd,
 			  void *priv_data)
 {
