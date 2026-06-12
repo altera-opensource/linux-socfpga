@@ -10,4 +10,4 @@ runs:
   - id: set-version
     shell: bash
     run: |
-      echo "SOCFPGA_REFDES_VERSION=mainline/668" >> $GITHUB_OUTPUT
+      echo "SOCFPGA_REFDES_VERSION=25.3.1/668" >> $GITHUB_OUTPUT
