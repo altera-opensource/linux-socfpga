@@ -170,8 +170,8 @@
 			qsfp-lane = <0x0>;
 			altr,has-ptp;
 			ptp_accu_mode = "Advanced";
-			ptp_tx_routing_adj = <23003>; //0.351 * 65536
-			ptp_rx_routing_adj = <14303>; //0.21825 * 65536
+			ptp_tx_routing_adj = <39665>; // 0.60525 * 65536
+			ptp_rx_routing_adj = <25493>; // 0.389 * 65536
 			status = "okay";
 			ui-adj-interval = <250>;
 			num_channels = <3>;
@@ -275,8 +275,8 @@
 			qsfp-lane = <0x0>;
 			altr,has-ptp;
 			ptp_accu_mode = "Advanced";
-			ptp_tx_routing_adj = <25985>; // 0.3965 * 65536
-			ptp_rx_routing_adj = <23494>; // 0.3585 * 65536
+			ptp_tx_routing_adj = <29720>; // 0.4535 * 65536
+			ptp_rx_routing_adj = <26968>; // 0.4115 * 65536
 			status = "okay";
 			ui-adj-interval = <250>;
 			num_channels = <3>;
