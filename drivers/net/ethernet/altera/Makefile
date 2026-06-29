@@ -24,7 +24,7 @@ endif
 
 ifeq ($(CONFIG_INTEL_FPGA_FREQ_CTRL), y)
 	obj-$(CONFIG_INTEL_FPGA_FREQ_CTRL) += intel_frequency_ctrl_driver.o
-	
+
         ifeq ($(CONFIG_DEBUG_FS),y)
 		intel_frequency_ctrl_driver-objs := intel_freq_ctrl_zl30733_debugfs.o
 	endif
@@ -93,6 +93,10 @@ ifeq ($(CONFIG_INTEL_FPGA_HSSI_XTILE),y)
 				      intel_fpga_hssi_ftile_ethtool.o	\
 				      altera_fpga_anlt.o
 
+        ifeq ($(CONFIG_INTEL_FPGA_XTILE_TSE),y)
+                intel_fpga_hssi_xtile-objs += intel_fpga_eth_xtile_tse.o \
+                                              intel_fpga_eth_xtile_tse_ethtool.o
+	endif
 endif
 
 ifeq ($(CONFIG_INTEL_FPGA_GTS_TILE), y)

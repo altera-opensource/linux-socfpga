@@ -1,0 +1,95 @@
+// SPDX-License-Identifier: GPL-2.0
+/*
+ * Copyright (C) 2026 Altera Corporation
+ */
+
+/{
+	soc: soc@0{
+		agilex_hps_bridges: bus@20000000 {
+		compatible = "simple-bus";
+		reg = <0x20000000 0x00001000>,
+		      <0x40000000 0x07000000>,
+		      <0x50000000 0x00020000>;
+		reg-names = "axi_h2f", "axi_h2f_lw";
+		#address-cells = <2>;
+		#size-cells = <1>;
+		ranges = <0x00000000 0x00000000 0x20000000 0x00001000>, /*axi h2f_lw*/
+			 <0x00000001 0x82200000 0x82200000 0x00200000>, /* TSE MAC */
+			 <0x00000001 0x80001100 0x80001100 0x000000FF>, /*DMAs */
+			 <0x00000001 0x40000000 0x40000000 0x04000000>, /*axi_h2f: Ethernet subsytem*/
+			 <0x00000001 0x44040000 0x44040000 0x00010000>, /*axi_h2f: QSFP Controller*/
+			 <0x00000001 0x44050000 0x44050000 0x00000040>, /*axi_h2f: Master ToD*/
+			 <0x00000001 0x45000000 0x45000000 0x00300000>, /*axi_h2f: mSGDMA Global CSR, Port CSR*/
+			 <0x00000001 0x50000000 0x50000000 0x00003000>, /*axi_h2f: Port0:HE, Pkt Mux, User CSR*/
+			 <0x00000001 0x50010000 0x50010000 0x00003000>; /*axi_h2f: Port1:HE, Pkt Mux, User CSR*/
+		};
+		clocks {
+			tod_in_clock: tod_in_clock {
+				#clock-cells = <0>;
+				compatible = "fixed-clock";
+				clock-frequency = <156250000>;
+				clock-output-names = "tod_in_clock";
+			};
+		};
+		tse_1_eth: tse_1_eth {
+			reg-names = "control_port";
+			reg =   <0x40000000 0x00000fff>;
+
+			compatible = "altr,xtile-tse-1.0";
+			#address-cells = <1>;
+			#size-cells = <1>;
+			ranges;
+			phy-mode = "sgmii";     /* embeddedsw.dts.params.phy-mode type STRING */
+			max-speed = <1000>;
+			monitor_poll_interval = <10>;
+			if_name = "eth1";
+			num_channels = <1>;
+			status = "okay";
+			max-frame-size = <1518>;
+			/* MAC internal FIFO depths (used by the driver to compute
+			 * rx_section_empty / tx_section_empty thresholds in MAC CSRs).
+			 * These are separate from the prefetcher FIFO depths declared
+			 * inside dma_0 below.
+			 */
+			rx-fifo-depth = <0x4000>;
+			tx-fifo-depth = <0x1000>;
+			altr,enable-sup-addr = <0>;
+			altr,enable-hash = <0>;
+			altr,has-supplementary-unicast;
+			altr,has-hash-multicast-filter;
+			interrupt-parent = <&intc>;
+			interrupt-names = "dma0_tx_irq", "dma0_rx_irq";
+			interrupts = <GIC_SPI 19 IRQ_TYPE_LEVEL_HIGH>, <GIC_SPI 20 IRQ_TYPE_LEVEL_HIGH>;
+			phy-handle = <&tse_phy0>;
+			phy-addr = <0>;
+			mdio {
+				compatible = "altr,tse-mdio";
+				mdio-id = <0>;
+				#address-cells = <1>;
+				#size-cells = <0>;
+				tse_phy0: ethernet-phy@0 {
+					reg = <0x0>;
+					compatible = "ethernet-phy-ieee802.3-c45";
+				};
+			};
+			dma_0 {
+				reg-names =     "tx_pref",
+						"tx_csr",
+						"tx_fifo",
+						"rx_pref",
+						"rx_csr",
+						"rx_fifo";
+				reg =   <0x45000000 0x00000020>,
+					<0x45000020 0x00000020>,
+					<0x45000040 0x00000020>,
+					<0x45000080 0x00000020>,
+					<0x450000A0 0x00000020>,
+					<0x450000C0 0x00000020>;
+				rx-fifo-depth = <0x4000>;
+				tx-fifo-depth = <0x1000>;
+				rx-fifo-almost-full = <0x2000>;
+				rx-fifo-almost-empty = <0x1000>;
+			};
+		};
+	};
+};

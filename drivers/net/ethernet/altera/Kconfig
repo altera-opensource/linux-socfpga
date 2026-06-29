@@ -72,7 +72,25 @@ config INTEL_FPGA_GTS_TILE
           This driver supports the Altera FPGA GTS Ethernet MAC.
 
           To compile this driver as a module, choose M here. The module
-          will be called intel_fpga_hssi_xtile.
+          will be called intel_fpga_gts_tile.
+
+config INTEL_FPGA_XTILE_TSE
+	bool "Altera FPGA XTile based TSE driver support"
+	depends on INTEL_FPGA_HSSI_XTILE
+	depends on OF
+	select PHYLIB
+	select PHYLINK
+	select PCS_LYNX
+	select MDIO_REGMAP
+	select REGMAP_MMIO
+	help
+	  This adds the Altera Triple-Speed Ethernet (TSE) MAC variant to the
+	  xtile pluggable driver framework, with 1000BASE-X/SGMII PCS and an
+	  external 10/100/1000 copper PHY (e.g., Marvell 88E2110) over SGMII.
+
+	  The TSE variant is compiled into the intel_fpga_hssi_xtile module
+	  (it is not a separate module), so this option requires
+	  INTEL_FPGA_HSSI_XTILE.
 
 config INTEL_FPGA_TOD
 	tristate "Altera FPGA ToD driver support"
