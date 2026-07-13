@@ -29,6 +29,7 @@
  #include "intel_fpga_eth_main.h"
  #include "intel_fpga_ftile_driver.h"
  #include "intel_fpga_etile_driver.h"
+ #include "intel_fpga_eth_xtile_tse.h"
  #include "intel_fpga_gts_driver.h"
  #include "intel_fpga_eth_hssi_itf.h"
  #include "intel_fpga_eth_tile_ops.h"
@@ -1156,7 +1157,8 @@ static int xtile_open(struct net_device *dev)
 			    dev->dev_addr);
 
 	/* clear the MAC layer statistics to start afresh */
-	xtile_clear_mac_statistics(pdev, hssi_port);
+	if (priv->pdev_hssi)
+		xtile_clear_mac_statistics(pdev, hssi_port);
 
 	/* we need to clear the dev stats so that the ifconfig on interface
 	 * shouldn't show old data
@@ -1259,7 +1261,7 @@ static int xtile_shutdown(struct net_device *dev)
 
 	eth_link_down(priv);
 
-	if (priv->anlt) {
+	if (priv->anlt && priv->pdev_hssi) {
 		if (priv->autoneg)
 			ret = hssi_anlt_disable(priv->pdev_hssi, priv->hssi_port);
 	}
@@ -1524,7 +1526,10 @@ static int xtile_set_hwtstamp_config(struct net_device *dev, struct ifreq *ifr)
  */
 static void xtile_set_rx_mode(struct net_device *dev)
 {
-	/* Not Supported */
+	struct intel_fpga_xtile_eth_private *priv = netdev_priv(dev);
+
+	if (priv->spec_ops && priv->spec_ops->tile.set_rx_mode)
+		priv->spec_ops->tile.set_rx_mode(dev);
 }
 
 static void xtile_update_mtu(struct intel_fpga_xtile_eth_private *priv,
@@ -1535,7 +1540,7 @@ static void xtile_update_mtu(struct intel_fpga_xtile_eth_private *priv,
 	struct set_mtu_data frame;
 
 	if (new_mtu < min_mtu || new_mtu > max_mtu) {
-		dev_err(&priv->pdev_hssi->dev,
+		dev_err(priv->device,
 			"WARNING:MTU size supported is: min(%u), max(%u) setting mtu to %u",
 			min_mtu, max_mtu, new_mtu);
 
@@ -1548,13 +1553,16 @@ static void xtile_update_mtu(struct intel_fpga_xtile_eth_private *priv,
 
 	priv->dev->mtu = new_mtu;
 
-	new_mtu += ETH_HLEN + VLAN_HLEN;
-	new_mtu = min_t(unsigned int, new_mtu, IP_MAX_MTU);
+	/* FIX: Only push MTU to HSSI hardware if it's an HSSI MAC */
+	if (priv->pdev_hssi) {
+		new_mtu += ETH_HLEN + VLAN_HLEN;
+		new_mtu = min_t(unsigned int, new_mtu, IP_MAX_MTU);
 
-	frame.port = priv->hssi_port;
-	frame.max_rx_frame_size = new_mtu;
-	frame.max_tx_frame_size = new_mtu;
-	hssiss_set_mtu(priv->pdev_hssi, SAL_SET_MTU, &frame);
+		frame.port = priv->hssi_port;
+		frame.max_rx_frame_size = new_mtu;
+		frame.max_tx_frame_size = new_mtu;
+		hssiss_set_mtu(priv->pdev_hssi, SAL_SET_MTU, &frame);
+	}
 }
 
 static int xtile_change_mtu(struct net_device *dev, int new_mtu)
@@ -1978,38 +1986,40 @@ static int intel_fpga_xtile_probe(struct platform_device *pdev)
 		priv->dma_info[queue].dma_priv.msg_enable = netif_msg_init(debug,
 									   default_msg_level);
 	}
-	/* Get the HSSI node device from the device tree node */
+
 	dev_hssi = of_parse_phandle(pdev->dev.of_node, "hssiss", 0);
-	if (!dev_hssi)
-		return -ENOENT;
 
-	pdev_hssi = of_find_device_by_node(dev_hssi);
-	of_node_put(dev_hssi);
-	if (!pdev_hssi)
-		return -ENODEV;
-	priv->pdev_hssi = pdev_hssi;
-
-	/* Get the HSSI node device from the device tree node */
-	/* get hssi port no from device tree */
-	if (of_property_read_u32(np, "hssi_relative_port",
-				 &priv->hssi_rel_port)) {
-		priv->hssi_rel_port = 0;
+	if (dev_hssi) {
+		pdev_hssi = of_find_device_by_node(dev_hssi);
+		of_node_put(dev_hssi);
+		if (!pdev_hssi)
+			return -ENODEV;
+		priv->pdev_hssi = pdev_hssi;
 	}
 
-	if (of_property_read_u32(np, "hssi_port",
-				 &priv->hssi_port)) {
-		dev_err(&pdev->dev, "cannot obtain hssi port info\n");
-		ret = -ENXIO;
-		goto err_free_netdev;
-	}
+	/* Only fetch HSSI-specific port configurations if HSSI is present */
+	if (priv->pdev_hssi) {
+		/* Get the HSSI node device from the device tree node */
+		/* get hssi port no from device tree */
+		if (of_property_read_u32(np, "hssi_relative_port",
+					 &priv->hssi_rel_port)) {
+			priv->hssi_rel_port = 0;
+		}
 
-	if (of_property_read_u32(np, "tile_chan",
-				 &priv->tile_chan)) {
-		dev_err(&pdev->dev, "cannot obtain tile channel info\n");
-		ret = -ENXIO;
-		goto err_free_netdev;
-	}
+		if (of_property_read_u32(np, "hssi_port",
+					 &priv->hssi_port)) {
+			dev_err(&pdev->dev, "cannot obtain hssi port info\n");
+			ret = -ENXIO;
+			goto err_free_netdev;
+		}
 
+		if (of_property_read_u32(np, "tile_chan",
+					 &priv->tile_chan)) {
+			dev_err(&pdev->dev, "cannot obtain tile channel info\n");
+			ret = -ENXIO;
+			goto err_free_netdev;
+		}
+	}
 	if (of_property_read_u32(np, "monitor_poll_interval",
 				 &priv->monitor_poll_interval)) {
 		dev_err(&pdev->dev, "cannot obtain monitor poll interval\n");
@@ -2157,43 +2167,6 @@ static int intel_fpga_xtile_probe(struct platform_device *pdev)
 		}
 	}
 
-	/* Get MAC PMA digital delays from device tree */
-	if (of_property_read_u32(np, "altr,tx-pma-delay-ns",
-				 &priv->tx_pma_delay_ns)) {
-		dev_warn(&pdev->dev, "cannot obtain Tx PMA delay ns\n");
-		priv->tx_pma_delay_ns = 0;
-	}
-
-	if (of_property_read_u32(np, "altr,rx-pma-delay-ns",
-				 &priv->rx_pma_delay_ns)) {
-		dev_warn(&pdev->dev, "cannot obtain Rx PMA delay\n");
-		priv->rx_pma_delay_ns = 0;
-	}
-
-	if (of_property_read_u32(np, "altr,tx-pma-delay-fns",
-				 &priv->tx_pma_delay_fns)) {
-		dev_warn(&pdev->dev, "cannot obtain Tx PMA delay fns\n");
-		priv->tx_pma_delay_fns = 0;
-	}
-
-	if (of_property_read_u32(np, "altr,rx-pma-delay-fns",
-				 &priv->rx_pma_delay_fns)) {
-		dev_warn(&pdev->dev, "cannot obtain Rx PMA delay\n");
-		priv->rx_pma_delay_fns = 0;
-	}
-
-	if (of_property_read_u32(np, "altr,tx-external-phy-delay-ns",
-				 &priv->tx_external_phy_delay_ns)) {
-		dev_warn(&pdev->dev, "cannot obtain Tx phy delay ns\n");
-		priv->tx_external_phy_delay_ns = 0;
-	}
-
-	if (of_property_read_u32(np, "altr,rx-external-phy-delay-ns",
-				 &priv->rx_external_phy_delay_ns)) {
-		dev_warn(&pdev->dev, "cannot obtain Rx phy delay ns\n");
-		priv->rx_external_phy_delay_ns = 0;
-	}
-
 	if (of_get_mac_address(pdev->dev.of_node, macaddr)) {
 		dev_info(&pdev->dev, "cannot obtain MAC address using random HW address\n");
 		eth_hw_addr_random(ndev);
@@ -2201,81 +2174,120 @@ static int intel_fpga_xtile_probe(struct platform_device *pdev)
 		dev_addr_set(ndev, macaddr);
 	}
 
-	priv->dr_supported  = hssi_dr_profiles_available(pdev_hssi);
-	dev_info(&pdev->dev, "DR support: %s\n", priv->dr_supported ? "yes" : "no");
-
-	/* Derive phy_iface from the boot DR profile (index 0) when DR is
-	 * available; fall back to the DTS "phy-mode" property otherwise.
-	 */
-	if (priv->dr_supported) {
-		int boot_speed = hssi_get_active_profile_speed(pdev_hssi);
-
-		priv->phy_iface = (boot_speed > 0) ?
-				  intel_fpga_xtile_speed_to_phy_iface(boot_speed) :
-				  PHY_INTERFACE_MODE_NA;
-
-		if (priv->phy_iface == PHY_INTERFACE_MODE_NA) {
-			dev_err(&pdev->dev,
-				"DR boot profile speed %d has no PHY interface mapping\n",
-				boot_speed);
-			ret = -EINVAL;
-			goto err_register_netdev;
+	if (priv->pdev_hssi) {
+		/* Get MAC PMA digital delays from device tree */
+		if (of_property_read_u32(np, "altr,tx-pma-delay-ns",
+					 &priv->tx_pma_delay_ns)) {
+			dev_warn(&pdev->dev, "cannot obtain Tx PMA delay ns\n");
+			priv->tx_pma_delay_ns = 0;
 		}
 
-		dev_info(&pdev->dev, "phy-mode derived from DR profile: %s (speed=%d Mbps)\n",
-			 phy_modes(priv->phy_iface), boot_speed);
-
-	} else {
-		ret = of_get_phy_mode(np, &priv->phy_iface);
-		if (ret) {
-			dev_err(&pdev->dev, "incorrect phy-mode\n");
-			goto err_register_netdev;
+		if (of_property_read_u32(np, "altr,rx-pma-delay-ns",
+					 &priv->rx_pma_delay_ns)) {
+			dev_warn(&pdev->dev, "cannot obtain Rx PMA delay\n");
+			priv->rx_pma_delay_ns = 0;
 		}
-	}
-	
-	/* Check autoneg */
-	ret  = of_property_read_string(pdev->dev.of_node, "autoneg_enabled",
-				       &autoneg_enabled);
-	dev_info(&pdev->dev, "autoneg_enabled property: %s", autoneg_enabled);
-	priv->anlt = of_property_read_bool(pdev->dev.of_node,
-					   "altr,has-anlt");
-	priv->prev_anlt_err = -1;
-	priv->fec_type = fec_type_none;
-	if (priv->anlt) {
-		if (strcasecmp(autoneg_enabled, "yes") == 0) {
-			priv->autoneg = true;
-			ret = altera_fpga_anlt_get_capabilities(priv);
-			if (ret)
-				dev_err(&pdev->dev, "ANLT : %s", get_anlt_error(ret));
+
+		if (of_property_read_u32(np, "altr,tx-pma-delay-fns",
+					 &priv->tx_pma_delay_fns)) {
+			dev_warn(&pdev->dev, "cannot obtain Tx PMA delay fns\n");
+			priv->tx_pma_delay_fns = 0;
+		}
+
+		if (of_property_read_u32(np, "altr,rx-pma-delay-fns",
+					 &priv->rx_pma_delay_fns)) {
+			dev_warn(&pdev->dev, "cannot obtain Rx PMA delay\n");
+			priv->rx_pma_delay_fns = 0;
+		}
+
+		if (of_property_read_u32(np, "altr,tx-external-phy-delay-ns",
+					 &priv->tx_external_phy_delay_ns)) {
+			dev_warn(&pdev->dev, "cannot obtain Tx phy delay ns\n");
+			priv->tx_external_phy_delay_ns = 0;
+		}
+
+		if (of_property_read_u32(np, "altr,rx-external-phy-delay-ns",
+					 &priv->rx_external_phy_delay_ns)) {
+			dev_warn(&pdev->dev, "cannot obtain Rx phy delay ns\n");
+			priv->rx_external_phy_delay_ns = 0;
+		}
+
+		priv->dr_supported  = hssi_dr_profiles_available(pdev_hssi);
+		dev_info(&pdev->dev, "DR support: %s\n", priv->dr_supported ? "yes" : "no");
+
+		/* Derive phy_iface from the boot DR profile (index 0) when DR is
+		 * available; fall back to the DTS "phy-mode" property otherwise.
+		 */
+		if (priv->dr_supported) {
+			int boot_speed = hssi_get_active_profile_speed(pdev_hssi);
+
+			priv->phy_iface = (boot_speed > 0) ?
+					  intel_fpga_xtile_speed_to_phy_iface(boot_speed) :
+					  PHY_INTERFACE_MODE_NA;
+
+			if (priv->phy_iface == PHY_INTERFACE_MODE_NA) {
+				dev_err(&pdev->dev,
+					"DR boot profile speed %d has no PHY interface mapping\n",
+					boot_speed);
+				ret = -EINVAL;
+				goto err_register_netdev;
+			}
+
+			dev_info(&pdev->dev, "phy-mode derived from DR profile: %s (speed=%d Mbps)\n",
+				 phy_modes(priv->phy_iface), boot_speed);
+
 		} else {
-			priv->autoneg = false;
-			dev_info(&pdev->dev, "Disabling ANLT");
-			//Disable ANLT
-			ret = hssi_anlt_disable(pdev_hssi, priv->hssi_port);
-			if (ret)
-				dev_err(&pdev->dev, "Could not disable ANLT\n");
+			ret = of_get_phy_mode(np, &priv->phy_iface);
+			if (ret) {
+				dev_err(&pdev->dev, "incorrect phy-mode\n");
+				goto err_register_netdev;
+			}
 		}
-	}
 
-	if (!priv->autoneg) {
-		fixed_node = fwnode_get_named_child_node(pdev->dev.fwnode, "fixed-link");
-		if (fixed_node) {
-			if (!priv->dr_supported)
-				fwnode_property_read_u32(fixed_node, "speed", &priv->link_speed);
-			else
-				priv->link_speed = hssi_get_active_profile_speed(priv->pdev_hssi);
+		/* Check autoneg */
+		ret  = of_property_read_string(pdev->dev.of_node, "autoneg_enabled",
+					       &autoneg_enabled);
+		dev_info(&pdev->dev, "autoneg_enabled property: %s", autoneg_enabled);
+		priv->anlt = of_property_read_bool(pdev->dev.of_node,
+						   "altr,has-anlt");
+		priv->prev_anlt_err = -1;
+		priv->fec_type = fec_type_none;
+		if (priv->anlt) {
+			if (strcasecmp(autoneg_enabled, "yes") == 0) {
+				priv->autoneg = true;
+				ret = altera_fpga_anlt_get_capabilities(priv);
+				if (ret)
+					dev_err(&pdev->dev, "ANLT : %s", get_anlt_error(ret));
+			} else {
+				priv->autoneg = false;
+				dev_info(&pdev->dev, "Disabling ANLT");
+				//Disable ANLT
+				ret = hssi_anlt_disable(pdev_hssi, priv->hssi_port);
+				if (ret)
+					dev_err(&pdev->dev, "Could not disable ANLT\n");
+			}
+		}
 
-			/* read the fixed link properties*/
-			priv->duplex = DUPLEX_FULL;
-			priv->autoneg = false;
+		if (!priv->autoneg) {
+			fixed_node = fwnode_get_named_child_node(pdev->dev.fwnode, "fixed-link");
+			if (fixed_node) {
+				if (!priv->dr_supported)
+					fwnode_property_read_u32(fixed_node, "speed", &priv->link_speed);
+				else
+					priv->link_speed = hssi_get_active_profile_speed(priv->pdev_hssi);
 
-			dev_info(&pdev->dev, "\tfixed link speed:%d full duplex:%d\n",
-				 priv->link_speed, priv->duplex);
-			fwnode_handle_put(fixed_node);
-		} else {
-			dev_err(&pdev->dev, "fixed link property undefined\n");
-			ret = -ENODEV;
-			goto err_register_netdev;
+				/* read the fixed link properties*/
+				priv->duplex = DUPLEX_FULL;
+				priv->autoneg = false;
+
+				dev_info(&pdev->dev, "\tfixed link speed:%d full duplex:%d\n",
+					 priv->link_speed, priv->duplex);
+				fwnode_handle_put(fixed_node);
+			} else {
+				dev_err(&pdev->dev, "fixed link property undefined\n");
+				ret = -ENODEV;
+				goto err_register_netdev;
+			}
 		}
 	}
 
@@ -2320,21 +2332,28 @@ static int intel_fpga_xtile_probe(struct platform_device *pdev)
 
 	rwlock_init(&priv->wr_lock);
 
+	/* HSSI variants create phylink here, with KR/BASER interface modes
+	 * and the core's HSSI phylink ops. TSE creates its own phylink
+	 * lazily on first ifup (tse_lazy_pcs_phylink_setup), with
+	 * SGMII/1000BASEX/MII/GMII/RGMII and its own phylink ops, because
+	 * alt_tse_pcs_create() requires a registered netdev as its devm context.
+	 */
+	if (priv->pdev_hssi) {
+		__set_bit(PHY_INTERFACE_MODE_10GBASER, priv->phylink_config.supported_interfaces);
+		__set_bit(PHY_INTERFACE_MODE_25GBASER, priv->phylink_config.supported_interfaces);
+		__set_bit(PHY_INTERFACE_MODE_50GKR, priv->phylink_config.supported_interfaces);
+	//	__set_bit(PHY_INTERFACE_MODE_50GKP, priv->phylink_config.supported_interfaces);
+		__set_bit(PHY_INTERFACE_MODE_100GKR, priv->phylink_config.supported_interfaces);
+	//	__set_bit(PHY_INTERFACE_MODE_100GKP, priv->phylink_config.supported_interfaces);
 
-	__set_bit(PHY_INTERFACE_MODE_10GBASER, priv->phylink_config.supported_interfaces);
-	__set_bit(PHY_INTERFACE_MODE_25GBASER, priv->phylink_config.supported_interfaces);
-	__set_bit(PHY_INTERFACE_MODE_50GKR, priv->phylink_config.supported_interfaces);
-//	__set_bit(PHY_INTERFACE_MODE_50GKP, priv->phylink_config.supported_interfaces);
-	__set_bit(PHY_INTERFACE_MODE_100GKR, priv->phylink_config.supported_interfaces);
-//	__set_bit(PHY_INTERFACE_MODE_100GKP, priv->phylink_config.supported_interfaces);
-
-	/* create phylink */
-	priv->phylink = phylink_create(&priv->phylink_config, pdev->dev.fwnode,
-				       priv->phy_iface, &intel_fpga_xtile_phylink_ops);
-	if (IS_ERR(priv->phylink)) {
-		dev_err(&pdev->dev, "failed to create phylink\n");
-		ret = PTR_ERR(priv->phylink);
-		goto err_register_netdev;
+		/* create phylink */
+		priv->phylink = phylink_create(&priv->phylink_config, pdev->dev.fwnode,
+					       priv->phy_iface, &intel_fpga_xtile_phylink_ops);
+		if (IS_ERR(priv->phylink)) {
+			dev_err(&pdev->dev, "failed to create phylink\n");
+			ret = PTR_ERR(priv->phylink);
+			goto err_register_netdev;
+		}
 	}
 
 	ret  = of_property_read_string(pdev->dev.of_node, "if_name",
@@ -2353,11 +2372,14 @@ static int intel_fpga_xtile_probe(struct platform_device *pdev)
 
 	platform_set_drvdata(pdev, ndev);
 
-	ret = xtile_fec_init(pdev, priv);
-	if (ret < 0) {
-		dev_err(&pdev->dev, "Unable to init FEC\n");
-		ret = -ENXIO;
-		goto err_init_fec;
+	/* Only initialize FEC for HSSI variants. Skip for TSE. */
+	if (priv->pdev_hssi) {
+		ret = xtile_fec_init(pdev, priv);
+		if (ret < 0) {
+			dev_err(&pdev->dev, "Unable to init FEC\n");
+			ret = -ENXIO;
+			goto err_init_fec;
+		}
 	}
 
 	/* Default, Need to change this */
@@ -2371,6 +2393,10 @@ static int intel_fpga_xtile_probe(struct platform_device *pdev)
 err_init_fec:
 	unregister_netdev(ndev);
 err_register_netdev:
+	if (priv->phylink) {
+		phylink_destroy(priv->phylink);
+		priv->phylink = NULL;
+	}
 	for (queue = 0; queue < priv->num_channels; queue++)
 		netif_napi_del(&priv->dma_info[queue].napi);
 err_free_netdev:
@@ -2384,12 +2410,24 @@ static void intel_fpga_xtile_remove(struct platform_device *pdev)
 {
 	struct intel_fpga_xtile_eth_private *priv;
 	struct net_device *ndev;
+	int ret;
 
 	ndev = platform_get_drvdata(pdev);
 	priv = netdev_priv(ndev);
 
 	/* perform the proper cleaning up */
 	xtile_shutdown(ndev);
+	if (priv->spec_ops->tile.remove) {
+		ret = priv->spec_ops->tile.remove(pdev);
+		if (ret)
+			dev_err(&pdev->dev, "failed to remove ethernet device\n");
+	}
+
+	if (priv->phylink) {
+		phylink_destroy(priv->phylink);
+		priv->phylink = NULL;
+	}
+
 	kfree(priv->dma_info);
 	platform_set_drvdata(pdev, NULL);
 	unregister_netdev(ndev);
@@ -2479,6 +2517,27 @@ static const struct xtile_spec_ops gts_data = {
  #endif
 };
 
+#ifdef CONFIG_INTEL_FPGA_XTILE_TSE
+static const struct xtile_spec_ops tse_data = {
+	.dma_ops   = &altera_dtype_prefetcher,
+	.tile = {
+		.reset             = intel_fpga_tse_reset,
+		.deassert_reset    = intel_fpga_tse_deassert_reset,
+		.init              = intel_fpga_tse_init,
+		.uninit            = intel_fpga_tse_uninit,
+		.start             = intel_fpga_tse_start,
+		.stop              = intel_fpga_tse_stop,
+		.remove            = intel_fpga_tse_remove,
+		.update_mac_addr   = intel_fpga_tse_update_mac_addr,
+		.link_fault_status = intel_fpga_tse_get_link_fault_status,
+		.reg_ethtool_ops   = intel_fpga_tse_set_ethtool_ops,
+		.check_dts_param   = intel_fpga_tse_check_dts_param,
+		.set_rx_mode       = intel_fpga_tse_dispatch_set_rx_mode,
+	},
+		.link_check       = xtile_get_link_status,
+};
+#endif
+
 static const struct of_device_id intel_fpga_xtile_ll_ids[] = {
 	{.compatible = "altr,hssi-etile-1.0",
 	 .data = &etile_data,
@@ -2489,6 +2548,11 @@ static const struct of_device_id intel_fpga_xtile_ll_ids[] = {
 	{.compatible = "altr,msgdma-gts-1.0",
 	 .data = &gts_data,
 	},
+#ifdef CONFIG_INTEL_FPGA_XTILE_TSE
+	{.compatible = "altr,xtile-tse-1.0",
+	 .data = &tse_data,
+	},
+#endif
 };
 
 MODULE_DEVICE_TABLE(of, intel_fpga_xtile_ll_ids);

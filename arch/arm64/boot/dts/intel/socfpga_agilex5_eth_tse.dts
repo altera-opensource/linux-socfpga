@@ -1,0 +1,7 @@
+// SPDX-License-Identifier: GPL-2.0
+/*
+ * Copyright (C) 2026 Altera Corporation
+ */
+#include "socfpga_agilex5_socdk_modular.dts"
+#include "socfpga_agilex5_eth_tse.dtsi"
+

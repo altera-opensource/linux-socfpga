@@ -124,6 +124,7 @@ typedef struct intel_fpga_xtile_eth_private {
 	bool dr_supported;
 	void __iomem *pio_speed_base;
 	void __iomem *pio_datapath_reset_base;
+	void *intel_fpga_tile_private;
 	bool ptp_enable;
 	u32 link_state;
 	bool cable_unplugged;
