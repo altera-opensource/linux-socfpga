@@ -2415,23 +2415,24 @@ static void intel_fpga_xtile_remove(struct platform_device *pdev)
 	ndev = platform_get_drvdata(pdev);
 	priv = netdev_priv(ndev);
 
-	/* perform the proper cleaning up */
-	xtile_shutdown(ndev);
+        if (priv->phylink) {
+                phylink_destroy(priv->phylink);
+                priv->phylink = NULL;
+        }
+
+        unregister_netdev(ndev);
+        free_netdev(ndev);
+
+        kfree(priv->dma_info);
+        priv->dma_info = NULL;
+
 	if (priv->spec_ops->tile.remove) {
 		ret = priv->spec_ops->tile.remove(pdev);
 		if (ret)
 			dev_err(&pdev->dev, "failed to remove ethernet device\n");
 	}
 
-	if (priv->phylink) {
-		phylink_destroy(priv->phylink);
-		priv->phylink = NULL;
-	}
-
-	kfree(priv->dma_info);
 	platform_set_drvdata(pdev, NULL);
-	unregister_netdev(ndev);
-	free_netdev(ndev);
 }
 
 static const struct altera_dmaops altera_dtype_prefetcher = {
