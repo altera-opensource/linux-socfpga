@@ -15,7 +15,8 @@
  #include "intel_fpga_ftile_driver.h"
  #include "intel_fpga_hssi_driver.h"
  #include <linux/interrupt.h>
-
+ #include <linux/delay.h>
+ 
  #define FTILE_EHIP_RESET_TO		10000 /* in us */
  #define FTILE_EHIP_RESET_POLL_INTERVAL	5 /* in us */
 
@@ -1499,16 +1500,19 @@ int ftile_uninit(intel_fpga_xtile_eth_private *priv)
 
 	/* Disable Ftile MAC flow ctrl */
 	ftile_disable_mac_flow_ctrl(priv);
-
+	
 	/* Just to make sure Ftile feature are disabled */
 	ftile_stop(priv);
 
-	/* Disable Ftile MAC datapath */
-	ftile_disable_mac(priv);
+	/* datapath reset is added to clear any unserved packets 
+	 * during link down and up
+	 */
+	ftile_pio_datapath_reset(priv, priv->hssi_rel_port, true);
 
-	/* Disable Ftile MAC flow ctrl */
-	ftile_disable_mac_flow_ctrl(priv);
+	usleep_range(10,20);
 
+	ftile_pio_datapath_reset(priv, priv->hssi_rel_port, false);
+	
 	return 0;
 }
 
