@@ -936,18 +936,19 @@ static int init_phy(struct net_device *dev)
 
 	ret = phylink_of_phy_connect(priv->phylink, priv->device->of_node, 0);
 
-	if (ret) {
-		netdev_dbg(dev, "no phy-handle found\n");
-		if (!priv->mdio) {
-			netdev_err(dev, "No phy-handle nor local mdio specified\n");
+	if (!ret)
+		return ret;
+
+	netdev_dbg(dev, "no phy-handle found\n");
+	if (!priv->mdio) {
+		netdev_err(dev, "No phy-handle nor local mdio specified\n");
+		return -ENODEV;
+	}
+	phydev = connect_local_phy(dev);
+	if (phydev) {
+		ret = phylink_connect_phy(priv->phylink, phydev);
+		if (ret)
 			return -ENODEV;
-		}
-		phydev = connect_local_phy(dev);
-		if (phydev) {
-			ret = phylink_connect_phy(priv->phylink, phydev);
-			if (ret)
-				return -ENODEV;
-		}
 	}
 
 	if (!phydev) {
