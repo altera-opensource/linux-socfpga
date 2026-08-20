@@ -1810,7 +1810,13 @@ static int gts_get_link_ksettings(struct net_device *dev,
 	if (!priv)
 		return -ENODEV;
 
-	return phylink_ethtool_ksettings_get(priv->phylink, cmd);
+	phylink_ethtool_ksettings_get(priv->phylink, cmd);
+
+	cmd->base.autoneg = AUTONEG_DISABLE;
+	cmd->base.speed = priv->link_speed;
+	cmd->base.duplex = priv->duplex;
+
+	return 0;
 }
 
 static const struct ethtool_ops gts_ethtool_ops = {
